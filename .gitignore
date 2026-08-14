@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Archivos de entorno (descomentar si se manejan credenciales sensibles o producción)
+# .env
+# .env.local
+
+# Compilación / Builds
+dist/
+build/
+
+# Logs del sistema
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Archivos de entorno y SO
+.DS_Store
+.vscode/
+
+# Docker volumes locales
+postgres_data/
