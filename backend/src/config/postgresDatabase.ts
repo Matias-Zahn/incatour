@@ -1,25 +1,12 @@
-import { Pool } from "pg";
-import { envs } from "./envs";
+import { PrismaClient } from "@prisma/client";
 
 export class PostgresDatabase {
   private static instance: PostgresDatabase;
-  private pool: Pool;
+  public prisma: PrismaClient;
 
   private constructor() {
-    this.pool = new Pool({
-      host: envs.DB_HOST,
-      port: envs.DB_PORT,
-      user: envs.DB_USER,
-      password: envs.DB_PASSWORD,
-      database: envs.DB_NAME,
-      max: 20, // Cantidad máxima de clientes en el pool
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-
-    this.pool.on("error", (err) => {
-      console.error("❌ Error inesperado en el pool de PostgreSQL:", err);
-    });
+    // Prisma gestiona automáticamente la URL desde el .env y el pool de conexiones
+    this.prisma = new PrismaClient();
   }
 
   // Punto de acceso global a la instancia única
@@ -30,15 +17,17 @@ export class PostgresDatabase {
     return PostgresDatabase.instance;
   }
 
-  // Método para verificar la conexión inicial
+  // Método para verificar la conexión inicial al levantar el backend
   public async connect(): Promise<void> {
     try {
-      const client = await this.pool.connect();
-      console.log("✅ Conectado a PostgreSQL exitosamente");
-      client.release();
+      await this.prisma.$connect();
+      console.log("✅ Conectado a PostgreSQL con Prisma exitosamente");
     } catch (error) {
-      console.error("❌ Error al conectar con PostgreSQL:", error);
+      console.error("❌ Error al conectar con PostgreSQL vía Prisma:", error);
       throw error;
     }
   }
 }
+
+// Exportamos directamente la instancia de Prisma para usarla más fácil en los repositorios
+export const db = PostgresDatabase.getInstance().prisma;
