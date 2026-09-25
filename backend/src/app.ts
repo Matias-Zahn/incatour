@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
 import { ClienteRoutes } from "./routes/cliente.routes";
+import { manejadorErrores } from "./error/manejadorErrores";
 
 const app = express();
 
@@ -17,6 +18,8 @@ app.get("/api/", (req, res) => {
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
 //ACA IRIAN las demas
+
+app.use(manejadorErrores);
 
 app.listen(envs.PORT, () => {
   console.log(`SERVIDOR corriendo en el puerto ${envs.PORT}`);
