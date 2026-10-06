@@ -12,9 +12,7 @@ export class ClienteRoutes {
 
     const clienteController = new ClienteController;
 
-    router.post("/registro", () => {
-      clienteController.registrar;
-    });
+    router.post("/registro", clienteController.registrar);
 
     return router;
   }
