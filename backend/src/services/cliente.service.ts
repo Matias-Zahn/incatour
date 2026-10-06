@@ -6,23 +6,26 @@ const prisma = new PrismaClient();
 
 export class ClienteService {
   async registrarCliente(datos: RegistroClienteDto) {
-    // 1. Verificar si el email ya existe
+    console.log("--> PASO 1: Entró al servicio. Buscando si el email existe...");
+    
     const usuarioExistente = await prisma.usuario.findUnique({
       where: { email: datos.email }
     });
+
+    console.log("--> PASO 2: Búsqueda finalizada. ¿Existe?", !!usuarioExistente);
 
     if (usuarioExistente) {
       throw new Error('El correo electrónico ya está registrado.');
     }
 
-    // 2. Encriptar la contraseña
+    console.log("--> PASO 3: Encriptando contraseña con bcrypt...");
     const saltRounds = 10;
     const contraseniaHasheada = await bcrypt.hash(datos.contrasenia, saltRounds);
 
-    // 3. Generar un número de cliente (lógica de negocio)
+    console.log("--> PASO 4: Contraseña encriptada. Generando Nro Cliente...");
     const nroCliente = `CLI-${Date.now()}`;
 
-    // 4. Crear el Usuario y el Cliente en una sola transacción
+    console.log("--> PASO 5: Guardando en PostgreSQL con Prisma...");
     const nuevoUsuario = await prisma.usuario.create({
       data: {
         email: datos.email,
@@ -38,13 +41,12 @@ export class ClienteService {
           }
         }
       },
-      // Incluimos el cliente en la respuesta para confirmar la creación
       include: {
         cliente: true
       }
     });
 
-    // Retornamos el usuario creado sin la contraseña por seguridad
+    console.log("--> PASO 6: Guardado exitoso. Retornando datos...");
     const { contrasenia, ...usuarioSinPass } = nuevoUsuario;
     return usuarioSinPass;
   }
