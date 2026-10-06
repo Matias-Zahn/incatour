@@ -59,7 +59,6 @@ model Reserva {
   transacciones          Transaccion[]
   reembolsos             Reembolso[]       // Relación con el nuevo modelo Reembolso
   solicitudes            Solicitud[]
-  valoraciones           Valoracion[]
   auditorias             RegistroAuditoria[]
   permisos               PermisoPasajero[] // Relación con los permisos de pasajero tramitados
 }
@@ -117,10 +116,13 @@ model GestionSolicitud {
 model Valoracion {
   idvaloracion Int      @id @default(autoincrement())
   idreserva    Int
+  idpasajero   Int      // <--- El campo que pide el profesor
   valoracion   Int
   comentario   String?
   fechaEnvio   DateTime @default(now())
-  reserva      Reserva  @relation(fields: [idreserva], references: [idreserva])
+
+  // La relación apuntaría a la tabla intermedia ReservaPasajero
+  reservaPasajero ReservaPasajero @relation(fields: [idreserva, idpasajero], references: [idreserva, idpasajero])
 }
 
 // ==========================================
@@ -157,14 +159,15 @@ model Pasajero {
 }
 
 model ReservaPasajero {
-  idreserva  Int
-  idpasajero Int
-  reserva    Reserva  @relation(fields: [idreserva], references: [idreserva])
-  pasajero   Pasajero @relation(fields: [idpasajero], references: [idpasajero])
+  idreserva    Int
+  idpasajero   Int
+  reserva      Reserva      @relation(fields: [idreserva], references: [idreserva])
+  pasajero     Pasajero     @relation(fields: [idpasajero], references: [idpasajero])
+  
+  valoraciones Valoracion[] // <-- Esta línea es la que te pide el segundo error
 
   @@id([idreserva, idpasajero])
 }
-
 // ==========================================
 // NUEVO ESQUEMA DE PERMISOS SEPARADOS
 // ==========================================
