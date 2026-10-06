@@ -31,7 +31,8 @@
     // "noUnusedParameters": true,
     // "noFallthroughCasesInSwitch": true,
     // "noPropertyAccessFromIndexSignature": true,
-
+    //para el bcrypt
+    "esModuleInterop": true,
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
