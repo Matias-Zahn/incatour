@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
-import { RegistroClienteDto } from '../dtos/registro-cliente.dto';
+import * as bcrypt from 'bcrypt';
+import { RegistroClienteDto } from './dtos/registro-cliente.dto';
 
 const prisma = new PrismaClient();
 
