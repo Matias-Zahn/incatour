@@ -7,10 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-// use prisma-8
-
-
+// ==========================================
+// MÓDULO USUARIOS Y CLIENTES
+// ==========================================
 
 model Usuario {
   idusuario   Int       @id @default(autoincrement())
@@ -23,6 +22,7 @@ model Usuario {
   // Relaciones 1 a 1 (un usuario puede tener un perfil de cliente o de personal)
   cliente     Cliente?
   personal    Personal?
+  reembolsos  Reembolso[] // Nueva relación para los reembolsos gestionados por el usuario
 }
 
 model Cliente {
@@ -36,6 +36,10 @@ model Cliente {
   usuario     Usuario   @relation(fields: [idusuario], references: [idusuario])
   reservas    Reserva[]
 }
+
+// ==========================================
+// MÓDULO RESERVAS Y SOLICITUDES
+// ==========================================
 
 model Reserva {
   idreserva              Int               @id @default(autoincrement())
@@ -53,47 +57,22 @@ model Reserva {
   salida                 Salida            @relation(fields: [idsalida], references: [idsalida])
   pasajeros              ReservaPasajero[]
   transacciones          Transaccion[]
+  reembolsos             Reembolso[]       // Relación con el nuevo modelo Reembolso
   solicitudes            Solicitud[]
-  valoraciones           Valoracion[]
   auditorias             RegistroAuditoria[]
+  permisos               PermisoPasajero[] // Relación con los permisos de pasajero tramitados
 }
 
-model Personal {
-  idpersonal                Int             @id @default(autoincrement())
-  idusuario                 Int?            @unique 
-  nombreCompleto            String
-  nroPasaporte              String          @unique
-  nacionalidad              String
-  fechaVencimientoPasaporte DateTime
-  estado                    String
-  nroHabilitacion           String?
-  fechaHabilitacion         DateTime?
-  rol                       String          // Rol específico operativo (Guía, Porteador)
-
-  usuario                   Usuario?        @relation(fields: [idusuario], references: [idusuario])
-  idiomas                   PersonalIdioma[]
-  asignaciones              AsignacionPersonal[]
-  permisos                  Permiso[]
-}
-
-model Pasajero {
-  idpasajero                Int                  @id @default(autoincrement())
-  nombreCompleto            String
-  nroPasaporte              String               @unique
-  nacionalidad              String
-  fechaVencimientoPasaporte DateTime
-  reservas                  ReservaPasajero[]
-  incidentes                IncidentePasajero[]
-  permisos                  Permiso[]
-}
-
-model ReservaPasajero {
-  idreserva  Int
-  idpasajero Int
-  reserva    Reserva  @relation(fields: [idreserva], references: [idreserva])
-  pasajero   Pasajero @relation(fields: [idpasajero], references: [idpasajero])
-
-  @@id([idreserva, idpasajero])
+model Reembolso {
+  idreembolso      Int      @id @default(autoincrement())
+  idreserva        Int
+  idusuario        Int
+  montoReembolsado Float
+  motivo           String
+  fechaReembolso   DateTime @default(now())
+  
+  reserva          Reserva  @relation(fields: [idreserva], references: [idreserva])
+  usuario          Usuario  @relation(fields: [idusuario], references: [idusuario])
 }
 
 model Transaccion {
@@ -114,18 +93,107 @@ model Solicitud {
   estado         String
   cantidadPlazas Int
   criterios      String?
-  motivoRechazo  String?
+  // Se eliminó motivoRechazo, pasa a GestionSolicitud
+  
   reserva        Reserva      @relation(fields: [idreserva], references: [idreserva])
   servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
+  gestiones      GestionSolicitud[]
+}
+
+model GestionSolicitud {
+  idsolicitud    Int
+  idservicio     Int
+  resultado      String
+  motivoRechazo  String?
+  fechaRespuesta DateTime     @default(now())
+
+  solicitud      Solicitud    @relation(fields: [idsolicitud], references: [idsolicitud])
+  servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@id([idsolicitud, idservicio])
 }
 
 model Valoracion {
   idvaloracion Int      @id @default(autoincrement())
   idreserva    Int
+  idpasajero   Int      // <--- El campo que pide el profesor
   valoracion   Int
   comentario   String?
   fechaEnvio   DateTime @default(now())
-  reserva      Reserva  @relation(fields: [idreserva], references: [idreserva])
+
+  // La relación apuntaría a la tabla intermedia ReservaPasajero
+  reservaPasajero ReservaPasajero @relation(fields: [idreserva, idpasajero], references: [idreserva, idpasajero])
+}
+
+// ==========================================
+// MÓDULO PERSONAL Y PASAJEROS
+// ==========================================
+
+model Personal {
+  idpersonal                Int             @id @default(autoincrement())
+  idusuario                 Int?            @unique 
+  nombreCompleto            String
+  nroPasaporte              String          @unique
+  nacionalidad              String
+  fechaVencimientoPasaporte DateTime
+  estado                    String
+  nroHabilitacion           String?
+  fechaHabilitacion         DateTime?
+  rol                       String          // Rol específico operativo (Guía, Porteador)
+
+  usuario                   Usuario?        @relation(fields: [idusuario], references: [idusuario])
+  idiomas                   PersonalIdioma[]
+  asignaciones              AsignacionPersonal[]
+  permisos                  PermisoPersonal[] // Relación con el permiso específico
+}
+
+model Pasajero {
+  idpasajero                Int                  @id @default(autoincrement())
+  nombreCompleto            String
+  nroPasaporte              String               @unique
+  nacionalidad              String
+  fechaVencimientoPasaporte DateTime
+  reservas                  ReservaPasajero[]
+  incidentes                IncidentePasajero[]
+  permisos                  PermisoPasajero[]    // Relación con el permiso específico
+}
+
+model ReservaPasajero {
+  idreserva    Int
+  idpasajero   Int
+  reserva      Reserva      @relation(fields: [idreserva], references: [idreserva])
+  pasajero     Pasajero     @relation(fields: [idpasajero], references: [idpasajero])
+  
+  valoraciones Valoracion[] // <-- Esta línea es la que te pide el segundo error
+
+  @@id([idreserva, idpasajero])
+}
+// ==========================================
+// NUEVO ESQUEMA DE PERMISOS SEPARADOS
+// ==========================================
+
+model PermisoPasajero {
+  idpermisopasajero Int      @id @default(autoincrement())
+  idreserva         Int
+  idpasajero        Int
+  nroPermiso        String   @unique
+  fechaEmision      DateTime
+  estadoTramite     String
+  
+  reserva           Reserva  @relation(fields: [idreserva], references: [idreserva])
+  pasajero          Pasajero @relation(fields: [idpasajero], references: [idpasajero])
+}
+
+model PermisoPersonal {
+  idpermisopersonal Int      @id @default(autoincrement())
+  idsalida          Int
+  idpersonal        Int
+  nroPermiso        String   @unique
+  fechaEmision      DateTime
+  estadoTramite     String
+  
+  salida            Salida   @relation(fields: [idsalida], references: [idsalida])
+  personal          Personal @relation(fields: [idpersonal], references: [idpersonal])
 }
 
 // ==========================================
@@ -228,7 +296,7 @@ model Salida {
   reservas              Reserva[]
   equipamientos         SalidaEquipamiento[]
   personalAsignado      AsignacionPersonal[]
-  permisos              Permiso[]
+  permisos              PermisoPersonal[]      // Relacionado con los permisos específicos
   avances               Avance[]
   incidentes            Incidente[]
   auditorias            RegistroAuditoria[]
@@ -285,9 +353,8 @@ model RegistroAuditoria {
 }
 
 // ==========================================
-// MÓDULO PERSONAL Y PERMISOS
+// MÓDULO ASIGNACIÓN DE PERSONAL
 // ==========================================
-
 
 model Idioma {
   ididioma Int              @id @default(autoincrement())
@@ -316,22 +383,8 @@ model AsignacionPersonal {
   @@id([idsalida, idpersonal])
 }
 
-model Permiso {
-  idpermiso     Int       @id @default(autoincrement())
-  idsalida      Int
-  idpasajero    Int?      // Constraint XOR en BD asegurará que uno de los dos esté presente
-  idpersonal    Int?      
-  nroPermiso    String    @unique
-  fechaEmision  DateTime
-  estadoTramite String
-  
-  salida        Salida    @relation(fields: [idsalida], references: [idsalida])
-  pasajero      Pasajero? @relation(fields: [idpasajero], references: [idpasajero])
-  personal      Personal? @relation(fields: [idpersonal], references: [idpersonal])
-}
-
 // ==========================================
-// MÓDULO PROVEEDORES Y SERVICIOS (Herencia)
+// MÓDULO PROVEEDORES Y SERVICIOS (Herencia CTI)
 // ==========================================
 
 model Proveedor {
@@ -355,7 +408,7 @@ model ServicioBase {
 
   proveedor      Proveedor @relation(fields: [idproveedor], references: [idproveedor])
   
-  // Relaciones hacia los subtipos (Patrón CTI - Class Table Inheritance)
+  // Relaciones hacia los subtipos (Patrón CTI)
   alojamiento    ServicioAlojamiento?
   transporte     ServicioTransporte?
   tren           ServicioTren?
@@ -365,6 +418,7 @@ model ServicioBase {
   paquetes       PaqueteServicio[]
   paquetesGarant Paquete[]              @relation("PaqueteServicioGarantizado")
   solicitudes    Solicitud[]
+  gestiones      GestionSolicitud[]
   
   salidasAloj    Salida[]               @relation("SalidaAlojamiento")
   salidasTrans   Salida[]               @relation("SalidaTransporte")

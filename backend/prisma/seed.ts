@@ -14,6 +14,15 @@ async function main() {
     },
   });
 
+  const usuarioAdmin = await db.usuario.create({
+    data: {
+      email: "admin@incatour.com",
+      contrasenia: "admin123",
+      rol: "ADMIN",
+      estado: "ACTIVO",
+    },
+  });
+
   const cliente = await db.cliente.create({
     data: {
       idusuario: usuarioCliente.idusuario, // Enlace 1:1 con el usuario
@@ -188,18 +197,16 @@ async function main() {
     },
   });
 
-  const paqueteEstablecimiento = await db.paquete.create({
+  await db.paquete.create({
     data: {
       idcircuito: circuito.idcircuito,
       nroPaquete: "PAQ-INC-02",
       nombrePaquete: "Inca VIP Hotel Montaña",
       estado: "ACTIVO",
       tipoGarantia: "Por Establecimiento",
-      // Como es por establecimiento, no requiere categoría general.
-      // Si tu esquema exige un string aquí, puedes poner "N/A" o dejarlo vacío según tu diseño.
       servicios: {
         create: [
-          { idservicio: servAloj.idservicio }, // Garantizamos este hotel específico
+          { idservicio: servAloj.idservicio },
           { idservicio: servTren.idservicio },
         ],
       },
@@ -222,28 +229,89 @@ async function main() {
           { idpersonal: porteador.idpersonal },
         ],
       },
+      permisos: {
+        create: [
+          {
+            idpersonal: guia.idpersonal,
+            nroPermiso: "PERM-GUIA-001",
+            fechaEmision: new Date("2026-10-01T10:00:00Z"),
+            estadoTramite: "Emitido",
+          },
+        ],
+      },
     },
   });
 
-  // 7. Reserva y Solicitud
+  // 7. Pasajero, Reserva, Solicitud y Permiso de Pasajero
+  const pasajero = await db.pasajero.create({
+    data: {
+      nombreCompleto: "Lucía Fernández",
+      nroPasaporte: "PAS-ARG-987654",
+      nacionalidad: "Argentina",
+      fechaVencimientoPasaporte: new Date("2032-05-10T00:00:00Z"),
+    },
+  });
+
   const reserva = await db.reserva.create({
     data: {
       idcliente: cliente.idcliente,
       idsalida: salida.idsalida,
       nroReserva: "RES-0001",
-      cantidadPasajeros: 2,
+      cantidadPasajeros: 1,
       precioCongelado: 1500.0,
       estado: "CONFIRMADA",
+      pasajeros: {
+        create: [{ idpasajero: pasajero.idpasajero }],
+      },
+      permisos: {
+        create: [
+          {
+            idpasajero: pasajero.idpasajero,
+            nroPermiso: "PERM-PAS-001",
+            fechaEmision: new Date("2026-10-02T12:00:00Z"),
+            estadoTramite: "Emitido",
+          },
+        ],
+      },
     },
   });
 
-  await db.solicitud.create({
+  const solicitud = await db.solicitud.create({
     data: {
       idreserva: reserva.idreserva,
       idservicio: servAloj.idservicio,
       nroSolicitud: "SOL-0001",
       estado: "PENDIENTE",
-      cantidadPlazas: 2,
+      cantidadPlazas: 1,
+      gestiones: {
+        create: [
+          {
+            idservicio: servAloj.idservicio,
+            resultado: "En Espera",
+          },
+        ],
+      },
+    },
+  });
+
+  // 8. Caso de ejemplo para cancelación con Reembolso
+  const reservaCancelada = await db.reserva.create({
+    data: {
+      idcliente: cliente.idcliente,
+      idsalida: salida.idsalida,
+      nroReserva: "RES-0002-CANC",
+      cantidadPasajeros: 1,
+      precioCongelado: 1500.0,
+      estado: "CANCELADA",
+      reembolsos: {
+        create: [
+          {
+            idusuario: usuarioAdmin.idusuario,
+            montoReembolsado: 1500.0,
+            motivo: "Cancelación temprana sin permisos emitidos",
+          },
+        ],
+      },
     },
   });
 
