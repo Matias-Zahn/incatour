@@ -18,11 +18,11 @@ export class ClienteController {
         return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
       }
 
-      if (datos.nombre.length > 64 ){
+      if (datos.nombre.trim().length > 64 ){
         return res.status(400).json({error: 'El nombre es demasiado largo.' });
       }
 
-      if (datos.apellido.length > 64 ){
+      if (datos.apellido.trim().length > 64 ){
         return res.status(400).json({error: 'El apellido es demasiado largo.' });
       }
 
