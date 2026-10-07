@@ -4,6 +4,7 @@ import { ClienteService } from '../services/cliente.service';
 const clienteService = new ClienteService();
 
 export class ClienteController {
+  
   async registrar(req: Request, res: Response) {
     console.log("¡La petición llegó al controlador!", req.body);
     try {
@@ -38,4 +39,7 @@ export class ClienteController {
       });
     }
   }
+
+  
+
 }
