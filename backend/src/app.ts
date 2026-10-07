@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
 import { ClienteRoutes } from "./routes/cliente.routes";
+import { CircuitoRoutes } from "./modulos/catalogo/circuito.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
 
 const app = express();
@@ -16,6 +17,9 @@ app.get("/api/", (req, res) => {
 //RUTAS
 // Para clientes - Registro - Reservas - ETC
 app.use("/api/clientes", ClienteRoutes.getRoutes);
+
+// Módulo Catálogo - Circuitos
+app.use("/api/circuitos", CircuitoRoutes.getRoutes);
 
 //ACA IRIAN las demas
 
