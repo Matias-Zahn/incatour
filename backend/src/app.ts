@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
 import { ClienteRoutes } from "./routes/cliente.routes";
-import { CircuitoRoutes } from "./modulos/catalogo/circuito.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
 
 const app = express();
@@ -19,7 +18,12 @@ app.get("/api/", (req, res) => {
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
 // Módulo Catálogo - Circuitos
+import { CircuitoRoutes } from "./modulos/catalogo/circuitos/circuito.routes";
 app.use("/api/circuitos", CircuitoRoutes.getRoutes);
+
+// Módulo Catálogo - Temporadas
+import { TemporadaRoutes } from "./modulos/catalogo/temporadas/temporada.routes";
+app.use("/api/temporadas", TemporadaRoutes.getRoutes);
 
 //ACA IRIAN las demas
 

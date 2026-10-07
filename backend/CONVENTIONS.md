@@ -42,15 +42,19 @@ Route → Controller → Service → Repository → Prisma (db)
 
 El código se organiza por módulo (familia de tablas), **NO por capa**.
 
-### ✅ Correcto — por módulo
+### ✅ Correcto — por submódulos
 ```text
 src/modulos/
   └── catalogo/
-      ├── circuito.dto.ts
-      ├── circuito.routes.ts
-      ├── circuito.controller.ts
-      ├── circuito.service.ts
-      └── circuito.repository.ts
+      ├── circuitos/
+      │   ├── circuito.dto.ts
+      │   ├── circuito.routes.ts
+      │   ├── circuito.controller.ts
+      │   ├── circuito.service.ts
+      │   └── circuito.repository.ts
+      └── temporadas/
+          ├── temporada.dto.ts
+          └── ...
 ```
 
 ### ❌ Incorrecto — por capa
