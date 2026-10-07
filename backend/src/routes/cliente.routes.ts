@@ -13,6 +13,7 @@ export class ClienteRoutes {
     const clienteController = new ClienteController;
 
     router.post("/registro", clienteController.registrar);
+    router.patch("/baja/:id",clienteController.darDeBaja)
 
     return router;
   }

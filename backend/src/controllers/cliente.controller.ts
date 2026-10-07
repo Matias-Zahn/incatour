@@ -40,6 +40,31 @@ export class ClienteController {
     }
   }
 
-  
+  darDeBaja = async (req: Request, res: Response) => {
+    try {
+      // Capturamos el ID de la URL (ej: /api/clientes/baja/5)
+      const idUsuario = parseInt(req.params.id as string);
+
+      // Validamos que el ID sea un número
+      if (isNaN(idUsuario)) {
+        return res.status(400).json({ error: 'El ID proporcionado no es válido.' });
+      }
+
+      const resultado = await clienteService.darDeBajaCliente(idUsuario);
+
+      return res.status(200).json({
+        mensaje: 'Cuenta de cliente dada de baja exitosamente',
+        data: resultado
+      });
+    } catch (error: any) {
+      if (error.message === 'Cliente no encontrado.') {
+        return res.status(404).json({ error: error.message });
+      }
+
+      return res.status(500).json({
+        error: 'Error interno al intentar dar de baja la cuenta'
+      });
+    }
+  }
 
 }
