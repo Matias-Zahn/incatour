@@ -25,6 +25,10 @@ app.use("/api/circuitos", CircuitoRoutes.getRoutes);
 import { TemporadaRoutes } from "./modulos/catalogo/temporadas/temporada.routes";
 app.use("/api/temporadas", TemporadaRoutes.getRoutes);
 
+// Módulo Catálogo - Etapas
+import { EtapaRoutes } from "./modulos/catalogo/etapas/etapa.routes";
+app.use("/api/circuitos/:idcircuito/etapas", EtapaRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
