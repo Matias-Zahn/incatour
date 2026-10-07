@@ -1,4 +1,4 @@
-import { CustomError } from "../../error/CustomError";
+import { CustomError } from "../../../error/CustomError";
 import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 import { CircuitoRepository } from "./circuito.repository";
 

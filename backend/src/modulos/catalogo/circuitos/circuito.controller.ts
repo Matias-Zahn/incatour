@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { CircuitoService } from "./circuito.service";
 import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
-import { CustomError } from "../../error/CustomError";
+import { CustomError } from "../../../error/CustomError";
 
 const circuitoService = new CircuitoService();
 

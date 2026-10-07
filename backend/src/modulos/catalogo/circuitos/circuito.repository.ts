@@ -1,4 +1,4 @@
-import { db } from "../../config/postgresDatabase";
+import { db } from "../../../config/postgresDatabase";
 import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 
 export class CircuitoRepository {
