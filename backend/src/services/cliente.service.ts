@@ -50,4 +50,35 @@ export class ClienteService {
     const { contrasenia, ...usuarioSinPass } = nuevoUsuario;
     return usuarioSinPass;
   }
+
+  async darDeBajaCliente(idUsuario: number) {
+    // 1. Verificar si el usuario existe y si realmente es un cliente
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { idusuario: idUsuario }, // En tu nueva BD el campo se llama idusuario
+      include: { cliente: true }
+    });
+
+    if (!usuarioExistente || !usuarioExistente.cliente) {
+      throw new Error('Cliente no encontrado.');
+    }
+
+    // 2. Actualizar el estado a 'INACTIVO' en Usuario y en Cliente simultáneamente
+    const usuarioActualizado = await prisma.usuario.update({
+      where: { idusuario: idUsuario },
+      data: { 
+        estado: 'INACTIVO',
+        cliente: {
+          update: {
+            estado: 'INACTIVO' // Apaga también el perfil de cliente
+          }
+        }
+      },
+      include: { cliente: true } 
+    });
+
+    // 3. Retornar los datos ocultando la contraseña
+    const { contrasenia, ...usuarioSinPass } = usuarioActualizado;
+    return usuarioSinPass;
+  }
+
 }
