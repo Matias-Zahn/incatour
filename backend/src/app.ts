@@ -29,6 +29,10 @@ app.use("/api/temporadas", TemporadaRoutes.getRoutes);
 import { EtapaRoutes } from "./modulos/catalogo/etapas/etapa.routes";
 app.use("/api/circuitos/:idcircuito/etapas", EtapaRoutes.getRoutes);
 
+// Módulo Catálogo - Paquetes
+import { PaqueteRoutes } from "./modulos/catalogo/paquetes/paquete.routes";
+app.use("/api/paquetes", PaqueteRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
