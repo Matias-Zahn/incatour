@@ -1,35 +1,47 @@
 // Importamos la conexión desde tu Singleton
 import { db } from "../src/config/postgresDatabase";
+import bcrypt from 'bcrypt';
 
 async function main() {
   console.log("🌱 Insertando datos semilla de IncaTour...");
 
   // 1. Usuarios, Clientes y Temporadas
-  const usuarioCliente = await db.usuario.create({
-    data: {
-      email: "juan@test.com",
-      contrasenia: "hash123", // En producción esto irá hasheado
-      rol: "CLIENTE",
-      estado: "ACTIVO",
-    },
-  });
+  // Hasheamos las contraseñas de prueba
+  const salt = await bcrypt.genSalt(10);
+  const contraseniaAdmin = await bcrypt.hash('AdminIncaTour123', salt);
+  const contraseniaCliente = await bcrypt.hash('hash123', salt);
+  const contraseniaGuia = await bcrypt.hash('guia123',salt);
 
   const usuarioAdmin = await db.usuario.create({
     data: {
-      email: "admin@incatour.com",
-      contrasenia: "admin123",
-      rol: "ADMIN",
-      estado: "ACTIVO",
+      nombre: 'Carlos',
+      apellido: 'Gerente',
+      email: 'admin@incatour.com',
+      contrasenia: contraseniaAdmin,
+      rol: 'ADMIN',
+      estado: 'ACTIVO'
+    }
+  });
+
+  // 3. Creamos al Usuario Cliente 
+  const usuarioCliente = await db.usuario.create({
+    data: {
+      nombre: 'Juan',
+      apellido: 'Pérez',
+      email: 'juan@test.com',
+      contrasenia: contraseniaCliente, 
+      rol: 'CLIENTE',
+      estado: 'ACTIVO',
     },
   });
 
+  
+  // 4. Creamos el Perfil Cliente (Enlace 1:1, ya sin nombre ni apellido)
   const cliente = await db.cliente.create({
     data: {
-      idusuario: usuarioCliente.idusuario, // Enlace 1:1 con el usuario
-      nroCliente: "CLI-001",
-      nombre: "Juan",
-      apellido: "Pérez",
-      estado: "ACTIVO",
+      idusuario: usuarioCliente.idusuario,
+      nroCliente: 'CLI-001',
+      estado: 'ACTIVO',
     },
   });
 
@@ -122,8 +134,10 @@ async function main() {
   // 3. Personal
   const usuarioGuia = await db.usuario.create({
     data: {
+      nombre: "Carlos",       // AGREGADO PARA SOLUCIONAR ERROR
+      apellido: "Mamani",     // AGREGADO PARA SOLUCIONAR ERROR
       email: "carlos.guia@incatour.com",
-      contrasenia: "guia123",
+      contrasenia: contraseniaGuia,
       rol: "GUIA",
       estado: "ACTIVO",
     },
