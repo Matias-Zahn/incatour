@@ -18,7 +18,7 @@ const options: swaggerJSDoc.Options = {
     ],
   },
   // Documentaremos los endpoints a través de comentarios JSDoc en los controladores
-  apis: ["./src/modulos/**/*.ts"],
+  apis: ["./src/modulos/**/*.ts", "./src/shared/**/*.ts"],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
