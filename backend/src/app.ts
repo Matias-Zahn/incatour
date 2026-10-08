@@ -33,6 +33,14 @@ app.use("/api/circuitos/:idcircuito/etapas", EtapaRoutes.getRoutes);
 import { PaqueteRoutes } from "./modulos/catalogo/paquetes/paquete.routes";
 app.use("/api/paquetes", PaqueteRoutes.getRoutes);
 
+// Módulo Catálogo - Público (Escaparate)
+import { CatalogoRoutes } from "./modulos/catalogo/catalogo-publico/catalogo.routes";
+app.use("/api/catalogo", CatalogoRoutes.getRoutes);
+
+// Módulo Reservas - Solicitudes de Alojamiento
+import { SolicitudRoutes } from "./modulos/reservas/solicitudes/solicitud.routes";
+app.use("/api/solicitudes", SolicitudRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
