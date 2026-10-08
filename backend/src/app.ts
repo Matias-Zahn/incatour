@@ -3,11 +3,14 @@ import cors from "cors";
 import { envs } from "./config/envs";
 import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
+import { setupSwagger } from "./config/swagger";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+setupSwagger(app);
 
 app.get("/api/", (req, res) => {
   res.json({ message: "HOLA" });
