@@ -231,6 +231,7 @@ model Circuito {
   dificultad            String
   minimoGuias           Int
   parametrosPorteadores String?
+  estado                String       @default("ACTIVO")
   etapas                EtapaRuta[]
   paquetes              Paquete[]
   avances               Avance[]
@@ -253,6 +254,7 @@ model Temporada {
   nombre      String
   fechaInicio DateTime
   fechaFin    DateTime
+  estado      String          @default("ACTIVO")
   tarifas     TarifaPaquete[]
 }
 
