@@ -21,6 +21,10 @@ app.get("/api/", (req, res) => {
 app.use("/api/auth", AuthRoutes.getRoutes);
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
+// Módulo Personal (Guías, Porteadores)
+import { PersonalRoutes } from "./modulos/cuentas/personal/personal.routes";
+app.use("/api/personal", PersonalRoutes.getRoutes);
+
 // Módulo Catálogo - Circuitos
 import { CircuitoRoutes } from "./modulos/catalogo/circuitos/circuito.routes";
 app.use("/api/circuitos", CircuitoRoutes.getRoutes);
