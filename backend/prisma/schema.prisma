@@ -13,6 +13,8 @@ datasource db {
 
 model Usuario {
   idusuario   Int       @id @default(autoincrement())
+  nombre      String
+  apellido    String
   email       String    @unique
   contrasenia String
   rol         String    // Ej: 'ADMIN', 'GUIA', 'CLIENTE'
@@ -29,8 +31,6 @@ model Cliente {
   idcliente   Int       @id @default(autoincrement())
   idusuario   Int       @unique // Clave foránea única para relación 1:1
   nroCliente  String    @unique
-  nombre      String
-  apellido    String
   estado      String
 
   usuario     Usuario   @relation(fields: [idusuario], references: [idusuario])

@@ -3,11 +3,21 @@ import { CrearClienteDto, ModificarClienteDto } from "./cliente.dto";
 
 export class ClienteRepository {
   async findAll() {
-    return db.cliente.findMany({ where: { estado: "ACTIVO" } });
+    return db.cliente.findMany({ 
+      where: { estado: "ACTIVO" },
+      include: {
+        usuario: { select: { nombre: true, apellido: true, email: true } }
+      }
+    });
   }
 
   async findById(idcliente: number) {
-    return db.cliente.findUnique({ where: { idcliente } });
+    return db.cliente.findUnique({ 
+      where: { idcliente },
+      include: {
+        usuario: { select: { nombre: true, apellido: true, email: true } }
+      }
+    });
   }
 
   async checkEmailExists(email: string) {
@@ -16,8 +26,11 @@ export class ClienteRepository {
 
   async createWithUser(data: CrearClienteDto, contraseniaHasheada: string, nroCliente: string) {
     return db.$transaction(async (tx) => {
+      // 1. Crear el usuario (ahora con nombre y apellido)
       const usuario = await tx.usuario.create({
         data: {
+          nombre: data.nombre,
+          apellido: data.apellido,
           email: data.email,
           contrasenia: contraseniaHasheada,
           rol: "CLIENTE",
@@ -25,46 +38,45 @@ export class ClienteRepository {
         }
       });
 
+      // 2. Crear el cliente (solo datos administrativos de negocio)
       const cliente = await tx.cliente.create({
         data: {
           idusuario: usuario.idusuario,
           nroCliente: nroCliente,
-          nombre: data.nombre,
-          apellido: data.apellido,
           estado: "ACTIVO"
         }
       });
 
-      return { cliente, idusuario: usuario.idusuario, email: usuario.email };
+      return { 
+        cliente, 
+        idusuario: usuario.idusuario, 
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email 
+      };
     });
   }
 
   async update(idcliente: number, idusuario: number, data: ModificarClienteDto) {
     return db.$transaction(async (tx) => {
-      // 1. Si enviaron email, actualizar la tabla Usuario
-      if (data.email) {
+      
+      const updateData: any = {};
+      if (data.nombre) updateData.nombre = data.nombre;
+      if (data.apellido) updateData.apellido = data.apellido;
+      if (data.email) updateData.email = data.email;
+
+      // 1. Si hay algo para actualizar, actualizamos la tabla Usuario
+      if (Object.keys(updateData).length > 0) {
         await tx.usuario.update({
           where: { idusuario },
-          data: { email: data.email }
-        });
-      }
-
-      // 2. Si enviaron nombre o apellido, actualizar la tabla Cliente
-      if (data.nombre || data.apellido) {
-        const updateData: any = {};
-        if (data.nombre) updateData.nombre = data.nombre;
-        if (data.apellido) updateData.apellido = data.apellido;
-
-        await tx.cliente.update({
-          where: { idcliente },
           data: updateData
         });
       }
 
-      // Devolver el cliente actualizado incluyendo el email del usuario para confirmación
+      // Devolver el cliente actualizado incluyendo los datos del usuario
       return tx.cliente.findUnique({
         where: { idcliente },
-        include: { usuario: { select: { email: true } } }
+        include: { usuario: { select: { nombre: true, apellido: true, email: true } } }
       });
     });
   }
@@ -81,7 +93,7 @@ export class ClienteRepository {
       where: { idcliente },
       include: {
         reservas: {
-          where: { estado: "Confirmada" } // Cambiado según CU-30/CU-32
+          where: { estado: "Confirmada" }
         }
       }
     });
