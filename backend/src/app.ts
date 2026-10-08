@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
 import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
+import { AuthRoutes } from "./shared/auth/auth.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
 
 const app = express();
@@ -14,7 +15,7 @@ app.get("/api/", (req, res) => {
 });
 
 //RUTAS
-// Para clientes - Registro - Reservas - ETC
+app.use("/api/auth", AuthRoutes.getRoutes);
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
 // Módulo Catálogo - Circuitos
