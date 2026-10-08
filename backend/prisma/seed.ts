@@ -69,6 +69,24 @@ async function main() {
     },
   });
 
+  const servAloj2 = await db.servicioBase.create({
+    data: {
+      idproveedor: proveedor.idproveedor,
+      nombreServicio: "Hotel Valle Sagrado",
+      costoBase: 110.0,
+      estado: "ACTIVO",
+      localidad: "Cusco",
+      alojamiento: {
+        create: {
+          categoria: "3 Estrellas",
+          tipoHabitacion: "Doble",
+          capacidadDisponible: 5,
+          modalidadConfirmacion: "A_SOLICITUD",
+        },
+      },
+    },
+  });
+
   const servTrans = await db.servicioBase.create({
     data: {
       idproveedor: proveedor.idproveedor,
@@ -188,6 +206,8 @@ async function main() {
       estado: "ACTIVO",
       tipoGarantia: "Por Categoría",
       categoriaGarantizada: "3 Estrellas",
+      localidadGarantizada: "Cusco",
+      tipoHabitacionGarantizada: "Doble",
       servicios: {
         create: [
           { idservicio: servAloj.idservicio },
