@@ -10,23 +10,62 @@ export class ClienteRepository {
     return db.cliente.findUnique({ where: { idcliente } });
   }
 
-  async findByNroCliente(nroCliente: string) {
-    return db.cliente.findUnique({ where: { nroCliente } });
+  async checkEmailExists(email: string) {
+    return db.usuario.findUnique({ where: { email } });
   }
 
-  async create(data: CrearClienteDto) {
-    return db.cliente.create({ 
-      data: { 
-        ...data, 
-        estado: "ACTIVO" 
-      } 
+  async createWithUser(data: CrearClienteDto, contraseniaHasheada: string, nroCliente: string) {
+    return db.$transaction(async (tx) => {
+      const usuario = await tx.usuario.create({
+        data: {
+          email: data.email,
+          contrasenia: contraseniaHasheada,
+          rol: "CLIENTE",
+          estado: "ACTIVO"
+        }
+      });
+
+      const cliente = await tx.cliente.create({
+        data: {
+          idusuario: usuario.idusuario,
+          nroCliente: nroCliente,
+          nombre: data.nombre,
+          apellido: data.apellido,
+          estado: "ACTIVO"
+        }
+      });
+
+      return { cliente, idusuario: usuario.idusuario, email: usuario.email };
     });
   }
 
-  async update(idcliente: number, data: ModificarClienteDto) {
-    return db.cliente.update({
-      where: { idcliente },
-      data,
+  async update(idcliente: number, idusuario: number, data: ModificarClienteDto) {
+    return db.$transaction(async (tx) => {
+      // 1. Si enviaron email, actualizar la tabla Usuario
+      if (data.email) {
+        await tx.usuario.update({
+          where: { idusuario },
+          data: { email: data.email }
+        });
+      }
+
+      // 2. Si enviaron nombre o apellido, actualizar la tabla Cliente
+      if (data.nombre || data.apellido) {
+        const updateData: any = {};
+        if (data.nombre) updateData.nombre = data.nombre;
+        if (data.apellido) updateData.apellido = data.apellido;
+
+        await tx.cliente.update({
+          where: { idcliente },
+          data: updateData
+        });
+      }
+
+      // Devolver el cliente actualizado incluyendo el email del usuario para confirmación
+      return tx.cliente.findUnique({
+        where: { idcliente },
+        include: { usuario: { select: { email: true } } }
+      });
     });
   }
 
@@ -42,7 +81,7 @@ export class ClienteRepository {
       where: { idcliente },
       include: {
         reservas: {
-          where: { estado: "ACTIVO" }
+          where: { estado: "Confirmada" } // Cambiado según CU-30/CU-32
         }
       }
     });

@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
 import { ClienteRepository } from "./cliente.repository";
 import { CrearClienteDto, ModificarClienteDto } from "./cliente.dto";
@@ -18,11 +19,18 @@ export class ClienteService {
   }
 
   async crearCliente(dto: CrearClienteDto) {
-    const existe = await this.repository.findByNroCliente(dto.nroCliente);
-    if (existe) {
-      throw CustomError.badRequest("Ya existe un cliente con ese número de cliente.");
+    const emailExiste = await this.repository.checkEmailExists(dto.email);
+    if (emailExiste) {
+      throw CustomError.badRequest("Ya existe un usuario registrado con ese correo electrónico.");
     }
-    return this.repository.create(dto);
+
+    const salt = await bcrypt.genSalt(10);
+    const contraseniaHasheada = await bcrypt.hash(dto.contrasenia, salt);
+
+    // Generación más segura para alta concurrencia
+    const nroCliente = `CLI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    return this.repository.createWithUser(dto, contraseniaHasheada, nroCliente);
   }
 
   async modificarCliente(id: number, dto: ModificarClienteDto) {
@@ -30,7 +38,21 @@ export class ClienteService {
     if (!cliente) {
       throw CustomError.notFound("Cliente no encontrado.");
     }
-    return this.repository.update(id, dto);
+
+    // Prevención de modificación en cuentas inactivas
+    if (cliente.estado === "INACTIVO") {
+      throw CustomError.badRequest("No se puede modificar una cuenta inactiva.");
+    }
+
+    // Validar que si mandaron un email nuevo, no esté en uso por otro usuario
+    if (dto.email) {
+      const usuarioConEmail = await this.repository.checkEmailExists(dto.email);
+      if (usuarioConEmail && usuarioConEmail.idusuario !== cliente.idusuario) {
+        throw CustomError.badRequest("El correo electrónico ya está en uso por otra cuenta.");
+      }
+    }
+
+    return this.repository.update(id, cliente.idusuario, dto);
   }
 
   async darDeBajaCliente(id: number) {

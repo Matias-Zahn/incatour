@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
-import { ClienteRoutes } from "./routes/cliente.routes";
+import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
 
 const app = express();
