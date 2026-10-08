@@ -63,7 +63,7 @@ async function main() {
           categoria: "3 Estrellas",
           tipoHabitacion: "Doble",
           capacidadDisponible: 10,
-          modalidadConfirmacion: "Inmediata",
+          modalidadConfirmacion: "BLOQUEO_PLAZAS",
         },
       },
     },
