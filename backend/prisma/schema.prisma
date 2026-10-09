@@ -12,29 +12,30 @@ datasource db {
 // ==========================================
 
 model Usuario {
-  idusuario   Int       @id @default(autoincrement())
+  idusuario   Int      @id @default(autoincrement())
   nombre      String
   apellido    String
-  email       String    @unique
+  email       String   @unique
   contrasenia String
-  rol         String    // Ej: 'ADMIN', 'GUIA', 'CLIENTE'
-  estado      String    @default("ACTIVO")
-  creadoEn    DateTime  @default(now())
+  rol         String // Ej: 'ADMIN', 'GUIA', 'CLIENTE'
+  estado      String   @default("ACTIVO")
+  creadoEn    DateTime @default(now())
 
-  // Relaciones 1 a 1 (un usuario puede tener un perfil de cliente o de personal)
-  cliente     Cliente?
-  personal    Personal?
-  reembolsos  Reembolso[] // Nueva relación para los reembolsos gestionados por el usuario
+  // Relaciones 1 a 1
+  cliente    Cliente?
+  guia       Guia?
+  reembolsos Reembolso[] // Nueva relación para los reembolsos gestionados por el usuario
 }
 
 model Cliente {
-  idcliente   Int       @id @default(autoincrement())
-  idusuario   Int       @unique // Clave foránea única para relación 1:1
-  nroCliente  String    @unique
-  estado      String
+  idcliente  Int    @id @default(autoincrement())
+  idusuario  Int    @unique // Clave foránea única para relación 1:1
+  nroCliente String @unique
+  estado     String
 
-  usuario     Usuario   @relation(fields: [idusuario], references: [idusuario])
-  reservas    Reserva[]
+  usuario  Usuario   @relation(fields: [idusuario], references: [idusuario])
+  reservas Reserva[]
+  resenias Resenia[]
 }
 
 // ==========================================
@@ -42,25 +43,25 @@ model Cliente {
 // ==========================================
 
 model Reserva {
-  idreserva              Int               @id @default(autoincrement())
+  idreserva              Int      @id @default(autoincrement())
   idcliente              Int
   idsalida               Int
-  nroReserva             String            @unique
-  fechaRealizacion       DateTime          @default(now())
+  nroReserva             String   @unique
+  fechaRealizacion       DateTime @default(now())
   cantidadPasajeros      Int
   precioCongelado        Float
   condicionesComerciales String?
   estado                 String
   estadoAlojamiento      String?
-  
-  cliente                Cliente           @relation(fields: [idcliente], references: [idcliente])
-  salida                 Salida            @relation(fields: [idsalida], references: [idsalida])
-  pasajeros              ReservaPasajero[]
-  transacciones          Transaccion[]
-  reembolsos             Reembolso[]       // Relación con el nuevo modelo Reembolso
-  solicitudes            Solicitud[]
-  auditorias             RegistroAuditoria[]
-  permisos               PermisoPasajero[] // Relación con los permisos de pasajero tramitados
+
+  cliente     Cliente             @relation(fields: [idcliente], references: [idcliente])
+  salida      Salida              @relation(fields: [idsalida], references: [idsalida])
+  pasajeros   ReservaPasajero[]
+  pagos       Pago[]
+  reembolsos  Reembolso[] // Relación con el nuevo modelo Reembolso
+  solicitudes Solicitud[]
+  auditorias  RegistroAuditoria[]
+  permisos    PermisoPasajero[] // Relación con los permisos de pasajero tramitados
 }
 
 model Reembolso {
@@ -70,12 +71,12 @@ model Reembolso {
   montoReembolsado Float
   motivo           String
   fechaReembolso   DateTime @default(now())
-  
-  reserva          Reserva  @relation(fields: [idreserva], references: [idreserva])
-  usuario          Usuario  @relation(fields: [idusuario], references: [idusuario])
+
+  reserva Reserva @relation(fields: [idreserva], references: [idreserva])
+  usuario Usuario @relation(fields: [idusuario], references: [idusuario])
 }
 
-model Transaccion {
+model Pago {
   nrotransaccion    Int      @id @default(autoincrement())
   idreserva         Int
   monto             Float
@@ -86,18 +87,17 @@ model Transaccion {
 }
 
 model Solicitud {
-  idsolicitud    Int          @id @default(autoincrement())
+  idsolicitud    Int     @id @default(autoincrement())
   idreserva      Int
   idservicio     Int
-  nroSolicitud   String       @unique
+  nroSolicitud   String  @unique
   estado         String
   cantidadPlazas Int
   criterios      String?
-  // Se eliminó motivoRechazo, pasa a GestionSolicitud
-  
-  reserva        Reserva      @relation(fields: [idreserva], references: [idreserva])
-  servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
-  gestiones      GestionSolicitud[]
+
+  reserva   Reserva            @relation(fields: [idreserva], references: [idreserva])
+  servicio  ServicioBase       @relation(fields: [idservicio], references: [idservicio])
+  gestiones GestionSolicitud[]
 }
 
 model GestionSolicitud {
@@ -105,24 +105,25 @@ model GestionSolicitud {
   idservicio     Int
   resultado      String
   motivoRechazo  String?
-  fechaRespuesta DateTime     @default(now())
+  fechaRespuesta DateTime @default(now())
 
-  solicitud      Solicitud    @relation(fields: [idsolicitud], references: [idsolicitud])
-  servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
+  solicitud Solicitud    @relation(fields: [idsolicitud], references: [idsolicitud])
+  servicio  ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idsolicitud, idservicio])
 }
 
-model Valoracion {
-  idvaloracion Int      @id @default(autoincrement())
-  idreserva    Int
-  idpasajero   Int      // <--- El campo que pide el profesor
-  valoracion   Int
-  comentario   String?
-  fechaEnvio   DateTime @default(now())
+model Resenia {
+  idcliente  Int
+  idsalida   Int
+  valoracion Int
+  comentario String?
+  fechaEnvio DateTime @default(now())
 
-  // La relación apuntaría a la tabla intermedia ReservaPasajero
-  reservaPasajero ReservaPasajero @relation(fields: [idreserva, idpasajero], references: [idreserva, idpasajero])
+  cliente Cliente @relation(fields: [idcliente], references: [idcliente])
+  salida  Salida  @relation(fields: [idsalida], references: [idsalida])
+
+  @@id([idcliente, idsalida])
 }
 
 // ==========================================
@@ -130,44 +131,50 @@ model Valoracion {
 // ==========================================
 
 model Personal {
-  idpersonal                Int             @id @default(autoincrement())
-  idusuario                 Int?            @unique 
+  idpersonal                Int      @id @default(autoincrement())
   nombreCompleto            String
-  nroPasaporte              String          @unique
+  nroPasaporte              String   @unique
   nacionalidad              String
   fechaVencimientoPasaporte DateTime
   estado                    String
-  nroHabilitacion           String?
-  fechaHabilitacion         DateTime?
-  rol                       String          // Rol específico operativo (Guía, Porteador)
+  rol                       String // Ej: 'Guía', 'Porteador'
 
-  usuario                   Usuario?        @relation(fields: [idusuario], references: [idusuario])
-  idiomas                   PersonalIdioma[]
-  asignaciones              AsignacionPersonal[]
-  permisos                  PermisoPersonal[] // Relación con el permiso específico
+  guia         Guia?
+  idiomas      Idioma[]
+  asignaciones AsignacionPersonal[]
+  permisos     PermisoPersonal[] // Relación con el permiso específico
+}
+
+model Guia {
+  idpersonal        Int       @id
+  idusuario         Int?      @unique
+  nroHabilitacion   String?
+  fechaHabilitacion DateTime?
+
+  personal Personal @relation(fields: [idpersonal], references: [idpersonal])
+  usuario  Usuario? @relation(fields: [idusuario], references: [idusuario])
 }
 
 model Pasajero {
-  idpasajero                Int                  @id @default(autoincrement())
+  idpasajero                Int                 @id @default(autoincrement())
   nombreCompleto            String
-  nroPasaporte              String               @unique
+  nroPasaporte              String              @unique
   nacionalidad              String
   fechaVencimientoPasaporte DateTime
   reservas                  ReservaPasajero[]
   incidentes                IncidentePasajero[]
-  permisos                  PermisoPasajero[]    // Relación con el permiso específico
+  permisos                  PermisoPasajero[] // Relación con el permiso específico
 }
 
 model ReservaPasajero {
-  idreserva    Int
-  idpasajero   Int
-  reserva      Reserva      @relation(fields: [idreserva], references: [idreserva])
-  pasajero     Pasajero     @relation(fields: [idpasajero], references: [idpasajero])
-  
-  valoraciones Valoracion[] // <-- Esta línea es la que te pide el segundo error
+  idreserva  Int
+  idpasajero Int
+  reserva    Reserva  @relation(fields: [idreserva], references: [idreserva])
+  pasajero   Pasajero @relation(fields: [idpasajero], references: [idpasajero])
 
   @@id([idreserva, idpasajero])
 }
+
 // ==========================================
 // NUEVO ESQUEMA DE PERMISOS SEPARADOS
 // ==========================================
@@ -179,9 +186,9 @@ model PermisoPasajero {
   nroPermiso        String   @unique
   fechaEmision      DateTime
   estadoTramite     String
-  
-  reserva           Reserva  @relation(fields: [idreserva], references: [idreserva])
-  pasajero          Pasajero @relation(fields: [idpasajero], references: [idpasajero])
+
+  reserva  Reserva  @relation(fields: [idreserva], references: [idreserva])
+  pasajero Pasajero @relation(fields: [idpasajero], references: [idpasajero])
 }
 
 model PermisoPersonal {
@@ -191,9 +198,9 @@ model PermisoPersonal {
   nroPermiso        String   @unique
   fechaEmision      DateTime
   estadoTramite     String
-  
-  salida            Salida   @relation(fields: [idsalida], references: [idsalida])
-  personal          Personal @relation(fields: [idpersonal], references: [idpersonal])
+
+  salida   Salida   @relation(fields: [idsalida], references: [idsalida])
+  personal Personal @relation(fields: [idpersonal], references: [idpersonal])
 }
 
 // ==========================================
@@ -201,37 +208,43 @@ model PermisoPersonal {
 // ==========================================
 
 model Paquete {
-  idpaquete                 Int               @id @default(autoincrement())
+  idpaquete                 Int     @id @default(autoincrement())
   idcircuito                Int
-  nroPaquete                String            @unique
+  nroPaquete                String  @unique
   nombrePaquete             String
   condiciones               String?
   estado                    String
   tipoGarantia              String
-  idservicioGarantizado     Int?
   localidadGarantizada      String?
   categoriaGarantizada      String?
   tipoHabitacionGarantizada String?
-  nochesPrevias             Int               @default(0)
-  nochesPosteriores         Int               @default(0)
-  diasDisponibles           String?           // Formato JSON o CSV de días habilitados
-  
-  circuito                  Circuito          @relation(fields: [idcircuito], references: [idcircuito])
-  servicioGarantizado       ServicioBase?     @relation("PaqueteServicioGarantizado", fields: [idservicioGarantizado], references: [idservicio])
-  tarifas                   TarifaPaquete[]
-  servicios                 PaqueteServicio[]
-  salidas                   Salida[]
-  auditorias                RegistroAuditoria[]
+  nochesPrevias             Int     @default(0)
+  nochesPosteriores         Int     @default(0)
+  diasDisponibles           String? // Formato JSON o CSV de días habilitados
+
+  circuito                 Circuito                  @relation(fields: [idcircuito], references: [idcircuito])
+  garantiasEstablecimiento GarantiaEstablecimiento[]
+  tarifas                  TarifaPaquete[]
+  servicios                PaqueteServicio[]
+  salidas                  Salida[]
+  auditorias               RegistroAuditoria[]
+}
+
+model GarantiaEstablecimiento {
+  idpaquete  Int          @id
+  idservicio Int
+  paquete    Paquete      @relation(fields: [idpaquete], references: [idpaquete])
+  servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
 }
 
 model Circuito {
-  idcircuito            Int          @id @default(autoincrement())
+  idcircuito            Int         @id @default(autoincrement())
   nombreCircuito        String
   duracionDias          Int
   dificultad            String
   minimoGuias           Int
   parametrosPorteadores String?
-  estado                String       @default("ACTIVO")
+  estado                String      @default("ACTIVO")
   etapas                EtapaRuta[]
   paquetes              Paquete[]
   avances               Avance[]
@@ -274,34 +287,40 @@ model TarifaPaquete {
 // ==========================================
 
 model Salida {
-  idsalida              Int       @id @default(autoincrement())
+  idsalida              Int      @id @default(autoincrement())
   idpaquete             Int
-  nroSalida             String    @unique
+  nroSalida             String   @unique
   idbloqueo             String?
-  stockLocal            Int       // Restricción CHECK pendiente en BD
+  stockLocal            Int // Restricción CHECK pendiente en BD
   stockLocalAlojamiento Int?
   tamanoMaximo          Int
   fechaInicio           DateTime
   fechaFin              DateTime
   estado                String
   ultimaEtapaAlcanzada  Int?
-  
-  idservicioAlojamiento Int?
-  idservicioTransporte  Int?
-  idservicioTren        Int?
 
-  paquete               Paquete                @relation(fields: [idpaquete], references: [idpaquete])
-  alojamiento           ServicioBase?          @relation("SalidaAlojamiento", fields: [idservicioAlojamiento], references: [idservicio])
-  transporte            ServicioBase?          @relation("SalidaTransporte", fields: [idservicioTransporte], references: [idservicio])
-  tren                  ServicioBase?          @relation("SalidaTren", fields: [idservicioTren], references: [idservicio])
-  
-  reservas              Reserva[]
-  equipamientos         SalidaEquipamiento[]
-  personalAsignado      AsignacionPersonal[]
-  permisos              PermisoPersonal[]      // Relacionado con los permisos específicos
-  avances               Avance[]
-  incidentes            Incidente[]
-  auditorias            RegistroAuditoria[]
+  paquete   Paquete          @relation(fields: [idpaquete], references: [idpaquete])
+  servicios SalidaServicio[]
+
+  reservas         Reserva[]
+  resenias         Resenia[]
+  equipamientos    SalidaEquipamiento[]
+  personalAsignado AsignacionPersonal[]
+  permisos         PermisoPersonal[] // Relacionado con los permisos específicos
+  avances          Avance[]
+  incidentes       Incidente[]
+  auditorias       RegistroAuditoria[]
+}
+
+model SalidaServicio {
+  idsalida   Int
+  idservicio Int
+  tipo       String
+
+  salida   Salida       @relation(fields: [idsalida], references: [idsalida])
+  servicio ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@unique([idsalida, tipo])
 }
 
 model Avance {
@@ -312,10 +331,10 @@ model Avance {
   estadoTramo      String
   fechaHoraLlegada DateTime?
   fechaHoraReporte DateTime  @default(now())
-  
-  salida           Salida    @relation(fields: [idsalida], references: [idsalida])
-  circuito         Circuito  @relation(fields: [idcircuito], references: [idcircuito])
-  etapa            EtapaRuta @relation(fields: [idcircuito, numeroOrden], references: [idcircuito, numeroOrden])
+
+  salida   Salida    @relation(fields: [idsalida], references: [idsalida])
+  circuito Circuito  @relation(fields: [idcircuito], references: [idcircuito])
+  etapa    EtapaRuta @relation(fields: [idcircuito, numeroOrden], references: [idcircuito, numeroOrden])
 }
 
 model Incidente {
@@ -340,18 +359,18 @@ model IncidentePasajero {
 }
 
 model RegistroAuditoria {
-  idcambio   Int      @id @default(autoincrement())
-  idsalida   Int?
-  idreserva  Int?
-  idpaquete  Int?
+  idcambio    Int      @id @default(autoincrement())
+  idsalida    Int?
+  idreserva   Int?
+  idpaquete   Int?
   fechaActual DateTime @default(now())
-  usuario    String
-  motivo     String?
-  cambios    Json     // Almacena el snapshot de antes y después
-  
-  salida     Salida?  @relation(fields: [idsalida], references: [idsalida])
-  reserva    Reserva? @relation(fields: [idreserva], references: [idreserva])
-  paquete    Paquete? @relation(fields: [idpaquete], references: [idpaquete])
+  usuario     String
+  motivo      String?
+  cambios     Json // Almacena el snapshot de antes y después
+
+  salida  Salida?  @relation(fields: [idsalida], references: [idsalida])
+  reserva Reserva? @relation(fields: [idreserva], references: [idreserva])
+  paquete Paquete? @relation(fields: [idpaquete], references: [idpaquete])
 }
 
 // ==========================================
@@ -359,21 +378,15 @@ model RegistroAuditoria {
 // ==========================================
 
 model Idioma {
-  ididioma Int              @id @default(autoincrement())
-  nombre   String
-  estado   String
-  personal PersonalIdioma[]
-}
-
-model PersonalIdioma {
   idpersonal   Int
-  ididioma     Int
+  nombre       String
   nivelDominio String
   esNativo     Boolean
-  personal     Personal @relation(fields: [idpersonal], references: [idpersonal])
-  idioma       Idioma   @relation(fields: [ididioma], references: [ididioma])
+  estado       String
 
-  @@id([idpersonal, ididioma])
+  personal Personal @relation(fields: [idpersonal], references: [idpersonal])
+
+  @@id([idpersonal, nombre])
 }
 
 model AsignacionPersonal {
@@ -408,24 +421,22 @@ model ServicioBase {
   estado         String
   localidad      String
 
-  proveedor      Proveedor @relation(fields: [idproveedor], references: [idproveedor])
-  
+  proveedor Proveedor @relation(fields: [idproveedor], references: [idproveedor])
+
   // Relaciones hacia los subtipos (Patrón CTI)
-  alojamiento    ServicioAlojamiento?
-  transporte     ServicioTransporte?
-  tren           ServicioTren?
-  equipamiento   ServicioEquipamiento?
+  alojamiento  ServicioAlojamiento?
+  transporte   ServicioTransporte?
+  tren         ServicioTren?
+  equipamiento ServicioEquipamiento?
 
   // Relaciones inversas
-  paquetes       PaqueteServicio[]
-  paquetesGarant Paquete[]              @relation("PaqueteServicioGarantizado")
-  solicitudes    Solicitud[]
-  gestiones      GestionSolicitud[]
-  
-  salidasAloj    Salida[]               @relation("SalidaAlojamiento")
-  salidasTrans   Salida[]               @relation("SalidaTransporte")
-  salidasTren    Salida[]               @relation("SalidaTren")
-  salidasEquip   SalidaEquipamiento[]
+  paquetes                 PaqueteServicio[]
+  garantiasEstablecimiento GarantiaEstablecimiento[]
+  solicitudes              Solicitud[]
+  gestiones                GestionSolicitud[]
+
+  salidas      SalidaServicio[]
+  salidasEquip SalidaEquipamiento[]
 }
 
 model ServicioAlojamiento {
@@ -449,7 +460,7 @@ model ServicioTren {
   idservicio     Int          @id
   horarioSalida  String
   horarioLlegada String
-  diasOperacion  String       // Ej: L-M-X-J-V-S-D
+  diasOperacion  String // Ej: L-M-X-J-V-S-D
   servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
 }
 

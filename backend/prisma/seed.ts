@@ -161,9 +161,8 @@ async function main() {
     },
   });
 
-  const guia = await db.personal.create({
+  const personalGuia = await db.personal.create({
     data: {
-      idusuario: usuarioGuia.idusuario,
       nombreCompleto: "Carlos Mamani",
       nroPasaporte: "P123456",
       nacionalidad: "Peruana",
@@ -171,6 +170,15 @@ async function main() {
       estado: "ACTIVO",
       rol: "Guía",
     },
+  });
+
+  const guia = await db.guia.create({
+    data: {
+      idpersonal: personalGuia.idpersonal,
+      idusuario: usuarioGuia.idusuario,
+      nroHabilitacion: "GUIA-001",
+      fechaHabilitacion: new Date("2020-01-01T00:00:00Z"),
+    }
   });
 
   const porteador = await db.personal.create({
@@ -244,6 +252,11 @@ async function main() {
           { idservicio: servTren.idservicio },
         ],
       },
+      garantiasEstablecimiento: {
+        create: [
+          { idservicio: servAloj.idservicio }
+        ]
+      }
     },
   });
 
@@ -259,14 +272,14 @@ async function main() {
       estado: "PUBLICADA",
       personalAsignado: {
         create: [
-          { idpersonal: guia.idpersonal },
+          { idpersonal: personalGuia.idpersonal },
           { idpersonal: porteador.idpersonal },
         ],
       },
       permisos: {
         create: [
           {
-            idpersonal: guia.idpersonal,
+            idpersonal: personalGuia.idpersonal,
             nroPermiso: "PERM-GUIA-001",
             fechaEmision: new Date("2026-10-01T10:00:00Z"),
             estadoTramite: "Emitido",

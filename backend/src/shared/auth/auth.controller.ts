@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { CustomError } from "../error/CustomError";
+import { CustomError } from "../../error/CustomError";
 import { LoginDto } from "./auth.dto";
 import { AuthService } from "./auth.service";
 
