@@ -10,7 +10,7 @@ export class CrearPersonalDto {
     public rolOperativo: string
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CrearPersonalDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CrearPersonalDto?] {
     let { nombre, apellido, email, contrasenia, nroPasaporte, nacionalidad, fechaVencimientoPasaporte, rolOperativo } = obj;
 
     // Consistencia estricta de Nombre
