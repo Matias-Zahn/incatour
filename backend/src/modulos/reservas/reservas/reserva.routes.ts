@@ -1,4 +1,3 @@
-// src/modulos/reservas/reservas/reserva.routes.ts
 import { Router } from "express";
 import { ReservaController } from "./reserva.controller";
 import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";

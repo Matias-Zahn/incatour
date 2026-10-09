@@ -1,4 +1,3 @@
-// src/modulos/reservas/reservas/reserva.controller.ts
 import { Request, Response, NextFunction } from "express";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaService } from "./reserva.service";

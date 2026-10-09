@@ -1,4 +1,3 @@
-// src/modulos/reservas/reservas/reserva.repository.ts
 import { db } from "../../../config/postgresDatabase";
 import { CrearReservaDto } from "./reserva.dto";
 

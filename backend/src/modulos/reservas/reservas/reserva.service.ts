@@ -1,4 +1,3 @@
-// src/modulos/reservas/reservas/reserva.service.ts
 import { CustomError } from "../../../error/CustomError";
 import { ReservaRepository } from "./reserva.repository";
 import { CrearReservaDto } from "./reserva.dto";
