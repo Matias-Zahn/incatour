@@ -26,7 +26,7 @@ export class ReservaRepository {
       // 1. Lectura del stock comercial con relaciones requeridas
       const salida = await tx.salida.findUnique({
         where: { idsalida: dto.idsalida },
-        include: { paquete: true } 
+        include: { paquete: { include: { garantiasEstablecimiento: true } } }
       });
 
       if (!salida || salida.stockLocal < dto.pasajeros.length) {
@@ -87,8 +87,8 @@ export class ReservaRepository {
         });
       }
 
-      // 6. Registrar la pasarela en el modelo Transaccion
-      await tx.transaccion.create({
+      // 6. Registrar la pasarela en el modelo Pago
+      await tx.pago.create({
         data: {
           idreserva: reserva.idreserva,
           monto: precioTotal,
@@ -98,11 +98,12 @@ export class ReservaRepository {
       });
 
       // 7. Flujo Alternativo: Generar Solicitud de Alojamiento Externa
-      if (crearSolicitud && salida.idservicioGarantizado) {
+      const idservicioGarantizado = salida.paquete.garantiasEstablecimiento[0]?.idservicio;
+      if (crearSolicitud && idservicioGarantizado) {
         await tx.solicitud.create({ 
           data: {
             idreserva: reserva.idreserva,
-            idservicio: salida.idservicioGarantizado,
+            idservicio: idservicioGarantizado,
             nroSolicitud: `SOL-${nroReserva}`,
             estado: "PENDIENTE",
             cantidadPlazas: dto.pasajeros.length,

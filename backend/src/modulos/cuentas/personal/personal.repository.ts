@@ -27,7 +27,6 @@ export class PersonalRepository {
       // 2. Crear Legajo Operativo
       const personal = await tx.personal.create({
         data: {
-          idusuario: usuario.idusuario,
           nombreCompleto: `${data.nombre} ${data.apellido}`,
           nroPasaporte: data.nroPasaporte,
           nacionalidad: data.nacionalidad,
@@ -36,6 +35,13 @@ export class PersonalRepository {
           estado: "ACTIVO"
         }
       });
+
+      // 3. La cuenta se vincula a través de Guia (normalización final)
+      if (data.rolOperativo === "Guía") {
+        await tx.guia.create({
+          data: { idpersonal: personal.idpersonal, idusuario: usuario.idusuario }
+        });
+      }
 
       return { personal, usuario };
     });
