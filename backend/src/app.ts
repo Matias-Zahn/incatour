@@ -53,6 +53,10 @@ app.use("/api/solicitudes", SolicitudRoutes.getRoutes);
 import { ReservaRoutes } from "./modulos/reservas/reservas/reserva.routes";
 app.use("/api/reservas", ReservaRoutes.getRoutes);
 
+// Módulo Salidas - Salidas
+import { SalidaRoutes } from "./modulos/salidas/salidas/salida.routes";
+app.use("/api/salidas", SalidaRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
