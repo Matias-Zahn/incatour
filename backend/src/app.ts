@@ -49,6 +49,10 @@ app.use("/api/catalogo", CatalogoRoutes.getRoutes);
 import { SolicitudRoutes } from "./modulos/reservas/solicitudes/solicitud.routes";
 app.use("/api/solicitudes", SolicitudRoutes.getRoutes);
 
+//Módulo Reservas - Reservas
+import { ReservaRoutes } from "./modulos/reservas/reservas/reserva.routes";
+app.use("/api/reservas", ReservaRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
