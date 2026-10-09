@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { CustomError } from "../error/CustomError";
+import { CustomError } from "../../error/CustomError";
 import { AuthRepository } from "./auth.repository";
 import { LoginDto } from "./auth.dto";
 import { envs } from "../../config/envs";
