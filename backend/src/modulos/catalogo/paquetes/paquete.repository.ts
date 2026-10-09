@@ -25,8 +25,8 @@ export class PaqueteRepository {
         circuito: true,
         tarifas: { include: { temporada: true } },
         servicios: { include: { servicio: true } },
-        servicioGarantizado: {
-          include: { alojamiento: true },
+        garantiasEstablecimiento: {
+          include: { servicio: { include: { alojamiento: true } } },
         },
       },
     });
@@ -65,7 +65,6 @@ export class PaqueteRepository {
           condiciones: data.condiciones || null,
           estado: data.estado,
           tipoGarantia: data.tipoGarantia,
-          idservicioGarantizado: data.idservicioGarantizado || null,
           localidadGarantizada: data.localidadGarantizada || null,
           categoriaGarantizada: data.categoriaGarantizada || null,
           tipoHabitacionGarantizada: data.tipoHabitacionGarantizada || null,
@@ -94,6 +93,16 @@ export class PaqueteRepository {
             idpaquete: paquete.idpaquete,
             idservicio,
           })),
+        });
+      }
+
+      // 3.5. Crear GarantiaEstablecimiento si se envió
+      if (data.idservicioGarantizado) {
+        await tx.garantiaEstablecimiento.create({
+          data: {
+            idpaquete: paquete.idpaquete,
+            idservicio: data.idservicioGarantizado
+          }
         });
       }
 
