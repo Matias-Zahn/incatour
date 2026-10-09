@@ -29,8 +29,9 @@ export class CatalogoService {
       let garantía = "Sin garantía especificada";
       if (paquete.tipoGarantia === "POR_CATEGORIA") {
         garantía = `${paquete.categoriaGarantizada} en ${paquete.localidadGarantizada}`;
-      } else if (paquete.tipoGarantia === "POR_ESTABLECIMIENTO" && paquete.servicioGarantizado) {
-        garantía = `${paquete.servicioGarantizado.nombreServicio} (${paquete.servicioGarantizado.localidad})`;
+      } else if (paquete.tipoGarantia === "POR_ESTABLECIMIENTO" && paquete.garantiasEstablecimiento.length > 0) {
+        const servGar = paquete.garantiasEstablecimiento[0]?.servicio;
+        garantía = servGar ? `${servGar.nombreServicio} (${servGar.localidad})` : "Garantía no especificada";
       }
 
       // Retornamos un objeto "limpio" y seguro para el cliente final

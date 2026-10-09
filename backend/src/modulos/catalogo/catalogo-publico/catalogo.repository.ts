@@ -27,9 +27,13 @@ export class CatalogoRepository {
             servicio: true
           }
         },
-        servicioGarantizado: {
+        garantiasEstablecimiento: {
           include: {
-            alojamiento: true
+            servicio: {
+              include: {
+                alojamiento: true
+              }
+            }
           }
         }
       },
