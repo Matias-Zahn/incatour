@@ -35,7 +35,7 @@ export const autenticar = (req: Request, res: Response, next: NextFunction) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const payload = jwt.verify(token, envs.JWT_SEED) as {
+    const payload = jwt.verify(String(token), envs.JWT_SEED) as {
       idusuario: number;
       email: string;
       nombre: string;
