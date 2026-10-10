@@ -1,10 +1,10 @@
 import LayoutGestion from "./components/LayoutGestion";
-import ProveedoresPage from "./pages/gestion/ProveedoresPage";
+import InicioGestionPage from "./pages/gestion/InicioGestionPage";
 
 function App() {
   return (
-    <LayoutGestion seccion="Proveedores">
-      <ProveedoresPage />
+    <LayoutGestion seccion="Inicio">
+      <InicioGestionPage />
     </LayoutGestion>
   );
 }

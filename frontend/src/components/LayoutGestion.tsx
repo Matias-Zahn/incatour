@@ -10,7 +10,7 @@ type LayoutGestionProps = {
 function LayoutGestion({ seccion, children }: LayoutGestionProps) {
     return (
         <div className="flex min-h-screen bg-fondo">
-            <BarraLateral />
+            <BarraLateral seccionActiva={seccion} />
             <div className="min-w-0 flex-1">
                 <BarraSuperior seccion={seccion} />
                 <main className="p-8">{children}</main>
