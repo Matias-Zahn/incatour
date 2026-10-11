@@ -1,3 +1,90 @@
+// Un solo lugar para estos valores: evita errores por tildes o mayúsculas ("Guía" vs "Guia")
+export const ROL_GUIA = "Guía";
+export const ROL_PORTEADOR = "Porteador";
+
+export class CrearPersonalDto {
+  private constructor(
+    public nombre: string,
+    public apellido: string,
+    public nroPasaporte: string,
+    public nacionalidad: string,
+    public fechaVencimientoPasaporte: Date,
+    public rolOperativo: string,
+    // Solo para guías: cuenta de acceso y habilitación (viven en las tablas Usuario y Guia)
+    public email?: string,
+    public contrasenia?: string,
+    public nroHabilitacion?: string,
+    public fechaHabilitacion?: Date
+  ) {}
+
+  public static create(obj: { [key: string]: any }): [string?, CrearPersonalDto?] {
+    let {
+      nombre, apellido, email, contrasenia, nroPasaporte, nacionalidad,
+      fechaVencimientoPasaporte, rolOperativo, nroHabilitacion, fechaHabilitacion,
+    } = obj;
+
+    // Consistencia estricta de Nombre
+    if (!nombre || typeof nombre !== "string") return ["El nombre es requerido"];
+    nombre = nombre.trim();
+    if (nombre.length === 0 || nombre.length > 64) return ["El nombre debe tener entre 1 y 64 caracteres"];
+    const regexLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
+    if (!regexLetras.test(nombre)) return ["El nombre solo puede contener letras y espacios"];
+
+    // Consistencia estricta de Apellido
+    if (!apellido || typeof apellido !== "string") return ["El apellido es requerido"];
+    apellido = apellido.trim();
+    if (apellido.length === 0 || apellido.length > 64) return ["El apellido debe tener entre 1 y 64 caracteres"];
+    if (!regexLetras.test(apellido)) return ["El apellido solo puede contener letras y espacios"];
+
+    if (!nroPasaporte || typeof nroPasaporte !== "string") return ["El número de pasaporte es requerido"];
+    nroPasaporte = nroPasaporte.trim();
+
+    if (!nacionalidad || typeof nacionalidad !== "string") return ["La nacionalidad es requerida"];
+    nacionalidad = nacionalidad.trim();
+
+    if (!fechaVencimientoPasaporte) return ["La fecha de vencimiento del pasaporte es requerida"];
+    const fechaPasaporte = new Date(fechaVencimientoPasaporte);
+    if (isNaN(fechaPasaporte.getTime())) return ["La fecha proporcionada no es válida"];
+
+    if (!rolOperativo || ![ROL_GUIA, ROL_PORTEADOR].includes(rolOperativo)) {
+      return [`El rol operativo debe ser '${ROL_GUIA}' o '${ROL_PORTEADOR}'`];
+    }
+
+    // Porteador: sin cuenta de acceso ni habilitación. Se ignoran esos campos si vinieran.
+    if (rolOperativo === ROL_PORTEADOR) {
+      return [
+        undefined,
+        new CrearPersonalDto(nombre, apellido, nroPasaporte, nacionalidad, fechaPasaporte, rolOperativo),
+      ];
+    }
+
+    // Guía: cuenta de acceso + habilitación obligatorias
+    if (!email || typeof email !== "string") return ["El email es requerido para un guía"];
+    email = email.trim().toLowerCase();
+
+    if (!contrasenia || typeof contrasenia !== "string") return ["La contraseña es requerida para un guía"];
+    if (contrasenia.length < 8) return ["La contraseña debe tener como mínimo 8 caracteres"];
+
+    if (!nroHabilitacion || typeof nroHabilitacion !== "string") {
+      return ["El número de habilitación es requerido para un guía"];
+    }
+    nroHabilitacion = nroHabilitacion.trim();
+
+    if (!fechaHabilitacion) return ["La fecha de la habilitación es requerida para un guía"];
+    const fechaHab = new Date(fechaHabilitacion);
+    if (isNaN(fechaHab.getTime())) return ["La fecha de habilitación no es válida"];
+
+    return [
+      undefined,
+      new CrearPersonalDto(
+        nombre, apellido, nroPasaporte, nacionalidad, fechaPasaporte, rolOperativo,
+        email, contrasenia, nroHabilitacion, fechaHab
+      ),
+    ];
+  }
+}
+
+/*
 export class CrearPersonalDto {
   private constructor(
     public nombre: string,
@@ -57,3 +144,4 @@ export class CrearPersonalDto {
     ];
   }
 }
+*/

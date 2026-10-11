@@ -172,13 +172,22 @@ async function main() {
     },
   });
 
-  const guia = await db.guia.create({
+  const guia = await db.personal.create({
     data: {
-      idpersonal: personalGuia.idpersonal,
-      idusuario: usuarioGuia.idusuario,
-      nroHabilitacion: "GUIA-001",
-      fechaHabilitacion: new Date("2020-01-01T00:00:00Z"),
-    }
+      nombreCompleto: "Carlos Mamani",
+      nroPasaporte: "P123456",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia.idusuario,
+          nroHabilitacion: "HAB-001",
+          fechaHabilitacion: new Date("2028-12-31T00:00:00Z"),
+        },
+      },
+    },
   });
 
   const porteador = await db.personal.create({

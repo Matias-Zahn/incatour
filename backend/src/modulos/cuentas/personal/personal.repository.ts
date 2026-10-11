@@ -1,5 +1,19 @@
 import { db } from "../../../config/postgresDatabase";
-import { CrearPersonalDto } from "./personal.dto";
+import { ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
+
+export interface DatosPersonal {
+  nombre: string;
+  apellido: string;
+  nroPasaporte: string;
+  nacionalidad: string;
+  fechaVencimientoPasaporte: Date;
+}
+
+export interface DatosGuia extends DatosPersonal {
+  email: string;
+  nroHabilitacion: string;
+  fechaHabilitacion: Date;
+}
 
 export class PersonalRepository {
   async checkEmailExists(email: string) {
@@ -10,9 +24,9 @@ export class PersonalRepository {
     return db.personal.findUnique({ where: { nroPasaporte } });
   }
 
-  async createWithUser(data: CrearPersonalDto, contraseniaHasheada: string) {
+  // Guía = Usuario (acceso) + Personal (legajo) + Guia (habilitación), todo en una transacción
+  async crearGuia(data: DatosGuia, contraseniaHasheada: string) {
     return db.$transaction(async (tx) => {
-      // 1. Crear Credenciales de Acceso
       const usuario = await tx.usuario.create({
         data: {
           nombre: data.nombre,
@@ -20,30 +34,56 @@ export class PersonalRepository {
           email: data.email,
           contrasenia: contraseniaHasheada,
           rol: "GUIA", // Rol de sistema
-          estado: "ACTIVO"
-        }
+          estado: "ACTIVO",
+        },
       });
 
-      // 2. Crear Legajo Operativo
+      // El usuario ya NO se enlaza desde Personal: se enlaza desde Guia
       const personal = await tx.personal.create({
         data: {
           nombreCompleto: `${data.nombre} ${data.apellido}`,
           nroPasaporte: data.nroPasaporte,
           nacionalidad: data.nacionalidad,
           fechaVencimientoPasaporte: data.fechaVencimientoPasaporte,
-          rol: data.rolOperativo,
-          estado: "ACTIVO"
-        }
+          rol: ROL_GUIA,
+          estado: "ACTIVO",
+          guia: {
+            create: {
+              idusuario: usuario.idusuario,
+              nroHabilitacion: data.nroHabilitacion,
+              fechaHabilitacion: data.fechaHabilitacion,
+            },
+          },
+        },
+        include: { guia: true },
       });
-
-      // 3. La cuenta se vincula a través de Guia (normalización final)
-      if (data.rolOperativo === "Guía") {
-        await tx.guia.create({
-          data: { idpersonal: personal.idpersonal, idusuario: usuario.idusuario }
-        });
-      }
 
       return { personal, usuario };
     });
+  }
+
+  // Porteador = solo Personal. No tiene cuenta de acceso ni fila en Guia.
+  async crearPorteador(data: DatosPersonal) {
+    return db.personal.create({
+      data: {
+        nombreCompleto: `${data.nombre} ${data.apellido}`,
+        nroPasaporte: data.nroPasaporte,
+        nacionalidad: data.nacionalidad,
+        fechaVencimientoPasaporte: data.fechaVencimientoPasaporte,
+        rol: ROL_PORTEADOR,
+        estado: "ACTIVO",
+      },
+    });
+  }
+
+  // Para los futuros endpoints del guía (CU-48, CU-49, CU-50):
+  // el token trae idusuario, y antes se llegaba al legajo por personal.idusuario.
+  // Ahora el camino es Usuario -> Guia -> Personal.
+  async obtenerIdPersonalPorUsuario(idusuario: number) {
+    const guia = await db.guia.findUnique({
+      where: { idusuario },
+      select: { idpersonal: true },
+    });
+    return guia?.idpersonal ?? null;
   }
 }
