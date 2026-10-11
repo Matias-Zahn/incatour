@@ -1,41 +1,183 @@
+import crypto from "crypto";
 import { CustomError } from "../../../error/CustomError";
-import { ReservaRepository } from "./reserva.repository";
+import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interface";
+import { PasarelaMock } from "../../../integraciones/pasarela/pasarela.mock";
+import { INotificador } from "../../../integraciones/notificador/notificador.interface";
+import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
 import { CrearReservaDto } from "./reserva.dto";
+import { ReservaRepository } from "./reserva.repository";
+
+// Tipo derivado del repositorio: el servicio no importa Prisma
+type SalidaCompra = NonNullable<Awaited<ReturnType<ReservaRepository["obtenerSalidaParaCompra"]>>>;
+
+const redondear2 = (n: number) => Math.round(n * 100) / 100;
 
 export class ReservaService {
   private repository = new ReservaRepository();
+  private pasarela: IPasarelaPagos = new PasarelaMock();
+  private notificador: INotificador = new NotificadorMock();
 
-  async procesarCompraDePaquete(dto: CrearReservaDto) {
-    // 1. Validar la existencia de la salida planificada
-    const salida = await this.repository.obtenerDetalleSalidaYPaquete(dto.idsalida);
-    if (!salida) throw CustomError.notFound("La salida planificada especificada no existe.");
-    if (salida.estado === "CANCELADA") throw CustomError.badRequest("No es posible reservar en una salida cancelada.");
+  // CU-30 Comprar un paquete completo
+  async crearReserva(dto: CrearReservaDto, idusuario: number) {
+    // 1. Quién compra: sale del token, nunca del body
+    const cliente = await this.repository.obtenerClientePorUsuario(idusuario);
+    if (!cliente || cliente.estado !== "ACTIVO") {
+      throw CustomError.forbidden("Solo un cliente activo puede realizar reservas.");
+    }
 
-    // 2. Convalidar vigencia técnica de pasaportes (Flujo Alternativo 2 del RUP)
-    const fechaInicioSalida = new Date(salida.fechaInicio);
+    // 2. Salida comprable
+    const salida = await this.repository.obtenerSalidaParaCompra(dto.idsalida);
+    if (!salida) throw CustomError.notFound("La salida no existe.");
+    if (salida.estado !== "PUBLICADA") {
+      throw CustomError.badRequest("La salida no está disponible para la venta.");
+    }
+    if (salida.fechaInicio <= new Date()) {
+      throw CustomError.badRequest("La salida ya comenzó o está por comenzar.");
+    }
+
+    const cantidad = dto.pasajeros.length;
+    if (cantidad > salida.stockLocal) {
+      throw CustomError.badRequest(`Solo quedan ${salida.stockLocal} lugares en esta salida.`);
+    }
+
+    // 3. Pasajeros: sin pasaportes repetidos y vigentes hasta el final del recorrido
+    const pasaportes = new Set(dto.pasajeros.map((p) => p.nroPasaporte));
+    if (pasaportes.size !== cantidad) {
+      throw CustomError.badRequest("Hay pasajeros con el mismo número de pasaporte.");
+    }
     for (const p of dto.pasajeros) {
-      const vencimiento = new Date(p.fechaVencimientoPasaporte);
-      if (vencimiento <= fechaInicioSalida) {
-        throw CustomError.badRequest(`El pasaporte de ${p.nombreCompleto} expira antes de la ejecución del circuito.`);
+      if (new Date(p.fechaVencimientoPasaporte) <= salida.fechaFin) {
+        throw CustomError.badRequest(
+          `El pasaporte de ${p.nombreCompleto} vence antes de finalizar el recorrido.`
+        );
       }
     }
 
-    // 3. Evaluar disponibilidad de alojamiento precargado local (Flujo Alternativo 4)
-    const tieneAlojamientosBloqueados = (salida.stockLocalAlojamiento !== null && salida.stockLocalAlojamiento >= dto.pasajeros.length);
-    
-    // Generación del identificador comercial unificado
-    const nroReserva = `RES-${Date.now().toString().slice(-6)}`;
+    // 4. El precio lo calcula el servidor
+    const precio = this.calcularPrecio(salida, dto);
+    const nroReserva = `RES-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
+    // 5. Reservar cupos (atómico). Si no alcanzan, se corta sin cobrar.
+    const cupos = await this.repository.reservarCupos(dto.idsalida, cantidad);
+    if (!cupos) {
+      throw CustomError.badRequest("No hay lugares suficientes en la salida.");
+    }
+    const { alojamientoReservado } = cupos;
+
+    // 6. Cobrar. La pasarela se llama FUERA de la transacción de base de datos.
+    let pago;
     try {
-      return await this.repository.procesarCompraAtomica({
-        dto,
-        nroReserva,
-        precioTotal: dto.montoTransaccion,
-        estadoAlojamiento: tieneAlojamientosBloqueados ? "CONFIRMADO" : "PENDIENTE",
-        crearSolicitud: !tieneAlojamientosBloqueados
+      pago = await this.pasarela.procesarPago({
+        monto: precio.total,
+        moneda: precio.moneda,
+        tarjeta: dto.tarjeta,
+        referenciaReserva: nroReserva,
       });
-    } catch (error: any) {
-      throw CustomError.badRequest(error.message || "Error al procesar la reserva transaccional.");
+    } catch (error) {
+      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      throw CustomError.internalServerError("No se pudo contactar a la pasarela de pagos.");
+    }
+
+    if (!pago.aprobado) {
+      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      this.notificador
+        .enviarEmailRechazo(cliente.usuario.email, pago.mensaje)
+        .catch((e) => console.error("Fallo al notificar el rechazo:", e));
+      throw CustomError.badRequest(`Pago rechazado: ${pago.mensaje}`);
+    }
+
+    // 7. Pago aprobado: registrar la reserva completa en una sola transacción
+    const garantiaNominal = salida.paquete.garantiasEstablecimiento[0]?.idservicio;
+    let reserva;
+    try {
+      reserva = await this.repository.confirmarReserva({
+        idcliente: cliente.idcliente,
+        idsalida: dto.idsalida,
+        nroReserva,
+        precioCongelado: precio.total,
+        condicionesComerciales: salida.paquete.condiciones ?? "",
+        medioPago: dto.medioPago,
+        pasajeros: dto.pasajeros,
+        estadoAlojamiento: alojamientoReservado ? "CONFIRMADO" : "PENDIENTE",
+        solicitud: alojamientoReservado
+          ? undefined
+          : {
+              nroSolicitud: `SOL-${nroReserva}`,
+              idservicio: garantiaNominal ?? null,
+              criterios:
+                `Localidad: ${salida.paquete.localidadGarantizada ?? "-"} | ` +
+                `Categoría: ${salida.paquete.categoriaGarantizada ?? "-"} | ` +
+                `Habitación: ${salida.paquete.tipoHabitacionGarantizada ?? "-"}`,
+            },
+      });
+    } catch (error) {
+      // Cobramos pero no pudimos registrar: se devuelven los cupos y se deja rastro para
+      // gestionar el reintegro (IPasarelaPagos todavía no tiene una operación de reembolso).
+      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      console.error(
+        `[CU-30] Pago aprobado (${pago.transaccionId}) sin reserva registrada para ${nroReserva}:`,
+        error
+      );
+      throw CustomError.internalServerError(
+        "El pago fue aprobado pero no pudimos registrar la reserva. Contactanos con el código " +
+          `${pago.transaccionId}.`
+      );
+    }
+
+    // 8. Confirmación por email: si falla, la reserva sigue siendo válida
+    this.notificador
+      .enviarEmailConfirmacion(cliente.usuario.email, reserva.idreserva, reserva.precioCongelado)
+      .catch((e) => console.error("Fallo al notificar la confirmación:", e));
+
+    return {
+      idreserva: reserva.idreserva,
+      nroReserva: reserva.nroReserva,
+      estado: reserva.estado,
+      estadoAlojamiento: reserva.estadoAlojamiento,
+      cantidadPasajeros: reserva.cantidadPasajeros,
+      precioCongelado: reserva.precioCongelado,
+      moneda: precio.moneda,
+      transaccionPasarela: pago.transaccionId,
+    };
+  }
+
+  // Tarifa de la temporada vigente en la fecha de inicio + exceso de equipaje
+  private calcularPrecio(salida: SalidaCompra, dto: CrearReservaDto) {
+    const tarifa = salida.paquete.tarifas.find(
+      (t) =>
+        t.temporada.estado === "ACTIVO" &&
+        t.temporada.fechaInicio <= salida.fechaInicio &&
+        salida.fechaInicio <= t.temporada.fechaFin
+    );
+    if (!tarifa) {
+      throw CustomError.badRequest("El paquete no tiene una tarifa vigente para la fecha de la salida.");
+    }
+
+    // Transporte de la salida; si todavía no se asignó, el incluido en el paquete
+    const transporte =
+      salida.servicios.map((s) => s.servicio.transporte).find((t) => t !== null) ??
+      salida.paquete.servicios.map((s) => s.servicio.transporte).find((t) => t !== null);
+
+    let extra = 0;
+    if (transporte) {
+      for (const e of dto.equipaje) {
+        const exceso = e.pesoDeclarado - transporte.pesoEquipajeIncluido;
+        if (exceso > 0) extra += exceso * transporte.costoPorKgExcedente;
+      }
+    }
+
+    return {
+      total: redondear2(tarifa.monto * dto.pasajeros.length + extra),
+      moneda: tarifa.moneda,
+    };
+  }
+
+  // La compensación nunca debe tapar el error original
+  private async liberarSinFallar(idsalida: number, cantidad: number, alojamientoReservado: boolean) {
+    try {
+      await this.repository.liberarCupos(idsalida, cantidad, alojamientoReservado);
+    } catch (e) {
+      console.error(`[CU-30] No se pudieron liberar los cupos de la salida ${idsalida}:`, e);
     }
   }
 }

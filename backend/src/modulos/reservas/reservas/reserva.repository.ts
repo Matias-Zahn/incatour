@@ -1,118 +1,138 @@
 import { db } from "../../../config/postgresDatabase";
-import { CrearReservaDto } from "./reserva.dto";
+import { PasajeroInput } from "./reserva.dto";
 
-export interface ProcesarCompraParams {
-  dto: CrearReservaDto;
+export interface DatosConfirmacionReserva {
+  idcliente: number;
+  idsalida: number;
   nroReserva: string;
-  precioTotal: number;
+  precioCongelado: number;
+  condicionesComerciales: string;
+  medioPago: string;
+  pasajeros: PasajeroInput[];
   estadoAlojamiento: string;
-  crearSolicitud: boolean;
+  // Solo si el alojamiento quedó pendiente (no había plazas bloqueadas)
+  solicitud?: {
+    nroSolicitud: string;
+    idservicio: number | null; // null cuando la garantía es por categoría
+    criterios: string;
+  };
 }
 
 export class ReservaRepository {
-  async obtenerDetalleSalidaYPaquete(idsalida: number) {
-    return await db.salida.findUnique({
-      where: { idsalida },
-      include: {
-        paquete: true
-      }
+  // El cliente se identifica por el usuario del token (no por un id que mande el front)
+  async obtenerClientePorUsuario(idusuario: number) {
+    return db.cliente.findUnique({
+      where: { idusuario },
+      include: { usuario: { select: { email: true } } },
     });
   }
 
-  async procesarCompraAtomica(params: ProcesarCompraParams) {
-    const { dto, nroReserva, precioTotal, estadoAlojamiento, crearSolicitud } = params;
+  // Todo lo que el servicio necesita para validar y calcular el precio (solo lectura)
+  async obtenerSalidaParaCompra(idsalida: number) {
+    return db.salida.findUnique({
+      where: { idsalida },
+      include: {
+        paquete: {
+          include: {
+            tarifas: { include: { temporada: true } },
+            servicios: { include: { servicio: { include: { transporte: true } } } },
+            garantiasEstablecimiento: true,
+          },
+        },
+        // Servicios ya asignados a la salida (SalidaServicio)
+        servicios: { include: { servicio: { include: { transporte: true } } } },
+      },
+    });
+  }
 
-    return await db.$transaction(async (tx) => {
-      // 1. Lectura del stock comercial con relaciones requeridas
-      const salida = await tx.salida.findUnique({
-        where: { idsalida: dto.idsalida },
-        include: { paquete: { include: { garantiasEstablecimiento: true } } }
+  /**
+   * Descuenta los cupos de forma ATÓMICA. Cada updateMany es un único
+   * UPDATE ... WHERE stock >= cantidad, así que dos compras simultáneas
+   * no pueden vender el mismo lugar (a diferencia de leer y luego actualizar).
+   * Devuelve null si no hay cupo suficiente.
+   */
+  async reservarCupos(idsalida: number, cantidad: number) {
+    return db.$transaction(async (tx) => {
+      const cupos = await tx.salida.updateMany({
+        where: { idsalida, estado: "PUBLICADA", stockLocal: { gte: cantidad } },
+        data: { stockLocal: { decrement: cantidad } },
       });
+      if (cupos.count === 0) return null;
 
-      if (!salida || salida.stockLocal < dto.pasajeros.length) {
-        throw new Error("Inventario insuficiente en el stock local de pasajes para esta salida.");
-      }
-
-      let decrementoAlojamiento = 0;
-
-      // 2. Validación de plazas físicas de hotel
-      if (estadoAlojamiento === "CONFIRMADO" && salida.stockLocalAlojamiento !== null) {
-        if (salida.stockLocalAlojamiento < dto.pasajeros.length) {
-          throw new Error("Plazas insuficientes en el stock local de alojamiento bloqueado.");
-        }
-        decrementoAlojamiento = dto.pasajeros.length;
-      }
-
-      // 3. Actualizar la Salida (Uso de operaciones atómicas)
-      await tx.salida.update({
-        where: { idsalida: dto.idsalida },
-        data: {
-          stockLocal: { decrement: dto.pasajeros.length },
-          ...(decrementoAlojamiento > 0 && {
-            stockLocalAlojamiento: { decrement: decrementoAlojamiento }
-          })
-        }
+      // Plazas de alojamiento bloqueadas: si alcanzan se descuentan; si no, quedará solicitud
+      const aloj = await tx.salida.updateMany({
+        where: { idsalida, stockLocalAlojamiento: { gte: cantidad } },
+        data: { stockLocalAlojamiento: { decrement: cantidad } },
       });
+      return { alojamientoReservado: aloj.count === 1 };
+    });
+  }
 
-      // 4. Registrar la Reserva core
-      const reserva = await tx.reserva.create({
-        data: {
-          idcliente: dto.idcliente,
-          idsalida: dto.idsalida,
-          nroReserva,
-          cantidadPasajeros: dto.pasajeros.length,
-          precioCongelado: precioTotal,
-          estado: "CONFIRMADA",
-          estadoAlojamiento: estadoAlojamiento,
-          condicionesComerciales: "Tarifas congeladas y validadas por pasarela de pago."
-        }
-      });
+  // Compensación: si el pago falla o no se puede confirmar, los cupos vuelven a la venta
+  async liberarCupos(idsalida: number, cantidad: number, alojamientoReservado: boolean) {
+    await db.salida.update({
+      where: { idsalida },
+      data: {
+        stockLocal: { increment: cantidad },
+        ...(alojamientoReservado && { stockLocalAlojamiento: { increment: cantidad } }),
+      },
+    });
+  }
 
-      // 5. Alta de Pasajeros y mapeo en la tabla intermedia ReservaPasajero
-      for (const p of dto.pasajeros) {
-        const pasajero = await tx.pasajero.create({
-          data: {
+  // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
+  async confirmarReserva(d: DatosConfirmacionReserva) {
+    return db.$transaction(async (tx) => {
+      // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza y se actualizan sus datos
+      const idsPasajeros: number[] = [];
+      for (const p of d.pasajeros) {
+        const pasajero = await tx.pasajero.upsert({
+          where: { nroPasaporte: p.nroPasaporte },
+          update: {
+            nombreCompleto: p.nombreCompleto,
+            nacionalidad: p.nacionalidad,
+            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte),
+          },
+          create: {
             nombreCompleto: p.nombreCompleto,
             nroPasaporte: p.nroPasaporte,
             nacionalidad: p.nacionalidad,
-            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte)
-          }
+            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte),
+          },
         });
-
-        await tx.reservaPasajero.create({
-          data: {
-            idreserva: reserva.idreserva,
-            idpasajero: pasajero.idpasajero 
-          }
-        });
+        idsPasajeros.push(pasajero.idpasajero);
       }
 
-      // 6. Registrar la pasarela en el modelo Pago
-      await tx.pago.create({
+      return tx.reserva.create({
         data: {
-          idreserva: reserva.idreserva,
-          monto: precioTotal,
-          medioPago: dto.medioPago,
-          estadoTransaccion: "APROBADO"
-        }
+          idcliente: d.idcliente,
+          idsalida: d.idsalida,
+          nroReserva: d.nroReserva,
+          cantidadPasajeros: d.pasajeros.length,
+          precioCongelado: d.precioCongelado,
+          condicionesComerciales: d.condicionesComerciales,
+          estado: "CONFIRMADA",
+          estadoAlojamiento: d.estadoAlojamiento,
+          pasajeros: { create: idsPasajeros.map((idpasajero) => ({ idpasajero })) },
+          pagos: {
+            create: {
+              monto: d.precioCongelado,
+              medioPago: d.medioPago,
+              estadoTransaccion: "APROBADA",
+            },
+          },
+          ...(d.solicitud && {
+            solicitudes: {
+              create: {
+                nroSolicitud: d.solicitud.nroSolicitud,
+                estado: "PENDIENTE",
+                cantidadPlazas: d.pasajeros.length,
+                idservicio: d.solicitud.idservicio,
+                criterios: d.solicitud.criterios,
+              },
+            },
+          }),
+        },
       });
-
-      // 7. Flujo Alternativo: Generar Solicitud de Alojamiento Externa
-      const idservicioGarantizado = salida.paquete.garantiasEstablecimiento[0]?.idservicio;
-      if (crearSolicitud && idservicioGarantizado) {
-        await tx.solicitud.create({ 
-          data: {
-            idreserva: reserva.idreserva,
-            idservicio: idservicioGarantizado,
-            nroSolicitud: `SOL-${nroReserva}`,
-            estado: "PENDIENTE",
-            cantidadPlazas: dto.pasajeros.length,
-            criterios: `Localidad: ${salida.paquete?.localidadGarantizada || "N/A"}, Cat: ${salida.paquete?.categoriaGarantizada || "Estándar"}`
-          }
-        });
-      }
-
-      return reserva;
     });
   }
 }

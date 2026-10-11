@@ -1,28 +1,20 @@
 import { Request, Response, NextFunction } from "express";
+import { CustomError } from "../../../error/CustomError";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaService } from "./reserva.service";
-import { CustomError } from "../../../error/CustomError";
 
 const service = new ReservaService();
 
 export class ReservaController {
-  public comprarPaquete = async (req: Request, res: Response, next: NextFunction) => {
+  crearReserva = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Extraemos la sesión unificada del cliente inyectada previamente por el Middleware
-      const idcliente = (req as any).usuarioAutenticado?.idusuario;
-      if (!idcliente) throw CustomError.unauthorized("No se detectó una sesión de cliente activa.");
-
-      // Enlazamos el ID al cuerpo de la petición para estructurar el DTO de forma consolidada
-      const [error, dto] = CrearReservaDto.create({ ...req.body, idcliente });
+      const [error, dto] = CrearReservaDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
 
-      const reservaConfirmada = await service.procesarCompraDePaquete(dto!);
+      const idusuario = req.usuarioAutenticado!.idusuario;
+      const resultado = await service.crearReserva(dto!, idusuario);
 
-      return res.status(211).json({
-        ok: true,
-        mensaje: "Reserva generada, procesada y confirmada con éxito.",
-        reserva: reservaConfirmada
-      });
+      return res.status(201).json({ mensaje: "Reserva confirmada", data: resultado });
     } catch (error) {
       next(error);
     }
