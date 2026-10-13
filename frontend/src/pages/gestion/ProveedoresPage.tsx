@@ -1,40 +1,26 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
+import FormularioProveedor from "../../components/FormularioProveedor";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
-
-type EstadoListadoTipo = "cargando" | "vacio" | "error" | "exito";
-
-type Proveedor = {
-    id: number;
-    nombre: string;
-    contacto: string;
-};
-
-type FormularioProveedor = {
-    nombre: string;
-    contacto: string;
-};
-
-const proveedoresIniciales: Proveedor[] = [
-    { id: 1, nombre: "Andes Travel", contacto: "contacto@andes.com" },
-    { id: 2, nombre: "Camino Inca Tours", contacto: "info@caminoinca.com" },
-];
-
-const formularioInicial: FormularioProveedor = {
-    nombre: "",
-    contacto: "",
-};
+import {
+    useDarDeBajaProveedor,
+    useModificarProveedor,
+    useProveedores,
+    useRegistrarProveedor,
+} from "../../services/proveedorService";
+import type { DatosProveedor, Proveedor } from "../../services/proveedorService";
 
 function ProveedoresPage() {
-    const [proveedores, setProveedores] = useState(proveedoresIniciales);
-    const [estado, setEstado] = useState<EstadoListadoTipo>("exito");
+    const { data: proveedores = [], isPending, isError, error } = useProveedores();
+    const registrar = useRegistrarProveedor();
+    const modificar = useModificarProveedor();
+    const darDeBaja = useDarDeBajaProveedor();
+    const guardando = registrar.isPending || modificar.isPending;
     const [paginaActual, setPaginaActual] = useState(1);
     const [formularioAbierto, setFormularioAbierto] = useState(false);
-    const [formulario, setFormulario] = useState(formularioInicial);
     const [proveedorEnEdicion, setProveedorEnEdicion] =
         useState<Proveedor | null>(null);
     const [proveedorSeleccionado, setProveedorSeleccionado] =
@@ -43,11 +29,6 @@ function ProveedoresPage() {
 
     function abrirFormulario(proveedor?: Proveedor) {
         setProveedorEnEdicion(proveedor ?? null);
-        setFormulario(
-            proveedor
-                ? { nombre: proveedor.nombre, contacto: proveedor.contacto }
-                : formularioInicial,
-        );
         setErrorFormulario("");
         setFormularioAbierto(true);
     }
@@ -55,50 +36,23 @@ function ProveedoresPage() {
     function cerrarFormulario() {
         setFormularioAbierto(false);
         setProveedorEnEdicion(null);
-        setFormulario(formularioInicial);
         setErrorFormulario("");
     }
 
-    function actualizarCampo(
-        campo: keyof FormularioProveedor,
-        valor: string,
-    ) {
-        setFormulario((actual) => ({ ...actual, [campo]: valor }));
-        setErrorFormulario("");
-    }
-
-    function guardarProveedor(evento: FormEvent<HTMLFormElement>) {
-        evento.preventDefault();
-
-        const nombre = formulario.nombre.trim();
-        const contacto = formulario.contacto.trim();
-
-        if (!nombre || !contacto) {
-            setErrorFormulario("Completá el nombre y el correo de contacto.");
-            return;
-        }
+    function guardarProveedor(datos: DatosProveedor) {
+        const opciones = {
+            onSuccess: cerrarFormulario,
+            onError: (e: Error) => setErrorFormulario(e.message),
+        };
 
         if (proveedorEnEdicion) {
-            setProveedores((actuales) =>
-                actuales.map((proveedor) =>
-                    proveedor.id === proveedorEnEdicion.id
-                        ? { ...proveedor, nombre, contacto }
-                        : proveedor,
-                ),
+            modificar.mutate(
+                { id: proveedorEnEdicion.id, datos },
+                opciones,
             );
         } else {
-            setProveedores((actuales) => [
-                ...actuales,
-                {
-                    id: Math.max(0, ...actuales.map((proveedor) => proveedor.id)) + 1,
-                    nombre,
-                    contacto,
-                },
-            ]);
+            registrar.mutate(datos, opciones);
         }
-
-        setEstado("exito");
-        cerrarFormulario();
     }
 
     function abrirDialogoBaja(proveedor: Proveedor) {
@@ -114,15 +68,15 @@ function ProveedoresPage() {
             return;
         }
 
-        setProveedores((actuales) =>
-            actuales.filter(
-                (proveedor) => proveedor.id !== proveedorSeleccionado.id,
-            ),
-        );
-        setProveedorSeleccionado(null);
-        setPaginaActual(1);
+        darDeBaja.mutate(proveedorSeleccionado.id, {
+            onSuccess: () => {
+                setProveedorSeleccionado(null);
+                setPaginaActual(1);
+            },
+        });
     }
 
+    const estado = isPending ? "cargando" : isError ? "error" : "exito";
     const mostrarListadoVacio = estado === "exito" && proveedores.length === 0;
 
     return (
@@ -146,80 +100,19 @@ function ProveedoresPage() {
             </header>
 
             {formularioAbierto ? (
-                <form
-                    className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta"
-                    onSubmit={guardarProveedor}
-                >
-                    <div className="mb-5">
-                        <h2 className="font-bold text-navegacion">
-                            {proveedorEnEdicion
-                                ? "Editar proveedor"
-                                : "Registrar proveedor"}
-                        </h2>
-                        <p className="mt-1 text-sm text-texto-suave">
-                            Ingresá los datos principales del proveedor.
-                        </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label className="grid gap-2 text-sm font-semibold text-texto">
-                            Nombre
-                            <input
-                                className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                value={formulario.nombre}
-                                onChange={(evento) =>
-                                    actualizarCampo("nombre", evento.target.value)
-                                }
-                                placeholder="Ej. Andes Travel"
-                                autoFocus
-                            />
-                        </label>
-
-                        <label className="grid gap-2 text-sm font-semibold text-texto">
-                            Correo de contacto
-                            <input
-                                type="email"
-                                className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                value={formulario.contacto}
-                                onChange={(evento) =>
-                                    actualizarCampo(
-                                        "contacto",
-                                        evento.target.value,
-                                    )
-                                }
-                                placeholder="contacto@proveedor.com"
-                            />
-                        </label>
-                    </div>
-
-                    {errorFormulario ? (
-                        <p className="mt-3 text-sm text-peligro" role="alert">
-                            {errorFormulario}
-                        </p>
-                    ) : null}
-
-                    <div className="mt-6 flex justify-end gap-3">
-                        <Boton
-                            variante="secundario"
-                            onClick={cerrarFormulario}
-                        >
-                            Cancelar
-                        </Boton>
-                        <Boton type="submit">
-                            {proveedorEnEdicion ? "Guardar cambios" : "Registrar proveedor"}
-                        </Boton>
-                    </div>
-                </form>
+                <FormularioProveedor
+                    proveedorEnEdicion={proveedorEnEdicion}
+                    alGuardar={guardarProveedor}
+                    alCancelar={cerrarFormulario}
+                    guardando={guardando}
+                    errorServidor={errorFormulario}
+                />
             ) : null}
 
             {estado !== "exito" ? (
                 <EstadoListado
                     estado={estado}
-                    mensaje={
-                        estado === "vacio"
-                            ? "Todavía no hay proveedores registrados."
-                            : undefined
-                    }
+                    mensaje={estado === "error" ? error?.message : undefined}
                 />
             ) : mostrarListadoVacio ? (
                 <EstadoListado
@@ -286,7 +179,7 @@ function ProveedoresPage() {
                         ? `¿Estás seguro de que querés dar de baja a ${proveedorSeleccionado.nombre}?`
                         : ""
                 }
-                textoConfirmar="Dar de baja"
+                textoConfirmar={darDeBaja.isPending ? "Procesando..." : "Dar de baja"}
                 onConfirmar={confirmarBaja}
                 onCancelar={cancelarBaja}
             />
