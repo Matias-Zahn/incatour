@@ -17,7 +17,8 @@ app.get("/api/", (req, res) => {
 
 // Autoridad
 import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
-//configurarAutoridad(new <ImplementacionSimulada>());
+import { AutoridadMock } from "./integraciones/autoridad/autoridad.mock"; // ajustá la ruta real
+//configurarAutoridad(new ImplementacionSimulada());
 
 //Modulo Auth
 import { AuthRoutes } from "./shared/auth/auth.routes";
@@ -55,6 +56,15 @@ app.use("/api/paquetes", PaqueteRoutes.getRoutes);
 import { CatalogoRoutes } from "./modulos/catalogo/catalogo-publico/catalogo.routes";
 app.use("/api/catalogo", CatalogoRoutes.getRoutes);
 
+// Módulo Proveedores - Proveedores
+import { ProveedorRoutes } from "./modulos/proveedores/proveedores/proveedor.routes";
+app.use("/api/proveedores", ProveedorRoutes.getRoutes);
+
+//  Módulos Proveedores - Servicios
+import { ServicioRoutes } from "./modulos/proveedores/servicios/servicio.routes";
+app.use("/api/proveedores/:idproveedor/servicios", ServicioRoutes.getRoutesPorProveedor);
+app.use("/api/servicios", ServicioRoutes.getRoutes); 
+ 
 // Módulo Reservas - Solicitudes de Alojamiento
 import { SolicitudRoutes } from "./modulos/reservas/solicitudes/solicitud.routes";
 app.use("/api/solicitudes", SolicitudRoutes.getRoutes);
