@@ -1,8 +1,6 @@
 import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
-import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
-import { AuthRoutes } from "./shared/auth/auth.routes";
 import { manejadorErrores } from "./error/manejadorErrores";
 import { setupSwagger } from "./config/swagger";
 
@@ -17,11 +15,15 @@ app.get("/api/", (req, res) => {
   res.json({ message: "HOLA" });
 });
 
-//RUTAS
+//Modulo Auth - Cuentas
+import { AuthRoutes } from "./shared/auth/auth.routes";
 app.use("/api/auth", AuthRoutes.getRoutes);
+
+// Modulo Clientes
+import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
-// Módulo Personal (Guías, Porteadores)
+// Modulo Personal (Guías)
 import { PersonalRoutes } from "./modulos/cuentas/personal/personal.routes";
 app.use("/api/personal", PersonalRoutes.getRoutes);
 
@@ -49,13 +51,35 @@ app.use("/api/catalogo", CatalogoRoutes.getRoutes);
 import { SolicitudRoutes } from "./modulos/reservas/solicitudes/solicitud.routes";
 app.use("/api/solicitudes", SolicitudRoutes.getRoutes);
 
-//Módulo Reservas - Reservas
+// Módulo Reservas - Reservas
 import { ReservaRoutes } from "./modulos/reservas/reservas/reserva.routes";
 app.use("/api/reservas", ReservaRoutes.getRoutes);
+
+// Módulo Reservas - GestionReserva
+import { GestionReservaRoutes } from "./modulos/reservas/gestion-reservas/gestion-reserva.routes"; // CU-31, 32 (rol 2)
+app.use("/api/reservas", GestionReservaRoutes.getRoutes);   // GET y POST /:id/* (CU-31, 32)
+
+// Módulo Reservas - Resenia
+import { ReseniaRoutes } from "./modulos/reservas/resenias/resenia.routes";   
+app.use("/api/resenias", ReseniaRoutes.getRoutes);
 
 // Módulo Salidas - Salidas
 import { SalidaRoutes } from "./modulos/salidas/salidas/salida.routes";
 app.use("/api/salidas", SalidaRoutes.getRoutes);
+
+// Módulo Salidas - Cancelación-Salida
+import { CancelacionSalidaRoutes } from "./modulos/salidas/cancelacion-salida/cancelacion-salida.routes";
+app.use("/api/salidas", CancelacionSalidaRoutes.getRoutes);  // GET /:id/cancelacion, POST /:id/cancelar
+
+// Módulo Salidas - Logistica
+import { LogisticaRoutes } from "./modulos/salidas/logistica/logistica.routes";
+app.use("/api/salidas", LogisticaRoutes.getRoutes);    
+
+// Autoridad
+import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
+// configurarAutoridad(new <ImplementacionSimulada>());
+
+
 
 //ACA IRIAN las demas
 
