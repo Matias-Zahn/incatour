@@ -2,7 +2,7 @@ import { ESTADO_RESERVA } from "../../../shared/constantes";
 
 const ESTADOS = Object.values(ESTADO_RESERVA) as string[];
 
-const fechaOpcional = (valor: any, nombre: string): [string?, Date?] => {
+const fechaOpcional = (valor: any, nombre: string): [string | undefined, Date?] => {
   if (valor === undefined) return [undefined, undefined];
   const f = new Date(valor);
   if (isNaN(f.getTime())) return [`${nombre} no es una fecha válida (usá YYYY-MM-DD).`];
@@ -16,7 +16,7 @@ const textoOpcional = (valor: any): string | undefined =>
 export class FiltrosMisReservasDto {
   private constructor(public estado?: string) {}
 
-  public static create(query: { [key: string]: any }): [string?, FiltrosMisReservasDto?] {
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosMisReservasDto?] {
     if (query.estado !== undefined && !ESTADOS.includes(query.estado)) {
       return [`estado debe ser uno de: ${ESTADOS.join(", ")}.`];
     }
@@ -36,7 +36,7 @@ export class FiltrosReservaDto {
     public limite: number = 50
   ) {}
 
-  public static create(query: { [key: string]: any }): [string?, FiltrosReservaDto?] {
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosReservaDto?] {
     if (query.estado !== undefined && !ESTADOS.includes(query.estado)) {
       return [`estado debe ser uno de: ${ESTADOS.join(", ")}.`];
     }
@@ -72,7 +72,7 @@ export class FiltrosReservaDto {
 export class CancelarReservaDto {
   private constructor(public motivo: string | null) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CancelarReservaDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CancelarReservaDto?] {
     const { motivo } = obj ?? {};
     if (motivo === undefined || motivo === null || motivo === "") return [undefined, new CancelarReservaDto(null)];
     if (typeof motivo !== "string" || motivo.trim().length > 300) {

@@ -6,7 +6,7 @@ export class PublicarReseniaDto {
     public comentario: string | null
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, PublicarReseniaDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, PublicarReseniaDto?] {
     const { idsalida, valoracion, comentario } = obj;
 
     if (!Number.isInteger(idsalida) || idsalida <= 0) return ["idsalida es requerido y debe ser un número entero."];
@@ -39,13 +39,13 @@ export class FiltrosReseniaDto {
     public fechaHasta?: Date
   ) {}
 
-  public static create(query: { [key: string]: any }): [string?, FiltrosReseniaDto?] {
-    const entero = (valor: any, nombre: string): [string?, number?] => {
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosReseniaDto?] {
+    const entero = (valor: any, nombre: string): [string | undefined, number?] => {
       if (valor === undefined) return [undefined, undefined];
       const n = parseInt(valor);
       return isNaN(n) ? [`${nombre} debe ser un número entero.`] : [undefined, n];
     };
-    const fecha = (valor: any, nombre: string): [string?, Date?] => {
+    const fecha = (valor: any, nombre: string): [string | undefined, Date?] => {
       if (valor === undefined) return [undefined, undefined];
       const f = new Date(valor);
       return isNaN(f.getTime()) ? [`${nombre} no es una fecha válida (YYYY-MM-DD).`] : [undefined, f];
