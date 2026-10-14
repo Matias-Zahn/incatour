@@ -15,7 +15,11 @@ app.get("/api/", (req, res) => {
   res.json({ message: "HOLA" });
 });
 
-//Modulo Auth - Cuentas
+// Autoridad
+import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
+//configurarAutoridad(new <ImplementacionSimulada>());
+
+//Modulo Auth
 import { AuthRoutes } from "./shared/auth/auth.routes";
 app.use("/api/auth", AuthRoutes.getRoutes);
 
@@ -23,9 +27,13 @@ app.use("/api/auth", AuthRoutes.getRoutes);
 import { ClienteRoutes } from "./modulos/cuentas/clientes/cliente.routes";
 app.use("/api/clientes", ClienteRoutes.getRoutes);
 
-// Modulo Personal (Guías)
+// Modulo Personal (Guías,Porteadores)
 import { PersonalRoutes } from "./modulos/cuentas/personal/personal.routes";
 app.use("/api/personal", PersonalRoutes.getRoutes);
+
+// Modulo Cuenta Guia
+import { CuentaGuiaRoutes } from "./modulos/cuentas/cuenta-guia/cuenta-guia.routes";
+app.use("/api/cuentas-guia", CuentaGuiaRoutes.getRoutes);
 
 // Módulo Catálogo - Circuitos
 import { CircuitoRoutes } from "./modulos/catalogo/circuitos/circuito.routes";
@@ -75,9 +83,7 @@ app.use("/api/salidas", CancelacionSalidaRoutes.getRoutes);  // GET /:id/cancela
 import { LogisticaRoutes } from "./modulos/salidas/logistica/logistica.routes";
 app.use("/api/salidas", LogisticaRoutes.getRoutes);    
 
-// Autoridad
-import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
-// configurarAutoridad(new <ImplementacionSimulada>());
+
 
 
 
