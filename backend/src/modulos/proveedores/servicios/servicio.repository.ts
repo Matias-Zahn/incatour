@@ -10,11 +10,32 @@ const INCLUDE_COMPLETO = {
   equipamiento: true,
 } as const;
 
-const RELACION_SUBTIPO: { [tipo in TipoServicio]: "alojamiento" | "transporte" | "tren" | "equipamiento" } = {
-  ALOJAMIENTO: "alojamiento",
-  TRANSPORTE: "transporte",
-  TREN: "tren",
-  EQUIPAMIENTO: "equipamiento",
+export interface BaseServicio {
+  nombreServicio?: string;
+  descripcion?: string | null;
+  costoBase?: number;
+  localidad?: string;
+}
+
+type Dato = { [k: string]: any };
+
+// Claves explícitas por tipo (sin claves calculadas): así Prisma tipa bien la creación anidada
+const subtipoCrear = (tipo: TipoServicio, datos: Dato) => {
+  switch (tipo) {
+    case "ALOJAMIENTO": return { alojamiento: { create: datos as any } };
+    case "TRANSPORTE": return { transporte: { create: datos as any } };
+    case "TREN": return { tren: { create: datos as any } };
+    default: return { equipamiento: { create: datos as any } };
+  }
+};
+
+const subtipoActualizar = (tipo: TipoServicio, datos: Dato) => {
+  switch (tipo) {
+    case "ALOJAMIENTO": return { alojamiento: { update: datos as any } };
+    case "TRANSPORTE": return { transporte: { update: datos as any } };
+    case "TREN": return { tren: { update: datos as any } };
+    default: return { equipamiento: { update: datos as any } };
+  }
 };
 
 export class ServicioRepository {
@@ -44,31 +65,24 @@ export class ServicioRepository {
 
   // CU-19: servicio base + subtipo en una sola transacción (patrón CTI)
   async create(idproveedor: number, dto: CrearServicioDto) {
-    const rel = RELACION_SUBTIPO[dto.tipo];
     return db.servicioBase.create({
       data: {
         idproveedor,
         ...dto.base,
         estado: ESTADO.ACTIVO,
-        [rel]: { create: dto.especifico },
+        ...subtipoCrear(dto.tipo, dto.especifico),
       },
       include: INCLUDE_COMPLETO,
     });
   }
 
   // CU-20: modificación en el mismo registro
-  async updateEnSitio(
-    id: number,
-    tipo: TipoServicio,
-    base: { [k: string]: any },
-    especifico: { [k: string]: any }
-  ) {
-    const rel = RELACION_SUBTIPO[tipo];
+  async updateEnSitio(id: number, tipo: TipoServicio, base: BaseServicio, especifico: Dato) {
     return db.servicioBase.update({
       where: { idservicio: id },
       data: {
         ...base,
-        ...(Object.keys(especifico).length > 0 && { [rel]: { update: especifico } }),
+        ...(Object.keys(especifico).length > 0 && subtipoActualizar(tipo, especifico)),
       },
       include: INCLUDE_COMPLETO,
     });
@@ -83,10 +97,9 @@ export class ServicioRepository {
   async versionar(
     original: { idservicio: number; idproveedor: number; nombreServicio: string; descripcion: string | null; costoBase: number; localidad: string },
     tipo: TipoServicio,
-    base: { [k: string]: any },
-    especificoCompleto: { [k: string]: any }
+    base: BaseServicio,
+    especificoCompleto: Dato
   ) {
-    const rel = RELACION_SUBTIPO[tipo];
     return db.$transaction(async (tx) => {
       const nuevo = await tx.servicioBase.create({
         data: {
@@ -97,7 +110,7 @@ export class ServicioRepository {
           localidad: original.localidad,
           ...base,
           estado: ESTADO.ACTIVO,
-          [rel]: { create: especificoCompleto },
+          ...subtipoCrear(tipo, especificoCompleto),
         },
         include: INCLUDE_COMPLETO,
       });
