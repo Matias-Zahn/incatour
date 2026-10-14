@@ -13,12 +13,16 @@ import {
 } from "../../services/proveedorService";
 import type { DatosProveedor, Proveedor } from "../../services/proveedorService";
 
+const ELEMENTOS_POR_PAGINA = 5;
+
 function ProveedoresPage() {
     const { data: proveedores = [], isPending, isError, error } = useProveedores();
     const registrar = useRegistrarProveedor();
     const modificar = useModificarProveedor();
     const darDeBaja = useDarDeBajaProveedor();
     const guardando = registrar.isPending || modificar.isPending;
+
+    const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
     const [formularioAbierto, setFormularioAbierto] = useState(false);
     const [proveedorEnEdicion, setProveedorEnEdicion] =
@@ -26,6 +30,11 @@ function ProveedoresPage() {
     const [proveedorSeleccionado, setProveedorSeleccionado] =
         useState<Proveedor | null>(null);
     const [errorFormulario, setErrorFormulario] = useState("");
+
+    function manejarCambioBusqueda(nuevoValor: string) {
+        setBusqueda(nuevoValor);
+        setPaginaActual(1);
+    }
 
     function abrirFormulario(proveedor?: Proveedor) {
         setProveedorEnEdicion(proveedor ?? null);
@@ -76,8 +85,32 @@ function ProveedoresPage() {
         });
     }
 
+    const terminoLimpio = busqueda.trim().toLowerCase();
+    const proveedoresFiltrados = proveedores.filter((proveedor) => {
+        if (!terminoLimpio) return true;
+        return (
+            proveedor.nombre.toLowerCase().includes(terminoLimpio) ||
+            proveedor.contacto.toLowerCase().includes(terminoLimpio)
+        );
+    });
+
+    const totalPaginas = Math.max(
+        1,
+        Math.ceil(proveedoresFiltrados.length / ELEMENTOS_POR_PAGINA),
+    );
+    const indiceInicio = (paginaActual - 1) * ELEMENTOS_POR_PAGINA;
+    const proveedoresPaginados = proveedoresFiltrados.slice(
+        indiceInicio,
+        indiceInicio + ELEMENTOS_POR_PAGINA,
+    );
+
     const estado = isPending ? "cargando" : isError ? "error" : "exito";
-    const mostrarListadoVacio = estado === "exito" && proveedores.length === 0;
+    const sinProveedoresRegistrados =
+        estado === "exito" && proveedores.length === 0;
+    const sinResultadosBusqueda =
+        estado === "exito" &&
+        proveedores.length > 0 &&
+        proveedoresFiltrados.length === 0;
 
     return (
         <section className="mx-auto max-w-7xl space-y-6">
@@ -109,20 +142,55 @@ function ProveedoresPage() {
                 />
             ) : null}
 
+            {estado === "exito" && proveedores.length > 0 ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative w-full max-w-md">
+                        <label htmlFor="buscar-proveedor" className="sr-only">
+                            Buscar proveedor
+                        </label>
+                        <input
+                            id="buscar-proveedor"
+                            type="search"
+                            value={busqueda}
+                            onChange={(evento) =>
+                                manejarCambioBusqueda(evento.target.value)
+                            }
+                            placeholder="Buscar por nombre o correo..."
+                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        />
+                    </div>
+
+                    {busqueda ? (
+                        <Boton
+                            variante="fantasma"
+                            className="self-start text-xs text-texto-suave sm:self-auto"
+                            onClick={() => manejarCambioBusqueda("")}
+                        >
+                            Limpiar búsqueda
+                        </Boton>
+                    ) : null}
+                </div>
+            ) : null}
+
             {estado !== "exito" ? (
                 <EstadoListado
                     estado={estado}
                     mensaje={estado === "error" ? error?.message : undefined}
                 />
-            ) : mostrarListadoVacio ? (
+            ) : sinProveedoresRegistrados ? (
                 <EstadoListado
                     estado="vacio"
                     mensaje="Todavía no hay proveedores registrados."
                 />
+            ) : sinResultadosBusqueda ? (
+                <EstadoListado
+                    estado="vacio"
+                    mensaje={`No se encontraron proveedores que coincidan con "${busqueda.trim()}".`}
+                />
             ) : (
                 <div className="overflow-x-auto">
                     <Tabla
-                        filas={proveedores}
+                        filas={proveedoresPaginados}
                         columnas={[
                             {
                                 clave: "nombre",
@@ -163,10 +231,10 @@ function ProveedoresPage() {
                 </div>
             )}
 
-            {estado === "exito" && proveedores.length > 0 ? (
+            {estado === "exito" && proveedoresFiltrados.length > 0 ? (
                 <Paginacion
                     paginaActual={paginaActual}
-                    totalPaginas={1}
+                    totalPaginas={totalPaginas}
                     onCambiarPagina={setPaginaActual}
                 />
             ) : null}
@@ -188,3 +256,4 @@ function ProveedoresPage() {
 }
 
 export default ProveedoresPage;
+
