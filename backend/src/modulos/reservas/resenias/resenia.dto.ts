@@ -40,12 +40,12 @@ export class FiltrosReseniaDto {
   ) {}
 
   public static create(query: { [key: string]: any }): [string | undefined, FiltrosReseniaDto?] {
-    const entero = (valor: any, nombre: string): [string | undefined, number?] => {
+    const entero = (valor: any, nombre: string): [string | undefined, (number | undefined)?] => {
       if (valor === undefined) return [undefined, undefined];
       const n = parseInt(valor);
       return isNaN(n) ? [`${nombre} debe ser un número entero.`] : [undefined, n];
     };
-    const fecha = (valor: any, nombre: string): [string | undefined, Date?] => {
+    const fecha = (valor: any, nombre: string): [string | undefined, (Date | undefined)?] => {
       if (valor === undefined) return [undefined, undefined];
       const f = new Date(valor);
       return isNaN(f.getTime()) ? [`${nombre} no es una fecha válida (YYYY-MM-DD).`] : [undefined, f];

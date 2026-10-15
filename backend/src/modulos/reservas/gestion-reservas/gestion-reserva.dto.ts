@@ -2,7 +2,7 @@ import { ESTADO_RESERVA } from "../../../shared/constantes";
 
 const ESTADOS = Object.values(ESTADO_RESERVA) as string[];
 
-const fechaOpcional = (valor: any, nombre: string): [string | undefined, Date?] => {
+const fechaOpcional = (valor: any, nombre: string): [string | undefined, (Date | undefined)?] => {
   if (valor === undefined) return [undefined, undefined];
   const f = new Date(valor);
   if (isNaN(f.getTime())) return [`${nombre} no es una fecha válida (usá YYYY-MM-DD).`];
