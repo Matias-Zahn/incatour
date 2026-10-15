@@ -81,13 +81,132 @@ export class PersonalRoutes {
      */
     router.post("/", autenticar, requierePerfil("ADMIN"), controller.crearPersonal);
 
-    // CU-22: Consultar personal operativo
+    /**
+     * @swagger
+     * /api/personal:
+     *   get:
+     *     summary: Consultar personal operativo (CU-22)
+     *     description: >
+     *       **RESTRINGIDO A ADMINISTRADOR.** Lista guías y porteadores con sus datos de pasaporte y,
+     *       en los guías, su habilitación. Todos los filtros son opcionales.
+     *     tags: [Personal]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: query, name: rol, schema: { type: string, enum: [Guía, Porteador] } }
+     *       - { in: query, name: estado, schema: { type: string, enum: [ACTIVO, INACTIVO] } }
+     *       - in: query
+     *         name: habilitacionVigente
+     *         schema: { type: boolean }
+     *         description: true = habilitación vigente, false = vencida. Deja solo guías.
+     *     responses:
+     *       200:
+     *         description: Lista de personal ordenada por nombre.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 data:
+     *                   type: array
+     *                   items: { $ref: '#/components/schemas/Personal' }
+     *       400: { description: Filtro inválido. }
+     *       401: { description: Token no proporcionado o inválido. }
+     *       403: { description: Se requiere el perfil ADMIN. }
+     *
+     * components:
+     *   schemas:
+     *     Personal:
+     *       type: object
+     *       properties:
+     *         idpersonal: { type: integer, example: 1 }
+     *         nombreCompleto: { type: string, example: Carlos Mamani }
+     *         nroPasaporte: { type: string, example: P123456 }
+     *         nacionalidad: { type: string, example: Peruana }
+     *         fechaVencimientoPasaporte: { type: string, format: date-time }
+     *         estado: { type: string, enum: [ACTIVO, INACTIVO] }
+     *         rol: { type: string, enum: [Guía, Porteador] }
+     *         guia:
+     *           type: object
+     *           nullable: true
+     *           description: Solo en guías. Los porteadores tienen null.
+     *           properties:
+     *             nroHabilitacion: { type: string, example: HAB-001 }
+     *             fechaHabilitacion: { type: string, format: date-time, description: Vencimiento de la habilitación. }
+     */
     router.get("/", autenticar, requierePerfil("ADMIN"), controller.consultarPersonal);
 
-    // CU-24: Modificar personal operativo
+    /**
+     * @swagger
+     * /api/personal/{id}:
+     *   put:
+     *     summary: Modificar personal operativo (CU-24)
+     *     description: >
+     *       **RESTRINGIDO A ADMINISTRADOR.** Modificación parcial: se envían solo los campos que cambian.
+     *       La habilitación solo se acepta para guías. El rol no se modifica y el estado se cambia con la baja (CU-25).
+     *     tags: [Personal]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: id, required: true, schema: { type: integer } }
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               nombreCompleto: { type: string, example: Carlos Mamani, description: Solo letras y espacios. }
+     *               nroPasaporte: { type: string, example: P123456, description: No puede estar usado por otra persona. }
+     *               nacionalidad: { type: string, example: Peruana }
+     *               fechaVencimientoPasaporte: { type: string, format: date, example: "2031-01-01", description: No puede ser pasada. }
+     *               nroHabilitacion: { type: string, example: HAB-001-R, description: Solo guías. }
+     *               fechaHabilitacion: { type: string, format: date, example: "2028-12-31", description: Solo guías. No puede ser pasada. }
+     *     responses:
+     *       200:
+     *         description: Personal modificado.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 mensaje: { type: string }
+     *                 data: { $ref: '#/components/schemas/Personal' }
+     *       400: { description: Datos inválidos, body vacío, intento de cambiar rol o estado, habilitación en un porteador, fecha vencida, pasaporte repetido o personal dado de baja. }
+     *       401: { description: Token no proporcionado o inválido. }
+     *       403: { description: Se requiere el perfil ADMIN. }
+     *       404: { description: El personal no existe. }
+     */
     router.put("/:id", autenticar, requierePerfil("ADMIN"), controller.modificarPersonal);
 
-    // CU-25: Baja lógica de personal operativo
+    /**
+     * @swagger
+     * /api/personal/{id}/baja:
+     *   patch:
+     *     summary: Baja de personal operativo (CU-25)
+     *     description: >
+     *       **RESTRINGIDO A ADMINISTRADOR.** Baja lógica: el personal queda INACTIVO y, si es guía, también su cuenta de acceso.
+     *       No procede si está asignado a una salida que todavía no finalizó (PUBLICADA, ABIERTA, CERRADA o EN_CURSO).
+     *     tags: [Personal]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: id, required: true, schema: { type: integer } }
+     *     responses:
+     *       200:
+     *         description: Personal dado de baja.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 mensaje: { type: string }
+     *                 data: { $ref: '#/components/schemas/Personal' }
+     *       400: { description: Asignado a salidas sin finalizar, o ya dado de baja. }
+     *       401: { description: Token no proporcionado o inválido. }
+     *       403: { description: Se requiere el perfil ADMIN. }
+     *       404: { description: El personal no existe. }
+     */
     router.patch("/:id/baja", autenticar, requierePerfil("ADMIN"), controller.darDeBaja);
 
     return router;
