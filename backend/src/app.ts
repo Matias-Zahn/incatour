@@ -93,10 +93,9 @@ app.use("/api/salidas", CancelacionSalidaRoutes.getRoutes);  // GET /:id/cancela
 import { LogisticaRoutes } from "./modulos/salidas/logistica/logistica.routes";
 app.use("/api/salidas", LogisticaRoutes.getRoutes);    
 
-
-
-
-
+// Módulo Salidas - Devolución de Equipamiento (CU-41)
+import { DevolucionEquipamientoRoutes } from "./modulos/salidas/devolucion-equipamiento/devolucion-equipamiento.routes";
+app.use("/api/salidas", DevolucionEquipamientoRoutes.getRoutes);
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
