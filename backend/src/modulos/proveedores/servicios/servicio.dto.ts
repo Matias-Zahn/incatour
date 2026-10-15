@@ -5,7 +5,7 @@ const DIAS_VALIDOS = ["L", "M", "X", "J", "V", "S", "D"];
 const REGEX_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // ---------- Validadores atómicos: devuelven [error, valorLimpio] ----------
-type Validador = (valor: any, campo: string) => [string?, any?];
+type Validador = (valor: any, campo: string) => [string | undefined, any?];
 
 const vTexto = (max: number): Validador => (v, c) =>
   typeof v === "string" && v.trim().length > 0 && v.trim().length <= max
@@ -75,7 +75,7 @@ const validarCampos = (
   obj: { [k: string]: any },
   campos: { [campo: string]: Validador },
   exigirTodos: boolean
-): [string?, { [k: string]: any }?] => {
+): [string | undefined, { [k: string]: any }?] => {
   const limpio: { [k: string]: any } = {};
   for (const [campo, validar] of Object.entries(campos)) {
     if (obj[campo] === undefined) {
@@ -89,7 +89,7 @@ const validarCampos = (
   return [undefined, limpio];
 };
 
-const validarDescripcion = (v: any): [string?, (string | null)?] => {
+const validarDescripcion = (v: any): [string | undefined, (string | null)?] => {
   if (v === undefined || v === null || v === "") return [undefined, null];
   if (typeof v !== "string" || v.trim().length > 500) return ["descripcion no puede superar los 500 caracteres."];
   return [undefined, v.trim()];
@@ -103,7 +103,7 @@ export class CrearServicioDto {
     public especifico: { [k: string]: any }
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CrearServicioDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CrearServicioDto?] {
     const tipos = Object.values(TIPO_SERVICIO) as string[];
     if (!obj.tipo || !tipos.includes(obj.tipo)) return [`tipo debe ser uno de: ${tipos.join(", ")}.`];
     const tipo = obj.tipo as TipoServicio;
@@ -138,7 +138,7 @@ export class ModificarServicioDto {
     public especifico: { [k: string]: any }
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, ModificarServicioDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, ModificarServicioDto?] {
     const [errBase, base] = validarCampos(obj, CAMPOS_BASE, false);
     if (errBase) return [errBase];
 
@@ -165,7 +165,7 @@ export class ModificarServicioDto {
 export class FiltrosServicioDto {
   private constructor(public estado?: string) {}
 
-  public static create(query: { [key: string]: any }): [string?, FiltrosServicioDto?] {
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosServicioDto?] {
     const { estado } = query;
     if (estado !== undefined && ![ESTADO.ACTIVO, ESTADO.INACTIVO].includes(estado)) {
       return [`estado debe ser ${ESTADO.ACTIVO} o ${ESTADO.INACTIVO}.`];

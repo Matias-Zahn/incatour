@@ -11,11 +11,13 @@ export interface DatosConfirmacionReserva {
   pasajeros: PasajeroInput[];
   estadoAlojamiento: string;
   // Solo si el alojamiento quedó pendiente (no había plazas bloqueadas)
-  solicitud?: {
-    nroSolicitud: string;
-    idservicio: number | null; // null cuando la garantía es por categoría
-    criterios: string;
-  };
+  solicitud?:
+    | {
+        nroSolicitud: string;
+        idservicio: number | null; // null cuando la garantía es por categoría
+        criterios: string;
+      }
+    | undefined;
 }
 
 export class ReservaRepository {

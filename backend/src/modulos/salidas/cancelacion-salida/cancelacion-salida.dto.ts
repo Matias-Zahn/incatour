@@ -2,7 +2,7 @@
 export class CancelarSalidaDto {
   private constructor(public motivo: string) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CancelarSalidaDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CancelarSalidaDto?] {
     const { motivo } = obj ?? {};
     if (typeof motivo !== "string" || motivo.trim().length === 0) return ["El motivo de la cancelación es requerido."];
     const limpio = motivo.trim();
