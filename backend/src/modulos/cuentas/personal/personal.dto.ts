@@ -1,3 +1,4 @@
+import { ESTADO } from "../../../shared/constantes";
 // Un solo lugar para estos valores: evita errores por tildes o mayúsculas ("Guía" vs "Guia")
 export const ROL_GUIA = "Guía";
 export const ROL_PORTEADOR = "Porteador";
@@ -17,7 +18,7 @@ export class CrearPersonalDto {
     public fechaHabilitacion?: Date
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CrearPersonalDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CrearPersonalDto?] {
     let {
       nombre, apellido, email, contrasenia, nroPasaporte, nacionalidad,
       fechaVencimientoPasaporte, rolOperativo, nroHabilitacion, fechaHabilitacion,
@@ -145,3 +146,28 @@ export class CrearPersonalDto {
   }
 }
 */
+// CU-22: filtros por query string (texto y todos opcionales)
+export class ConsultarPersonalDto {
+  private constructor(
+    public rol: string | undefined,
+    public estado: string | undefined,
+    public habilitacionVigente: boolean | undefined,
+  ) {}
+
+  public static create(query: { [key: string]: any }): [string | undefined, ConsultarPersonalDto?] {
+    const { rol, estado, habilitacionVigente } = query;
+
+    if (rol !== undefined && ![ROL_GUIA, ROL_PORTEADOR].includes(rol)) {
+      return [`rol debe ser '${ROL_GUIA}' o '${ROL_PORTEADOR}'`];
+    }
+    if (estado !== undefined && !Object.values(ESTADO).includes(estado)) {
+      return [`estado debe ser ${Object.values(ESTADO).join(" o ")}`];
+    }
+    if (habilitacionVigente !== undefined && !["true", "false"].includes(habilitacionVigente)) {
+      return ["habilitacionVigente debe ser true o false"];
+    }
+
+    const vigente = habilitacionVigente === undefined ? undefined : habilitacionVigente === "true";
+    return [undefined, new ConsultarPersonalDto(rol, estado, vigente)];
+  }
+}
