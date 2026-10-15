@@ -89,14 +89,14 @@ model Pago {
 model Solicitud {
   idsolicitud    Int     @id @default(autoincrement())
   idreserva      Int
-  idservicio     Int
+  idservicio     Int?
   nroSolicitud   String  @unique
   estado         String
   cantidadPlazas Int
   criterios      String?
 
   reserva   Reserva            @relation(fields: [idreserva], references: [idreserva])
-  servicio  ServicioBase       @relation(fields: [idservicio], references: [idservicio])
+  servicio  ServicioBase?      @relation(fields: [idservicio], references: [idservicio])
   gestiones GestionSolicitud[]
 }
 

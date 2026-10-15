@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@theme {
+    --color-navegacion: #123d70;
+    --color-marca: #079dcc;
+    --color-marca-oscura: #087fae;
+    --color-marca-activa: #e4f6fb;
+    --color-marca-suave: #e4f6fb;
+    --color-primario: #079dcc;
+    --color-fondo: #f3f6f8;
+    --color-peligro: #ca4e59;
+    --color-exito: #158556;
+    --color-advertencia: #d18a13;
+    --color-texto: #19385b;
+    --color-texto-suave: #718194;
+    --color-borde: #d9e2e8;
+
+    --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+
+    --radius-control: 0.4375rem;
+    --radius-tarjeta: 0.875rem;
+    --shadow-tarjeta: 0 6px 18px rgb(26 64 94 / 0.045);
+}

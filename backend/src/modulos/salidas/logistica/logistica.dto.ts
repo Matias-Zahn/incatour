@@ -23,7 +23,7 @@ export class ModificarLogisticaDto {
     public motivo: string | null
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, ModificarLogisticaDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, ModificarLogisticaDto?] {
     const itemsDesasignar = obj.itemsDesasignar ?? [];
     const itemsNuevos = obj.itemsNuevos ?? [];
 
@@ -93,7 +93,7 @@ export class ModificarLogisticaDto {
 export class TipoRecursoDto {
   private constructor(public tipo: string) {}
 
-  public static create(query: { [key: string]: any }): [string?, TipoRecursoDto?] {
+  public static create(query: { [key: string]: any }): [string | undefined, TipoRecursoDto?] {
     if (!TIPOS_LOGISTICA.includes(query.tipo)) return [`tipo es requerido y debe ser uno de: ${TIPOS_LOGISTICA.join(", ")}.`];
     return [undefined, new TipoRecursoDto(query.tipo)];
   }

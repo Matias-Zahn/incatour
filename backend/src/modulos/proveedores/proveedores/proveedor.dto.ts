@@ -3,7 +3,7 @@ import { ESTADO, TIPOS_PROVEEDOR } from "../../../shared/constantes";
 const ESTADOS_VALIDOS: string[] = [ESTADO.ACTIVO, ESTADO.INACTIVO];
 
 /** Valida un texto obligatorio. Devuelve [error, valorLimpio]. */
-const textoRequerido = (valor: any, nombre: string, max: number): [string?, string?] => {
+const textoRequerido = (valor: any, nombre: string, max: number): [string | undefined, string?] => {
   if (typeof valor !== "string" || valor.trim().length === 0) return [`${nombre} es requerido.`];
   const limpio = valor.trim();
   if (limpio.length > max) return [`${nombre} no puede superar los ${max} caracteres.`];
@@ -21,7 +21,7 @@ export class CrearProveedorDto {
     public estado: string
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, CrearProveedorDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, CrearProveedorDto?] {
     const { tipoProveedor, estado } = obj;
 
     if (!tipoProveedor || !TIPOS_PROVEEDOR.includes(tipoProveedor)) {
@@ -58,7 +58,7 @@ export class ModificarProveedorDto {
     public estado?: string
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string?, ModificarProveedorDto?] {
+  public static create(obj: { [key: string]: any }): [string | undefined, ModificarProveedorDto?] {
     const { tipoProveedor, estado } = obj;
     const campos = ["tipoProveedor", "razonSocial", "localidad", "datosContacto", "canalComunicacion", "estado"];
     if (!campos.some((c) => obj[c] !== undefined)) {
@@ -98,7 +98,7 @@ export class FiltrosProveedorDto {
     public estado?: string
   ) {}
 
-  public static create(query: { [key: string]: any }): [string?, FiltrosProveedorDto?] {
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosProveedorDto?] {
     const { tipoProveedor, localidad, estado } = query;
     if (tipoProveedor !== undefined && !TIPOS_PROVEEDOR.includes(tipoProveedor)) {
       return [`tipoProveedor debe ser uno de: ${TIPOS_PROVEEDOR.join(", ")}.`];
