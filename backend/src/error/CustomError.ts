@@ -17,6 +17,10 @@ export class CustomError extends Error {
     return new CustomError(message, 403);
   }
 
+  public static conflict(message: string) {
+    return new CustomError(message, 409);
+  }
+
   public static notFound(message: string) {
     return new CustomError(message, 404);
   }

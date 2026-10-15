@@ -96,6 +96,10 @@ app.use("/api/salidas", LogisticaRoutes.getRoutes);
 // Módulo Salidas - Devolución de Equipamiento (CU-41)
 import { DevolucionEquipamientoRoutes } from "./modulos/salidas/devolucion-equipamiento/devolucion-equipamiento.routes";
 app.use("/api/salidas", DevolucionEquipamientoRoutes.getRoutes);
+
+// Módulo Salidas - Asignación de recursos (CU-40)
+import { AsignacionRoutes } from "./modulos/salidas/asignacion/asignacion.routes";
+app.use("/api/salidas", AsignacionRoutes.getRoutes);
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
