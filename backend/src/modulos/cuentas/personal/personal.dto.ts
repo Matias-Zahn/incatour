@@ -171,3 +171,60 @@ export class ConsultarPersonalDto {
     return [undefined, new ConsultarPersonalDto(rol, estado, vigente)];
   }
 }
+
+// CU-24: modificación parcial. El rol y el estado no se cambian acá (el estado es la baja, CU-25)
+export class ModificarPersonalDto {
+  private constructor(
+    public nombreCompleto: string | undefined,
+    public nroPasaporte: string | undefined,
+    public nacionalidad: string | undefined,
+    public fechaVencimientoPasaporte: Date | undefined,
+    public nroHabilitacion: string | undefined,
+    public fechaHabilitacion: Date | undefined,
+  ) {}
+
+  get modificaHabilitacion() {
+    return this.nroHabilitacion !== undefined || this.fechaHabilitacion !== undefined;
+  }
+
+  public static create(obj: { [key: string]: any }): [string | undefined, ModificarPersonalDto?] {
+    const { rol, rolOperativo, estado } = obj;
+    if (rol !== undefined || rolOperativo !== undefined) return ["El rol no se puede modificar"];
+    if (estado !== undefined) return ["El estado se cambia con la baja (CU-25)"];
+
+    const [e1, nombreCompleto] = texto(obj.nombreCompleto, "nombreCompleto", /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/);
+    if (e1) return [e1];
+    const [e2, nroPasaporte] = texto(obj.nroPasaporte, "nroPasaporte");
+    if (e2) return [e2];
+    const [e3, nacionalidad] = texto(obj.nacionalidad, "nacionalidad");
+    if (e3) return [e3];
+    const [e4, nroHabilitacion] = texto(obj.nroHabilitacion, "nroHabilitacion");
+    if (e4) return [e4];
+    const [e5, fechaVencimientoPasaporte] = fecha(obj.fechaVencimientoPasaporte, "fechaVencimientoPasaporte");
+    if (e5) return [e5];
+    const [e6, fechaHabilitacion] = fecha(obj.fechaHabilitacion, "fechaHabilitacion");
+    if (e6) return [e6];
+
+    const dto = new ModificarPersonalDto(
+      nombreCompleto, nroPasaporte, nacionalidad, fechaVencimientoPasaporte, nroHabilitacion, fechaHabilitacion,
+    );
+    if (Object.values(dto).every((v) => v === undefined)) return ["No se envió ningún dato para modificar"];
+    return [undefined, dto];
+  }
+}
+
+const texto = (valor: unknown, campo: string, formato?: RegExp): [string | undefined, string?] => {
+  if (valor === undefined) return [undefined];
+  if (typeof valor !== "string" || valor.trim().length === 0 || valor.trim().length > 128) {
+    return [`${campo} debe ser un texto de 1 a 128 caracteres`];
+  }
+  if (formato && !formato.test(valor.trim())) return [`${campo} solo puede contener letras y espacios`];
+  return [undefined, valor.trim()];
+};
+
+const fecha = (valor: unknown, campo: string): [string | undefined, Date?] => {
+  if (valor === undefined) return [undefined];
+  const f = new Date(String(valor));
+  if (typeof valor !== "string" || isNaN(f.getTime())) return [`${campo} debe ser una fecha válida (AAAA-MM-DD)`];
+  return [undefined, f];
+};

@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ConsultarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
+import { ConsultarPersonalDto, ModificarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
 
 export interface DatosPersonal {
   nombre: string;
@@ -89,6 +89,32 @@ export class PersonalRepository {
       },
       include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
       orderBy: { nombreCompleto: "asc" },
+    });
+  }
+
+  async buscarPorId(idpersonal: number) {
+    return db.personal.findUnique({ where: { idpersonal }, include: { guia: true } });
+  }
+
+  // CU-24: Personal y, si corresponde, Guia en una sola operación
+  async modificar(idpersonal: number, dto: ModificarPersonalDto) {
+    return db.personal.update({
+      where: { idpersonal },
+      data: {
+        ...(dto.nombreCompleto && { nombreCompleto: dto.nombreCompleto }),
+        ...(dto.nroPasaporte && { nroPasaporte: dto.nroPasaporte }),
+        ...(dto.nacionalidad && { nacionalidad: dto.nacionalidad }),
+        ...(dto.fechaVencimientoPasaporte && { fechaVencimientoPasaporte: dto.fechaVencimientoPasaporte }),
+        ...(dto.modificaHabilitacion && {
+          guia: {
+            update: {
+              ...(dto.nroHabilitacion && { nroHabilitacion: dto.nroHabilitacion }),
+              ...(dto.fechaHabilitacion && { fechaHabilitacion: dto.fechaHabilitacion }),
+            },
+          },
+        }),
+      },
+      include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
     });
   }
 
