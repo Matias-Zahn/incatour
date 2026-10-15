@@ -10,6 +10,10 @@ export class SalidaRoutes {
     // CU-35: Consultar salidas
     router.get("/", autenticar, requierePerfil("ADMIN"), controller.consultarSalidas);
 
+    // CU-36: Crear salida planificada (primero las opciones, después la confirmación)
+    router.get("/opciones", autenticar, requierePerfil("ADMIN"), controller.consultarOpcionesSalida);
+    router.post("/", autenticar, requierePerfil("ADMIN"), controller.confirmarCreacionSalida);
+
     return router;
   }
 }
