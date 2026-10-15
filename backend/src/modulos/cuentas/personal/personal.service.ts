@@ -1,10 +1,15 @@
 import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
 import { PersonalRepository } from "./personal.repository";
-import { CrearPersonalDto, ROL_GUIA } from "./personal.dto";
+import { ConsultarPersonalDto, CrearPersonalDto, ROL_GUIA } from "./personal.dto";
 
 export class PersonalService {
   private repository = new PersonalRepository();
+
+  // CU-22: Consultar personal operativo
+  async consultarPersonal(dto: ConsultarPersonalDto) {
+    return this.repository.buscar(dto);
+  }
 
   async crearPersonal(dto: CrearPersonalDto) {
     const hoy = new Date();

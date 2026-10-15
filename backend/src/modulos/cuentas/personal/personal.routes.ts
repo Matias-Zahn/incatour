@@ -81,6 +81,9 @@ export class PersonalRoutes {
      */
     router.post("/", autenticar, requierePerfil("ADMIN"), controller.crearPersonal);
 
+    // CU-22: Consultar personal operativo
+    router.get("/", autenticar, requierePerfil("ADMIN"), controller.consultarPersonal);
+
     return router;
   }
 }

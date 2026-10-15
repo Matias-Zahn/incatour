@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
+import { ConsultarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
 
 export interface DatosPersonal {
   nombre: string;
@@ -73,6 +73,22 @@ export class PersonalRepository {
         rol: ROL_PORTEADOR,
         estado: "ACTIVO",
       },
+    });
+  }
+
+  // CU-22: la habilitación es del guía, así que filtrar por vigencia deja solo guías
+  async buscar(dto: ConsultarPersonalDto) {
+    const hoy = new Date();
+    return db.personal.findMany({
+      where: {
+        ...(dto.rol && { rol: dto.rol }),
+        ...(dto.estado && { estado: dto.estado }),
+        ...(dto.habilitacionVigente !== undefined && {
+          guia: { fechaHabilitacion: dto.habilitacionVigente ? { gte: hoy } : { lt: hoy } },
+        }),
+      },
+      include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
+      orderBy: { nombreCompleto: "asc" },
     });
   }
 

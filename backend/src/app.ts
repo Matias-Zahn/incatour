@@ -17,8 +17,8 @@ app.get("/api/", (req, res) => {
 
 // Autoridad
 import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
-import { AutoridadMock } from "./integraciones/autoridad/autoridad.mock"; // ajustá la ruta real
-//configurarAutoridad(new ImplementacionSimulada());
+import { AutoridadMock } from "./integraciones/autoridad/autoridad.mock";
+configurarAutoridad(new AutoridadMock());
 
 //Modulo Auth
 import { AuthRoutes } from "./shared/auth/auth.routes";
