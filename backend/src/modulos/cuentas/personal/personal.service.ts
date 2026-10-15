@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
 import { PersonalRepository } from "./personal.repository";
-import { ConsultarPersonalDto, CrearPersonalDto, ROL_GUIA } from "./personal.dto";
+import { ConsultarPersonalDto, CrearPersonalDto, ModificarPersonalDto, ROL_GUIA } from "./personal.dto";
+import { ESTADO } from "../../../shared/constantes";
 
 export class PersonalService {
   private repository = new PersonalRepository();
@@ -9,6 +10,32 @@ export class PersonalService {
   // CU-22: Consultar personal operativo
   async consultarPersonal(dto: ConsultarPersonalDto) {
     return this.repository.buscar(dto);
+  }
+
+  // CU-24: Modificar personal operativo
+  async modificarPersonal(idpersonal: number, dto: ModificarPersonalDto) {
+    const personal = await this.repository.buscarPorId(idpersonal);
+    if (!personal) throw CustomError.notFound("El personal no existe");
+    if (personal.estado !== ESTADO.ACTIVO) throw CustomError.badRequest("No se puede modificar personal dado de baja");
+
+    if (dto.modificaHabilitacion && !personal.guia) {
+      throw CustomError.badRequest("La habilitación solo corresponde a un guía");
+    }
+
+    const hoy = new Date();
+    if (dto.fechaVencimientoPasaporte && dto.fechaVencimientoPasaporte < hoy) {
+      throw CustomError.badRequest("El pasaporte no puede estar vencido");
+    }
+    if (dto.fechaHabilitacion && dto.fechaHabilitacion < hoy) {
+      throw CustomError.badRequest("La habilitación no puede estar vencida");
+    }
+
+    if (dto.nroPasaporte && dto.nroPasaporte !== personal.nroPasaporte) {
+      const existe = await this.repository.checkPasaporteExists(dto.nroPasaporte);
+      if (existe) throw CustomError.badRequest("Este número de pasaporte ya está registrado");
+    }
+
+    return this.repository.modificar(idpersonal, dto);
   }
 
   async crearPersonal(dto: CrearPersonalDto) {
