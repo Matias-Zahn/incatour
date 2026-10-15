@@ -48,3 +48,37 @@ const aFecha = (valor: unknown, campo: string): [string | undefined, Date?] => {
   }
   return [undefined, fecha];
 };
+
+// CU-36: llega por body (números) en POST y por query (texto) en GET /opciones
+export class CrearSalidaDto {
+  private constructor(
+    public idpaquete: number,
+    public fechaInicio: Date,
+    public tamanoMaximo: number,
+    public idalojamiento: number | undefined,
+  ) {}
+
+  public static create(obj: { [key: string]: any }): [string | undefined, CrearSalidaDto?] {
+    const idpaquete = entero(obj.idpaquete);
+    if (!idpaquete) return ["idpaquete es requerido y debe ser un entero positivo"];
+
+    const tamanoMaximo = entero(obj.tamanoMaximo);
+    if (!tamanoMaximo) return ["tamanoMaximo es requerido y debe ser un entero positivo"];
+
+    const fechaInicio = new Date(String(obj.fechaInicio));
+    if (obj.fechaInicio === undefined || isNaN(fechaInicio.getTime())) {
+      return ["fechaInicio es requerida y debe ser una fecha válida (AAAA-MM-DD)"];
+    }
+
+    const idalojamiento = obj.idalojamiento == null ? undefined : entero(obj.idalojamiento);
+    if (idalojamiento === null) return ["idalojamiento debe ser un entero positivo"];
+
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento)];
+  }
+}
+
+// Acepta 5 o "5"; devuelve null si no es un entero positivo
+const entero = (valor: unknown): number | null => {
+  const n = typeof valor === "string" && valor.trim() !== "" ? Number(valor) : valor;
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : null;
+};

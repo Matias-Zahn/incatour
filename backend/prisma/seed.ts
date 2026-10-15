@@ -169,17 +169,6 @@ async function main() {
       fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
       estado: "ACTIVO",
       rol: "Guía",
-    },
-  });
-
-  const guia = await db.personal.create({
-    data: {
-      nombreCompleto: "Carlos Mamani",
-      nroPasaporte: "P123456",
-      nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
-      estado: "ACTIVO",
-      rol: "Guía",
       guia: {
         create: {
           idusuario: usuarioGuia.idusuario,
@@ -239,6 +228,7 @@ async function main() {
       categoriaGarantizada: "3 Estrellas",
       localidadGarantizada: "Cusco",
       tipoHabitacionGarantizada: "Doble",
+      tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 650, moneda: "USD" }] },
       servicios: {
         create: [
           { idservicio: servAloj.idservicio },
@@ -255,6 +245,7 @@ async function main() {
       nombrePaquete: "Inca VIP Hotel Montaña",
       estado: "ACTIVO",
       tipoGarantia: "Por Establecimiento",
+      tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 980, moneda: "USD" }] },
       servicios: {
         create: [
           { idservicio: servAloj.idservicio },

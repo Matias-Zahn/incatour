@@ -21,6 +21,10 @@ export class CustomError extends Error {
     return new CustomError(message, 404);
   }
 
+  public static serviceUnavailable(message: string) {
+    return new CustomError(message, 503);
+  }
+
   public static internalServerError(message: string) {
     return new CustomError(message, 500);
   }
