@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { ConsultarPersonalDto, ModificarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
 
 export interface DatosPersonal {
@@ -115,6 +116,28 @@ export class PersonalRepository {
         }),
       },
       include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
+    });
+  }
+
+  /**
+   * CU-25: el chequeo de salidas sin finalizar y la baja van en la misma transacción
+   * (mismo patrón que la baja de cuenta del CU-46). Si es guía, también se desactiva su cuenta.
+   */
+  async darDeBaja(idpersonal: number, idusuario: number | null) {
+    return db.$transaction(async (tx) => {
+      const pendientes = await tx.asignacionPersonal.count({
+        where: { idpersonal, salida: { estado: { in: SALIDAS_ACTIVAS } } },
+      });
+      if (pendientes > 0) return { bloqueadoPor: pendientes } as const;
+
+      const personal = await tx.personal.update({
+        where: { idpersonal },
+        data: { estado: ESTADO.INACTIVO },
+      });
+      if (idusuario) {
+        await tx.usuario.update({ where: { idusuario }, data: { estado: ESTADO.INACTIVO } });
+      }
+      return { personal } as const;
     });
   }
 

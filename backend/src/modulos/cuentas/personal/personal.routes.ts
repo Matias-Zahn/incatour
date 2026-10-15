@@ -87,6 +87,9 @@ export class PersonalRoutes {
     // CU-24: Modificar personal operativo
     router.put("/:id", autenticar, requierePerfil("ADMIN"), controller.modificarPersonal);
 
+    // CU-25: Baja lógica de personal operativo
+    router.patch("/:id/baja", autenticar, requierePerfil("ADMIN"), controller.darDeBaja);
+
     return router;
   }
 }
