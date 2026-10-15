@@ -38,6 +38,21 @@ export class PersonalService {
     return this.repository.modificar(idpersonal, dto);
   }
 
+  // CU-25: Baja lógica de personal operativo
+  async darDeBaja(idpersonal: number) {
+    const personal = await this.repository.buscarPorId(idpersonal);
+    if (!personal) throw CustomError.notFound("El personal no existe");
+    if (personal.estado !== ESTADO.ACTIVO) throw CustomError.badRequest("El personal ya está dado de baja");
+
+    const resultado = await this.repository.darDeBaja(idpersonal, personal.guia?.idusuario ?? null);
+    if ("bloqueadoPor" in resultado) {
+      throw CustomError.badRequest(
+        `No se puede dar de baja: está asignado a ${resultado.bloqueadoPor} salida(s) que todavía no finalizaron`
+      );
+    }
+    return resultado.personal;
+  }
+
   async crearPersonal(dto: CrearPersonalDto) {
     const hoy = new Date();
 

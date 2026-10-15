@@ -6,6 +6,19 @@ import { PersonalService } from "./personal.service";
 const service = new PersonalService();
 
 export class PersonalController {
+  // CU-25: PATCH /api/personal/:id/baja
+  darDeBaja = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) throw CustomError.badRequest("El id debe ser un número entero positivo");
+
+      const personal = await service.darDeBaja(id);
+      return res.json({ mensaje: "Personal dado de baja exitosamente", data: personal });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // CU-24: PUT /api/personal/:id
   modificarPersonal = async (req: Request, res: Response, next: NextFunction) => {
     try {
