@@ -1,15 +1,17 @@
 import type { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 
 type ElementoNavegacion = {
     etiqueta: string;
     icono: ReactNode;
+    ruta?: string;
 };
 
 const elementosNavegacion: ElementoNavegacion[] = [
-    { etiqueta: "Inicio", icono: "⌂" },
+    { etiqueta: "Inicio", icono: "⌂", ruta: "/" },
     { etiqueta: "Circuitos", icono: "⌁" },
     { etiqueta: "Paquetes turísticos", icono: "▣" },
-    { etiqueta: "Proveedores", icono: "▱" },
+    { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: "◫" },
     { etiqueta: "Reservas y pagos", icono: "▤" },
     { etiqueta: "Personal", icono: "♙" },
@@ -32,19 +34,42 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                 <ul className="space-y-1">
                     {elementosNavegacion.map((elemento) => (
                         <li key={elemento.etiqueta}>
-                            <button
-                                type="button"
-                                className={`flex w-full items-center gap-3 rounded-control px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-                                    elemento.etiqueta === seccionActiva
-                                        ? "bg-marca-activa text-texto"
-                                        : "text-white hover:bg-white/15"
-                                }`}
-                            >
-                                <span aria-hidden="true" className="w-5 text-center text-base">
-                                    {elemento.icono}
-                                </span>
-                                {elemento.etiqueta}
-                            </button>
+                            {elemento.ruta ? (
+                                <NavLink
+                                    to={elemento.ruta}
+                                    end={elemento.ruta === "/"}
+                                    className={({ isActive }) =>
+                                        `flex w-full items-center gap-3 rounded-control px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                                            isActive ||
+                                            elemento.etiqueta === seccionActiva
+                                                ? "bg-marca-activa text-texto"
+                                                : "text-white hover:bg-white/15"
+                                        }`
+                                    }
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className="w-5 text-center text-base"
+                                    >
+                                        {elemento.icono}
+                                    </span>
+                                    {elemento.etiqueta}
+                                </NavLink>
+                            ) : (
+                                <button
+                                    type="button"
+                                    disabled
+                                    className="flex w-full items-center gap-3 rounded-control px-3 py-2.5 text-left text-sm font-semibold text-white/60"
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className="w-5 text-center text-base"
+                                    >
+                                        {elemento.icono}
+                                    </span>
+                                    {elemento.etiqueta}
+                                </button>
+                            )}
                         </li>
                     ))}
                 </ul>
