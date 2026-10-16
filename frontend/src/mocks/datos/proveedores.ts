@@ -10,7 +10,7 @@ export const proveedoresSemilla: Proveedor[] = [
         datosContacto: "reservas@hoteles-cusco.pe",
         canalComunicacion: "Correo electrónico",
         estado: "ACTIVO",
-        _count: { servicios: 2 },
+        cantidadServicios: 2,
     },
     {
         id: 2,
@@ -21,6 +21,6 @@ export const proveedoresSemilla: Proveedor[] = [
         datosContacto: "+51 984 555 111",
         canalComunicacion: "WhatsApp",
         estado: "ACTIVO",
-        _count: { servicios: 1 },
+        cantidadServicios: 1,
     },
 ];

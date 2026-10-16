@@ -39,6 +39,12 @@ export function listarProveedores(): Promise<Proveedor[]> {
         .then((datos) => datos.map(normalizarProveedor));
 }
 
+export function obtenerProveedor(id: number): Promise<Proveedor> {
+    return solicitarApi<{ data: ProveedorApi }>(`/proveedores/${id}`)
+        .then(respuestaDatos)
+        .then(normalizarProveedor);
+}
+
 export function registrarProveedor(datos: DatosProveedor): Promise<Proveedor> {
     return solicitarApi<{ data: ProveedorApi }>("/proveedores", {
         method: "POST",
@@ -64,12 +70,21 @@ export function darDeBajaProveedor(id: number): Promise<Proveedor> {
 
 export const clavesProveedores = {
     todos: ["proveedores"] as const,
+    uno: (id: number) => ["proveedores", id] as const,
 };
 
 export function useProveedores() {
     return useQuery({
         queryKey: clavesProveedores.todos,
         queryFn: listarProveedores,
+    });
+}
+
+export function useProveedor(id: number) {
+    return useQuery({
+        queryKey: clavesProveedores.uno(id),
+        queryFn: () => obtenerProveedor(id),
+        enabled: Number.isInteger(id) && id > 0,
     });
 }
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
@@ -144,6 +145,12 @@ function ProveedoresPage() {
                 />
             ) : null}
 
+            {darDeBaja.isError ? (
+                <Alerta tipo="error" titulo="No se pudo dar de baja el proveedor">
+                    {darDeBaja.error.message}
+                </Alerta>
+            ) : null}
+
             {estado === "exito" && proveedores.length > 0 ? (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="relative w-full max-w-md">
@@ -265,6 +272,7 @@ function ProveedoresPage() {
                         : ""
                 }
                 textoConfirmar={darDeBaja.isPending ? "Procesando..." : "Dar de baja"}
+                cargando={darDeBaja.isPending}
                 onConfirmar={confirmarBaja}
                 onCancelar={cancelarBaja}
             />
