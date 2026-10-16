@@ -26,3 +26,49 @@ export class RegistrarAvanceDto {
     return [undefined, new RegistrarAvanceDto(numeroOrden, estadoTramo, llegada)];
   }
 }
+
+// CU-50: opciones que el guía elige al registrar un incidente
+export const TIPO_INCIDENTE = ["ACCIDENTE", "SALUD", "CLIMA", "EQUIPAMIENTO", "RETRASO", "OTRO"] as const;
+export const NIVEL_GRAVEDAD = ["BAJO", "MEDIO", "CRITICO"] as const;
+
+// CU-50: confirmarRegistro(salidaId, tipo, desc, gravedad, fechaOcurrencia, arrayAfectados)
+export class RegistrarIncidenteDto {
+  private constructor(
+    public tipoIncidente: string,
+    public descripcion: string,
+    public nivelGravedad: string,
+    public fechaHoraOcurrencia: Date,
+    public pasajerosAfectados: number[],
+  ) {}
+
+  public static create(obj: { [key: string]: any }): [string | undefined, RegistrarIncidenteDto?] {
+    const { tipoIncidente, descripcion, nivelGravedad, fechaHoraOcurrencia, pasajerosAfectados = [] } = obj;
+
+    if (!(TIPO_INCIDENTE as readonly string[]).includes(tipoIncidente)) {
+      return [`tipoIncidente debe ser uno de: ${TIPO_INCIDENTE.join(", ")}`];
+    }
+    if (typeof descripcion !== "string" || descripcion.trim().length < 5 || descripcion.trim().length > 1000) {
+      return ["La descripción es requerida (entre 5 y 1000 caracteres)"];
+    }
+    if (!(NIVEL_GRAVEDAD as readonly string[]).includes(nivelGravedad)) {
+      return [`nivelGravedad debe ser ${NIVEL_GRAVEDAD.join(", ")}`];
+    }
+    const ocurrencia = new Date(String(fechaHoraOcurrencia));
+    if (fechaHoraOcurrencia === undefined || isNaN(ocurrencia.getTime())) {
+      return ["fechaHoraOcurrencia es requerida y debe ser una fecha y hora válida"];
+    }
+    // FA1: pasajeros afectados, opcional
+    if (
+      !Array.isArray(pasajerosAfectados) ||
+      !pasajerosAfectados.every((id) => typeof id === "number" && Number.isInteger(id) && id > 0) ||
+      new Set(pasajerosAfectados).size !== pasajerosAfectados.length
+    ) {
+      return ["pasajerosAfectados debe ser una lista de ids de pasajero sin repetir"];
+    }
+
+    return [
+      undefined,
+      new RegistrarIncidenteDto(tipoIncidente, descripcion.trim(), nivelGravedad, ocurrencia, pasajerosAfectados),
+    ];
+  }
+}

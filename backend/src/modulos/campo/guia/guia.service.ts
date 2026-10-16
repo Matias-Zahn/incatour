@@ -1,6 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
-import { ESTADO_TRAMO, RegistrarAvanceDto } from "./guia.dto";
+import { ESTADO_TRAMO, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 import { GuiaRepository } from "./guia.repository";
 
 export class GuiaService {
@@ -118,6 +118,44 @@ export class GuiaService {
       estadoSalida:
         completa && dto.numeroOrden === ultimaDelCircuito ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
     });
+  }
+
+  // CU-50 FA1: pasajeros de la salida, para elegir a los afectados
+  async consultarPasajerosSalida(idusuario: number, idsalida: number) {
+    const s = await this.salidaDelGuia(idusuario, idsalida);
+    return s.reservas.flatMap((r) =>
+      r.pasajeros.map(({ pasajero: p }) => ({ idpasajero: p.idpasajero, nombreCompleto: p.nombreCompleto, nroPasaporte: p.nroPasaporte }))
+    );
+  }
+
+  // CU-50: confirmarRegistro — el guía informa un imprevisto de la salida
+  async registrarIncidente(idusuario: number, idsalida: number, dto: RegistrarIncidenteDto) {
+    const s = await this.salidaDelGuia(idusuario, idsalida);
+    if (!SALIDAS_ACTIVAS.includes(s.estado)) {
+      throw CustomError.badRequest(`No se pueden registrar incidentes en una salida ${s.estado}`);
+    }
+
+    if (dto.fechaHoraOcurrencia > new Date()) {
+      throw CustomError.badRequest("La fecha y hora del incidente no puede ser futura");
+    }
+    if (dto.fechaHoraOcurrencia < s.fechaInicio) {
+      throw CustomError.badRequest("La fecha y hora del incidente es anterior al inicio de la salida");
+    }
+
+    // FA1: los afectados tienen que ser pasajeros de esta salida
+    const nomina = new Set(s.reservas.flatMap((r) => r.pasajeros.map((rp) => rp.idpasajero)));
+    const ajenos = dto.pasajerosAfectados.filter((id) => !nomina.has(id));
+    if (ajenos.length) {
+      throw CustomError.badRequest(`Estos pasajeros no viajan en la salida: ${ajenos.join(", ")}`);
+    }
+
+    // Paso 17: el incidente registrado es la alerta del panel del administrador (GET /api/incidentes)
+    return this.repository.registrarIncidente({ idsalida, ...dto });
+  }
+
+  // CU-50 paso 17: panel de alertas del administrador
+  async listarIncidentes(filtros: { idsalida?: number; nivelGravedad?: string }) {
+    return this.repository.listarIncidentes(filtros);
   }
 
   // La salida, solo si el guía del token está asignado a ella

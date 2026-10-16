@@ -77,4 +77,41 @@ export class GuiaRepository {
       return { avance, salida };
     });
   }
+
+  // CU-50 paso 16: el incidente y sus pasajeros afectados en una sola operación (create anidado)
+  async registrarIncidente(p: {
+    idsalida: number;
+    tipoIncidente: string;
+    descripcion: string;
+    nivelGravedad: string;
+    fechaHoraOcurrencia: Date;
+    pasajerosAfectados: number[];
+  }) {
+    return db.incidente.create({
+      data: {
+        idsalida: p.idsalida,
+        tipoIncidente: p.tipoIncidente,
+        descripcion: p.descripcion,
+        nivelGravedad: p.nivelGravedad,
+        fechaHoraOcurrencia: p.fechaHoraOcurrencia,
+        pasajeros: { create: p.pasajerosAfectados.map((idpasajero) => ({ idpasajero })) },
+      },
+      include: { pasajeros: { include: { pasajero: { select: { nombreCompleto: true } } } } },
+    });
+  }
+
+  // CU-50 paso 17: las alertas del panel del administrador son los incidentes, del más reciente al más viejo
+  async listarIncidentes(filtros: { idsalida?: number; nivelGravedad?: string }) {
+    return db.incidente.findMany({
+      where: {
+        ...(filtros.idsalida && { idsalida: filtros.idsalida }),
+        ...(filtros.nivelGravedad && { nivelGravedad: filtros.nivelGravedad }),
+      },
+      include: {
+        salida: { select: { nroSalida: true } },
+        pasajeros: { include: { pasajero: { select: { nombreCompleto: true } } } },
+      },
+      orderBy: { fechaHoraReporte: "desc" },
+    });
+  }
 }
