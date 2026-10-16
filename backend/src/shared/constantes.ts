@@ -21,6 +21,7 @@ export const ESTADO_PERMISO = { EMITIDO: "Emitido", PERDIDO: "Perdido", DADO_DE_
 
 export const ESTADO_SALIDA = {
   PUBLICADA: "PUBLICADA",
+  EN_CURSO: "EN_CURSO", // desde el primer avance informado por el guía (CU-49)
   FINALIZADA: "FINALIZADA",
   CANCELADA: "CANCELADA",
 } as const;

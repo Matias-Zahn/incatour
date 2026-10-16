@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/app.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "docs": "tsx scripts/exportar-openapi.ts",
     "test": "vitest run"
   },
   "keywords": [],

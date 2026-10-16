@@ -143,6 +143,7 @@ model Personal {
   idiomas      Idioma[]
   asignaciones AsignacionPersonal[]
   permisos     PermisoPersonal[] // Relación con el permiso específico
+  evaluaciones EvaluacionPersonal[]
 }
 
 model Guia {
@@ -302,14 +303,16 @@ model Salida {
   paquete   Paquete          @relation(fields: [idpaquete], references: [idpaquete])
   servicios SalidaServicio[]
 
-  reservas         Reserva[]
-  resenias         Resenia[]
-  equipamientos    SalidaEquipamiento[]
-  personalAsignado AsignacionPersonal[]
-  permisos         PermisoPersonal[] // Relacionado con los permisos específicos
-  avances          Avance[]
-  incidentes       Incidente[]
-  auditorias       RegistroAuditoria[]
+  reservas                Reserva[]
+  resenias                Resenia[]
+  equipamientos           SalidaEquipamiento[]
+  personalAsignado        AsignacionPersonal[]
+  permisos                PermisoPersonal[] // Relacionado con los permisos específicos
+  avances                 Avance[]
+  incidentes              Incidente[]
+  auditorias              RegistroAuditoria[]
+  evaluacionesPersonal    EvaluacionPersonal[]
+  evaluacionesProveedores EvaluacionProveedor[]
 }
 
 model SalidaServicio {
@@ -403,13 +406,14 @@ model AsignacionPersonal {
 // ==========================================
 
 model Proveedor {
-  idproveedor       Int            @id @default(autoincrement())
+  idproveedor       Int                   @id @default(autoincrement())
   tipoProveedor     String
   razonSocial       String
   localidad         String
   canalComunicacion String?
   estado            String
   servicios         ServicioBase[]
+  evaluaciones      EvaluacionProveedor[]
 }
 
 model ServicioBase {
@@ -488,4 +492,32 @@ model SalidaEquipamiento {
   servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idsalida, idservicio])
+}
+
+// CU-42: el administrador evalúa al personal y a los proveedores por su desempeño en una salida.
+// Clave compuesta: una sola evaluación por salida y por evaluado (como RESENIA).
+model EvaluacionPersonal {
+  idsalida        Int
+  idpersonal      Int
+  puntaje         Int // 1 a 5 (CHECK en la migración)
+  comentario      String?
+  fechaEvaluacion DateTime @default(now())
+
+  salida   Salida   @relation(fields: [idsalida], references: [idsalida])
+  personal Personal @relation(fields: [idpersonal], references: [idpersonal])
+
+  @@id([idsalida, idpersonal])
+}
+
+model EvaluacionProveedor {
+  idsalida        Int
+  idproveedor     Int
+  puntaje         Int // 1 a 5 (CHECK en la migración)
+  comentario      String?
+  fechaEvaluacion DateTime @default(now())
+
+  salida    Salida    @relation(fields: [idsalida], references: [idsalida])
+  proveedor Proveedor @relation(fields: [idproveedor], references: [idproveedor])
+
+  @@id([idsalida, idproveedor])
 }
