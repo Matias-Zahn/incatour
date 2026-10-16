@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GuiaService } from "./guia.service";
+import { RegistrarAvanceDto } from "./guia.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn() },
+  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn() },
 }));
 vi.mock("./guia.repository", () => ({ GuiaRepository: class { constructor() { return repo; } } }));
 
@@ -37,5 +38,72 @@ describe("GuiaService.consultarDetalleSalida (CU-48)", () => {
     repo.idPersonalDelUsuario.mockResolvedValue(null);
 
     await expect(new GuiaService().consultarDetalleSalida(1, 2)).rejects.toMatchObject({ statusCode: 403 });
+  });
+});
+
+describe("GuiaService.registrarAvance (CU-49)", () => {
+  const etapas = [1, 2, 3].map((n) => ({ idcircuito: 5, numeroOrden: n }));
+  const enRecorrido = (extra = {}) => ({
+    ...salida,
+    estado: "CERRADA",
+    fechaInicio: new Date("2026-01-10"),
+    ultimaEtapaAlcanzada: null,
+    paquete: { ...salida.paquete, circuito: { ...salida.paquete.circuito, etapas } },
+    ...extra,
+  });
+  const avance = (numeroOrden: number, estadoTramo = "COMPLETADO", fechaHoraLlegada = "2026-01-11T15:00:00Z") =>
+    RegistrarAvanceDto.create({ numeroOrden, estadoTramo, fechaHoraLlegada })[1]!;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    repo.idPersonalDelUsuario.mockResolvedValue(7);
+    repo.registrarAvance.mockImplementation(async (p) => p);
+  });
+
+  it("el primer avance pone la salida EN_CURSO y guarda la última etapa", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido());
+
+    const r = await new GuiaService().registrarAvance(1, 2, avance(1));
+
+    expect(r).toMatchObject({ idcircuito: 5, numeroOrden: 1, estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
+  });
+
+  it("completar la última etapa finaliza la salida", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 2 }));
+
+    const r = await new GuiaService().registrarAvance(1, 2, avance(3));
+
+    expect(r).toMatchObject({ estadoSalida: "FINALIZADA", ultimaEtapaAlcanzada: 3 });
+  });
+
+  it("un tramo DEMORADO no avanza la última etapa", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 1 }));
+
+    const r = await new GuiaService().registrarAvance(1, 2, avance(2, "DEMORADO"));
+
+    expect(r).toMatchObject({ estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
+  });
+
+  it("rechaza saltear etapas, repetir una completada o una etapa de otro circuito", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 1 }));
+    const servicio = new GuiaService();
+
+    await expect(servicio.registrarAvance(1, 2, avance(3))).rejects.toThrow("Antes hay que informar la etapa 2");
+    await expect(servicio.registrarAvance(1, 2, avance(1))).rejects.toThrow("ya se informó");
+    await expect(servicio.registrarAvance(1, 2, avance(9))).rejects.toThrow("no pertenece al circuito");
+  });
+
+  it("rechaza una llegada futura o anterior al inicio de la salida", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido());
+    const servicio = new GuiaService();
+
+    await expect(servicio.registrarAvance(1, 2, avance(1, "COMPLETADO", "2099-01-01T10:00:00Z"))).rejects.toThrow("futura");
+    await expect(servicio.registrarAvance(1, 2, avance(1, "COMPLETADO", "2025-12-31T10:00:00Z"))).rejects.toThrow("anterior al inicio");
+  });
+
+  it("no registra avances en una salida cancelada", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "CANCELADA" }));
+
+    await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toThrow("CANCELADA");
   });
 });

@@ -47,4 +47,34 @@ export class GuiaRepository {
       },
     });
   }
+
+  // CU-49 pasos 10 y 11, en una transacción: el avance y el estado de la salida se actualizan juntos
+  async registrarAvance(p: {
+    idsalida: number;
+    idcircuito: number;
+    numeroOrden: number;
+    estadoTramo: string;
+    fechaHoraLlegada: Date;
+    ultimaEtapaAlcanzada: number | null;
+    estadoSalida: string;
+  }) {
+    return db.$transaction(async (tx) => {
+      // fechaHoraReporte la pone la base (default now): así quedan separados el hecho y el aviso
+      const avance = await tx.avance.create({
+        data: {
+          idsalida: p.idsalida,
+          idcircuito: p.idcircuito,
+          numeroOrden: p.numeroOrden,
+          estadoTramo: p.estadoTramo,
+          fechaHoraLlegada: p.fechaHoraLlegada,
+        },
+      });
+      const salida = await tx.salida.update({
+        where: { idsalida: p.idsalida },
+        data: { estado: p.estadoSalida, ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada },
+        select: { idsalida: true, estado: true, ultimaEtapaAlcanzada: true },
+      });
+      return { avance, salida };
+    });
+  }
 }

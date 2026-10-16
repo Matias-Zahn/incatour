@@ -66,6 +66,48 @@ export class GuiaRoutes {
      */
     router.get("/salidas/:idsalida", controller.consultarDetalleSalida);
 
+    /**
+     * @swagger
+     * /api/guia/salidas/{idsalida}/avances:
+     *   post:
+     *     summary: Registrar avance del recorrido (CU-49)
+     *     description: >
+     *       **RESTRINGIDO A GUÍA.** El guía asignado informa la llegada al final de una etapa. Se guardan por separado
+     *       cuándo ocurrió (fechaHoraLlegada) y cuándo se informó (fechaHoraReporte), porque el recorrido pasa por zonas
+     *       sin señal. Las etapas se informan en orden. El primer avance pone la salida EN_CURSO y completar la última
+     *       etapa la deja FINALIZADA.
+     *     tags: [Portal del guía]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [numeroOrden, estadoTramo, fechaHoraLlegada]
+     *             properties:
+     *               numeroOrden: { type: integer, example: 1, description: Etapa alcanzada (numeroOrden del itinerario). }
+     *               estadoTramo: { type: string, enum: [COMPLETADO, DEMORADO] }
+     *               fechaHoraLlegada: { type: string, format: date-time, example: "2026-12-10T14:35:00-05:00", description: Cuándo llegó realmente. No puede ser futura. }
+     *     responses:
+     *       201:
+     *         description: Avance registrado.
+     *         content:
+     *           application/json:
+     *             example:
+     *               mensaje: Avance registrado correctamente
+     *               data:
+     *                 avance: { idavance: 1, numeroOrden: 1, estadoTramo: COMPLETADO, fechaHoraLlegada: "2026-12-10T19:35:00.000Z", fechaHoraReporte: "2026-12-10T22:02:11.000Z" }
+     *                 salida: { idsalida: 2, estado: EN_CURSO, ultimaEtapaAlcanzada: 1 }
+     *       400: { description: Datos inválidos, etapa de otro circuito, fuera de orden o ya completada, llegada futura o anterior a la etapa previa, o salida no activa. }
+     *       403: { description: El guía no está asignado a esa salida. }
+     *       404: { description: La salida no existe. }
+     */
+    router.post("/salidas/:idsalida/avances", controller.registrarAvance);
+
     return router;
   }
 }
