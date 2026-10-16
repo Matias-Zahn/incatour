@@ -194,7 +194,7 @@ export class AsignacionService {
   }
 }
 
-const habilitacionVigente = (guia: { fechaHabilitacion: Date | null } | null, hasta: Date) =>
+export const habilitacionVigente = (guia: { fechaHabilitacion: Date | null } | null, hasta: Date) =>
   !!guia?.fechaHabilitacion && guia.fechaHabilitacion >= hasta;
 
 // Nómina completa (paso 14): pasajeros de las reservas confirmadas y personal asignado
