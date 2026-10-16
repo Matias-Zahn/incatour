@@ -1,0 +1,5117 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "IncaTour API",
+    "version": "1.0.0",
+    "description": "API de IncaTour para la gestión de paquetes, reservas y solicitudes de alojamiento."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Servidor de Desarrollo Local"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Ingresá el token JWT obtenido del endpoint POST /api/auth/login"
+      }
+    },
+    "schemas": {
+      "Salida": {
+        "type": "object",
+        "properties": {
+          "idsalida": {
+            "type": "integer",
+            "example": 2
+          },
+          "idpaquete": {
+            "type": "integer",
+            "example": 1
+          },
+          "nroSalida": {
+            "type": "string",
+            "example": "SAL-2026-002"
+          },
+          "idbloqueo": {
+            "type": "string",
+            "example": "BLQ-FE517B3A",
+            "description": "Bloqueo otorgado por la autoridad."
+          },
+          "stockLocal": {
+            "type": "integer",
+            "example": 8,
+            "description": "Pasajes disponibles para la venta."
+          },
+          "stockLocalAlojamiento": {
+            "type": "integer",
+            "example": 8,
+            "description": "Plazas de hotel bloqueadas disponibles."
+          },
+          "tamanoMaximo": {
+            "type": "integer",
+            "example": 8
+          },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "example": "PUBLICADA"
+          }
+        }
+      },
+      "Personal": {
+        "type": "object",
+        "properties": {
+          "idpersonal": {
+            "type": "integer",
+            "example": 1
+          },
+          "nombreCompleto": {
+            "type": "string",
+            "example": "Carlos Mamani"
+          },
+          "nroPasaporte": {
+            "type": "string",
+            "example": "P123456"
+          },
+          "nacionalidad": {
+            "type": "string",
+            "example": "Peruana"
+          },
+          "fechaVencimientoPasaporte": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ]
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Guía",
+              "Porteador"
+            ]
+          },
+          "guia": {
+            "type": "object",
+            "nullable": true,
+            "description": "Solo en guías. Los porteadores tienen null.",
+            "properties": {
+              "nroHabilitacion": {
+                "type": "string",
+                "example": "HAB-001"
+              },
+              "fechaHabilitacion": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Vencimiento de la habilitación."
+              }
+            }
+          }
+        }
+      },
+      "CuentaGuia": {
+        "type": "object",
+        "properties": {
+          "idusuario": {
+            "type": "integer",
+            "example": 4
+          },
+          "email": {
+            "type": "string",
+            "example": "guia@incatour.com"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string",
+            "example": "GUIA"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ],
+            "description": "Estado de la CUENTA de acceso."
+          },
+          "creadoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "guia": {
+            "type": "object",
+            "description": "Guía asociado a la cuenta (legajo del personal operativo).",
+            "properties": {
+              "idpersonal": {
+                "type": "integer"
+              },
+              "nombreCompleto": {
+                "type": "string"
+              },
+              "nroPasaporte": {
+                "type": "string"
+              },
+              "estadoPersonal": {
+                "type": "string",
+                "enum": [
+                  "ACTIVO",
+                  "INACTIVO"
+                ]
+              }
+            }
+          },
+          "habilitacion": {
+            "type": "object",
+            "properties": {
+              "nroHabilitacion": {
+                "type": "string",
+                "nullable": true
+              },
+              "fechaHabilitacion": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "situacion": {
+                "type": "string",
+                "enum": [
+                  "VIGENTE",
+                  "VENCIDA",
+                  "SIN_DATOS"
+                ]
+              }
+            }
+          },
+          "salidasPendientes": {
+            "type": "integer",
+            "description": "Salidas asignadas al guía cuyo recorrido todavía no finalizó."
+          },
+          "puedeDarseDeBaja": {
+            "type": "boolean",
+            "description": "Cuenta ACTIVA y sin salidas pendientes."
+          }
+        }
+      },
+      "Temporada": {
+        "type": "object",
+        "properties": {
+          "idtemporada": {
+            "type": "integer",
+            "example": 1
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Temporada alta 2026"
+          },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-05-01T00:00:00.000Z"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-09-30T00:00:00.000Z"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ],
+            "example": "ACTIVO"
+          }
+        }
+      },
+      "Circuito": {
+        "type": "object",
+        "properties": {
+          "idcircuito": {
+            "type": "integer",
+            "example": 1
+          },
+          "nombreCircuito": {
+            "type": "string",
+            "example": "Camino Inca Clásico"
+          },
+          "duracionDias": {
+            "type": "integer",
+            "example": 4
+          },
+          "dificultad": {
+            "type": "string",
+            "example": "MEDIA"
+          },
+          "minimoGuias": {
+            "type": "integer",
+            "example": 1
+          },
+          "parametrosPorteadores": {
+            "type": "string",
+            "nullable": true,
+            "example": "1 porteador cada 2 pasajeros"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ],
+            "example": "ACTIVO"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/salidas": {
+      "get": {
+        "summary": "Consultar salidas (CU-35)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista las salidas con su paquete, personal asignado y servicios, ordenadas por fecha de inicio. Todos los filtros son opcionales.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idpaquete",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "example": "PUBLICADA"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Fecha de inicio desde."
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Fecha de inicio hasta."
+          },
+          {
+            "in": "query",
+            "name": "idguia",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "idpersonal de un guía asignado."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de salidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Salida"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido o desde posterior a hasta."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear salida planificada (CU-36)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Bloquea ante la autoridad el tamaño máximo más la dotación, bloquea las plazas del alojamiento elegido y publica la salida. Si la base falla después del bloqueo, el cupo se libera. idalojamiento es obligatorio si algún alojamiento confirma por bloqueo y alcanza; si ninguno, la salida se crea sin alojamiento (FA3) y cada reserva generará su solicitud.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idpaquete",
+                  "fechaInicio",
+                  "tamanoMaximo"
+                ],
+                "properties": {
+                  "idpaquete": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "fechaInicio": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-11-20"
+                  },
+                  "tamanoMaximo": {
+                    "type": "integer",
+                    "example": 8
+                  },
+                  "idalojamiento": {
+                    "type": "integer",
+                    "example": 1,
+                    "description": "Uno de los alojamientos de /api/salidas/opciones."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Salida creada y publicada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "salida": {
+                          "$ref": "#/components/schemas/Salida"
+                        },
+                        "dotacion": {
+                          "type": "object",
+                          "properties": {
+                            "guias": {
+                              "type": "integer"
+                            },
+                            "porteadores": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "totalLugares": {
+                          "type": "integer",
+                          "example": 14
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "alojamiento no válido o sin elegir": null,
+            "o sin cupo suficiente (FA1": null,
+            "informa los lugares disponibles).": null
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          },
+          "404": {
+            "description": "El paquete no existe."
+          },
+          "503": {
+            "description": "La autoridad no responde (FA2). Reintentar más tarde."
+          }
+        }
+      }
+    },
+    "/api/salidas/opciones": {
+      "get": {
+        "summary": "Opciones para crear una salida (CU-36, pasos 4 a 7)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación de personal que exige el circuito, el total de lugares a bloquear ante la autoridad y los alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas. No modifica nada.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idpaquete",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "fechaInicio",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-11-20"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tamanoMaximo",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 8
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dotación, total de lugares y alojamientos posibles.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "paquete": {
+                      "idpaquete": 1,
+                      "nombrePaquete": "Inca Clásico Standard"
+                    },
+                    "tamanoMaximo": 8,
+                    "dotacion": {
+                      "guias": 2,
+                      "porteadores": 4
+                    },
+                    "totalLugares": 14,
+                    "alojamientos": [
+                      {
+                        "idservicio": 1,
+                        "nombreServicio": "Hotel Montaña",
+                        "localidad": "Cusco",
+                        "categoria": "3 Estrellas",
+                        "capacidadDisponible": 10,
+                        "alcanza": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "fecha pasada": null,
+            "paquete inactivo": null,
+            "sin tarifa vigente o sin parámetros de dotación.": null
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          },
+          "404": {
+            "description": "El paquete no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/personal": {
+      "get": {
+        "summary": "Personal asignado a la salida (CU-38, paso 4)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Muestra la logística y el personal asignado, con el permiso vigente de cada uno. Solo para salidas que todavía no iniciaron (FA2).\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal y logística de la salida.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "salida": {
+                      "idsalida": 2,
+                      "nroSalida": "SAL-2026-002",
+                      "estado": "CERRADA"
+                    },
+                    "personal": [
+                      {
+                        "idpersonal": 3,
+                        "nombreCompleto": "Rosa Prueba",
+                        "rol": "Guía",
+                        "permiso": "PER-1A2B3C4D"
+                      }
+                    ],
+                    "servicios": [
+                      {
+                        "tipo": "TRANSPORTE",
+                        "nombreServicio": "Minibus Sprinter"
+                      }
+                    ],
+                    "equipamiento": [
+                      {
+                        "nombreServicio": "Carpas Alta Montaña",
+                        "cantidad": 2
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La salida ya inició o no está activa (FA2)."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/personal/{idpersonal}/reemplazantes": {
+      "get": {
+        "summary": "Reemplazantes disponibles (CU-38, paso 8)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Personal del mismo rol que el integrante a reemplazar, activo, sin otra salida superpuesta y, si es guía, con la habilitación vigente para las fechas.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idpersonal",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Integrante a reemplazar."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de reemplazantes posibles."
+          },
+          "400": {
+            "description": "La salida ya inició o esa persona no está asignada."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/reemplazos": {
+      "post": {
+        "summary": "Reemplazar personal asignado (CU-38)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Desvincula al integrante original y asigna al reemplazante. Si el original tenía permiso emitido, se da de baja ante la autoridad y se emite uno nuevo para el reemplazante sobre el mismo lugar. El motivo queda en la auditoría. Si la base falla después de emitir, el permiso nuevo se da de baja.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idoriginal",
+                  "idreemplazante",
+                  "motivo"
+                ],
+                "properties": {
+                  "idoriginal": {
+                    "type": "integer",
+                    "example": 3
+                  },
+                  "idreemplazante": {
+                    "type": "integer",
+                    "example": 5
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "example": "Licencia médica"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reemplazo realizado.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "mensaje": "Reemplazo realizado correctamente",
+                  "data": {
+                    "sale": {
+                      "idpersonal": 3,
+                      "nombreCompleto": "Rosa Prueba"
+                    },
+                    "entra": {
+                      "idpersonal": 5,
+                      "nombreCompleto": "Ana Prueba"
+                    },
+                    "permisoDadoDeBaja": "PER-1A2B3C4D",
+                    "permisoNuevo": "PER-9F8E7D6C"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Reemplazante de otro rol",
+            "ocupado": null,
+            "sin habilitación o con pasaporte vencido (FA1)": null,
+            "salida iniciada (FA2)": null,
+            "o el original no está asignado.": null
+          },
+          "404": {
+            "description": "La salida o el reemplazante no existen."
+          },
+          "503": {
+            "description": "La autoridad no respondió. Si el permiso viejo ya se dio de baja",
+            "el reintento emite el nuevo.": null
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/logistica": {
+      "get": {
+        "summary": "Panel de logística de una salida (CU-39, paso 2)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Muestra el equipamiento y el transporte asignados con su proveedor y la lista de requerimientos sin asignar (`TRANSPORTE` si la salida no tiene transporte).\n",
+        "tags": [
+          "Logística de salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Panel de logística.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PanelLogistica"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      },
+      "put": {
+        "summary": "Modificar la logística de una salida (CU-39)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** En una única transacción primero **desasigna** (reintegra al stock del proveedor original) y luego **asigna** (descuenta del stock del nuevo proveedor, de forma atómica), de modo que si algo falla no se aplica nada. Cambiar la cantidad de un equipamiento equivale a desasignarlo y volver a asignarlo. El transporte nuevo requiere el comprobante de la reserva externa. El motivo es opcional y, junto con el antes y el después, queda en la auditoría. Si se desasigna el transporte sin reemplazo, la respuesta lo informa como \"Sin asignar\". Solo procede en salidas que no comenzaron. El personal se reemplaza por el CU-38.\n",
+        "tags": [
+          "Logística de salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "itemsDesasignar": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "tipo",
+                        "idservicio"
+                      ],
+                      "properties": {
+                        "tipo": {
+                          "type": "string",
+                          "enum": [
+                            "EQUIPAMIENTO",
+                            "TRANSPORTE"
+                          ]
+                        },
+                        "idservicio": {
+                          "type": "integer",
+                          "example": 7
+                        }
+                      }
+                    }
+                  },
+                  "itemsNuevos": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "tipo",
+                        "idservicio"
+                      ],
+                      "properties": {
+                        "tipo": {
+                          "type": "string",
+                          "enum": [
+                            "EQUIPAMIENTO",
+                            "TRANSPORTE"
+                          ]
+                        },
+                        "idservicio": {
+                          "type": "integer",
+                          "example": 9
+                        },
+                        "cantidad": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "Obligatoria para EQUIPAMIENTO."
+                        },
+                        "comprobanteReserva": {
+                          "type": "string",
+                          "description": "Obligatorio para TRANSPORTE.",
+                          "example": "RES-EXT-2291"
+                        }
+                      }
+                    }
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "example": "El proveedor original canceló el servicio"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logística modificada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "panel": {
+                          "$ref": "#/components/schemas/PanelLogistica"
+                        },
+                        "advertencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, stock insuficiente, transporte no disponible o salida que ya comenzó.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/logistica/disponibles": {
+      "get": {
+        "summary": "Proveedores disponibles para reasignar (CU-39, paso 5)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** EQUIPAMIENTO: servicios activos con stock. TRANSPORTE: servicios activos, de proveedores activos, con capacidad para los pasajeros confirmados y sin otra salida activa en las mismas fechas. Solo para salidas que no comenzaron.\n",
+        "tags": [
+          "Logística de salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EQUIPAMIENTO",
+                "TRANSPORTE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servicios disponibles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idservicio": {
+                            "type": "integer"
+                          },
+                          "nombreServicio": {
+                            "type": "string"
+                          },
+                          "localidad": {
+                            "type": "string"
+                          },
+                          "costoBase": {
+                            "type": "number"
+                          },
+                          "proveedor": {
+                            "type": "object",
+                            "properties": {
+                              "idproveedor": {
+                                "type": "integer"
+                              },
+                              "razonSocial": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "disponibilidad": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tipo inválido o salida que ya comenzó.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/evaluaciones": {
+      "get": {
+        "summary": "Personal y proveedores evaluables de una salida (CU-42)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista el personal que participó de la salida y los proveedores que dieron algún servicio (alojamiento, transporte, tren o equipamiento), con su evaluación si ya la tienen. Solo para salidas FINALIZADAS.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evaluables de la salida.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "salida": {
+                      "idsalida": 1,
+                      "nroSalida": "SAL-2026-001"
+                    },
+                    "personal": [
+                      {
+                        "idpersonal": 1,
+                        "nombreCompleto": "Carlos Mamani",
+                        "rol": "Guía",
+                        "evaluacion": null
+                      }
+                    ],
+                    "proveedores": [
+                      {
+                        "idproveedor": 1,
+                        "razonSocial": "Andes Travel",
+                        "evaluacion": {
+                          "puntaje": 4,
+                          "comentario": "Puntual"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La salida no está finalizada."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      },
+      "post": {
+        "summary": "Evaluar personal o proveedor (CU-42)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Califica de 1 a 5 a una persona que participó de la salida o a un proveedor que dio servicio en ella. Una sola evaluación por salida y por evaluado. Las evaluaciones se consultan en GET /api/resenias (CU-43).\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tipo",
+                  "id",
+                  "puntaje"
+                ],
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "PERSONAL",
+                      "PROVEEDOR"
+                    ]
+                  },
+                  "id": {
+                    "type": "integer",
+                    "example": 1,
+                    "description": "idpersonal o idproveedor según el tipo."
+                  },
+                  "puntaje": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "example": 4
+                  },
+                  "comentario": {
+                    "type": "string",
+                    "example": "Muy buena atención al grupo",
+                    "description": "Opcional",
+                    "hasta 500 caracteres.": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Evaluación registrada."
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "salida no finalizada": null,
+            "evaluado que no participó o ya evaluado.": null
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/equipamiento-asignado": {
+      "get": {
+        "summary": "Consultar equipamiento asignado a la salida para devolución (CU-41)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista los artículos de equipamiento de camping que fueron asignados a la salida para facilitar la carga de devolución e inspección.\n",
+        "tags": [
+          "Devolución de Equipamiento"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID de la salida"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de equipamiento asignado"
+          },
+          "401": {
+            "description": "No autenticado"
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "404": {
+            "description": "Salida no encontrada"
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/devolucion-equipamiento": {
+      "post": {
+        "summary": "Registrar devolución del equipamiento (CU-41)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Terminada la salida, registra qué equipamiento se devolvió y en qué estado (buen estado o dañado/extraviado). Reintegra atómicamente al stock del proveedor las unidades en buen estado y deja registro de trazabilidad en la auditoría del sistema (Cubre RF-56).\n",
+        "tags": [
+          "Devolución de Equipamiento"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID de la salida"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "observacionesGenerales": {
+                    "type": "string",
+                    "example": "Devolución recibida en depósito central sin novedades mayores."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "idservicio",
+                        "cantidadBuenEstado"
+                      ],
+                      "properties": {
+                        "idservicio": {
+                          "type": "integer",
+                          "example": 5
+                        },
+                        "cantidadBuenEstado": {
+                          "type": "integer",
+                          "example": 4
+                        },
+                        "cantidadDaniada": {
+                          "type": "integer",
+                          "example": 1
+                        },
+                        "observaciones": {
+                          "type": "string",
+                          "example": "1 carpa con varilla doblada"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Devolución registrada y stock reintegrado con éxito."
+          },
+          "400": {
+            "description": "Salida aún no finalizada, cantidades inválidas o servicio no asignado."
+          },
+          "401": {
+            "description": "No autenticado."
+          },
+          "403": {
+            "description": "Requiere perfil ADMIN."
+          },
+          "404": {
+            "description": "Salida no encontrada."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/cancelacion": {
+      "get": {
+        "summary": "Impacto de cancelar una salida (CU-37, antes de confirmar)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** No modifica nada. Informa las reservas afectadas, el total a reembolsar (100% de lo abonado), los permisos que pasarían a Perdido y los recursos que se liberan. Se rechaza si la salida ya está cancelada o su recorrido comenzó.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de impacto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "idsalida": {
+                          "type": "integer"
+                        },
+                        "nroSalida": {
+                          "type": "string"
+                        },
+                        "paquete": {
+                          "type": "string"
+                        },
+                        "fechaInicio": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "reservasAfectadas": {
+                          "type": "integer"
+                        },
+                        "totalAReembolsar": {
+                          "type": "number"
+                        },
+                        "permisosQuePasanAPerdido": {
+                          "type": "integer"
+                        },
+                        "notificaAClientes": {
+                          "type": "boolean"
+                        },
+                        "recursosQueSeLiberan": {
+                          "type": "object",
+                          "properties": {
+                            "personal": {
+                              "type": "integer"
+                            },
+                            "equipamiento": {
+                              "type": "integer"
+                            },
+                            "servicios": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La salida ya está cancelada o su recorrido comenzó.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/cancelar": {
+      "post": {
+        "summary": "Cancelar una salida (CU-37)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Primero libera ante la autoridad la totalidad de los cupos bloqueados; si la autoridad no responde, **la salida no se cancela**. Luego, en una única transacción: los permisos emitidos pasan a Perdido, se reintegra el stock de equipamiento, se dan de baja las solicitudes de alojamiento pendientes, todas las reservas pasan a Cancelada con su reembolso del 100% de lo abonado y la salida queda Cancelada, con el motivo en el registro de auditoría. Por último se avisa por correo a los titulares con el motivo, el importe y salidas alternativas. Solo procede si el recorrido no comenzó. El dinero se acredita por fuera del sistema.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "motivo"
+                ],
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 300,
+                    "example": "Condiciones climáticas adversas en el recorrido"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Salida cancelada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "idsalida": {
+                          "type": "integer"
+                        },
+                        "nroSalida": {
+                          "type": "string"
+                        },
+                        "estado": {
+                          "type": "string",
+                          "example": "CANCELADA"
+                        },
+                        "reservasCanceladas": {
+                          "type": "integer"
+                        },
+                        "reembolsoTotal": {
+                          "type": "number"
+                        },
+                        "notificaciones": {
+                          "type": "object",
+                          "properties": {
+                            "enviadas": {
+                              "type": "integer"
+                            },
+                            "fallidas": {
+                              "type": "integer"
+                            },
+                            "salidasAlternativasOfrecidas": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Motivo inválido, salida ya cancelada o recorrido comenzado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La salida no existe."
+          },
+          "500": {
+            "description": "La autoridad no respondió; la salida no se canceló. Reintentar más tarde."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/asignacion": {
+      "get": {
+        "summary": "Panel de asignación de recursos (CU-40, pasos 2 y 3)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación definitiva según los pasajeros confirmados y los lugares sobrantes del bloqueo, y lista el personal, los transportes y el equipamiento disponibles. Responde 409 si alguna reserva tiene el alojamiento pendiente (FA5, se resuelve con el CU-34).\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Panel de asignación.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "salida": {
+                      "idsalida": 2,
+                      "nroSalida": "SAL-2026-002"
+                    },
+                    "pasajerosConfirmados": 3,
+                    "dotacionRequerida": {
+                      "guias": 2,
+                      "porteadores": 2
+                    },
+                    "bloqueoInicial": 14,
+                    "lugaresSobrantes": 7,
+                    "personalDisponible": [
+                      {
+                        "idpersonal": 1,
+                        "nombreCompleto": "Carlos Mamani",
+                        "rol": "Guía"
+                      }
+                    ],
+                    "transportesDisponibles": [
+                      {
+                        "idservicio": 3,
+                        "nombreServicio": "Minibus Sprinter",
+                        "capacidadVehiculo": 15
+                      }
+                    ],
+                    "stockCamping": [
+                      {
+                        "idservicio": 5,
+                        "nombreServicio": "Carpas",
+                        "tipoEquipamiento": "Carpa",
+                        "cantidadDisponible": 20
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Salida en un estado que no admite asignación",
+            "sin bloqueo": null,
+            "ya asignada o sin pasajeros.": null
+          },
+          "404": {
+            "description": "La salida no existe."
+          },
+          "409": {
+            "description": "Hay reservas con el alojamiento pendiente (FA5)."
+          }
+        }
+      },
+      "post": {
+        "summary": "Confirmar asignación de recursos y emitir permisos (CU-40)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Asigna personal, transporte y equipamiento, emite los permisos de toda la nómina (pasajeros y personal), devuelve al hotel las plazas no vendidas, libera los lugares sobrantes del bloqueo y cierra la venta. Si la base falla después de emitir, los permisos se dan de baja.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "personalIds",
+                  "idtransporte"
+                ],
+                "properties": {
+                  "personalIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "example": [
+                      1,
+                      2,
+                      4,
+                      5
+                    ]
+                  },
+                  "idtransporte": {
+                    "type": "integer",
+                    "example": 3
+                  },
+                  "itemsCamping": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idservicio": {
+                          "type": "integer",
+                          "example": 5
+                        },
+                        "cantidad": {
+                          "type": "integer",
+                          "example": 4
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asignación confirmada. Informa los permisos emitidos y los lugares liberados."
+          },
+          "400": {
+            "description": "Personal ocupado",
+            "dado de baja o sin habilitación (FA1)": null,
+            "stock insuficiente (FA2)": null,
+            "transporte sin cupo (FA3)": null,
+            "pasaportes vencidos (FA4) o dotación incompleta.": null
+          },
+          "404": {
+            "description": "La salida no existe."
+          },
+          "409": {
+            "description": "Hay reservas con el alojamiento pendiente (FA5)."
+          },
+          "503": {
+            "description": "La autoridad no pudo emitir los permisos. No se modificó nada."
+          }
+        }
+      }
+    },
+    "/api/solicitudes": {
+      "get": {
+        "summary": "Consultar Solicitudes Pendientes (CU-33)",
+        "description": "Retorna todas las solicitudes de alojamiento que están pendientes de confirmación.",
+        "tags": [
+          "Solicitudes de Alojamiento"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de solicitudes pendientes"
+          }
+        }
+      }
+    },
+    "/api/solicitudes/{id}/opciones": {
+      "get": {
+        "summary": "Obtener Opciones de Alojamiento (CU-34 Fase 1)",
+        "description": "Busca hoteles compatibles con las garantías del paquete, excluyendo los ya rechazados.",
+        "tags": [
+          "Solicitudes de Alojamiento"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opciones de contacto para la solicitud"
+          },
+          "400": {
+            "description": "Error en la solicitud o ID inválido"
+          },
+          "409": {
+            "description": "No hay hoteles compatibles (bloquea consolidación)"
+          }
+        }
+      }
+    },
+    "/api/solicitudes/{id}/resolver": {
+      "post": {
+        "summary": "Resolver Solicitud (CU-34 Fase 2)",
+        "description": "Registra la aceptación o rechazo por parte del proveedor. Si es rechazada, genera un reintento automático.",
+        "tags": [
+          "Solicitudes de Alojamiento"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "servicioId",
+                  "resolucion"
+                ],
+                "properties": {
+                  "servicioId": {
+                    "type": "integer"
+                  },
+                  "resolucion": {
+                    "type": "string",
+                    "enum": [
+                      "ACEPTADA",
+                      "RECHAZADA"
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolución procesada exitosamente"
+          }
+        }
+      }
+    },
+    "/api/reservas": {
+      "post": {
+        "summary": "Comprar un paquete (CU-30)",
+        "description": "**RESTRINGIDO A CLIENTE.** Valida la salida y los pasajeros, calcula el precio con la tarifa vigente, descuenta los cupos, cobra en la pasarela y registra la reserva. Si el pago es rechazado, los cupos vuelven a la venta.\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idsalida",
+                  "pasajeros",
+                  "medioPago",
+                  "tarjeta"
+                ],
+                "properties": {
+                  "idsalida": {
+                    "type": "integer"
+                  },
+                  "medioPago": {
+                    "type": "string",
+                    "example": "TARJETA"
+                  },
+                  "pasajeros": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nombreCompleto": {
+                          "type": "string"
+                        },
+                        "nroPasaporte": {
+                          "type": "string"
+                        },
+                        "nacionalidad": {
+                          "type": "string"
+                        },
+                        "fechaVencimientoPasaporte": {
+                          "type": "string",
+                          "format": "date"
+                        }
+                      }
+                    }
+                  },
+                  "equipaje": {
+                    "type": "array",
+                    "description": "Un elemento por pasajero, en el mismo orden.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pesoDeclarado": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "tarjeta": {
+                    "type": "object",
+                    "properties": {
+                      "numero": {
+                        "type": "string"
+                      },
+                      "titular": {
+                        "type": "string"
+                      },
+                      "vencimiento": {
+                        "type": "string",
+                        "example": "12/29"
+                      },
+                      "cvv": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reserva confirmada."
+          },
+          "400": {
+            "description": "Datos inválidos, sin cupo o pago rechazado."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil CLIENTE."
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar y filtrar reservas (CU-31, administrador)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Filtra por titular (nombre, apellido o email), pasajero (nombre o pasaporte), paquete, rango de fecha de inicio de la salida y estado. Las más recientes primero.\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "titular",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pasajero",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idpaquete",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fechaDesde",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fechaHasta",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONFIRMADA",
+                "CANCELADA"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservas que cumplen el filtro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/ReservaResumen"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "titular": {
+                                "type": "object",
+                                "properties": {
+                                  "nombre": {
+                                    "type": "string"
+                                  },
+                                  "apellido": {
+                                    "type": "string"
+                                  },
+                                  "email": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/resenias/historial-reservas": {
+      "get": {
+        "summary": "Historial de reservas del cliente para reseñar (CU-47, pasos 1 a 4)",
+        "description": "**RESTRINGIDO A CLIENTE.** Lista las reservas del cliente con los datos de su salida y la reseña ya publicada (si existe). `puedeResenar` es true cuando la reserva está Confirmada, la salida está Finalizada y todavía no hay reseña del cliente para esa salida.\n",
+        "tags": [
+          "Reseñas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial de reservas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idreserva": {
+                            "type": "integer"
+                          },
+                          "nroReserva": {
+                            "type": "string"
+                          },
+                          "estadoReserva": {
+                            "type": "string"
+                          },
+                          "puedeResenar": {
+                            "type": "boolean"
+                          },
+                          "resenia": {
+                            "nullable": true,
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/Resenia"
+                              }
+                            ]
+                          },
+                          "salida": {
+                            "type": "object",
+                            "properties": {
+                              "idsalida": {
+                                "type": "integer"
+                              },
+                              "nroSalida": {
+                                "type": "string"
+                              },
+                              "estado": {
+                                "type": "string"
+                              },
+                              "fechaInicio": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "fechaFin": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "paquete": {
+                                "type": "object",
+                                "properties": {
+                                  "idpaquete": {
+                                    "type": "integer"
+                                  },
+                                  "nombrePaquete": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil CLIENTE."
+          }
+        }
+      }
+    },
+    "/api/resenias": {
+      "post": {
+        "summary": "Publicar reseña de la experiencia (CU-47)",
+        "description": "**RESTRINGIDO A CLIENTE.** La reseña queda asociada al cliente y a la salida. Reglas: el cliente participó con una reserva Confirmada, la salida está Finalizada, la valoración es de 1 a 5 y cada cliente puede publicar una única reseña por salida.\n",
+        "tags": [
+          "Reseñas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idsalida",
+                  "valoracion"
+                ],
+                "properties": {
+                  "idsalida": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "valoracion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "example": 5
+                  },
+                  "comentario": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "example": "Una experiencia inolvidable."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reseña publicada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Resenia"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, salida no finalizada o reseña duplicada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El cliente no participó en la salida con una reserva confirmada."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      },
+      "get": {
+        "summary": "Consultar evaluaciones y reseñas (CU-43)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista las reseñas de los clientes con un resumen (cantidad y promedio) y las evaluaciones del administrador al personal y a los proveedores (CU-42). Los filtros se aplican a las dos: el rango de valoración filtra también el puntaje.\n",
+        "tags": [
+          "Reseñas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idsalida",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "idpaquete",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "valoracionMin",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          {
+            "in": "query",
+            "name": "valoracionMax",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          {
+            "in": "query",
+            "name": "fechaDesde",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fechaHasta",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reseñas y resumen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resumen": {
+                          "type": "object",
+                          "properties": {
+                            "cantidad": {
+                              "type": "integer"
+                            },
+                            "promedio": {
+                              "type": "number",
+                              "nullable": true,
+                              "example": 4.5
+                            }
+                          }
+                        },
+                        "resenias": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Resenia"
+                          }
+                        },
+                        "evaluaciones": {
+                          "type": "object",
+                          "description": "Evaluaciones del CU-42.",
+                          "properties": {
+                            "personal": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "proveedores": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/reservas/mis-reservas": {
+      "get": {
+        "summary": "Consultar mis reservas (CU-31, cliente)",
+        "description": "**RESTRINGIDO A CLIENTE.** Lista las reservas del cliente autenticado con su estado, salida, paquete, cantidad de pasajeros y situación de pago (`pagado` y `reintegro`).\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONFIRMADA",
+                "CANCELADA"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservas del cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReservaResumen"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil CLIENTE."
+          }
+        }
+      }
+    },
+    "/api/reservas/{idreserva}": {
+      "get": {
+        "summary": "Detalle de una reserva (CU-31)",
+        "description": "**CLIENTE (solo la propia) o ADMINISTRADOR.** Incluye itinerario (etapas del circuito), pasajeros, pagos, reembolsos, solicitudes de alojamiento y estado de los permisos.\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idreserva",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalle de la reserva."
+          },
+          "403": {
+            "description": "La reserva pertenece a otro cliente."
+          },
+          "404": {
+            "description": "La reserva no existe."
+          }
+        }
+      }
+    },
+    "/api/reservas/{idreserva}/comprobante": {
+      "get": {
+        "summary": "Descargar resumen y comprobantes de la reserva (CU-31)",
+        "description": "**CLIENTE (solo la propia) o ADMINISTRADOR.** Devuelve el comprobante con `Content-Disposition: attachment` para su descarga.\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idreserva",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comprobante (JSON descargable)."
+          },
+          "403": {
+            "description": "La reserva pertenece a otro cliente."
+          },
+          "404": {
+            "description": "La reserva no existe."
+          }
+        }
+      }
+    },
+    "/api/reservas/{idreserva}/cancelacion": {
+      "get": {
+        "summary": "Resumen de liquidación antes de cancelar (CU-32, pasos 2 a 4)",
+        "description": "**CLIENTE (solo la propia) o ADMINISTRADOR.** No modifica nada. Informa el importe abonado, el monto a reintegrar y si los lugares volverán a la venta. Si hay permisos emitidos el reintegro es de $0 y los lugares no vuelven a la venta (flujo alternativo 2). Se rechaza si la reserva no está Confirmada o si la salida ya comenzó (flujo alternativo 1).\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idreserva",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de liquidación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ResumenCancelacion"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La reserva no está Confirmada o la salida ya comenzó.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "La reserva pertenece a otro cliente."
+          },
+          "404": {
+            "description": "La reserva no existe."
+          }
+        }
+      }
+    },
+    "/api/reservas/{idreserva}/cancelar": {
+      "post": {
+        "summary": "Confirmar la cancelación de una reserva (CU-32)",
+        "description": "**CLIENTE (solo la propia) o ADMINISTRADOR.** Cancela la reserva y asienta el reembolso (usuario, motivo, importe y fecha). Reintegra el 100% de lo abonado; con permisos emitidos el importe es $0, los permisos pasan a Perdido y el stock local no se repone. Libera las plazas de alojamiento o cancela la solicitud vinculada y envía la constancia al titular. No interactúa con la autoridad ni mueve dinero: la acreditación es externa al sistema.\n",
+        "tags": [
+          "Reservas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idreserva",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "example": "Cambio de planes",
+                    "description": "Opcional."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reserva cancelada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "idreserva": {
+                          "type": "integer"
+                        },
+                        "nroReserva": {
+                          "type": "string"
+                        },
+                        "estado": {
+                          "type": "string",
+                          "example": "CANCELADA"
+                        },
+                        "lugaresVuelvenALaVenta": {
+                          "type": "boolean"
+                        },
+                        "reembolso": {
+                          "type": "object",
+                          "properties": {
+                            "idreembolso": {
+                              "type": "integer"
+                            },
+                            "montoReembolsado": {
+                              "type": "number"
+                            },
+                            "motivo": {
+                              "type": "string"
+                            },
+                            "fechaReembolso": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "nota": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Reserva no confirmada, salida iniciada o ya cancelada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "La reserva pertenece a otro cliente."
+          },
+          "404": {
+            "description": "La reserva no existe."
+          }
+        }
+      }
+    },
+    "/api/proveedores/{idproveedor}/servicios": {
+      "get": {
+        "summary": "Consultar servicios de un proveedor (CU-18)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista los servicios del proveedor con las condiciones propias de su rubro y su disponibilidad. Para EQUIPAMIENTO la disponibilidad informa `cantidadDisponible` (libre), `cantidadComprometida` (en salidas activas) e `inventarioTotal`.\n",
+        "tags": [
+          "Servicios de proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idproveedor",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servicios del proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Servicio"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID o filtro inválido."
+          },
+          "404": {
+            "description": "El proveedor no existe."
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrar servicio de un proveedor (CU-19)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** El `tipo` debe coincidir con el rubro del proveedor, que además debe estar ACTIVO. Alojamiento: localidad, categoría, tipo de habitación, capacidad y modalidad de confirmación. Transporte: capacidad, peso de equipaje incluido y costo por kg excedente. Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.\n",
+        "tags": [
+          "Servicios de proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idproveedor",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicioCrear"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Servicio registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Servicio"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, tipo distinto al del proveedor, proveedor inactivo o nombre duplicado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El proveedor no existe."
+          }
+        }
+      }
+    },
+    "/api/servicios/{id}": {
+      "get": {
+        "summary": "Obtener servicio para su edición (CU-20, solicitarEdicionServicio)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Devuelve los datos actuales y un bloque `edicion` con los campos editables según el tipo, si el servicio está en uso en salidas activas y si garantiza a un paquete activo. Si `aplicaSoloAFuturasSalidas` es true, un cambio estructural generará una versión nueva del servicio.\n",
+        "tags": [
+          "Servicios de proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servicio con su información de edición.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Servicio"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "edicion": {
+                              "type": "object",
+                              "properties": {
+                                "camposEditables": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "enUsoEnSalidasActivas": {
+                                  "type": "boolean"
+                                },
+                                "garantizaPaquetesActivos": {
+                                  "type": "boolean"
+                                },
+                                "aplicaSoloAFuturasSalidas": {
+                                  "type": "boolean"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El servicio no existe."
+          }
+        }
+      },
+      "put": {
+        "summary": "Modificar servicio de un proveedor (CU-20)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Se envía solo lo que cambia.\nReglas: (1) un cambio estructural de alojamiento o transporte sobre un servicio asignado a salidas publicadas o en curso se guarda como una **versión nueva** (la anterior queda INACTIVA y conserva sus salidas); el paquete pasa a usar la versión nueva. (2) En equipamiento se edita `inventarioTotal` (inventario físico real) y no puede quedar por debajo de lo comprometido en salidas activas. (3) Un alojamiento garantizado por un paquete activo no puede cambiar localidad, categoría ni tipo de habitación, y debe mantener el bloqueo de plazas. Las reservas ya contratadas no se alteran: conservan su precio congelado.\n",
+        "tags": [
+          "Servicios de proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicioModificar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Servicio modificado (o versionado).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "versionado": {
+                      "type": "boolean"
+                    },
+                    "idservicioAnterior": {
+                      "type": "integer",
+                      "description": "Solo si versionado es true."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Servicio"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, campo ajeno al tipo, stock inferior al comprometido o garantía en riesgo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El servicio no existe."
+          }
+        }
+      }
+    },
+    "/api/servicios/{id}/baja": {
+      "patch": {
+        "summary": "Baja lógica de servicio (CU-21)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Pasa el servicio a INACTIVO sin borrarlo. Se bloquea si tiene solicitudes de alojamiento pendientes, si está asignado a salidas activas o en curso, o si es el establecimiento garantizado por un paquete activo.\n",
+        "tags": [
+          "Servicios de proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servicio dado de baja.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Servicio"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ya estaba dado de baja o tiene dependencias activas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El servicio no existe."
+          }
+        }
+      }
+    },
+    "/api/proveedores": {
+      "get": {
+        "summary": "Consultar proveedores (CU-14)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista los proveedores con su razón social, tipo, localidad, datos de contacto, canal habitual de comunicación y estado. Incluye inactivos salvo que se filtre por estado.\n",
+        "tags": [
+          "Proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tipoProveedor",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALOJAMIENTO",
+                "TRANSPORTE",
+                "TREN",
+                "EQUIPAMIENTO"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "localidad",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Coincidencia parcial, sin distinguir mayúsculas."
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado de proveedores.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Proveedor"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      },
+      "post": {
+        "summary": "Alta de proveedor (CU-15)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** El tipo (rubro) del proveedor define qué servicios podrá registrar después (CU-19). No puede haber dos proveedores activos con la misma razón social en la misma localidad.\n",
+        "tags": [
+          "Proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProveedorCrear"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Proveedor registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Proveedor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o proveedor duplicado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}": {
+      "get": {
+        "summary": "Obtener un proveedor",
+        "tags": [
+          "Proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proveedor encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Proveedor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID inválido."
+          },
+          "404": {
+            "description": "El proveedor no existe."
+          }
+        }
+      },
+      "put": {
+        "summary": "Modificar proveedor (CU-16)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Se envía solo lo que cambia. Reglas: no se puede cambiar el tipo si el proveedor ya tiene servicios, y pasar el estado a INACTIVO aplica las mismas validaciones que la baja (CU-17). Reactivar (INACTIVO a ACTIVO) está permitido.\n",
+        "tags": [
+          "Proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProveedorModificar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proveedor modificado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Proveedor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, duplicado, cambio de tipo con servicios o baja bloqueada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El proveedor no existe."
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/baja": {
+      "patch": {
+        "summary": "Baja lógica de proveedor (CU-17)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Pasa el estado a INACTIVO sin borrar el registro ni alterar el historial. Se bloquea si el proveedor tiene solicitudes de alojamiento pendientes (\"Error. El proveedor tiene solicitudes pendientes\") o servicios asignados a salidas activas o en curso (\"Error. El proveedor cuenta con salidas activas\").\n",
+        "tags": [
+          "Proveedores"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proveedor dado de baja.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Proveedor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ya estaba dado de baja o tiene dependencias activas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El proveedor no existe."
+          }
+        }
+      }
+    },
+    "/api/personal": {
+      "post": {
+        "summary": "Registrar cuenta de Guía operativo",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Crea simultáneamente las credenciales de acceso (tabla Usuario con rol GUIA) y el legajo operativo (tabla Personal) dentro de una transacción atómica. Requiere un token JWT válido con perfil ADMIN en el header Authorization.\n",
+        "tags": [
+          "Personal"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "apellido",
+                  "email",
+                  "contrasenia",
+                  "nroPasaporte",
+                  "nacionalidad",
+                  "fechaVencimientoPasaporte",
+                  "rolOperativo"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Carlos",
+                    "description": "Solo letras y espacios (sin números ni símbolos)"
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Mamani",
+                    "description": "Solo letras y espacios (sin números ni símbolos)"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "carlos.guia2@incatour.com"
+                  },
+                  "contrasenia": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "MiClaveSecreta123"
+                  },
+                  "nroPasaporte": {
+                    "type": "string",
+                    "example": "PE-9876543"
+                  },
+                  "nacionalidad": {
+                    "type": "string",
+                    "example": "Peruana"
+                  },
+                  "fechaVencimientoPasaporte": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2032-12-31",
+                    "description": "No puede ser una fecha pasada"
+                  },
+                  "rolOperativo": {
+                    "type": "string",
+                    "enum": [
+                      "Guía",
+                      "Porteador"
+                    ],
+                    "example": "Guía"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta del guía y legajo operativo creados exitosamente."
+          },
+          "400": {
+            "description": "Error de validación (nombre con símbolos, pasaporte vencido, email o pasaporte duplicado, contraseña menor a 8 caracteres)."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido/expirado."
+          },
+          "403": {
+            "description": "Acceso denegado. Se requiere el perfil ADMIN."
+          }
+        }
+      },
+      "get": {
+        "summary": "Consultar personal operativo (CU-22)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista guías y porteadores con sus datos de pasaporte y, en los guías, su habilitación. Todos los filtros son opcionales.\n",
+        "tags": [
+          "Personal"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "rol",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Guía",
+                "Porteador"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "habilitacionVigente",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true = habilitación vigente, false = vencida. Deja solo guías."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de personal ordenada por nombre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Personal"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/personal/{id}": {
+      "put": {
+        "summary": "Modificar personal operativo (CU-24)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Modificación parcial: se envían solo los campos que cambian. La habilitación solo se acepta para guías. El rol no se modifica y el estado se cambia con la baja (CU-25).\n",
+        "tags": [
+          "Personal"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombreCompleto": {
+                    "type": "string",
+                    "example": "Carlos Mamani",
+                    "description": "Solo letras y espacios."
+                  },
+                  "nroPasaporte": {
+                    "type": "string",
+                    "example": "P123456",
+                    "description": "No puede estar usado por otra persona."
+                  },
+                  "nacionalidad": {
+                    "type": "string",
+                    "example": "Peruana"
+                  },
+                  "fechaVencimientoPasaporte": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2031-01-01",
+                    "description": "No puede ser pasada."
+                  },
+                  "nroHabilitacion": {
+                    "type": "string",
+                    "example": "HAB-001-R",
+                    "description": "Solo guías."
+                  },
+                  "fechaHabilitacion": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2028-12-31",
+                    "description": "Solo guías. No puede ser pasada."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Personal modificado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Personal"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "body vacío": null,
+            "intento de cambiar rol o estado": null,
+            "habilitación en un porteador": null,
+            "fecha vencida": null,
+            "pasaporte repetido o personal dado de baja.": null
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          },
+          "404": {
+            "description": "El personal no existe."
+          }
+        }
+      }
+    },
+    "/api/personal/{id}/baja": {
+      "patch": {
+        "summary": "Baja de personal operativo (CU-25)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Baja lógica: el personal queda INACTIVO y, si es guía, también su cuenta de acceso. No procede si está asignado a una salida que todavía no finalizó (PUBLICADA, ABIERTA, CERRADA o EN_CURSO).\n",
+        "tags": [
+          "Personal"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal dado de baja.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Personal"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Asignado a salidas sin finalizar",
+            "o ya dado de baja.": null
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          },
+          "404": {
+            "description": "El personal no existe."
+          }
+        }
+      }
+    },
+    "/api/cuentas-guia": {
+      "get": {
+        "summary": "Consultar usuarios guía (CU-44)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista las cuentas de acceso de los guías (solo ellos tienen cuenta; los porteadores no) con el guía asociado, la situación de su habilitación y las salidas que tiene pendientes. Filtra por rol y estado de la cuenta, situación de la habilitación y búsqueda por nombre, apellido o email.\n",
+        "tags": [
+          "Cuentas de guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "rol",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GUIA"
+              ]
+            },
+            "description": "Hoy el único rol con cuenta entre el personal operativo."
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "habilitacion",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VIGENTE",
+                "VENCIDA"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "busqueda",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Coincidencia parcial en nombre, apellido o email."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuentas de guía.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CuentaGuia"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/cuentas-guia/{idusuario}/baja": {
+      "patch": {
+        "summary": "Baja cuenta guía (CU-46)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Baja lógica de la cuenta de acceso: pasa a INACTIVO, el guía ya no puede iniciar sesión y se conserva todo su historial de salidas. El legajo del personal no se modifica (eso es la baja de personal, CU-25). No se puede dar de baja la cuenta de un guía asignado a una salida cuyo recorrido no finalizó. La verificación y la baja ocurren en una misma transacción.\n",
+        "tags": [
+          "Cuentas de guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idusuario",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID del usuario (cuenta) del guía, no el del personal."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuenta dada de baja.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CuentaGuia"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La cuenta ya estaba dada de baja o el guía tiene salidas pendientes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe una cuenta de guía con ese ID."
+          }
+        }
+      }
+    },
+    "/api/clientes": {
+      "get": {
+        "summary": "Obtener todos los clientes activos",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Devuelve la lista completa de clientes con estado ACTIVO, incluyendo nombre, apellido y email heredados de la tabla Usuario.\n",
+        "tags": [
+          "Clientes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clientes obtenida exitosamente."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido/expirado."
+          },
+          "403": {
+            "description": "Acceso denegado. Se requiere el perfil ADMIN."
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrar un nuevo cliente",
+        "description": "**Endpoint público — no requiere autenticación.** Es la puerta de entrada al sistema para nuevos usuarios. Crea simultáneamente la cuenta de acceso (tabla Usuario con rol CLIENTE) y el perfil comercial (tabla Cliente) dentro de una transacción atómica.\n",
+        "tags": [
+          "Clientes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "apellido",
+                  "email",
+                  "contrasenia"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Juan",
+                    "description": "Solo letras y espacios (sin números ni símbolos)"
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Pérez",
+                    "description": "Solo letras y espacios (sin números ni símbolos)"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "usuario@test.com"
+                  },
+                  "contrasenia": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "password123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cliente registrado exitosamente."
+          },
+          "400": {
+            "description": "Error de validación (nombre con símbolos, email duplicado, contraseña menor a 8 caracteres)."
+          }
+        }
+      }
+    },
+    "/api/clientes/{id}": {
+      "get": {
+        "summary": "Obtener un cliente por su ID",
+        "description": "Accesible por el propio Cliente (para ver su propio perfil) o por el Administrador.\n",
+        "tags": [
+          "Clientes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true,
+            "description": "ID numérico del cliente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente encontrado."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido/expirado."
+          },
+          "403": {
+            "description": "Acceso denegado. Se requiere perfil ADMIN o CLIENTE."
+          },
+          "404": {
+            "description": "Cliente no encontrado."
+          }
+        }
+      },
+      "put": {
+        "summary": "Modificar datos de perfil de un cliente",
+        "description": "**RESTRINGIDO AL PROPIO CLIENTE.** Permite actualizar nombre, apellido y email. La contraseña NO es modificable por este endpoint (requerimiento futuro del ERS). No se puede modificar una cuenta con estado INACTIVO.\n",
+        "tags": [
+          "Clientes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true,
+            "description": "ID numérico del cliente a modificar"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Juan"
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "example": "Pérez"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "nuevo@email.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cliente actualizado exitosamente."
+          },
+          "400": {
+            "description": "Cuenta inactiva o email ya en uso."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido/expirado."
+          },
+          "403": {
+            "description": "Acceso denegado. Se requiere el perfil CLIENTE."
+          },
+          "404": {
+            "description": "Cliente no encontrado."
+          }
+        }
+      }
+    },
+    "/api/clientes/{id}/baja": {
+      "patch": {
+        "summary": "Dar de baja lógica a un cliente",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Realiza una baja lógica (estado INACTIVO). No elimina el registro de la base de datos. No se puede dar de baja a un cliente que tenga reservas en estado \"Confirmada\".\n",
+        "tags": [
+          "Clientes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true,
+            "description": "ID numérico del cliente a dar de baja"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente inhabilitado exitosamente."
+          },
+          "400": {
+            "description": "El cliente tiene reservas en estado Confirmada."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido/expirado."
+          },
+          "403": {
+            "description": "Acceso denegado. Se requiere el perfil ADMIN."
+          },
+          "404": {
+            "description": "Cliente no encontrado."
+          }
+        }
+      }
+    },
+    "/api/temporadas": {
+      "get": {
+        "summary": "Consultar temporadas (CU-06)",
+        "tags": [
+          "Temporadas"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de temporadas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Temporada"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear temporada (CU-07)",
+        "tags": [
+          "Temporadas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "fechaInicio",
+                  "fechaFin"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "example": "Temporada alta 2026"
+                  },
+                  "fechaInicio": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-05-01"
+                  },
+                  "fechaFin": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Debe ser posterior a fechaInicio",
+                    "example": "2026-09-30"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Temporada creada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string",
+                      "example": "Temporada creada exitosamente"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Temporada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos, fechas incoherentes o ya existe una temporada activa con ese nombre"
+          }
+        }
+      }
+    },
+    "/api/temporadas/{id}": {
+      "put": {
+        "summary": "Modificar temporada (CU-08)",
+        "description": "Debe enviarse al menos un campo. La fecha de inicio debe quedar anterior a la de fin.",
+        "tags": [
+          "Temporadas"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string"
+                  },
+                  "fechaInicio": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "fechaFin": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Temporada modificada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Temporada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID o datos inválidos, fechas incoherentes o nombre duplicado"
+          },
+          "404": {
+            "description": "Temporada no encontrada o inactiva"
+          }
+        }
+      }
+    },
+    "/api/temporadas/{id}/baja": {
+      "patch": {
+        "summary": "Baja temporada (CU-09)",
+        "description": "Baja lógica. No se permite si la temporada tiene tarifas de paquetes asociadas.",
+        "tags": [
+          "Temporadas"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Temporada dada de baja exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Temporada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID inválido o temporada con tarifas de paquetes asociadas"
+          },
+          "404": {
+            "description": "Temporada no encontrada o ya inactiva"
+          }
+        }
+      }
+    },
+    "/api/paquetes": {
+      "get": {
+        "summary": "Consultar paquetes turísticos (CU-10)",
+        "tags": [
+          "Paquetes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de paquetes obtenida exitosamente"
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear Paquete Turístico (CU-11)",
+        "tags": [
+          "Paquetes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idcircuito": {
+                    "type": "integer"
+                  },
+                  "nombrePaquete": {
+                    "type": "string"
+                  },
+                  "tipoGarantia": {
+                    "type": "string"
+                  },
+                  "idservicioGarantizado": {
+                    "type": "integer"
+                  },
+                  "nochesPrevias": {
+                    "type": "integer"
+                  },
+                  "nochesPosteriores": {
+                    "type": "integer"
+                  },
+                  "matrizPrecios": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "serviciosIncluidos": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paquete creado exitosamente"
+          }
+        }
+      }
+    },
+    "/api/paquetes/{id}": {
+      "get": {
+        "summary": "Obtener paquete por ID",
+        "tags": [
+          "Paquetes"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paquete encontrado"
+          }
+        }
+      },
+      "put": {
+        "summary": "Modificar Paquete (CU-12)",
+        "tags": [
+          "Paquetes"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paquete modificado exitosamente"
+          }
+        }
+      }
+    },
+    "/api/paquetes/{id}/baja": {
+      "patch": {
+        "summary": "Dar de baja Paquete (CU-13)",
+        "tags": [
+          "Paquetes"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paquete dado de baja exitosamente"
+          }
+        }
+      }
+    },
+    "/api/circuitos/{idcircuito}/etapas": {
+      "get": {
+        "summary": "Listar etapas de un circuito",
+        "tags": [
+          "Etapas"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idcircuito",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de etapas obtenida exitosamente"
+          }
+        }
+      },
+      "put": {
+        "summary": "Reemplazo masivo de etapas (CU-05)",
+        "description": "Borra las etapas actuales y las reemplaza por las nuevas provistas, validando correlatividad.",
+        "tags": [
+          "Etapas"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idcircuito",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "numeroOrden": {
+                      "type": "integer"
+                    },
+                    "puntoInicio": {
+                      "type": "string"
+                    },
+                    "puntoFin": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Secuencia de etapas actualizada exitosamente"
+          },
+          "400": {
+            "description": "Error de validación de correlatividad"
+          }
+        }
+      }
+    },
+    "/api/circuitos": {
+      "get": {
+        "summary": "Consultar circuitos turísticos (CU-01)",
+        "tags": [
+          "Circuitos"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de circuitos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Circuito"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear circuito turístico (CU-02)",
+        "tags": [
+          "Circuitos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombreCircuito",
+                  "duracionDias",
+                  "dificultad",
+                  "minimoGuias"
+                ],
+                "properties": {
+                  "nombreCircuito": {
+                    "type": "string",
+                    "example": "Camino Inca Clásico"
+                  },
+                  "duracionDias": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 4
+                  },
+                  "dificultad": {
+                    "type": "string",
+                    "example": "MEDIA"
+                  },
+                  "minimoGuias": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
+                  },
+                  "parametrosPorteadores": {
+                    "type": "string",
+                    "example": "1 porteador cada 2 pasajeros"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Circuito creado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string",
+                      "example": "Circuito creado exitosamente"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Circuito"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o ya existe un circuito activo con ese nombre"
+          }
+        }
+      }
+    },
+    "/api/circuitos/{id}": {
+      "put": {
+        "summary": "Modificar circuito turístico (CU-03)",
+        "description": "Debe enviarse al menos un campo. Solo se pueden modificar circuitos activos.",
+        "tags": [
+          "Circuitos"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombreCircuito": {
+                    "type": "string"
+                  },
+                  "duracionDias": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "dificultad": {
+                    "type": "string"
+                  },
+                  "minimoGuias": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "parametrosPorteadores": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Circuito modificado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Circuito"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID o datos inválidos, circuito inactivo o nombre duplicado"
+          },
+          "404": {
+            "description": "Circuito no encontrado"
+          }
+        }
+      }
+    },
+    "/api/circuitos/{id}/baja": {
+      "patch": {
+        "summary": "Baja circuito turístico (CU-04)",
+        "description": "Baja lógica. No se permite si el circuito tiene paquetes activos asociados.",
+        "tags": [
+          "Circuitos"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Circuito dado de baja exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Circuito"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID inválido, circuito ya inactivo o con paquetes activos"
+          },
+          "404": {
+            "description": "Circuito no encontrado"
+          }
+        }
+      }
+    },
+    "/api/catalogo": {
+      "get": {
+        "summary": "Catálogo Público de Paquetes",
+        "description": "Retorna todos los paquetes vigentes optimizados para el Frontend (Escaparate).",
+        "tags": [
+          "Catálogo Público"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de paquetes exitosa"
+          }
+        }
+      }
+    },
+    "/api/incidentes": {
+      "get": {
+        "summary": "Alertas de incidentes (CU-50, panel del administrador)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Incidentes informados por los guías, del más reciente al más viejo, con la salida y los pasajeros afectados. Filtros opcionales por salida y gravedad.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idsalida",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "nivelGravedad",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BAJO",
+                "MEDIO",
+                "CRITICO"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de incidentes."
+          },
+          "400": {
+            "description": "Filtro inválido."
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil ADMIN."
+          }
+        }
+      }
+    },
+    "/api/guia/salidas": {
+      "get": {
+        "summary": "Mis salidas asignadas (CU-48)",
+        "description": "**RESTRINGIDO A GUÍA.** Salidas a las que está asignado el guía del token, sin las canceladas, ordenadas por fecha. Es el punto de entrada para registrar avances (CU-49) e incidentes (CU-50).\n",
+        "tags": [
+          "Portal del guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Salidas asignadas.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": [
+                    {
+                      "idsalida": 2,
+                      "nroSalida": "SAL-2026-002",
+                      "paquete": "Inca Clásico Standard",
+                      "circuito": "Camino del Inca Clásico",
+                      "fechaInicio": "2026-12-10T00:00:00.000Z",
+                      "fechaFin": "2026-12-13T00:00:00.000Z",
+                      "estado": "CERRADA",
+                      "pasajeros": 3
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token no proporcionado o inválido."
+          },
+          "403": {
+            "description": "Se requiere el perfil GUIA",
+            "o la cuenta no está vinculada a un guía.": null
+          }
+        }
+      }
+    },
+    "/api/guia/salidas/{idsalida}": {
+      "get": {
+        "summary": "Información de la salida asignada (CU-48)",
+        "description": "**RESTRINGIDO A GUÍA.** Itinerario tramo a tramo (con el último avance informado de cada etapa), nómina de pasajeros con el contacto del titular de su reserva, personal, servicios y equipamiento. Solo para salidas a las que el guía está asignado.\n",
+        "tags": [
+          "Portal del guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalle de la salida.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "salida": {
+                      "idsalida": 2,
+                      "nroSalida": "SAL-2026-002",
+                      "circuito": "Camino del Inca Clásico",
+                      "duracionDias": 4,
+                      "estado": "CERRADA"
+                    },
+                    "itinerario": [
+                      {
+                        "numeroOrden": 1,
+                        "puntoInicio": "Km 82",
+                        "puntoFin": "Wayllabamba",
+                        "campamentoPrevisto": "Wayllabamba Camp",
+                        "estadoTramo": null,
+                        "fechaHoraLlegada": null
+                      }
+                    ],
+                    "nomina": [
+                      {
+                        "idpasajero": 2,
+                        "nombreCompleto": "Turista 1",
+                        "nroPasaporte": "TP-1",
+                        "nacionalidad": "Argentina",
+                        "nroReserva": "RES-1",
+                        "contacto": {
+                          "titular": "Juan Pérez",
+                          "email": "juan@test.com"
+                        }
+                      }
+                    ],
+                    "personal": [
+                      {
+                        "idpersonal": 1,
+                        "nombreCompleto": "Carlos Mamani",
+                        "rol": "Guía"
+                      }
+                    ],
+                    "servicios": [
+                      {
+                        "tipo": "TRANSPORTE",
+                        "nombreServicio": "Minibus Sprinter"
+                      }
+                    ],
+                    "equipamiento": [
+                      {
+                        "nombreServicio": "Carpas Alta Montaña",
+                        "tipoEquipamiento": "Carpa 4 Estaciones",
+                        "cantidad": 2
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Id inválido."
+          },
+          "403": {
+            "description": "El guía no está asignado a esa salida."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/guia/salidas/{idsalida}/avances": {
+      "post": {
+        "summary": "Registrar avance del recorrido (CU-49)",
+        "description": "**RESTRINGIDO A GUÍA.** El guía asignado informa la llegada al final de una etapa. Se guardan por separado cuándo ocurrió (fechaHoraLlegada) y cuándo se informó (fechaHoraReporte), porque el recorrido pasa por zonas sin señal. Las etapas se informan en orden. El primer avance pone la salida EN_CURSO y completar la última etapa la deja FINALIZADA.\n",
+        "tags": [
+          "Portal del guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "numeroOrden",
+                  "estadoTramo",
+                  "fechaHoraLlegada"
+                ],
+                "properties": {
+                  "numeroOrden": {
+                    "type": "integer",
+                    "example": 1,
+                    "description": "Etapa alcanzada (numeroOrden del itinerario)."
+                  },
+                  "estadoTramo": {
+                    "type": "string",
+                    "enum": [
+                      "COMPLETADO",
+                      "DEMORADO"
+                    ]
+                  },
+                  "fechaHoraLlegada": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-12-10T14:35:00-05:00",
+                    "description": "Cuándo llegó realmente. No puede ser futura."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Avance registrado.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "mensaje": "Avance registrado correctamente",
+                  "data": {
+                    "avance": {
+                      "idavance": 1,
+                      "numeroOrden": 1,
+                      "estadoTramo": "COMPLETADO",
+                      "fechaHoraLlegada": "2026-12-10T19:35:00.000Z",
+                      "fechaHoraReporte": "2026-12-10T22:02:11.000Z"
+                    },
+                    "salida": {
+                      "idsalida": 2,
+                      "estado": "EN_CURSO",
+                      "ultimaEtapaAlcanzada": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "etapa de otro circuito": null,
+            "fuera de orden o ya completada": null,
+            "llegada futura o anterior a la etapa previa": null,
+            "o salida no activa.": null
+          },
+          "403": {
+            "description": "El guía no está asignado a esa salida."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/guia/salidas/{idsalida}/pasajeros": {
+      "get": {
+        "summary": "Pasajeros de la salida (CU-50, FA1)",
+        "description": "**RESTRINGIDO A GUÍA.** Lista los pasajeros de la salida para elegir a los afectados por un incidente.\n",
+        "tags": [
+          "Portal del guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pasajeros de la salida.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": [
+                    {
+                      "idpasajero": 2,
+                      "nombreCompleto": "Turista 1",
+                      "nroPasaporte": "TP-1"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El guía no está asignado a esa salida."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/guia/salidas/{idsalida}/incidentes": {
+      "post": {
+        "summary": "Notificar incidente (CU-50)",
+        "description": "**RESTRINGIDO A GUÍA.** El guía asignado registra un imprevisto de la salida. Se guardan por separado cuándo ocurrió (fechaHoraOcurrencia) y cuándo se informó (fechaHoraReporte). Todo incidente queda como alerta en el panel del administrador (GET /api/incidentes), cualquiera sea su gravedad.\n",
+        "tags": [
+          "Portal del guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tipoIncidente",
+                  "descripcion",
+                  "nivelGravedad",
+                  "fechaHoraOcurrencia"
+                ],
+                "properties": {
+                  "tipoIncidente": {
+                    "type": "string",
+                    "enum": [
+                      "ACCIDENTE",
+                      "SALUD",
+                      "CLIMA",
+                      "EQUIPAMIENTO",
+                      "RETRASO",
+                      "OTRO"
+                    ]
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "example": "Un pasajero se torció el tobillo en el descenso",
+                    "description": "Entre 5 y 1000 caracteres."
+                  },
+                  "nivelGravedad": {
+                    "type": "string",
+                    "enum": [
+                      "BAJO",
+                      "MEDIO",
+                      "CRITICO"
+                    ]
+                  },
+                  "fechaHoraOcurrencia": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-12-11T10:20:00-05:00"
+                  },
+                  "pasajerosAfectados": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "example": [
+                      2
+                    ],
+                    "description": "Opcional (FA1). Ids de pasajeros de la salida."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Incidente registrado y visible en el panel del administrador."
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "fecha futura o anterior al inicio": null,
+            "pasajeros que no viajan en la salida": null,
+            "o salida no activa.": null
+          },
+          "403": {
+            "description": "El guía no está asignado a esa salida."
+          },
+          "404": {
+            "description": "La salida no existe."
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Iniciar sesión en el sistema",
+        "tags": [
+          "Autenticación"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "example": "admin@incatour.com"
+                  },
+                  "contrasenia": {
+                    "type": "string",
+                    "example": "AdminIncaTour123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticación exitosa. Devuelve el JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "usuario": {
+                      "type": "object"
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas o cuenta inactiva."
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Temporadas",
+      "description": "Gestión de Temporadas (CU-06 a CU-09)"
+    },
+    {
+      "name": "Paquetes",
+      "description": "Gestión del CRUD de Paquetes Turísticos"
+    },
+    {
+      "name": "Etapas",
+      "description": "Gestión de etapas de circuitos (Bulk Replace)"
+    },
+    {
+      "name": "Circuitos",
+      "description": "Gestión de Circuitos Turísticos (CU-01 a CU-04)"
+    }
+  ]
+}
