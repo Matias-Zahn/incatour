@@ -1,4 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
+import { ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { ESTADO_TRAMO, RegistrarAvanceDto } from "./guia.dto";
 import { GuiaRepository } from "./guia.repository";
 
 export class GuiaService {
@@ -22,13 +24,7 @@ export class GuiaService {
 
   // CU-48: consultarDetalleSalida — itinerario tramo a tramo, nómina con contacto y equipamiento
   async consultarDetalleSalida(idusuario: number, idsalida: number) {
-    const idpersonal = await this.legajo(idusuario);
-    const s = await this.repository.detalleSalida(idsalida);
-    if (!s) throw CustomError.notFound("La salida no existe");
-    // Un guía solo ve las salidas a las que está asignado
-    if (!s.personalAsignado.some((a) => a.idpersonal === idpersonal)) {
-      throw CustomError.forbidden("No estás asignado a esta salida");
-    }
+    const s = await this.salidaDelGuia(idusuario, idsalida);
 
     const { circuito } = s.paquete;
     return {
@@ -76,6 +72,63 @@ export class GuiaService {
         cantidad: e.cantidad,
       })),
     };
+  }
+
+  // CU-49: registrarAvance — el guía informa la llegada al final de una etapa
+  async registrarAvance(idusuario: number, idsalida: number, dto: RegistrarAvanceDto) {
+    const s = await this.salidaDelGuia(idusuario, idsalida);
+    if (!SALIDAS_ACTIVAS.includes(s.estado)) {
+      throw CustomError.badRequest(`No se pueden registrar avances en una salida ${s.estado}`);
+    }
+
+    // La etapa tiene que pertenecer al circuito del paquete de la salida (restricción del documento de la base)
+    const { etapas } = s.paquete.circuito;
+    const etapa = etapas.find((e) => e.numeroOrden === dto.numeroOrden);
+    if (!etapa) throw CustomError.badRequest(`La etapa ${dto.numeroOrden} no pertenece al circuito de la salida`);
+
+    // Las etapas se informan en orden: no se saltea ninguna ni se vuelve a una ya completada
+    const ultima = s.ultimaEtapaAlcanzada ?? 0;
+    if (dto.numeroOrden <= ultima) {
+      throw CustomError.badRequest(`La etapa ${dto.numeroOrden} ya se informó como completada`);
+    }
+    if (dto.numeroOrden > ultima + 1) {
+      throw CustomError.badRequest(`Antes hay que informar la etapa ${ultima + 1}`);
+    }
+
+    if (dto.fechaHoraLlegada > new Date()) throw CustomError.badRequest("La fecha y hora de llegada no puede ser futura");
+    if (dto.fechaHoraLlegada < s.fechaInicio) {
+      throw CustomError.badRequest("La fecha y hora de llegada es anterior al inicio de la salida");
+    }
+    const anterior = s.avances.find((a) => a.numeroOrden === ultima && a.estadoTramo === ESTADO_TRAMO.COMPLETADO);
+    if (anterior?.fechaHoraLlegada && dto.fechaHoraLlegada < anterior.fechaHoraLlegada) {
+      throw CustomError.badRequest(`La llegada no puede ser anterior a la de la etapa ${ultima}`);
+    }
+
+    // Paso 11: el primer avance pone la salida en curso; completar la última etapa la finaliza
+    const completa = dto.estadoTramo === ESTADO_TRAMO.COMPLETADO;
+    const ultimaDelCircuito = Math.max(...etapas.map((e) => e.numeroOrden));
+
+    return this.repository.registrarAvance({
+      idsalida,
+      idcircuito: etapa.idcircuito,
+      numeroOrden: dto.numeroOrden,
+      estadoTramo: dto.estadoTramo,
+      fechaHoraLlegada: dto.fechaHoraLlegada,
+      ultimaEtapaAlcanzada: completa ? dto.numeroOrden : s.ultimaEtapaAlcanzada,
+      estadoSalida:
+        completa && dto.numeroOrden === ultimaDelCircuito ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
+    });
+  }
+
+  // La salida, solo si el guía del token está asignado a ella
+  private async salidaDelGuia(idusuario: number, idsalida: number) {
+    const idpersonal = await this.legajo(idusuario);
+    const s = await this.repository.detalleSalida(idsalida);
+    if (!s) throw CustomError.notFound("La salida no existe");
+    if (!s.personalAsignado.some((a) => a.idpersonal === idpersonal)) {
+      throw CustomError.forbidden("No estás asignado a esta salida");
+    }
+    return s;
   }
 
   private async legajo(idusuario: number) {
