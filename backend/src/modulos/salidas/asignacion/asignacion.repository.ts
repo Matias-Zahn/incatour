@@ -29,7 +29,7 @@ export class AsignacionRepository {
   }
 
   // Personal ACTIVO sin otra salida activa que se superponga con estas fechas (FA1)
-  async personalLibre(salida: SalidaParaAsignar, ids?: number[]) {
+  async personalLibre(salida: { idsalida: number; fechaInicio: Date; fechaFin: Date }, ids?: number[]) {
     return db.personal.findMany({
       where: {
         ...(ids && { idpersonal: { in: ids } }),

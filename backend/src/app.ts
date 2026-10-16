@@ -100,6 +100,10 @@ app.use("/api/salidas", DevolucionEquipamientoRoutes.getRoutes);
 // Módulo Salidas - Asignación de recursos (CU-40)
 import { AsignacionRoutes } from "./modulos/salidas/asignacion/asignacion.routes";
 app.use("/api/salidas", AsignacionRoutes.getRoutes);
+
+// Módulo Salidas - Reemplazo de personal (CU-38)
+import { ReemplazoRoutes } from "./modulos/salidas/reemplazos/reemplazo.routes";
+app.use("/api/salidas", ReemplazoRoutes.getRoutes);
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
