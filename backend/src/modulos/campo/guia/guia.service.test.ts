@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GuiaService } from "./guia.service";
-import { RegistrarAvanceDto } from "./guia.dto";
+import { RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn() },
+  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn(), registrarIncidente: vi.fn() },
 }));
 vi.mock("./guia.repository", () => ({ GuiaRepository: class { constructor() { return repo; } } }));
 
@@ -105,5 +105,56 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "CANCELADA" }));
 
     await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toThrow("CANCELADA");
+  });
+});
+
+describe("GuiaService.registrarIncidente (CU-50)", () => {
+  const conPasajeros = (estado = "EN_CURSO") => ({
+    ...salida,
+    estado,
+    fechaInicio: new Date("2026-01-10"),
+    reservas: [{ pasajeros: [{ idpasajero: 2, pasajero: { idpasajero: 2 } }, { idpasajero: 3, pasajero: { idpasajero: 3 } }] }],
+  });
+  const incidente = (extra = {}) =>
+    RegistrarIncidenteDto.create({
+      tipoIncidente: "SALUD",
+      descripcion: "Pasajero con mal de altura",
+      nivelGravedad: "MEDIO",
+      fechaHoraOcurrencia: "2026-01-11T10:00:00Z",
+      ...extra,
+    })[1]!;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    repo.idPersonalDelUsuario.mockResolvedValue(7);
+    repo.detalleSalida.mockResolvedValue(conPasajeros());
+    repo.registrarIncidente.mockImplementation(async (p) => p);
+  });
+
+  it("registra el incidente con los pasajeros afectados (FA1)", async () => {
+    const r = await new GuiaService().registrarIncidente(1, 2, incidente({ pasajerosAfectados: [3] }));
+
+    expect(r).toMatchObject({ idsalida: 2, tipoIncidente: "SALUD", nivelGravedad: "MEDIO", pasajerosAfectados: [3] });
+  });
+
+  it("rechaza pasajeros que no viajan en la salida", async () => {
+    await expect(new GuiaService().registrarIncidente(1, 2, incidente({ pasajerosAfectados: [2, 99] }))).rejects.toThrow("99");
+  });
+
+  it("rechaza una fecha futura y una salida no activa", async () => {
+    await expect(new GuiaService().registrarIncidente(1, 2, incidente({ fechaHoraOcurrencia: "2099-01-01T00:00:00Z" }))).rejects.toThrow("futura");
+
+    repo.detalleSalida.mockResolvedValue(conPasajeros("FINALIZADA"));
+    await expect(new GuiaService().registrarIncidente(1, 2, incidente())).rejects.toThrow("FINALIZADA");
+  });
+
+  it("el DTO exige tipo, descripción y gravedad válidos", () => {
+    const crear = (extra: object) =>
+      RegistrarIncidenteDto.create({ tipoIncidente: "SALUD", descripcion: "Algo pasó", nivelGravedad: "BAJO", fechaHoraOcurrencia: "2026-01-11T10:00:00Z", ...extra })[0];
+
+    expect(crear({ tipoIncidente: "TERREMOTO" })).toMatch("tipoIncidente");
+    expect(crear({ descripcion: "" })).toMatch("descripción");
+    expect(crear({ nivelGravedad: "ALTO" })).toMatch("nivelGravedad");
+    expect(crear({ pasajerosAfectados: [2, 2] })).toMatch("sin repetir");
   });
 });

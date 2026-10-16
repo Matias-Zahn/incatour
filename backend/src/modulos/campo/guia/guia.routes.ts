@@ -108,6 +108,65 @@ export class GuiaRoutes {
      */
     router.post("/salidas/:idsalida/avances", controller.registrarAvance);
 
+    /**
+     * @swagger
+     * /api/guia/salidas/{idsalida}/pasajeros:
+     *   get:
+     *     summary: Pasajeros de la salida (CU-50, FA1)
+     *     description: >
+     *       **RESTRINGIDO A GUÍA.** Lista los pasajeros de la salida para elegir a los afectados por un incidente.
+     *     tags: [Portal del guía]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     responses:
+     *       200:
+     *         description: Pasajeros de la salida.
+     *         content:
+     *           application/json:
+     *             example:
+     *               data: [{ idpasajero: 2, nombreCompleto: Turista 1, nroPasaporte: TP-1 }]
+     *       403: { description: El guía no está asignado a esa salida. }
+     *       404: { description: La salida no existe. }
+     */
+    router.get("/salidas/:idsalida/pasajeros", controller.consultarPasajerosSalida);
+
+    /**
+     * @swagger
+     * /api/guia/salidas/{idsalida}/incidentes:
+     *   post:
+     *     summary: Notificar incidente (CU-50)
+     *     description: >
+     *       **RESTRINGIDO A GUÍA.** El guía asignado registra un imprevisto de la salida. Se guardan por separado
+     *       cuándo ocurrió (fechaHoraOcurrencia) y cuándo se informó (fechaHoraReporte). Todo incidente queda como
+     *       alerta en el panel del administrador (GET /api/incidentes), cualquiera sea su gravedad.
+     *     tags: [Portal del guía]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [tipoIncidente, descripcion, nivelGravedad, fechaHoraOcurrencia]
+     *             properties:
+     *               tipoIncidente: { type: string, enum: [ACCIDENTE, SALUD, CLIMA, EQUIPAMIENTO, RETRASO, OTRO] }
+     *               descripcion: { type: string, example: Un pasajero se torció el tobillo en el descenso, description: Entre 5 y 1000 caracteres. }
+     *               nivelGravedad: { type: string, enum: [BAJO, MEDIO, CRITICO] }
+     *               fechaHoraOcurrencia: { type: string, format: date-time, example: "2026-12-11T10:20:00-05:00" }
+     *               pasajerosAfectados: { type: array, items: { type: integer }, example: [2], description: Opcional (FA1). Ids de pasajeros de la salida. }
+     *     responses:
+     *       201: { description: Incidente registrado y visible en el panel del administrador. }
+     *       400: { description: Datos inválidos, fecha futura o anterior al inicio, pasajeros que no viajan en la salida, o salida no activa. }
+     *       403: { description: El guía no está asignado a esa salida. }
+     *       404: { description: La salida no existe. }
+     */
+    router.post("/salidas/:idsalida/incidentes", controller.confirmarRegistroIncidente);
+
     return router;
   }
 }

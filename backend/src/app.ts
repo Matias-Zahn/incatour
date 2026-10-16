@@ -107,6 +107,8 @@ app.use("/api/salidas", ReemplazoRoutes.getRoutes);
 // Módulo Campo - Portal del guía (CU-48)
 import { GuiaRoutes } from "./modulos/campo/guia/guia.routes";
 app.use("/api/guia", GuiaRoutes.getRoutes);
+import { IncidenteRoutes } from "./modulos/campo/guia/incidentes.routes";
+app.use("/api/incidentes", IncidenteRoutes.getRoutes);
 
 //ACA IRIAN las demas
 
