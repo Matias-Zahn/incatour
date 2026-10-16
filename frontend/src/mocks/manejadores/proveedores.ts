@@ -3,45 +3,48 @@ import { construirUrl } from "../../services/clienteApi";
 import type { DatosProveedor, Proveedor } from "../../services/proveedorService";
 import { proveedoresSemilla } from "../datos/proveedores";
 
-// "Base de datos" en memoria; se reinicia al recargar la página.
 let proveedores: Proveedor[] = [...proveedoresSemilla];
 
-const noEncontrado = () =>
+const respuestaNoEncontrado = () =>
     HttpResponse.json({ mensaje: "Proveedor no encontrado." }, { status: 404 });
 
 export const manejadoresProveedores = [
     http.get(construirUrl("/proveedores"), async () => {
         await delay();
-        return HttpResponse.json(proveedores);
+        return HttpResponse.json({ data: proveedores });
     }),
-
     http.post(construirUrl("/proveedores"), async ({ request }) => {
         await delay();
         const datos = (await request.json()) as DatosProveedor;
         const nuevo: Proveedor = {
-            id: Math.max(0, ...proveedores.map((p) => p.id)) + 1,
+            id: Math.max(0, ...proveedores.map((p) => p.idproveedor)) + 1,
+            idproveedor: Math.max(0, ...proveedores.map((p) => p.idproveedor)) + 1,
             ...datos,
+            _count: { servicios: 0 },
         };
         proveedores = [...proveedores, nuevo];
-        return HttpResponse.json(nuevo, { status: 201 });
+        return HttpResponse.json(
+            { mensaje: "Proveedor registrado exitosamente", data: nuevo },
+            { status: 201 },
+        );
     }),
-
     http.put(construirUrl("/proveedores/:id"), async ({ params, request }) => {
         await delay();
         const id = Number(params.id);
-        const existente = proveedores.find((p) => p.id === id);
-        if (!existente) return noEncontrado();
-        const datos = (await request.json()) as DatosProveedor;
+        const existente = proveedores.find((p) => p.idproveedor === id);
+        if (!existente) return respuestaNoEncontrado();
+        const datos = (await request.json()) as Partial<DatosProveedor>;
         const actualizado: Proveedor = { ...existente, ...datos };
-        proveedores = proveedores.map((p) => (p.id === id ? actualizado : p));
-        return HttpResponse.json(actualizado);
+        proveedores = proveedores.map((p) => (p.idproveedor === id ? actualizado : p));
+        return HttpResponse.json({ mensaje: "Proveedor modificado exitosamente", data: actualizado });
     }),
-
-    http.delete(construirUrl("/proveedores/:id"), async ({ params }) => {
+    http.patch(construirUrl("/proveedores/:id/baja"), async ({ params }) => {
         await delay();
         const id = Number(params.id);
-        if (!proveedores.some((p) => p.id === id)) return noEncontrado();
-        proveedores = proveedores.filter((p) => p.id !== id);
-        return new HttpResponse(null, { status: 204 });
+        const existente = proveedores.find((p) => p.idproveedor === id);
+        if (!existente) return respuestaNoEncontrado();
+        const actualizado = { ...existente, estado: "INACTIVO" as const };
+        proveedores = proveedores.map((p) => (p.idproveedor === id ? actualizado : p));
+        return HttpResponse.json({ mensaje: "Proveedor dado de baja exitosamente", data: actualizado });
     }),
 ];

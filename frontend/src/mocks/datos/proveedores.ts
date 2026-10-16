@@ -1,9 +1,26 @@
 import type { Proveedor } from "../../services/proveedorService";
 
 export const proveedoresSemilla: Proveedor[] = [
-    { id: 1, nombre: "Andes Travel", contacto: "contacto@andes.com" },
-    { id: 2, nombre: "Camino Inca Tours", contacto: "info@caminoinca.com" },
-    { id: 3, nombre: "Transportes Urubamba", contacto: "reservas@urubamba.pe" },
-    { id: 4, nombre: "Hostal Machu Picchu", contacto: "hola@hostalmp.pe" },
-    { id: 5, nombre: "Porteadores Qhapaq Ñan", contacto: "equipo@qhapaqnan.pe" },
+    {
+        id: 1,
+        idproveedor: 1,
+        tipoProveedor: "ALOJAMIENTO",
+        razonSocial: "Hoteles del Cusco",
+        localidad: "Cusco",
+        datosContacto: "reservas@hoteles-cusco.pe",
+        canalComunicacion: "Correo electrónico",
+        estado: "ACTIVO",
+        _count: { servicios: 2 },
+    },
+    {
+        id: 2,
+        idproveedor: 2,
+        tipoProveedor: "TRANSPORTE",
+        razonSocial: "Transportes Urubamba",
+        localidad: "Urubamba",
+        datosContacto: "+51 984 555 111",
+        canalComunicacion: "WhatsApp",
+        estado: "ACTIVO",
+        _count: { servicios: 1 },
+    },
 ];

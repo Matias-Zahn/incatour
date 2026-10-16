@@ -1,6 +1,7 @@
 import LayoutGestion from "./components/LayoutGestion";
 import InicioGestionPage from "./pages/gestion/InicioGestionPage";
 import ProveedoresPage from "./pages/gestion/ProveedoresPage";
+import ServiciosPage from "./pages/gestion/ServiciosPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 function App() {
@@ -20,6 +21,14 @@ function App() {
           element={
             <LayoutGestion seccion="Proveedores">
               <ProveedoresPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/proveedores/:idProveedor/servicios"
+          element={
+            <LayoutGestion seccion="Proveedores">
+              <ServiciosPage />
             </LayoutGestion>
           }
         />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
@@ -89,8 +90,9 @@ function ProveedoresPage() {
     const proveedoresFiltrados = proveedores.filter((proveedor) => {
         if (!terminoLimpio) return true;
         return (
-            proveedor.nombre.toLowerCase().includes(terminoLimpio) ||
-            proveedor.contacto.toLowerCase().includes(terminoLimpio)
+            proveedor.razonSocial.toLowerCase().includes(terminoLimpio) ||
+            proveedor.localidad.toLowerCase().includes(terminoLimpio) ||
+            proveedor.datosContacto.toLowerCase().includes(terminoLimpio)
         );
     });
 
@@ -155,7 +157,7 @@ function ProveedoresPage() {
                             onChange={(evento) =>
                                 manejarCambioBusqueda(evento.target.value)
                             }
-                            placeholder="Buscar por nombre o correo..."
+                            placeholder="Buscar por razón social, localidad o contacto..."
                             className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
                     </div>
@@ -193,18 +195,32 @@ function ProveedoresPage() {
                         filas={proveedoresPaginados}
                         columnas={[
                             {
-                                clave: "nombre",
-                                titulo: "Proveedor",
+                                clave: "razonSocial",
+                                titulo: "Razón social",
                             },
                             {
-                                clave: "contacto",
-                                titulo: "Contacto",
+                                clave: "tipoProveedor",
+                                titulo: "Rubro",
                             },
                             {
-                                clave: "id",
+                                clave: "localidad",
+                                titulo: "Localidad",
+                            },
+                            {
+                                clave: "estado",
+                                titulo: "Estado",
+                            },
+                            {
+                                clave: "idproveedor",
                                 titulo: "Acciones",
                                 renderizar: (proveedor) => (
                                     <div className="flex flex-wrap gap-2">
+                                        <Link
+                                            to={`/gestion/proveedores/${proveedor.idproveedor}/servicios`}
+                                            className="inline-flex items-center justify-center rounded-control bg-transparent px-3 py-1.5 text-xs font-semibold text-texto hover:bg-fondo focus-visible:outline-2 focus-visible:outline-marca"
+                                        >
+                                            Servicios
+                                        </Link>
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
@@ -220,6 +236,7 @@ function ProveedoresPage() {
                                             onClick={() =>
                                                 abrirDialogoBaja(proveedor)
                                             }
+                                            disabled={proveedor.estado === "INACTIVO"}
                                         >
                                             Dar de baja
                                         </Boton>
@@ -244,7 +261,7 @@ function ProveedoresPage() {
                 titulo="Confirmar baja de proveedor"
                 descripcion={
                     proveedorSeleccionado
-                        ? `¿Estás seguro de que querés dar de baja a ${proveedorSeleccionado.nombre}?`
+                        ? `¿Estás seguro de que querés dar de baja a ${proveedorSeleccionado.razonSocial}?`
                         : ""
                 }
                 textoConfirmar={darDeBaja.isPending ? "Procesando..." : "Dar de baja"}
@@ -256,4 +273,3 @@ function ProveedoresPage() {
 }
 
 export default ProveedoresPage;
-
