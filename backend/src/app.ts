@@ -104,6 +104,10 @@ app.use("/api/salidas", AsignacionRoutes.getRoutes);
 // Módulo Salidas - Reemplazo de personal (CU-38)
 import { ReemplazoRoutes } from "./modulos/salidas/reemplazos/reemplazo.routes";
 app.use("/api/salidas", ReemplazoRoutes.getRoutes);
+// Módulo Campo - Portal del guía (CU-48)
+import { GuiaRoutes } from "./modulos/campo/guia/guia.routes";
+app.use("/api/guia", GuiaRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(manejadorErrores);
