@@ -2,6 +2,7 @@ import { CustomError } from "../../../error/CustomError";
 import { ESTADO_RESERVA, ESTADO_SALIDA, redondear2 } from "../../../shared/constantes";
 import { FiltrosReseniaDto, PublicarReseniaDto } from "./resenia.dto";
 import { ReseniaRepository } from "./resenia.repository";
+import { EvaluacionService } from "../../salidas/evaluaciones/evaluacion.service";
 
 export class ReseniaService {
   private repository: ReseniaRepository;
@@ -60,11 +61,20 @@ export class ReseniaService {
     return resenia;
   }
 
-  // CU-43: consulta del administrador (reseñas de los clientes)
+  // CU-43: consulta del administrador (reseñas de los clientes y evaluaciones del CU-42)
   async consultarResenias(filtros: FiltrosReseniaDto) {
-    const [resenias, resumen] = await Promise.all([
+    const [resenias, resumen, evaluaciones] = await Promise.all([
       this.repository.findConFiltros(filtros),
       this.repository.resumen(filtros),
+      // Mismos filtros: el rango de valoración se aplica al puntaje (las dos escalas van de 1 a 5)
+      new EvaluacionService().listar({
+        idsalida: filtros.idsalida,
+        idpaquete: filtros.idpaquete,
+        puntajeMin: filtros.valoracionMin,
+        puntajeMax: filtros.valoracionMax,
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
+      }),
     ]);
 
     return {
@@ -73,6 +83,7 @@ export class ReseniaService {
         promedio: resumen.promedio === null ? null : redondear2(resumen.promedio),
       },
       resenias,
+      evaluaciones,
     };
   }
 

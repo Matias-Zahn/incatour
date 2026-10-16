@@ -107,10 +107,11 @@ export class ReseniaRoutes {
      * @swagger
      * /api/resenias:
      *   get:
-     *     summary: Consultar reseñas de los clientes (CU-43)
+     *     summary: Consultar evaluaciones y reseñas (CU-43)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Lista las reseñas con filtros y un resumen (cantidad y promedio).
-     *       Las evaluaciones de proveedores y personal (CU-42) se agregan a esta consulta cuando se definan sus tablas.
+     *       **RESTRINGIDO A ADMINISTRADOR.** Lista las reseñas de los clientes con un resumen (cantidad y promedio) y
+     *       las evaluaciones del administrador al personal y a los proveedores (CU-42). Los filtros se aplican a las
+     *       dos: el rango de valoración filtra también el puntaje.
      *     tags: [Reseñas]
      *     security:
      *       - BearerAuth: []
@@ -152,6 +153,12 @@ export class ReseniaRoutes {
      *                     resenias:
      *                       type: array
      *                       items: { $ref: '#/components/schemas/Resenia' }
+     *                     evaluaciones:
+     *                       type: object
+     *                       description: Evaluaciones del CU-42.
+     *                       properties:
+     *                         personal: { type: array, items: { type: object } }
+     *                         proveedores: { type: array, items: { type: object } }
      *       400:
      *         description: Filtro inválido.
      *       403:
