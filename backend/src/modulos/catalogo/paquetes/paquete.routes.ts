@@ -9,13 +9,13 @@ import { PaqueteController } from "./paquete.controller";
  * 
  * /api/paquetes:
  *   get:
- *     summary: Listar paquetes activos
+ *     summary: Consultar paquetes turísticos (CU-10)
  *     tags: [Paquetes]
  *     responses:
  *       200:
  *         description: Lista de paquetes obtenida exitosamente
  *   post:
- *     summary: Crear Paquete Turístico (CU-10)
+ *     summary: Crear Paquete Turístico (CU-11)
  *     tags: [Paquetes]
  *     requestBody:
  *       required: true
@@ -99,13 +99,13 @@ export class PaqueteRoutes {
     const router = Router();
     const controller = new PaqueteController();
 
-    // Consultar paquetes activos
+    // CU-10: Consultar paquetes activos
     router.get("/", controller.consultarPaquetes);
 
     // Consultar paquete por ID
     router.get("/:id", controller.consultarPaquetePorId);
 
-    // CU-10: Crear Paquete Turístico
+    // CU-11: Crear Paquete Turístico
     router.post("/", controller.confirmarCreacion);
 
     // CU-12: Modificar Paquete

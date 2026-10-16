@@ -19,7 +19,7 @@ export class PaqueteService {
   }
 
   /**
-   * CU-10: Crear Paquete Turístico.
+   * CU-11: Crear Paquete Turístico.
    * Sigue estrictamente el DSS: registrarNuevoPaquete(datosPaquete, alojamientoId, tipoGarantia, matrizPrecios)
    */
   async registrarNuevoPaquete(dto: CrearPaqueteDto) {

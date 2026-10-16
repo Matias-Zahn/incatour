@@ -7,7 +7,7 @@ const paqueteService = new PaqueteService();
 
 export class PaqueteController {
 
-  // GET /api/paquetes
+  // GET /api/paquetes — CU-10: Consultar paquetes turísticos
   consultarPaquetes = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const paquetes = await paqueteService.consultarPaquetes();
@@ -30,7 +30,7 @@ export class PaqueteController {
     }
   };
 
-  // POST /api/paquetes — CU-10: Crear Paquete Turístico
+  // POST /api/paquetes — CU-11: Crear Paquete Turístico
   confirmarCreacion = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const [error, dto] = CrearPaqueteDto.create(req.body);
