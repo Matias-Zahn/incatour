@@ -1,6 +1,12 @@
 import LayoutGestion from "./components/LayoutGestion";
+import CircuitosPage from "./pages/gestion/CircuitosPage";
+import EtapasCircuitoPage from "./pages/gestion/EtapasCircuitoPage";
+import { EvaluacionesPage } from "./pages/gestion/EvaluacionesPage";
 import InicioGestionPage from "./pages/gestion/InicioGestionPage";
+import PaquetesPage from "./pages/gestion/PaquetesPage";
 import ProveedoresPage from "./pages/gestion/ProveedoresPage";
+import { SolicitudesPage } from "./pages/gestion/SolicitudesPage";
+import TemporadasPage from "./pages/gestion/TemporadasPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 function App() {
@@ -16,10 +22,58 @@ function App() {
           }
         />
         <Route
+          path="/gestion/circuitos"
+          element={
+            <LayoutGestion seccion="Circuitos">
+              <CircuitosPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/circuitos/:idCircuito/etapas"
+          element={
+            <LayoutGestion seccion="Circuitos">
+              <EtapasCircuitoPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/temporadas"
+          element={
+            <LayoutGestion seccion="Circuitos">
+              <TemporadasPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/paquetes"
+          element={
+            <LayoutGestion seccion="Paquetes turísticos">
+              <PaquetesPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
           path="/gestion/proveedores"
           element={
             <LayoutGestion seccion="Proveedores">
               <ProveedoresPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/solicitudes"
+          element={
+            <LayoutGestion seccion="Reservas y pagos">
+              <SolicitudesPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/evaluaciones"
+          element={
+            <LayoutGestion seccion="Reseñas y evaluaciones">
+              <EvaluacionesPage />
             </LayoutGestion>
           }
         />
