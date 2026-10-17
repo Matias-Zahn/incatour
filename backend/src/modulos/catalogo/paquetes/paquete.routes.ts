@@ -141,7 +141,11 @@ import { PaqueteController } from "./paquete.controller";
  *       404:
  *         description: Paquete no encontrado
  */
-import { subirImagenPaquete } from "../../../shared/upload/uploadPaquete.middleware";
+import {
+  subirImagenPaquete,
+  subirCarruselPaquete,
+  modificarFotoEspecifica,
+} from "../../../shared/upload/uploadPaquete.middleware";
 import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 
 export class PaqueteRoutes {
@@ -149,7 +153,10 @@ export class PaqueteRoutes {
     const router = Router();
     const controller = new PaqueteController();
 
-    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    // Consulta de imágenes del paquete (PÚBLICO para catálogo y cliente)
+    router.get("/:id/imagenes", controller.consultarImagenes);
+
+    // Gestión interna: solo el administrador
     router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-10: Consultar paquetes activos
@@ -167,14 +174,23 @@ export class PaqueteRoutes {
     // CU-13: Baja de Paquete
     router.patch("/:id/baja", controller.darDeBaja);
 
-    // Subir imagen del paquete (JPG, PNG, WEBP, máx 3MB)
-    router.post(
-      "/:id/imagen",
-      autenticar,
-      requierePerfil("ADMIN"),
-      subirImagenPaquete.single("imagen"),
-      controller.subirImagen
+    // Subir imagen individual (portada principal)
+    router.post("/:id/imagen", subirImagenPaquete.single("imagen"), controller.subirImagen);
+    router.put("/:id/imagen", subirImagenPaquete.single("imagen"), controller.subirImagen);
+
+    // Subir / Modificar carrusel de fotos (de 1 a 5 fotos, la 1° es la principal)
+    router.post("/:id/carrusel", subirCarruselPaquete.array("imagenes", 5), controller.subirCarrusel);
+    router.put("/:id/carrusel", subirCarruselPaquete.array("imagenes", 5), controller.subirCarrusel);
+
+    // Reemplazar una foto en particular del carrusel (ej: foto_2, principal)
+    router.put(
+      "/:id/carrusel/:nombreFoto",
+      modificarFotoEspecifica.single("imagen"),
+      controller.modificarFotoIndividual
     );
+
+    // Eliminar una foto en particular del carrusel (ej: foto_2, principal)
+    router.delete("/:id/carrusel/:nombreFoto", controller.eliminarFotoIndividual);
 
     return router;
   }
