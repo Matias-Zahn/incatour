@@ -8,6 +8,7 @@ import {
     FIN_DE_SEMANA,
     TODOS_LOS_DIAS,
     parsearDiasDisponibles,
+    resolverUrlImagenPaquete,
     serializarDiasDisponibles,
     type CodigoDia,
     type DatosCrearPaquete,
@@ -24,12 +25,23 @@ type FormularioPaqueteProps = {
     circuitos: Circuito[];
     temporadas: Temporada[];
     serviciosDisponibles: ServicioDisponiblePaquete[];
-    alGuardarNuevo: (datos: DatosCrearPaquete) => void;
-    alGuardarEdicion: (id: number, datos: DatosModificarPaquete) => void;
+    alGuardarNuevo: (
+        datos: DatosCrearPaquete,
+        imagenesArchivos?: File[],
+    ) => void;
+    alGuardarEdicion: (
+        id: number,
+        datos: DatosModificarPaquete,
+        imagenesArchivos?: File[],
+    ) => void;
     alCancelar: () => void;
     guardando?: boolean;
     errorServidor?: string;
 };
+
+const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
+const TAMANO_MAXIMO_IMAGEN_BYTES = 3 * 1024 * 1024; // 3 MB
+const MAX_IMAGENES_PAQUETE = 5;
 
 const CATEGORIAS_SUGERIDAS = [
     "3 Estrellas",
@@ -147,12 +159,94 @@ function FormularioPaquete({
         () =>
             paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ?? [],
     );
+    const [imagenesArchivos, setImagenesArchivos] = useState<File[]>([]);
+    const [vistasPrevias, setVistasPrevias] = useState<string[]>([]);
     const [errorValidacion, setErrorValidacion] = useState("");
+
+    const imagenesActualesPaquete: string[] =
+        paqueteEnEdicion?.imagenes && paqueteEnEdicion.imagenes.length > 0
+            ? paqueteEnEdicion.imagenes
+            : paqueteEnEdicion?.imagenPrincipal
+              ? [paqueteEnEdicion.imagenPrincipal]
+              : [];
 
     const circuitoSeleccionado = circuitos.find(
         (c) => c.idcircuito === idcircuito,
     );
     const cantidadEtapasCircuito = circuitoSeleccionado?.etapas?.length ?? 0;
+
+    function manejarSeleccionImagenes(
+        evento: React.ChangeEvent<HTMLInputElement>,
+    ) {
+        setErrorValidacion("");
+        const listaSeleccionada = Array.from(evento.target.files ?? []);
+        evento.target.value = "";
+        if (listaSeleccionada.length === 0) {
+            return;
+        }
+
+        if (
+            imagenesArchivos.length + listaSeleccionada.length >
+            MAX_IMAGENES_PAQUETE
+        ) {
+            setErrorValidacion(
+                `Solo se permiten hasta ${MAX_IMAGENES_PAQUETE} imágenes por paquete (actualmente tenés ${imagenesArchivos.length} seleccionadas).`,
+            );
+            return;
+        }
+
+        for (const archivo of listaSeleccionada) {
+            if (!FORMATOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
+                setErrorValidacion(
+                    `El archivo "${archivo.name}" no tiene un formato válido. Solo se permiten JPG, PNG o WEBP.`,
+                );
+                return;
+            }
+            if (archivo.size > TAMANO_MAXIMO_IMAGEN_BYTES) {
+                setErrorValidacion(
+                    `El archivo "${archivo.name}" supera el tamaño máximo permitido de 3 MB.`,
+                );
+                return;
+            }
+        }
+
+        const nuevasUrls = listaSeleccionada.map((archivo) =>
+            URL.createObjectURL(archivo),
+        );
+        setImagenesArchivos((prev) => [...prev, ...listaSeleccionada]);
+        setVistasPrevias((prev) => [...prev, ...nuevasUrls]);
+    }
+
+    function quitarImagenEnIndice(indice: number) {
+        setVistasPrevias((prev) => {
+            const urlQuitada = prev[indice];
+            if (urlQuitada) URL.revokeObjectURL(urlQuitada);
+            return prev.filter((_, idx) => idx !== indice);
+        });
+        setImagenesArchivos((prev) => prev.filter((_, idx) => idx !== indice));
+    }
+
+    function promoverImagenAPortada(indice: number) {
+        if (indice <= 0 || indice >= imagenesArchivos.length) return;
+        setImagenesArchivos((prev) => {
+            const copia = [...prev];
+            const [elegida] = copia.splice(indice, 1);
+            return elegida ? [elegida, ...copia] : prev;
+        });
+        setVistasPrevias((prev) => {
+            const copia = [...prev];
+            const [elegida] = copia.splice(indice, 1);
+            return elegida ? [elegida, ...copia] : prev;
+        });
+    }
+
+    function limpiarTodasLasImagenesSeleccionadas() {
+        for (const url of vistasPrevias) {
+            URL.revokeObjectURL(url);
+        }
+        setImagenesArchivos([]);
+        setVistasPrevias([]);
+    }
 
     function alternarDia(codigo: CodigoDia) {
         setErrorValidacion("");
@@ -278,14 +372,18 @@ function FormularioPaquete({
         const diasSerializados = serializarDiasDisponibles(diasSeleccionados);
 
         if (esEdicion && paqueteEnEdicion) {
-            alGuardarEdicion(paqueteEnEdicion.idpaquete, {
-                nombrePaquete: nombrePaquete.trim(),
-                condiciones: condiciones.trim() || undefined,
-                nochesPrevias,
-                nochesPosteriores,
-                diasDisponibles: diasSerializados,
-                matrizPrecios,
-            });
+            alGuardarEdicion(
+                paqueteEnEdicion.idpaquete,
+                {
+                    nombrePaquete: nombrePaquete.trim(),
+                    condiciones: condiciones.trim() || undefined,
+                    nochesPrevias,
+                    nochesPosteriores,
+                    diasDisponibles: diasSerializados,
+                    matrizPrecios,
+                },
+                imagenesArchivos,
+            );
             return;
         }
 
@@ -323,25 +421,28 @@ function FormularioPaquete({
             }
         }
 
-        alGuardarNuevo({
-            idcircuito,
-            nombrePaquete: nombrePaquete.trim(),
-            condiciones: condiciones.trim() || undefined,
-            tipoGarantia,
-            ...(tipoGarantia === "POR_ESTABLECIMIENTO"
-                ? { idservicioGarantizado }
-                : {
-                      localidadGarantizada: localidadGarantizada.trim(),
-                      categoriaGarantizada: categoriaGarantizada.trim(),
-                      tipoHabitacionGarantizada:
-                          tipoHabitacionGarantizada.trim() || undefined,
-                  }),
-            nochesPrevias,
-            nochesPosteriores,
-            diasDisponibles: diasSerializados,
-            matrizPrecios,
-            serviciosIncluidos,
-        });
+        alGuardarNuevo(
+            {
+                idcircuito,
+                nombrePaquete: nombrePaquete.trim(),
+                condiciones: condiciones.trim() || undefined,
+                tipoGarantia,
+                ...(tipoGarantia === "POR_ESTABLECIMIENTO"
+                    ? { idservicioGarantizado }
+                    : {
+                          localidadGarantizada: localidadGarantizada.trim(),
+                          categoriaGarantizada: categoriaGarantizada.trim(),
+                          tipoHabitacionGarantizada:
+                              tipoHabitacionGarantizada.trim() || undefined,
+                      }),
+                nochesPrevias,
+                nochesPosteriores,
+                diasDisponibles: diasSerializados,
+                matrizPrecios,
+                serviciosIncluidos,
+            },
+            imagenesArchivos,
+        );
     }
 
     const mensajeError = errorValidacion || errorServidor;
@@ -959,6 +1060,226 @@ function FormularioPaquete({
                     </div>
                 </div>
             ) : null}
+
+            {/* GALERÍA DE IMÁGENES DEL PAQUETE (MÍNIMO 1, MÁXIMO 5 AL SUBIR) */}
+            <div className="space-y-4 border-t border-borde pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
+                            {esEdicion ? "4" : "5"}
+                        </span>
+                        <div>
+                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
+                                Galería de imágenes del paquete{" "}
+                                <span className="font-normal normal-case text-texto-suave">
+                                    (1 a {MAX_IMAGENES_PAQUETE} imágenes)
+                                </span>
+                            </h3>
+                            <p className="text-xs text-texto-suave">
+                                Formatos admitidos: JPG, PNG o WEBP · Máximo 3 MB por foto · Hasta{" "}
+                                {MAX_IMAGENES_PAQUETE} imágenes (la primera será la portada{" "}
+                                <code className="rounded bg-fondo px-1 py-0.5 text-[11px]">
+                                    principal.*
+                                </code>
+                                ).
+                            </p>
+                        </div>
+                    </div>
+
+                    <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
+                        {imagenesArchivos.length} / {MAX_IMAGENES_PAQUETE} nuevas seleccionadas
+                    </span>
+                </div>
+
+                {/* IMÁGENES ACTUALES EN MODO EDICIÓN */}
+                {esEdicion && imagenesActualesPaquete.length > 0 ? (
+                    <div className="space-y-2.5 rounded-control border border-borde bg-fondo/60 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold uppercase tracking-wide text-navegacion">
+                                    Imágenes actuales del paquete ({imagenesActualesPaquete.length})
+                                </span>
+                                <span
+                                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                        paqueteEnEdicion?.tieneImagenesPropias
+                                            ? "bg-green-50 text-exito"
+                                            : "bg-slate-200 text-texto-suave"
+                                    }`}
+                                >
+                                    {paqueteEnEdicion?.tieneImagenesPropias
+                                        ? "Galería propia cargada"
+                                        : "Imagen de catálogo por defecto"}
+                                </span>
+                            </div>
+                            <span className="text-xs text-texto-suave">
+                                {imagenesArchivos.length > 0
+                                    ? "⚠ Al guardar se reemplazarán por las nuevas imágenes seleccionadas abajo."
+                                    : "Si no seleccionás archivos nuevos, se conservarán estas imágenes."}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                            {imagenesActualesPaquete.map((urlImg, idx) => (
+                                <div
+                                    key={`${urlImg}-${idx}`}
+                                    className="group relative overflow-hidden rounded-control border border-borde bg-white shadow-xs"
+                                >
+                                    <img
+                                        src={resolverUrlImagenPaquete(urlImg)}
+                                        alt={`Imagen actual ${idx + 1} de ${paqueteEnEdicion?.nombrePaquete ?? "paquete"}`}
+                                        className="h-24 w-full object-cover"
+                                    />
+                                    <div className="flex items-center justify-between bg-white px-2 py-1 text-[11px]">
+                                        <span
+                                            className={`font-semibold ${
+                                                idx === 0
+                                                    ? "text-marca-oscura"
+                                                    : "text-texto-suave"
+                                            }`}
+                                        >
+                                            {idx === 0
+                                                ? "★ Portada actual"
+                                                : `Foto #${idx + 1}`}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* SELECTOR Y VISTA PREVIA DE NUEVAS IMÁGENES (1 A 5) */}
+                <div className="space-y-3 rounded-control border border-dashed border-borde bg-fondo/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <label
+                                htmlFor="archivo-imagen-paquete"
+                                className={`inline-flex items-center gap-2 rounded-control border border-borde bg-white px-3.5 py-2 text-xs font-semibold text-navegacion shadow-xs transition ${
+                                    imagenesArchivos.length >= MAX_IMAGENES_PAQUETE
+                                        ? "cursor-not-allowed opacity-50"
+                                        : "cursor-pointer hover:bg-fondo"
+                                }`}
+                            >
+                                <span>
+                                    {imagenesArchivos.length === 0
+                                        ? esEdicion
+                                            ? "Seleccionar nuevas imágenes (1 a 5)"
+                                            : "Seleccionar imágenes (1 a 5)"
+                                        : imagenesArchivos.length < MAX_IMAGENES_PAQUETE
+                                          ? `Agregar más imágenes (${MAX_IMAGENES_PAQUETE - imagenesArchivos.length} disponibles)`
+                                          : "Límite de 5 imágenes alcanzado"}
+                                </span>
+                                <input
+                                    id="archivo-imagen-paquete"
+                                    type="file"
+                                    multiple
+                                    disabled={
+                                        imagenesArchivos.length >=
+                                        MAX_IMAGENES_PAQUETE
+                                    }
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={manejarSeleccionImagenes}
+                                    className="sr-only"
+                                />
+                            </label>
+
+                            {imagenesArchivos.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={limpiarTodasLasImagenesSeleccionadas}
+                                    className="rounded-control px-2.5 py-1.5 text-xs font-semibold text-peligro hover:bg-peligro/10"
+                                >
+                                    Quitar todas ({imagenesArchivos.length})
+                                </button>
+                            ) : null}
+                        </div>
+
+                        <p className="text-xs text-texto-suave">
+                            {imagenesArchivos.length === 0
+                                ? esEdicion
+                                    ? "Podés subir entre 1 y 5 imágenes nuevas para actualizar la galería del paquete."
+                                    : "Podés adjuntar entre 1 y 5 imágenes; la primera será la portada principal."
+                                : "Podés elegir cuál será la portada haciendo clic en «Usar como portada»."}
+                        </p>
+                    </div>
+
+                    {vistasPrevias.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                            {vistasPrevias.map((urlPrevia, idx) => {
+                                const archivo = imagenesArchivos[idx];
+                                return (
+                                    <div
+                                        key={`${archivo?.name ?? "img"}-${idx}`}
+                                        className={`flex flex-col overflow-hidden rounded-control border bg-white shadow-xs ${
+                                            idx === 0
+                                                ? "border-marca ring-2 ring-marca/20"
+                                                : "border-borde"
+                                        }`}
+                                    >
+                                        <div className="relative">
+                                            <img
+                                                src={urlPrevia}
+                                                alt={`Vista previa ${idx + 1}`}
+                                                className="h-24 w-full object-cover"
+                                            />
+                                            <span
+                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                                                    idx === 0
+                                                        ? "bg-marca text-white"
+                                                        : "bg-navegacion/80 text-white"
+                                                }`}
+                                            >
+                                                {idx === 0
+                                                    ? "★ Portada"
+                                                    : `Imagen #${idx + 1}`}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 text-[11px]">
+                                            <div className="truncate font-semibold text-texto" title={archivo?.name}>
+                                                {archivo?.name}
+                                                <span className="ml-1 font-normal text-texto-suave">
+                                                    ({((archivo?.size ?? 0) / 1024).toFixed(0)} KB)
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-1 border-t border-borde pt-1">
+                                                {idx > 0 ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            promoverImagenAPortada(
+                                                                idx,
+                                                            )
+                                                        }
+                                                        className="font-semibold text-marca-oscura hover:underline"
+                                                    >
+                                                        Usar como portada
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[10px] font-semibold text-exito">
+                                                        Principal
+                                                    </span>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        quitarImagenEnIndice(idx)
+                                                    }
+                                                    className="font-semibold text-peligro hover:underline"
+                                                >
+                                                    Quitar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
 
             {mensajeError ? (
                 <p className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-sm text-peligro" role="alert">

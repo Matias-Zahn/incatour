@@ -1,9 +1,28 @@
 import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
+import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
 
 const paqueteService = new PaqueteService();
+
+function enriquecerPaqueteConImagenes<
+  T extends {
+    idpaquete: number;
+    nombrePaquete?: string | null;
+    circuito?: { nombreCircuito?: string | null } | null;
+  },
+>(paquete: T) {
+  const infoImg = obtenerImagenesDePaquete(
+    paquete.idpaquete,
+    paquete.nombrePaquete,
+    paquete.circuito?.nombreCircuito,
+  );
+  return {
+    ...paquete,
+    ...infoImg,
+  };
+}
 
 export class PaqueteController {
 
@@ -11,7 +30,7 @@ export class PaqueteController {
   consultarPaquetes = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const paquetes = await paqueteService.consultarPaquetes();
-      return res.json({ data: paquetes });
+      return res.json({ data: paquetes.map(enriquecerPaqueteConImagenes) });
     } catch (error) {
       next(error);
     }
@@ -24,7 +43,7 @@ export class PaqueteController {
       if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
 
       const paquete = await paqueteService.consultarPaquetePorId(id);
-      return res.json({ data: paquete });
+      return res.json({ data: enriquecerPaqueteConImagenes(paquete) });
     } catch (error) {
       next(error);
     }
@@ -40,7 +59,7 @@ export class PaqueteController {
 
       return res.status(201).json({
         mensaje: "Paquete turístico creado y publicado exitosamente",
-        data: paquete,
+        data: paquete ? enriquecerPaqueteConImagenes(paquete) : paquete,
       });
     } catch (error) {
       next(error);
@@ -60,7 +79,7 @@ export class PaqueteController {
 
       return res.json({
         mensaje: "Paquete turístico modificado exitosamente",
-        data: paquete,
+        data: paquete ? enriquecerPaqueteConImagenes(paquete) : paquete,
       });
     } catch (error) {
       next(error);
@@ -84,7 +103,7 @@ export class PaqueteController {
     }
   };
 
-  // POST /api/paquetes/:id/imagen — Subir imagen del paquete
+  // POST y PUT /api/paquetes/:id/imagen — Subir entre 1 y 5 imágenes del paquete
   subirImagen = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id as string);
@@ -93,15 +112,35 @@ export class PaqueteController {
       // Verificamos que el paquete exista
       await paqueteService.consultarPaquetePorId(id);
 
-      if (!req.file) {
-        throw CustomError.badRequest("Debe adjuntar un archivo de imagen en el campo 'imagen'.");
+      const archivosSubidos: Express.Multer.File[] = Array.isArray(req.files)
+        ? req.files
+        : req.file
+          ? [req.file]
+          : [];
+
+      if (archivosSubidos.length === 0) {
+        throw CustomError.badRequest("Debe adjuntar entre 1 y 5 archivos de imagen en el campo 'imagen'.");
       }
 
-      const urlImagen = `/imagenes/paquetes/${id}/${req.file.filename}`;
+      if (archivosSubidos.length > 5) {
+        throw CustomError.badRequest("Se permiten como máximo 5 imágenes por paquete turístico.");
+      }
+
+      const nombresArchivos = archivosSubidos.map((f) => f.filename);
+      const urls = nombresArchivos.map((nombre) => `/imagenes/paquetes/${id}/${nombre}`);
 
       return res.status(200).json({
-        mensaje: "Imagen del paquete subida exitosamente.",
-        data: { idpaquete: id, archivo: req.file.filename, url: urlImagen },
+        mensaje:
+          archivosSubidos.length === 1
+            ? "Imagen del paquete subida exitosamente."
+            : `${archivosSubidos.length} imágenes del paquete subidas exitosamente.`,
+        data: {
+          idpaquete: id,
+          archivo: nombresArchivos[0]!,
+          url: urls[0]!,
+          archivos: nombresArchivos,
+          urls,
+        },
       });
     } catch (error) {
       next(error);

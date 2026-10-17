@@ -104,6 +104,26 @@ export type ServicioDisponiblePaquete = {
     };
 };
 
+const URL_API_CONFIG: string = import.meta.env.VITE_API_URL ?? "/api";
+const ORIGEN_BACKEND: string = URL_API_CONFIG.startsWith("http")
+    ? URL_API_CONFIG.replace(/\/api\/?$/, "")
+    : "http://localhost:3000";
+
+export function resolverUrlImagenPaquete(url?: string | null): string {
+    if (!url) {
+        return `${ORIGEN_BACKEND}/imagenes/catalogo/camino_inca_tradicional.jpg`;
+    }
+    if (
+        url.startsWith("http://") ||
+        url.startsWith("https://") ||
+        url.startsWith("blob:") ||
+        url.startsWith("data:")
+    ) {
+        return url;
+    }
+    return `${ORIGEN_BACKEND}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 export type Paquete = {
     id: number;
     idpaquete: number;
@@ -119,6 +139,9 @@ export type Paquete = {
     nochesPrevias: number;
     nochesPosteriores: number;
     diasDisponibles?: string | null;
+    imagenPrincipal?: string;
+    imagenes?: string[];
+    tieneImagenesPropias?: boolean;
     circuito?: Omit<Circuito, "id">;
     tarifas?: TarifaPaquete[];
     servicios?: {
@@ -219,7 +242,7 @@ async function obtenerTokenAutenticado(forzarRenovacion = false): Promise<string
     if (import.meta.env.VITE_DEV_TOKEN) {
         return import.meta.env.VITE_DEV_TOKEN as string;
     }
-    if (!import.meta.env.DEV) {
+    if (!import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS !== "false") {
         return null;
     }
     if (!promesaTokenDev) {
@@ -287,20 +310,22 @@ function normalizarPaquete(paquete: PaqueteApi): Paquete {
     };
 }
 
+export type RespuestaSubirImagenPaquete = {
+    idpaquete: number;
+    archivo: string;
+    url: string;
+    archivos?: string[];
+    urls?: string[];
+};
+
 export async function listarPaquetes(): Promise<Paquete[]> {
-    const headers = await cabecerasAuthAsync();
-    return solicitarApi<RespuestaDatos<PaqueteApi[]>>("/paquetes", {
-        headers,
-    })
+    return solicitarApiConAuth<RespuestaDatos<PaqueteApi[]>>("/paquetes")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarPaquete));
 }
 
 export async function obtenerPaquetePorId(id: number): Promise<Paquete> {
-    const headers = await cabecerasAuthAsync();
-    return solicitarApi<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`, {
-        headers,
-    })
+    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`)
         .then(respuestaDatos)
         .then(normalizarPaquete);
 }
@@ -308,10 +333,8 @@ export async function obtenerPaquetePorId(id: number): Promise<Paquete> {
 export async function registrarPaquete(
     datos: DatosCrearPaquete,
 ): Promise<Paquete> {
-    const headers = await cabecerasAuthAsync();
-    return solicitarApi<RespuestaDatos<PaqueteApi>>("/paquetes", {
+    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>("/paquetes", {
         method: "POST",
-        headers,
         body: JSON.stringify(datos),
     })
         .then(respuestaDatos)
@@ -322,10 +345,8 @@ export async function modificarPaquete(
     id: number,
     datos: DatosModificarPaquete,
 ): Promise<Paquete> {
-    const headers = await cabecerasAuthAsync();
-    return solicitarApi<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`, {
+    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`, {
         method: "PUT",
-        headers,
         body: JSON.stringify(datos),
     })
         .then(respuestaDatos)
@@ -333,21 +354,41 @@ export async function modificarPaquete(
 }
 
 export async function darDeBajaPaquete(id: number): Promise<Paquete> {
-    const headers = await cabecerasAuthAsync();
-    return solicitarApi<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}/baja`, {
-        method: "PATCH",
-        headers,
-    })
+    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(
+        `/paquetes/${id}/baja`,
+        {
+            method: "PATCH",
+        },
+    )
         .then(respuestaDatos)
         .then(normalizarPaquete);
+}
+
+export async function subirImagenPaquete(
+    idPaquete: number,
+    archivos: File | File[],
+    metodo: "POST" | "PUT" = "POST",
+): Promise<RespuestaSubirImagenPaquete> {
+    const lista = Array.isArray(archivos) ? archivos : [archivos];
+    const formData = new FormData();
+    for (const archivo of lista) {
+        formData.append("imagen", archivo);
+    }
+
+    return solicitarApiConAuth<RespuestaDatos<RespuestaSubirImagenPaquete>>(
+        `/paquetes/${idPaquete}/imagen`,
+        {
+            method: metodo,
+            body: formData,
+        },
+    ).then(respuestaDatos);
 }
 
 export async function listarServiciosDisponiblesCatalogo(): Promise<
     ServicioDisponiblePaquete[]
 > {
     try {
-        const headers = await cabecerasAuthAsync();
-        const resProveedores = await solicitarApi<
+        const resProveedores = await solicitarApiConAuth<
             RespuestaDatos<
                 {
                     idproveedor: number;
@@ -356,14 +397,13 @@ export async function listarServiciosDisponiblesCatalogo(): Promise<
                     estado: string;
                 }[]
             >
-        >("/proveedores?estado=ACTIVO", { headers });
+        >("/proveedores?estado=ACTIVO");
 
         const proveedores = resProveedores.data ?? [];
         const listasPorProveedor = await Promise.all(
             proveedores.map((prov) =>
-                solicitarApi<RespuestaDatos<ServicioDisponiblePaquete[]>>(
+                solicitarApiConAuth<RespuestaDatos<ServicioDisponiblePaquete[]>>(
                     `/proveedores/${prov.idproveedor}/servicios?estado=ACTIVO`,
-                    { headers },
                 )
                     .then((r) => r.data ?? [])
                     .catch(() => [] as ServicioDisponiblePaquete[]),
@@ -444,5 +484,28 @@ export function useDarDeBajaPaquete() {
             clienteConsultas.invalidateQueries({
                 queryKey: clavesPaquetes.todos,
             }),
+    });
+}
+
+export function useSubirImagenPaquete() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            id,
+            archivos,
+            metodo = "POST",
+        }: {
+            id: number;
+            archivos: File | File[];
+            metodo?: "POST" | "PUT";
+        }) => subirImagenPaquete(id, archivos, metodo),
+        onSuccess: (_, variables) => {
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.todos,
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.uno(variables.id),
+            });
+        },
     });
 }
