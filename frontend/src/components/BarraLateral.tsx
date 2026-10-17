@@ -9,13 +9,13 @@ type ElementoNavegacion = {
 
 const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Inicio", icono: "⌂", ruta: "/" },
-    { etiqueta: "Circuitos", icono: "⌁" },
-    { etiqueta: "Paquetes turísticos", icono: "▣" },
+    { etiqueta: "Circuitos", icono: "⌁", ruta: "/gestion/circuitos" },
+    { etiqueta: "Paquetes turísticos", icono: "▣", ruta: "/gestion/paquetes" },
     { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: "◫" },
-    { etiqueta: "Reservas y pagos", icono: "▤" },
+    { etiqueta: "Reservas y pagos", icono: "▤", ruta: "/gestion/solicitudes" },
     { etiqueta: "Personal", icono: "♙" },
-    { etiqueta: "Reseñas y evaluaciones", icono: "☆" },
+    { etiqueta: "Reseñas y evaluaciones", icono: "☆", ruta: "/gestion/evaluaciones" },
 ];
 
 type BarraLateralProps = {

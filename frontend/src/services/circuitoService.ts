@@ -1,0 +1,230 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
+import { solicitarApi } from "./clienteApi";
+
+export const nivelesDificultad = ["Baja", "Media", "Alta"] as const;
+
+export const esquemaCircuito = z.object({
+    nombreCircuito: z
+        .string()
+        .trim()
+        .min(1, "El nombre del circuito es obligatorio.")
+        .max(120, "El nombre no puede superar los 120 caracteres."),
+    duracionDias: z
+        .number({ message: "Ingresá una duración válida en días." })
+        .int("La duración debe ser un número entero.")
+        .min(1, "La duración debe ser de al menos 1 día."),
+    dificultad: z
+        .string()
+        .trim()
+        .min(1, "La dificultad es obligatoria."),
+    minimoGuias: z
+        .number({ message: "Ingresá una cantidad de guías válida." })
+        .int("El mínimo de guías debe ser un número entero.")
+        .min(1, "El mínimo de guías debe ser de al menos 1."),
+    parametrosPorteadores: z
+        .string()
+        .trim()
+        .max(200, "Los parámetros no pueden superar los 200 caracteres.")
+        .optional(),
+});
+
+export type DatosCircuito = z.infer<typeof esquemaCircuito>;
+
+export type EtapaCircuito = {
+    idcircuito: number;
+    numeroOrden: number;
+    puntoInicio: string;
+    puntoFin: string;
+    campamentoPrevisto?: string | null;
+};
+
+export type DatosEtapaCircuito = {
+    numeroOrden: number;
+    puntoInicio: string;
+    puntoFin: string;
+    campamentoPrevisto?: string | null;
+};
+
+export type Circuito = {
+    id: number;
+    idcircuito: number;
+    nombreCircuito: string;
+    duracionDias: number;
+    dificultad: string;
+    minimoGuias: number;
+    parametrosPorteadores?: string | null;
+    estado: "ACTIVO" | "INACTIVO";
+    etapas?: EtapaCircuito[];
+};
+
+type CircuitoApi = Omit<Circuito, "id">;
+
+type RespuestaDatos<T> = {
+    mensaje?: string;
+    data: T;
+};
+
+function cabecerasAuth(): HeadersInit {
+    const token =
+        (typeof window !== "undefined" ? localStorage.getItem("token") : null) ??
+        import.meta.env.VITE_DEV_TOKEN;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function respuestaDatos<T>(respuesta: RespuestaDatos<T>): T {
+    return respuesta.data;
+}
+
+function normalizarCircuito(circuito: CircuitoApi): Circuito {
+    return {
+        ...circuito,
+        id: circuito.idcircuito,
+    };
+}
+
+function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCircuito> {
+    const copia: Partial<DatosCircuito> = { ...datos };
+    if (copia.parametrosPorteadores !== undefined) {
+        const texto = copia.parametrosPorteadores.trim();
+        copia.parametrosPorteadores = texto.length > 0 ? texto : undefined;
+    }
+    return copia;
+}
+
+export function listarCircuitos(): Promise<Circuito[]> {
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos", {
+        headers: cabecerasAuth(),
+    })
+        .then(respuestaDatos)
+        .then((datos) => datos.map(normalizarCircuito));
+}
+
+export function registrarCircuito(datos: DatosCircuito): Promise<Circuito> {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>("/circuitos", {
+        method: "POST",
+        headers: cabecerasAuth(),
+        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+    })
+        .then(respuestaDatos)
+        .then(normalizarCircuito);
+}
+
+export function modificarCircuito(
+    id: number,
+    datos: Partial<DatosCircuito>,
+): Promise<Circuito> {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
+        method: "PUT",
+        headers: cabecerasAuth(),
+        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+    })
+        .then(respuestaDatos)
+        .then(normalizarCircuito);
+}
+
+export function darDeBajaCircuito(id: number): Promise<Circuito> {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}/baja`, {
+        method: "PATCH",
+        headers: cabecerasAuth(),
+    })
+        .then(respuestaDatos)
+        .then(normalizarCircuito);
+}
+
+// CU-05: Consultar y reemplazar secuencia completa de etapas del circuito
+export function listarEtapasCircuito(idCircuito: number): Promise<EtapaCircuito[]> {
+    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
+        `/circuitos/${idCircuito}/etapas`,
+        {
+            headers: cabecerasAuth(),
+        },
+    ).then(respuestaDatos);
+}
+
+export function guardarSecuenciaEtapas(
+    idCircuito: number,
+    etapas: DatosEtapaCircuito[],
+): Promise<EtapaCircuito[]> {
+    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
+        `/circuitos/${idCircuito}/etapas`,
+        {
+            method: "PUT",
+            headers: cabecerasAuth(),
+            body: JSON.stringify({
+                etapas: etapas.map((etapa, indice) => ({
+                    numeroOrden: indice + 1,
+                    puntoInicio: etapa.puntoInicio.trim(),
+                    puntoFin: etapa.puntoFin.trim(),
+                    campamentoPrevisto:
+                        etapa.campamentoPrevisto?.trim() || null,
+                })),
+            }),
+        },
+    ).then(respuestaDatos);
+}
+
+export const clavesCircuitos = {
+    todos: ["circuitos"] as const,
+    uno: (id: number) => ["circuitos", id] as const,
+    etapas: (idCircuito: number) => ["circuitos", idCircuito, "etapas"] as const,
+};
+
+export function useCircuitos() {
+    return useQuery({
+        queryKey: clavesCircuitos.todos,
+        queryFn: listarCircuitos,
+    });
+}
+
+export function useEtapasCircuito(idCircuito: number) {
+    return useQuery({
+        queryKey: clavesCircuitos.etapas(idCircuito),
+        queryFn: () => listarEtapasCircuito(idCircuito),
+        enabled: Number.isInteger(idCircuito) && idCircuito > 0,
+    });
+}
+
+export function useRegistrarCircuito() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: registrarCircuito,
+        onSuccess: () =>
+            clienteConsultas.invalidateQueries({ queryKey: clavesCircuitos.todos }),
+    });
+}
+
+export function useModificarCircuito() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, datos }: { id: number; datos: Partial<DatosCircuito> }) =>
+            modificarCircuito(id, datos),
+        onSuccess: () =>
+            clienteConsultas.invalidateQueries({ queryKey: clavesCircuitos.todos }),
+    });
+}
+
+export function useDarDeBajaCircuito() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: darDeBajaCircuito,
+        onSuccess: () =>
+            clienteConsultas.invalidateQueries({ queryKey: clavesCircuitos.todos }),
+    });
+}
+
+export function useGuardarEtapasCircuito(idCircuito: number) {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: (etapas: DatosEtapaCircuito[]) =>
+            guardarSecuenciaEtapas(idCircuito, etapas),
+        onSuccess: () => {
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesCircuitos.etapas(idCircuito),
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesCircuitos.todos,
+            });
+        },
+    });
+}
