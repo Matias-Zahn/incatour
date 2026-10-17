@@ -233,11 +233,12 @@ async function obtenerTokenAutenticado(forzarRenovacion = false): Promise<string
         })
             .then(async (res) => {
                 if (!res.ok) return null;
-                const cuerpo = (await res.json()) as { token?: string };
-                if (cuerpo.token && typeof window !== "undefined") {
-                    localStorage.setItem("token", cuerpo.token);
+                const cuerpo = (await res.json()) as { data?: { token?: string } };
+                const token = cuerpo.data?.token;
+                if (token && typeof window !== "undefined") {
+                    localStorage.setItem("token", token);
                 }
-                return cuerpo.token ?? null;
+                return token ?? null;
             })
             .catch(() => null)
             .finally(() => {

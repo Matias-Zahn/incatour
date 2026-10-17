@@ -16,7 +16,7 @@ Se lee junto con `openapi.json`, que tiene el detalle de cada endpoint.
 - **Login:** `POST /api/auth/login` con `{ "email", "contrasenia" }`.
 - **Respuesta del login:**
   ```json
-  { "usuario": { "idusuario": 1, "email": "...", "nombre": "...", "apellido": "...", "rol": "ADMIN" }, "token": "eyJ..." }
+  { "data": { "usuario": { "idusuario": 1, "email": "...", "nombre": "...", "apellido": "...", "rol": "ADMIN" }, "token": "eyJ..." } }
   ```
 - **El token** dura **8 horas** y va en cada pedido como `Authorization: Bearer <token>`.
 - **Perfiles (`rol`):** `ADMIN`, `CLIENTE` y `GUIA`. Cada endpoint dice en su descripción qué perfil exige.
@@ -35,16 +35,7 @@ Se lee junto con `openapi.json`, que tiene el detalle de cada endpoint.
   ```json
   { "mensaje": "Salida creada y publicada exitosamente", "data": { ... } }
   ```
-- **Excepciones**, que **no** usan `data`:
-
-  | Endpoint | Devuelve |
-  |---|---|
-  | `POST /api/auth/login` | `{ usuario, token }` |
-  | `POST /api/personal` | `{ mensaje, perfilOperativo, credencialesAcceso }` |
-  | `GET /api/solicitudes/{id}/opciones` | El objeto directo |
-  | `POST /api/solicitudes/{id}/resolver` | `{ mensaje, ... }` directo |
-  | `GET /api/salidas/{id}/equipamiento-asignado` | El objeto directo |
-  | `POST /api/salidas/{id}/devolucion-equipamiento` | `{ mensaje, ... }` directo |
+- **Todos los endpoints usan este formato,** sin excepciones. Algunas consultas agregan campos extra al lado de `data`, como `cantidad`.
 
 ### Errores
 - **Siempre tienen esta forma:**
@@ -86,7 +77,7 @@ if (!respuesta.ok) {
 }
 ```
 
-Los servicios de cada recurso devuelven `respuesta.data` (salvo las excepciones de la sección 1), así las pantallas no tienen que desarmar la respuesta.
+Los servicios de cada recurso devuelven `respuesta.data`, así las pantallas no tienen que desarmar la respuesta.
 
 **Para probar antes de que exista el login:** pedí un token en `/api-docs` (`POST /api/auth/login`) y pegalo a mano.
 

@@ -101,9 +101,7 @@ export class PaqueteController {
 
       return res.status(200).json({
         mensaje: "Imagen del paquete subida exitosamente.",
-        idpaquete: id,
-        archivo: req.file.filename,
-        url: urlImagen,
+        data: { idpaquete: id, archivo: req.file.filename, url: urlImagen },
       });
     } catch (error) {
       next(error);
