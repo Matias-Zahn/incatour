@@ -11,12 +11,16 @@ import { PaqueteController } from "./paquete.controller";
  *   get:
  *     summary: Consultar paquetes turísticos (CU-10)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de paquetes obtenida exitosamente
  *   post:
  *     summary: Crear Paquete Turístico (CU-11)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -52,6 +56,8 @@ import { PaqueteController } from "./paquete.controller";
  *   get:
  *     summary: Obtener paquete por ID
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -64,6 +70,8 @@ import { PaqueteController } from "./paquete.controller";
  *   put:
  *     summary: Modificar Paquete (CU-12)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -84,6 +92,8 @@ import { PaqueteController } from "./paquete.controller";
  *   patch:
  *     summary: Dar de baja Paquete (CU-13)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -138,6 +148,9 @@ export class PaqueteRoutes {
   static get getRoutes(): Router {
     const router = Router();
     const controller = new PaqueteController();
+
+    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-10: Consultar paquetes activos
     router.get("/", controller.consultarPaquetes);
