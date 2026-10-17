@@ -21,9 +21,15 @@ export function construirUrl(ruta: string): string {
  * al back real, el resto del código no cambia.
  */
 export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+    const esFormData =
+        typeof FormData !== "undefined" && opciones.body instanceof FormData;
+    const cabecerasBase: HeadersInit = esFormData
+        ? {}
+        : { "Content-Type": "application/json" };
+
     const respuesta = await fetch(construirUrl(ruta), {
         ...opciones,
-        headers: { "Content-Type": "application/json", ...opciones.headers },
+        headers: { ...cabecerasBase, ...opciones.headers },
     });
 
     if (!respuesta.ok) {

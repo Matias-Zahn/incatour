@@ -1,6 +1,7 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import type { Request } from "express";
 import { CustomError } from "../../error/CustomError";
 
 const BASE_IMG_PATH = path.resolve(process.cwd(), "public/imagenes/paquetes");
@@ -11,6 +12,7 @@ let contadorFoto = 1;
 
 const storageCarrusel = multer.diskStorage({
   destination: (req, _file, cb) => {
+    const reqImg = req as RequestConIndiceImagen;
     const id = req.params.id;
     const dir = path.join(BASE_IMG_PATH, id as string);
     fs.mkdirSync(dir, { recursive: true });
@@ -122,3 +124,78 @@ export const modificarFotoEspecifica = multer({
     fileSize: 3 * 1024 * 1024,
   },
 });
+
+const IMAGENES_CATALOGO_POR_DEFECTO = [
+  "/imagenes/catalogo/camino_inca_tradicional.jpg",
+  "/imagenes/catalogo/travesia_salkantay.jpg",
+  "/imagenes/catalogo/camino_choquequirao.jpg",
+  "/imagenes/catalogo/secretos_valle_sagrado.jpg",
+  "/imagenes/catalogo/sendero_de_los_andes.jpg",
+  "/imagenes/catalogo/centro_cusco.jpg",
+];
+
+function imagenCatalogoSugerida(
+  idpaquete: number,
+  nombrePaquete?: string | null,
+  nombreCircuito?: string | null,
+): string {
+  const texto = `${nombrePaquete ?? ""} ${nombreCircuito ?? ""}`.toLowerCase();
+  if (texto.includes("salkantay")) return "/imagenes/catalogo/travesia_salkantay.jpg";
+  if (texto.includes("choquequirao")) return "/imagenes/catalogo/camino_choquequirao.jpg";
+  if (texto.includes("valle")) return "/imagenes/catalogo/secretos_valle_sagrado.jpg";
+  if (texto.includes("andes") || texto.includes("ausangate")) return "/imagenes/catalogo/sendero_de_los_andes.jpg";
+  if (texto.includes("cusco") || texto.includes("city")) return "/imagenes/catalogo/centro_cusco.jpg";
+  if (texto.includes("inca")) return "/imagenes/catalogo/camino_inca_tradicional.jpg";
+  const idx = Math.max(0, idpaquete - 1) % IMAGENES_CATALOGO_POR_DEFECTO.length;
+  return IMAGENES_CATALOGO_POR_DEFECTO[idx]!;
+}
+
+export function obtenerImagenesDePaquete(
+  idpaquete: number,
+  nombrePaquete?: string | null,
+  nombreCircuito?: string | null,
+): {
+  imagenPrincipal: string;
+  imagenes: string[];
+  tieneImagenesPropias: boolean;
+} {
+  const dir = path.join(BASE_IMG_PATH, String(idpaquete));
+  try {
+    if (fs.existsSync(dir)) {
+      const archivos = fs
+        .readdirSync(dir)
+        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f))
+        .sort((a, b) => {
+          const esPrinA = a.startsWith("principal.") ? 0 : 1;
+          const esPrinB = b.startsWith("principal.") ? 0 : 1;
+          if (esPrinA !== esPrinB) return esPrinA - esPrinB;
+          return a.localeCompare(b, undefined, { numeric: true });
+        });
+
+      if (archivos.length > 0) {
+        const urls = archivos.slice(0, 5).map((archivo) => {
+          try {
+            const stat = fs.statSync(path.join(dir, archivo));
+            return `/imagenes/paquetes/${idpaquete}/${archivo}?v=${Math.floor(stat.mtimeMs)}`;
+          } catch {
+            return `/imagenes/paquetes/${idpaquete}/${archivo}`;
+          }
+        });
+        return {
+          imagenPrincipal: urls[0]!,
+          imagenes: urls,
+          tieneImagenesPropias: true,
+        };
+      }
+    }
+  } catch {
+    // Si no se puede leer el directorio, usar imagen por defecto
+  }
+
+  const porDefecto = imagenCatalogoSugerida(idpaquete, nombrePaquete, nombreCircuito);
+  return {
+    imagenPrincipal: porDefecto,
+    imagenes: [porDefecto],
+    tieneImagenesPropias: false,
+  };
+}
