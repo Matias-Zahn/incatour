@@ -73,13 +73,37 @@ function FormularioServicio({ servicioEnEdicion, tipoProveedor, alGuardar, alCan
                     Descripción
                     <textarea {...register("descripcion")} rows={2} className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20" />
                 </label>
-                {campos[tipoProveedor].map((campo) => (
-                    <label key={campo.nombre} className="grid gap-2 text-sm font-semibold text-texto">
-                        {campo.etiqueta}
-                        <input type={campo.tipo ?? "text"} step={campo.tipo === "number" ? "0.01" : undefined} {...register(campo.nombre, campo.tipo === "number" ? { valueAsNumber: true } : undefined)} className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20" />
-                        {errors[campo.nombre] ? <span className="text-xs font-normal text-peligro">{errors[campo.nombre]?.message}</span> : null}
-                    </label>
-                ))}
+                {campos[tipoProveedor].map((campo) => {
+                    const nombreCampo =
+                        servicioEnEdicion &&
+                        tipoProveedor === "EQUIPAMIENTO" &&
+                        campo.nombre === "cantidadDisponible"
+                            ? "inventarioTotal"
+                            : campo.nombre;
+                    return (
+                        <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
+                            {nombreCampo === "inventarioTotal"
+                                ? "Inventario total"
+                                : campo.etiqueta}
+                            <input
+                                type={campo.tipo ?? "text"}
+                                step={campo.tipo === "number" ? "0.01" : undefined}
+                                {...register(
+                                    nombreCampo,
+                                    campo.tipo === "number"
+                                        ? { valueAsNumber: true }
+                                        : undefined,
+                                )}
+                                className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            />
+                            {errors[nombreCampo] ? (
+                                <span className="text-xs font-normal text-peligro">
+                                    {errors[nombreCampo]?.message}
+                                </span>
+                            ) : null}
+                        </label>
+                    );
+                })}
             </div>
             {errorServidor ? <p className="mt-3 text-sm text-peligro" role="alert">{errorServidor}</p> : null}
             <div className="mt-6 flex justify-end gap-3">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
@@ -46,6 +47,11 @@ function ServiciosPage() {
                 <Boton onClick={() => { setServicioEnEdicion(null); setFormularioAbierto(true); }}>Nuevo servicio</Boton>
             </header>
             {formularioAbierto ? <FormularioServicio tipoProveedor={tipoProveedor} servicioEnEdicion={servicioEnEdicion} alGuardar={guardar} alCancelar={() => setFormularioAbierto(false)} guardando={registrar.isPending || modificar.isPending} errorServidor={(registrar.error ?? modificar.error)?.message} /> : null}
+            {darDeBaja.isError ? (
+                <Alerta tipo="error" titulo="No se pudo dar de baja el servicio">
+                    {darDeBaja.error.message}
+                </Alerta>
+            ) : null}
             {estado !== "exito" ? <EstadoListado estado={estado} mensaje={estado === "error" ? error?.message : undefined} /> : servicios.length === 0 ? <EstadoListado estado="vacio" mensaje="Todavía no hay servicios registrados para este proveedor." /> : (
                 <div className="overflow-x-auto">
                     <Tabla filas={servicios.map((servicio) => ({ ...servicio, id: servicio.idservicio }))} columnas={[

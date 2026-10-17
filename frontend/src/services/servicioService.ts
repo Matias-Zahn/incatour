@@ -4,6 +4,7 @@ import { solicitarApi } from "./clienteApi";
 
 export const tiposServicio = ["ALOJAMIENTO", "TRANSPORTE", "TREN", "EQUIPAMIENTO"] as const;
 export type TipoServicio = (typeof tiposServicio)[number];
+export type EstadoServicio = "ACTIVO" | "INACTIVO";
 
 const camposComunes = {
     tipo: z.enum(tiposServicio),
@@ -27,6 +28,7 @@ export const esquemaServicio = z.object({
     diasOperacion: z.string().optional(),
     tipoEquipamiento: z.string().optional(),
     cantidadDisponible: z.number().int().min(0).optional(),
+    inventarioTotal: z.number().int().min(0).optional(),
 }).superRefine((datos, contexto) => {
     const requeridos: Record<TipoServicio, [keyof DatosServicio, string][]> = {
         ALOJAMIENTO: [["categoria", "La categoría es obligatoria."], ["tipoHabitacion", "El tipo de habitación es obligatorio."], ["capacidadDisponible", "La capacidad es obligatoria."], ["modalidadConfirmacion", "La modalidad es obligatoria."]],
@@ -35,7 +37,16 @@ export const esquemaServicio = z.object({
         EQUIPAMIENTO: [["tipoEquipamiento", "El tipo de equipamiento es obligatorio."], ["cantidadDisponible", "La cantidad es obligatoria."]],
     };
     for (const [campo, mensaje] of requeridos[datos.tipo]) {
-        if (datos[campo] === undefined || datos[campo] === "") contexto.addIssue({ code: "custom", path: [campo], message: mensaje });
+        if (
+            datos.tipo !== "EQUIPAMIENTO" ||
+            campo !== "cantidadDisponible" ||
+            datos.cantidadDisponible !== undefined ||
+            datos.inventarioTotal === undefined
+        ) {
+            if (datos[campo] === undefined || datos[campo] === "") {
+                contexto.addIssue({ code: "custom", path: [campo], message: mensaje });
+            }
+        }
     }
 });
 
@@ -44,23 +55,42 @@ export type Servicio = DatosServicio & {
     idservicio: number;
     id: number;
     idproveedor: number;
-    estado: "ACTIVO" | "INACTIVO";
+    estado: EstadoServicio;
     proveedor?: { razonSocial: string };
-    alojamiento?: Record<string, unknown>;
-    transporte?: Record<string, unknown>;
-    tren?: Record<string, unknown>;
-    equipamiento?: Record<string, unknown>;
+    cantidadComprometida?: number;
+    inventarioTotal?: number;
+    edicion?: {
+        camposEditables: string[];
+        enUsoEnSalidasActivas: boolean;
+        garantizaPaquetesActivos: boolean;
+        aplicaSoloAFuturasSalidas: boolean;
+    };
 };
 
-type ServicioApi = Omit<Servicio, "id" | "tipo"> & { tipo?: TipoServicio };
+type ServicioApi = {
+    idservicio: number;
+    idproveedor?: number;
+    tipo: TipoServicio;
+    nombreServicio: string;
+    descripcion: string | null;
+    costoBase: number;
+    localidad: string;
+    estado: EstadoServicio;
+    proveedor?: Servicio["proveedor"];
+    datos: Record<string, string | number | null>;
+    disponibilidad: Record<string, string | number>;
+    edicion?: Servicio["edicion"];
+};
 
 function normalizarServicio(servicio: ServicioApi): Servicio {
-    const tipo = servicio.tipo
-        ?? (servicio.alojamiento ? "ALOJAMIENTO"
-            : servicio.transporte ? "TRANSPORTE"
-                : servicio.tren ? "TREN" : "EQUIPAMIENTO");
-    const detalle = servicio.alojamiento ?? servicio.transporte ?? servicio.tren ?? servicio.equipamiento ?? {};
-    return { ...servicio, ...detalle, tipo, id: servicio.idservicio };
+    const camposEspecificos = { ...servicio.datos, ...servicio.disponibilidad };
+    return {
+        ...servicio,
+        ...camposEspecificos,
+        id: servicio.idservicio,
+        idproveedor: servicio.idproveedor ?? 0,
+        descripcion: servicio.descripcion ?? "",
+    } as Servicio;
 }
 
 type Respuesta<T> = { data: T };
@@ -74,10 +104,18 @@ export function listarServicios(idProveedor: number, incluirInactivos = true): P
 }
 
 export function registrarServicio(idProveedor: number, datos: DatosServicio): Promise<Servicio> {
+    const datosAlta = { ...datos };
+    delete datosAlta.inventarioTotal;
     return solicitarApi<Respuesta<ServicioApi>>(`/proveedores/${idProveedor}/servicios`, {
         method: "POST",
-        body: JSON.stringify(datos),
+        body: JSON.stringify(datosAlta),
     }).then(extraer).then(normalizarServicio);
+}
+
+export function obtenerServicio(id: number): Promise<Servicio> {
+    return solicitarApi<Respuesta<ServicioApi>>(`/servicios/${id}`)
+        .then(extraer)
+        .then(normalizarServicio);
 }
 
 export function modificarServicio(id: number, datos: Partial<DatosServicio>): Promise<Servicio> {
@@ -93,12 +131,22 @@ export function darDeBajaServicio(id: number): Promise<Servicio> {
 
 export const clavesServicios = {
     porProveedor: (id: number) => ["servicios", id] as const,
+    uno: (id: number) => ["servicio", id] as const,
 };
 
 export function useServicios(idProveedor: number) {
     return useQuery({
         queryKey: clavesServicios.porProveedor(idProveedor),
         queryFn: () => listarServicios(idProveedor),
+        enabled: Number.isInteger(idProveedor) && idProveedor > 0,
+    });
+}
+
+export function useServicio(id: number) {
+    return useQuery({
+        queryKey: clavesServicios.uno(id),
+        queryFn: () => obtenerServicio(id),
+        enabled: Number.isInteger(id) && id > 0,
     });
 }
 
