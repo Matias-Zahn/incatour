@@ -260,11 +260,24 @@ async function main() {
     },
   });
 
+  // 5b. Autoridad simulada: el bloqueo de SAL-2026-001 (16 pasajeros + 2 guías + 8 porteadores)
+  await db.autoridadCupoDiario.create({ data: { fecha: "2026-11-15", ocupados: 26 } });
+  await db.autoridadBloqueo.create({
+    data: {
+      idBloqueo: "BLQ-SEED-001",
+      fecha: "2026-11-15",
+      lugares: 26,
+      // Los mismos permisos que la salida tiene registrados (PermisoPersonal y PermisoPasajero)
+      permisos: { create: [{ nroPermiso: "PERM-GUIA-001" }, { nroPermiso: "PERM-PAS-001" }] },
+    },
+  });
+
   // 6. Salida Publicada
   const salida = await db.salida.create({
     data: {
       idpaquete: paquete.idpaquete,
       nroSalida: "SAL-2026-001",
+      idbloqueo: "BLQ-SEED-001",
       stockLocal: 16,
       tamanoMaximo: 16,
       fechaInicio: new Date("2026-11-15T00:00:00Z"),

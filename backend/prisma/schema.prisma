@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "autoridad"]
 }
 
 // ==========================================
@@ -25,6 +27,8 @@ model Usuario {
   cliente    Cliente?
   guia       Guia?
   reembolsos Reembolso[] // Nueva relación para los reembolsos gestionados por el usuario
+
+  @@schema("public")
 }
 
 model Cliente {
@@ -36,6 +40,8 @@ model Cliente {
   usuario  Usuario   @relation(fields: [idusuario], references: [idusuario])
   reservas Reserva[]
   resenias Resenia[]
+
+  @@schema("public")
 }
 
 // ==========================================
@@ -62,6 +68,8 @@ model Reserva {
   solicitudes Solicitud[]
   auditorias  RegistroAuditoria[]
   permisos    PermisoPasajero[] // Relación con los permisos de pasajero tramitados
+
+  @@schema("public")
 }
 
 model Reembolso {
@@ -74,6 +82,8 @@ model Reembolso {
 
   reserva Reserva @relation(fields: [idreserva], references: [idreserva])
   usuario Usuario @relation(fields: [idusuario], references: [idusuario])
+
+  @@schema("public")
 }
 
 model Pago {
@@ -84,6 +94,8 @@ model Pago {
   estadoTransaccion String
   fechahora         DateTime @default(now())
   reserva           Reserva  @relation(fields: [idreserva], references: [idreserva])
+
+  @@schema("public")
 }
 
 model Solicitud {
@@ -98,6 +110,8 @@ model Solicitud {
   reserva   Reserva            @relation(fields: [idreserva], references: [idreserva])
   servicio  ServicioBase?      @relation(fields: [idservicio], references: [idservicio])
   gestiones GestionSolicitud[]
+
+  @@schema("public")
 }
 
 model GestionSolicitud {
@@ -111,6 +125,7 @@ model GestionSolicitud {
   servicio  ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idsolicitud, idservicio])
+  @@schema("public")
 }
 
 model Resenia {
@@ -124,6 +139,7 @@ model Resenia {
   salida  Salida  @relation(fields: [idsalida], references: [idsalida])
 
   @@id([idcliente, idsalida])
+  @@schema("public")
 }
 
 // ==========================================
@@ -144,6 +160,8 @@ model Personal {
   asignaciones AsignacionPersonal[]
   permisos     PermisoPersonal[] // Relación con el permiso específico
   evaluaciones EvaluacionPersonal[]
+
+  @@schema("public")
 }
 
 model Guia {
@@ -154,6 +172,8 @@ model Guia {
 
   personal Personal @relation(fields: [idpersonal], references: [idpersonal])
   usuario  Usuario? @relation(fields: [idusuario], references: [idusuario])
+
+  @@schema("public")
 }
 
 model Pasajero {
@@ -165,6 +185,8 @@ model Pasajero {
   reservas                  ReservaPasajero[]
   incidentes                IncidentePasajero[]
   permisos                  PermisoPasajero[] // Relación con el permiso específico
+
+  @@schema("public")
 }
 
 model ReservaPasajero {
@@ -174,6 +196,7 @@ model ReservaPasajero {
   pasajero   Pasajero @relation(fields: [idpasajero], references: [idpasajero])
 
   @@id([idreserva, idpasajero])
+  @@schema("public")
 }
 
 // ==========================================
@@ -190,6 +213,8 @@ model PermisoPasajero {
 
   reserva  Reserva  @relation(fields: [idreserva], references: [idreserva])
   pasajero Pasajero @relation(fields: [idpasajero], references: [idpasajero])
+
+  @@schema("public")
 }
 
 model PermisoPersonal {
@@ -202,6 +227,8 @@ model PermisoPersonal {
 
   salida   Salida   @relation(fields: [idsalida], references: [idsalida])
   personal Personal @relation(fields: [idpersonal], references: [idpersonal])
+
+  @@schema("public")
 }
 
 // ==========================================
@@ -229,6 +256,8 @@ model Paquete {
   servicios                PaqueteServicio[]
   salidas                  Salida[]
   auditorias               RegistroAuditoria[]
+
+  @@schema("public")
 }
 
 model GarantiaEstablecimiento {
@@ -236,6 +265,8 @@ model GarantiaEstablecimiento {
   idservicio Int
   paquete    Paquete      @relation(fields: [idpaquete], references: [idpaquete])
   servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@schema("public")
 }
 
 model Circuito {
@@ -249,6 +280,8 @@ model Circuito {
   etapas                EtapaRuta[]
   paquetes              Paquete[]
   avances               Avance[]
+
+  @@schema("public")
 }
 
 model EtapaRuta {
@@ -261,6 +294,7 @@ model EtapaRuta {
   avances            Avance[]
 
   @@id([idcircuito, numeroOrden])
+  @@schema("public")
 }
 
 model Temporada {
@@ -270,6 +304,8 @@ model Temporada {
   fechaFin    DateTime
   estado      String          @default("ACTIVO")
   tarifas     TarifaPaquete[]
+
+  @@schema("public")
 }
 
 model TarifaPaquete {
@@ -281,6 +317,7 @@ model TarifaPaquete {
   temporada   Temporada @relation(fields: [idtemporada], references: [idtemporada])
 
   @@id([idpaquete, idtemporada])
+  @@schema("public")
 }
 
 // ==========================================
@@ -313,6 +350,8 @@ model Salida {
   auditorias              RegistroAuditoria[]
   evaluacionesPersonal    EvaluacionPersonal[]
   evaluacionesProveedores EvaluacionProveedor[]
+
+  @@schema("public")
 }
 
 model SalidaServicio {
@@ -324,6 +363,7 @@ model SalidaServicio {
   servicio ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@unique([idsalida, tipo])
+  @@schema("public")
 }
 
 model Avance {
@@ -338,6 +378,8 @@ model Avance {
   salida   Salida    @relation(fields: [idsalida], references: [idsalida])
   circuito Circuito  @relation(fields: [idcircuito], references: [idcircuito])
   etapa    EtapaRuta @relation(fields: [idcircuito, numeroOrden], references: [idcircuito, numeroOrden])
+
+  @@schema("public")
 }
 
 model Incidente {
@@ -350,6 +392,8 @@ model Incidente {
   fechaHoraReporte    DateTime            @default(now())
   salida              Salida              @relation(fields: [idsalida], references: [idsalida])
   pasajeros           IncidentePasajero[]
+
+  @@schema("public")
 }
 
 model IncidentePasajero {
@@ -359,6 +403,7 @@ model IncidentePasajero {
   pasajero    Pasajero  @relation(fields: [idpasajero], references: [idpasajero])
 
   @@id([idincidente, idpasajero])
+  @@schema("public")
 }
 
 model RegistroAuditoria {
@@ -374,6 +419,8 @@ model RegistroAuditoria {
   salida  Salida?  @relation(fields: [idsalida], references: [idsalida])
   reserva Reserva? @relation(fields: [idreserva], references: [idreserva])
   paquete Paquete? @relation(fields: [idpaquete], references: [idpaquete])
+
+  @@schema("public")
 }
 
 // ==========================================
@@ -390,6 +437,7 @@ model Idioma {
   personal Personal @relation(fields: [idpersonal], references: [idpersonal])
 
   @@id([idpersonal, nombre])
+  @@schema("public")
 }
 
 model AsignacionPersonal {
@@ -399,6 +447,7 @@ model AsignacionPersonal {
   personal   Personal @relation(fields: [idpersonal], references: [idpersonal])
 
   @@id([idsalida, idpersonal])
+  @@schema("public")
 }
 
 // ==========================================
@@ -414,6 +463,8 @@ model Proveedor {
   estado            String
   servicios         ServicioBase[]
   evaluaciones      EvaluacionProveedor[]
+
+  @@schema("public")
 }
 
 model ServicioBase {
@@ -441,6 +492,8 @@ model ServicioBase {
 
   salidas      SalidaServicio[]
   salidasEquip SalidaEquipamiento[]
+
+  @@schema("public")
 }
 
 model ServicioAlojamiento {
@@ -450,6 +503,8 @@ model ServicioAlojamiento {
   capacidadDisponible   Int
   modalidadConfirmacion String
   servicio              ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@schema("public")
 }
 
 model ServicioTransporte {
@@ -458,6 +513,8 @@ model ServicioTransporte {
   pesoEquipajeIncluido Float
   costoPorKgExcedente  Float
   servicio             ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@schema("public")
 }
 
 model ServicioTren {
@@ -466,6 +523,8 @@ model ServicioTren {
   horarioLlegada String
   diasOperacion  String // Ej: L-M-X-J-V-S-D
   servicio       ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@schema("public")
 }
 
 model ServicioEquipamiento {
@@ -473,6 +532,8 @@ model ServicioEquipamiento {
   tipoEquipamiento   String
   cantidadDisponible Int
   servicio           ServicioBase @relation(fields: [idservicio], references: [idservicio])
+
+  @@schema("public")
 }
 
 model PaqueteServicio {
@@ -482,6 +543,7 @@ model PaqueteServicio {
   servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idpaquete, idservicio])
+  @@schema("public")
 }
 
 model SalidaEquipamiento {
@@ -492,6 +554,7 @@ model SalidaEquipamiento {
   servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idsalida, idservicio])
+  @@schema("public")
 }
 
 // CU-42: el administrador evalúa al personal y a los proveedores por su desempeño en una salida.
@@ -507,6 +570,7 @@ model EvaluacionPersonal {
   personal Personal @relation(fields: [idpersonal], references: [idpersonal])
 
   @@id([idsalida, idpersonal])
+  @@schema("public")
 }
 
 model EvaluacionProveedor {
@@ -520,4 +584,36 @@ model EvaluacionProveedor {
   proveedor Proveedor @relation(fields: [idproveedor], references: [idproveedor])
 
   @@id([idsalida, idproveedor])
+  @@schema("public")
+}
+
+// ── Autoridad simulada (ApiDDCGobierno) ────────────────────────────────────────
+// Simula el sistema EXTERNO de la autoridad del Camino Inca: tiene su propio almacenamiento y
+// ninguna FK hacia las tablas del sistema. Solo la usa integraciones/autoridad/autoridad.simulada.ts.
+model AutoridadCupoDiario {
+  fecha    String @id // "2026-11-15"
+  ocupados Int    @default(0) // lugares bloqueados ese día (tope: 500)
+
+  @@map("cupo_diario")
+  @@schema("autoridad")
+}
+
+model AutoridadBloqueo {
+  idBloqueo String             @id
+  fecha     String
+  lugares   Int
+  permisos  AutoridadPermiso[]
+
+  @@map("bloqueo")
+  @@schema("autoridad")
+}
+
+model AutoridadPermiso {
+  nroPermiso String           @id
+  idBloqueo  String
+  vigente    Boolean          @default(true)
+  bloqueo    AutoridadBloqueo @relation(fields: [idBloqueo], references: [idBloqueo], onDelete: Cascade)
+
+  @@map("permiso")
+  @@schema("autoridad")
 }

@@ -28,8 +28,8 @@ app.get("/api/", (req, res) => {
 
 // Autoridad
 import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
-import { AutoridadMock } from "./integraciones/autoridad/autoridad.mock";
-configurarAutoridad(new AutoridadMock());
+import { AutoridadSimulada } from "./integraciones/autoridad/autoridad.simulada";
+configurarAutoridad(new AutoridadSimulada());
 
 //Modulo Auth
 import { AuthRoutes } from "./shared/auth/auth.routes";
