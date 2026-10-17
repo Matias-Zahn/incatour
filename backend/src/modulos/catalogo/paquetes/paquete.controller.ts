@@ -83,4 +83,30 @@ export class PaqueteController {
       next(error);
     }
   };
+
+  // POST /api/paquetes/:id/imagen — Subir imagen del paquete
+  subirImagen = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+
+      // Verificamos que el paquete exista
+      await paqueteService.consultarPaquetePorId(id);
+
+      if (!req.file) {
+        throw CustomError.badRequest("Debe adjuntar un archivo de imagen en el campo 'imagen'.");
+      }
+
+      const urlImagen = `/imagenes/paquetes/${id}/${req.file.filename}`;
+
+      return res.status(200).json({
+        mensaje: "Imagen del paquete subida exitosamente.",
+        idpaquete: id,
+        archivo: req.file.filename,
+        url: urlImagen,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
