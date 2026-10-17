@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { solicitarApi } from "./clienteApi";
+import { solicitarApiConAuth } from "./paqueteService";
 
 export const esquemaTemporada = z
     .object({
@@ -45,13 +45,6 @@ type RespuestaDatos<T> = {
     data: T;
 };
 
-function cabecerasAuth(): HeadersInit {
-    const token =
-        (typeof window !== "undefined" ? localStorage.getItem("token") : null) ??
-        import.meta.env.VITE_DEV_TOKEN;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 function respuestaDatos<T>(respuesta: RespuestaDatos<T>): T {
     return respuesta.data;
 }
@@ -64,17 +57,14 @@ function normalizarTemporada(temporada: TemporadaApi): Temporada {
 }
 
 export function listarTemporadas(): Promise<Temporada[]> {
-    return solicitarApi<RespuestaDatos<TemporadaApi[]>>("/temporadas", {
-        headers: cabecerasAuth(),
-    })
+    return solicitarApiConAuth<RespuestaDatos<TemporadaApi[]>>("/temporadas")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarTemporada));
 }
 
 export function registrarTemporada(datos: DatosTemporada): Promise<Temporada> {
-    return solicitarApi<RespuestaDatos<TemporadaApi>>("/temporadas", {
+    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>("/temporadas", {
         method: "POST",
-        headers: cabecerasAuth(),
         body: JSON.stringify(datos),
     })
         .then(respuestaDatos)
@@ -85,9 +75,8 @@ export function modificarTemporada(
     id: number,
     datos: Partial<DatosTemporada>,
 ): Promise<Temporada> {
-    return solicitarApi<RespuestaDatos<TemporadaApi>>(`/temporadas/${id}`, {
+    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>(`/temporadas/${id}`, {
         method: "PUT",
-        headers: cabecerasAuth(),
         body: JSON.stringify(datos),
     })
         .then(respuestaDatos)
@@ -95,11 +84,10 @@ export function modificarTemporada(
 }
 
 export function darDeBajaTemporada(id: number): Promise<Temporada> {
-    return solicitarApi<RespuestaDatos<TemporadaApi>>(
+    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>(
         `/temporadas/${id}/baja`,
         {
             method: "PATCH",
-            headers: cabecerasAuth(),
         },
     )
         .then(respuestaDatos)

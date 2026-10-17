@@ -29,8 +29,9 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
     if (!respuesta.ok) {
         let mensaje = "Ocurrió un error inesperado.";
         try {
-            const cuerpo = (await respuesta.json()) as { mensaje?: string };
-            if (cuerpo.mensaje) mensaje = cuerpo.mensaje;
+            const cuerpo = (await respuesta.json()) as { error?: string; mensaje?: string };
+            if (cuerpo.error) mensaje = cuerpo.error;
+            else if (cuerpo.mensaje) mensaje = cuerpo.mensaje;
         } catch {
             // respuesta sin cuerpo JSON
         }
