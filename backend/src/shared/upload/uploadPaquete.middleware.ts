@@ -16,6 +16,19 @@ const storage = multer.diskStorage({
     const dir = path.join(BASE_IMG_PATH, id as string);
     // Creamos la carpeta de la entidad si no existe
     fs.mkdirSync(dir, { recursive: true });
+
+    // Si ya existía una imagen previa (ej: principal.png o principal.jpg), la limpiamos para reemplazarla limpiamente
+    try {
+      const archivosPrevios = fs.readdirSync(dir);
+      for (const archivo of archivosPrevios) {
+        if (archivo.startsWith("principal.")) {
+          fs.unlinkSync(path.join(dir, archivo));
+        }
+      }
+    } catch {
+      // Si la carpeta estaba vacía o recién creada, continúa normalmente
+    }
+
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
