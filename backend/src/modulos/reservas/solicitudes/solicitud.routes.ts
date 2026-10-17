@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 import { SolicitudController } from "./solicitud.controller";
 
 /**
@@ -9,6 +10,8 @@ import { SolicitudController } from "./solicitud.controller";
  *     description: Retorna todas las solicitudes de alojamiento que están pendientes de confirmación.
  *     tags:
  *       - Solicitudes de Alojamiento
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de solicitudes pendientes
@@ -19,6 +22,8 @@ import { SolicitudController } from "./solicitud.controller";
  *     description: Busca hoteles compatibles con las garantías del paquete, excluyendo los ya rechazados.
  *     tags:
  *       - Solicitudes de Alojamiento
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -39,6 +44,8 @@ import { SolicitudController } from "./solicitud.controller";
  *     description: Registra la aceptación o rechazo por parte del proveedor. Si es rechazada, genera un reintento automático.
  *     tags:
  *       - Solicitudes de Alojamiento
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -70,6 +77,9 @@ export class SolicitudRoutes {
   static get getRoutes(): Router {
     const router = Router();
     const controller = new SolicitudController();
+
+    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-33
     router.get("/", controller.consultarPendientes);

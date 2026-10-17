@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 import { TemporadaController } from "./temporada.controller";
 
 /**
@@ -35,6 +36,8 @@ import { TemporadaController } from "./temporada.controller";
  *   get:
  *     summary: Consultar temporadas (CU-06)
  *     tags: [Temporadas]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de temporadas
@@ -50,6 +53,8 @@ import { TemporadaController } from "./temporada.controller";
  *   post:
  *     summary: Crear temporada (CU-07)
  *     tags: [Temporadas]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -91,6 +96,8 @@ import { TemporadaController } from "./temporada.controller";
  *     summary: Modificar temporada (CU-08)
  *     description: Debe enviarse al menos un campo. La fecha de inicio debe quedar anterior a la de fin.
  *     tags: [Temporadas]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -134,6 +141,8 @@ import { TemporadaController } from "./temporada.controller";
  *     summary: Baja temporada (CU-09)
  *     description: Baja lógica. No se permite si la temporada tiene tarifas de paquetes asociadas.
  *     tags: [Temporadas]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -161,6 +170,9 @@ export class TemporadaRoutes {
   static get getRoutes(): Router {
     const router = Router();
     const controller = new TemporadaController();
+
+    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-06: Consultar Temporadas
     router.get("/", controller.consultarTemporadas);

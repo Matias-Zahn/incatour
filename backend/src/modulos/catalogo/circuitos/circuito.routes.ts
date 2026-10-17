@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 import { CircuitoController } from "./circuito.controller";
 
 /**
@@ -40,6 +41,8 @@ import { CircuitoController } from "./circuito.controller";
  *   get:
  *     summary: Consultar circuitos turísticos (CU-01)
  *     tags: [Circuitos]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de circuitos
@@ -55,6 +58,8 @@ import { CircuitoController } from "./circuito.controller";
  *   post:
  *     summary: Crear circuito turístico (CU-02)
  *     tags: [Circuitos]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -101,6 +106,8 @@ import { CircuitoController } from "./circuito.controller";
  *     summary: Modificar circuito turístico (CU-03)
  *     description: Debe enviarse al menos un campo. Solo se pueden modificar circuitos activos.
  *     tags: [Circuitos]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -148,6 +155,8 @@ import { CircuitoController } from "./circuito.controller";
  *     summary: Baja circuito turístico (CU-04)
  *     description: Baja lógica. No se permite si el circuito tiene paquetes activos asociados.
  *     tags: [Circuitos]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -175,6 +184,9 @@ export class CircuitoRoutes {
   static get getRoutes(): Router {
     const router = Router();
     const controller = new CircuitoController();
+
+    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-01: Consultar circuitos
     router.get("/", controller.consultarCircuitos);
