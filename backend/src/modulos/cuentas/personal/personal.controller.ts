@@ -54,7 +54,8 @@ export class PersonalController {
       if (error) throw CustomError.badRequest(error);
 
       const resultado = await service.crearPersonal(dto!);
-      return res.status(201).json(resultado);
+      const { mensaje, ...data } = resultado;
+      return res.status(201).json({ mensaje, data });
     } catch (error) {
       next(error);
     }

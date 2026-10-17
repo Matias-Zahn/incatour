@@ -28,7 +28,7 @@ export class SolicitudController {
       if (isNaN(id)) throw CustomError.badRequest("ID inválido");
 
       const opciones = await service.buscarServiciosCompatibles(id);
-      return res.json(opciones);
+      return res.json({ data: opciones });
     } catch (error) {
       next(error);
     }
@@ -44,7 +44,8 @@ export class SolicitudController {
       if (errorDto || !dto) throw CustomError.badRequest(errorDto!);
 
       const resultado = await service.procesarResolucion(id, dto);
-      return res.status(200).json(resultado);
+      const { mensaje, ...data } = resultado;
+      return res.status(200).json({ mensaje, data });
     } catch (error) {
       next(error);
     }

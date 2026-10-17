@@ -51,7 +51,7 @@ export const manejadoresSolicitudes = [
       );
     }
 
-    return HttpResponse.json({
+    return HttpResponse.json({ data: {
       solicitudId: sol.idsolicitud,
       reserva: sol.reserva.nroReserva,
       cliente: sol.reserva.cliente.nroCliente,
@@ -66,7 +66,7 @@ export const manejadoresSolicitudes = [
         proveedor: s.proveedor,
         canalContacto: "Por fuera del sistema",
       })),
-    });
+    } });
   }),
 
   // CU-34 Fase 2: POST /api/solicitudes/:id/resolver
@@ -105,7 +105,7 @@ export const manejadoresSolicitudes = [
 
       return HttpResponse.json({
         mensaje: "Rechazo registrado. Se generó una solicitud nueva en estado Pendiente.",
-        nuevaSolicitudId: nuevaSol.idsolicitud,
+        data: { nuevaSolicitudId: nuevaSol.idsolicitud },
       });
     }
 
@@ -118,7 +118,7 @@ export const manejadoresSolicitudes = [
 
     return HttpResponse.json({
       mensaje: "Solicitud Confirmada exitosamente.",
-      solicitudesPendientesRestantesEnSalida: pendientesEnSalida,
+      data: { solicitudesPendientesRestantesEnSalida: pendientesEnSalida },
     });
   }),
 ];

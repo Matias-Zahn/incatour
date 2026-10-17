@@ -90,24 +90,25 @@ export async function listarSolicitudesPendientes(): Promise<SolicitudPendiente[
 }
 
 // CU-34 (Paso 1): Obtener opciones de hoteles compatibles excluyendo los que ya rechazaron
-// Excepción al sobre { data }: devuelve el objeto directamente en la raíz
 export async function consultarOpcionesSolicitud(
   idSolicitud: number,
 ): Promise<OpcionesGestionSolicitud> {
-  return solicitarApiConAuth<OpcionesGestionSolicitud>(`/solicitudes/${idSolicitud}/opciones`);
+  const res = await solicitarApiConAuth<{ data: OpcionesGestionSolicitud }>(`/solicitudes/${idSolicitud}/opciones`);
+  return res.data;
 }
 
 // CU-34 (Paso 2): Resolver solicitud como ACEPTADA o RECHAZADA
-// Excepción al sobre { data }: devuelve { mensaje, nuevaSolicitudId? | solicitudesPendientesRestantesEnSalida? }
+// Responde { mensaje, data: { nuevaSolicitudId? | solicitudesPendientesRestantesEnSalida? } }
 export async function resolverSolicitud(
   idSolicitud: number,
   payload: ResolverSolicitudPayload,
 ): Promise<RespuestaResolucionSolicitud> {
-  return solicitarApiConAuth<RespuestaResolucionSolicitud>(
-    `/solicitudes/${idSolicitud}/resolver`,
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-  );
+  const { mensaje, data } = await solicitarApiConAuth<{
+    mensaje: string;
+    data: Omit<RespuestaResolucionSolicitud, "mensaje">;
+  }>(`/solicitudes/${idSolicitud}/resolver`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return { mensaje, ...data } as RespuestaResolucionSolicitud;
 }

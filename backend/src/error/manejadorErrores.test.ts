@@ -1,0 +1,47 @@
+import { describe, it, expect, vi } from "vitest";
+import type { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
+import multer from "multer";
+import { manejadorErrores } from "./manejadorErrores";
+import { CustomError } from "./CustomError";
+
+// Respuesta falsa que guarda el código y el cuerpo
+const responder = (err: unknown) => {
+  const r = { estado: 0, cuerpo: {} as { error?: string } };
+  const res = {
+    status: (c: number) => ((r.estado = c), res),
+    json: (b: { error?: string }) => ((r.cuerpo = b), res),
+  };
+  manejadorErrores(err, {} as Request, res as unknown as Response, (() => {}) as NextFunction);
+  return r;
+};
+const prisma = (code: string) => new Prisma.PrismaClientKnownRequestError("x", { code, clientVersion: "5" });
+
+describe("manejadorErrores", () => {
+  it("respeta el código de un CustomError", () => {
+    const r = responder(CustomError.notFound("No está"));
+    expect([r.estado, r.cuerpo.error]).toEqual([404, "No está"]);
+  });
+
+  it("un JSON mal formado es 400, no 500", () => {
+    const err = Object.assign(new SyntaxError("Unexpected token"), { body: "{mal" });
+    expect(responder(err).estado).toBe(400);
+  });
+
+  it("traduce los errores conocidos de Prisma", () => {
+    expect(responder(prisma("P2002")).estado).toBe(409);
+    expect(responder(prisma("P2025")).estado).toBe(404);
+    expect(responder(prisma("P2003")).estado).toBe(400);
+  });
+
+  it("un archivo demasiado grande es 400", () => {
+    const r = responder(new multer.MulterError("LIMIT_FILE_SIZE"));
+    expect([r.estado, r.cuerpo.error]).toEqual([400, "El archivo supera el tamaño máximo permitido"]);
+  });
+
+  it("cualquier otro error es 500 sin mostrar detalles", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = responder(new Error("detalle interno de la base"));
+    expect([r.estado, r.cuerpo.error]).toEqual([500, "Error interno del servidor"]);
+  });
+});
