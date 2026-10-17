@@ -1,4 +1,5 @@
 import { setupWorker } from "msw/browser";
+import { manejadoresCatalogoReservas } from "./manejadores/catalogoReservas";
 import { manejadoresCircuitos } from "./manejadores/circuitos";
 import { manejadoresEvaluaciones } from "./manejadores/evaluaciones";
 import { manejadoresPaquetes } from "./manejadores/paquetes";
@@ -14,6 +15,7 @@ export const manejadores = [
     ...manejadoresPaquetes,
     ...manejadoresSolicitudes,
     ...manejadoresEvaluaciones,
+    ...manejadoresCatalogoReservas,
 ];
 
 export const trabajadorMocks = setupWorker(...manejadores);

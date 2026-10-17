@@ -117,9 +117,17 @@ function InicioGestionPage() {
                     </p>
                 </div>
 
-                <Boton onClick={() => navigate("/gestion/paquetes")}>
-                    Gestionar paquetes turísticos
-                </Boton>
+                <div className="flex flex-wrap gap-2">
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/catalogo?vista=admin")}
+                    >
+                        👁 Ver tienda como cliente
+                    </Boton>
+                    <Boton onClick={() => navigate("/gestion/paquetes")}>
+                        Gestionar paquetes turísticos
+                    </Boton>
+                </div>
             </header>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

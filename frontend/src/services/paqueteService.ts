@@ -364,6 +364,23 @@ export async function darDeBajaPaquete(id: number): Promise<Paquete> {
         .then(normalizarPaquete);
 }
 
+export function extraerNombreFotoCarrusel(
+    urlImagen: string,
+    indiceFallback = 0,
+): string {
+    const sinQuery = urlImagen.split("?")[0] ?? "";
+    const segmentoFinal = sinQuery.split("/").pop() ?? "";
+    const base = segmentoFinal.replace(/\.(jpe?g|png|webp)$/i, "").toLowerCase();
+    if (
+        ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"].includes(
+            base,
+        )
+    ) {
+        return base === "foto_1" ? "principal" : base;
+    }
+    return indiceFallback === 0 ? "principal" : `foto_${indiceFallback + 1}`;
+}
+
 export async function subirImagenPaquete(
     idPaquete: number,
     archivos: File | File[],
@@ -372,16 +389,61 @@ export async function subirImagenPaquete(
     const lista = Array.isArray(archivos) ? archivos : [archivos];
     const formData = new FormData();
     for (const archivo of lista) {
-        formData.append("imagen", archivo);
+        formData.append("imagenes", archivo);
     }
 
-    return solicitarApiConAuth<RespuestaDatos<RespuestaSubirImagenPaquete>>(
-        `/paquetes/${idPaquete}/imagen`,
-        {
-            method: metodo,
-            body: formData,
-        },
-    ).then(respuestaDatos);
+    return solicitarApiConAuth<
+        RespuestaDatos<{
+            idpaquete: number;
+            totalImagenes?: number;
+            principal?: string;
+            carrusel?: string[];
+            archivo?: string;
+            url?: string;
+            archivos?: string[];
+            urls?: string[];
+        }>
+    >(`/paquetes/${idPaquete}/carrusel`, {
+        method: metodo,
+        body: formData,
+    }).then((res) => {
+        const d = respuestaDatos(res);
+        const urls = d.carrusel ?? d.urls ?? (d.principal ? [d.principal] : []);
+        return {
+            idpaquete: d.idpaquete,
+            archivo: d.archivo ?? "principal",
+            url: d.principal ?? d.url ?? urls[0] ?? "",
+            archivos: d.archivos ?? urls,
+            urls,
+        };
+    });
+}
+
+export async function modificarFotoIndividualPaquete(
+    idPaquete: number,
+    nombreFoto: string,
+    archivo: File,
+): Promise<{ idpaquete: number; fotoModificada: string; url: string }> {
+    const formData = new FormData();
+    formData.append("imagen", archivo);
+
+    return solicitarApiConAuth<
+        RespuestaDatos<{ idpaquete: number; fotoModificada: string; url: string }>
+    >(`/paquetes/${idPaquete}/carrusel/${nombreFoto}`, {
+        method: "PUT",
+        body: formData,
+    }).then(respuestaDatos);
+}
+
+export async function eliminarFotoIndividualPaquete(
+    idPaquete: number,
+    nombreFoto: string,
+): Promise<{ idpaquete: number; fotoEliminada: string }> {
+    return solicitarApiConAuth<
+        RespuestaDatos<{ idpaquete: number; fotoEliminada: string }>
+    >(`/paquetes/${idPaquete}/carrusel/${nombreFoto}`, {
+        method: "DELETE",
+    }).then(respuestaDatos);
 }
 
 export async function listarServiciosDisponiblesCatalogo(): Promise<
@@ -505,6 +567,59 @@ export function useSubirImagenPaquete() {
             });
             clienteConsultas.invalidateQueries({
                 queryKey: clavesPaquetes.uno(variables.id),
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: ["catalogo-publico"],
+            });
+        },
+    });
+}
+
+export function useModificarFotoIndividualPaquete() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            id,
+            nombreFoto,
+            archivo,
+        }: {
+            id: number;
+            nombreFoto: string;
+            archivo: File;
+        }) => modificarFotoIndividualPaquete(id, nombreFoto, archivo),
+        onSuccess: (_, variables) => {
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.todos,
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.uno(variables.id),
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: ["catalogo-publico"],
+            });
+        },
+    });
+}
+
+export function useEliminarFotoIndividualPaquete() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            id,
+            nombreFoto,
+        }: {
+            id: number;
+            nombreFoto: string;
+        }) => eliminarFotoIndividualPaquete(id, nombreFoto),
+        onSuccess: (_, variables) => {
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.todos,
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: clavesPaquetes.uno(variables.id),
+            });
+            clienteConsultas.invalidateQueries({
+                queryKey: ["catalogo-publico"],
             });
         },
     });

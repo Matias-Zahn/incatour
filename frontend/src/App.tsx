@@ -1,4 +1,6 @@
+import LayoutCliente from "./components/LayoutCliente";
 import LayoutGestion from "./components/LayoutGestion";
+import CatalogoCompraPage from "./pages/cliente/CatalogoCompraPage";
 import CircuitosPage from "./pages/gestion/CircuitosPage";
 import EtapasCircuitoPage from "./pages/gestion/EtapasCircuitoPage";
 import { EvaluacionesPage } from "./pages/gestion/EvaluacionesPage";
@@ -19,6 +21,14 @@ function App() {
             <LayoutGestion seccion="Inicio">
               <InicioGestionPage />
             </LayoutGestion>
+          }
+        />
+        <Route
+          path="/catalogo"
+          element={
+            <LayoutCliente>
+              <CatalogoCompraPage />
+            </LayoutCliente>
           }
         />
         <Route

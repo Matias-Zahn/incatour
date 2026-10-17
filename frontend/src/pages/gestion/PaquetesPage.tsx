@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
@@ -48,6 +49,7 @@ function obtenerGaleriaPaquete(paquete: Paquete): string[] {
 }
 
 function PaquetesPage() {
+    const navegar = useNavigate();
     const { data: paquetes = [], isPending, isError, error } = usePaquetes();
     const { data: circuitos = [] } = useCircuitos();
     const { data: temporadas = [] } = useTemporadas();
@@ -301,9 +303,17 @@ function PaquetesPage() {
                     </p>
                 </div>
 
-                <Boton onClick={() => abrirFormulario()}>
-                    Nuevo paquete turístico
-                </Boton>
+                <div className="flex flex-wrap gap-2">
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navegar("/catalogo?vista=admin")}
+                    >
+                        👁 Ver tienda como cliente
+                    </Boton>
+                    <Boton onClick={() => abrirFormulario()}>
+                        Nuevo paquete turístico
+                    </Boton>
+                </div>
             </header>
 
             {formularioAbierto ? (
@@ -1027,38 +1037,54 @@ function PaquetesPage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-borde bg-fondo/40 px-6 py-4">
-                                        {paqueteVistaPrevia.estado ===
-                                        "ACTIVO" ? (
-                                            <>
-                                                <Boton
-                                                    variante="secundario"
-                                                    onClick={() =>
-                                                        iniciarSubidaImagenRapida(
-                                                            paqueteVistaPrevia,
-                                                        )
-                                                    }
-                                                >
-                                                    Subir / cambiar imágenes (1 a 5)
-                                                </Boton>
-                                                <Boton
-                                                    onClick={() => {
-                                                        const p =
-                                                            paqueteVistaPrevia;
-                                                        cerrarVistaPrevia();
-                                                        abrirFormulario(p);
-                                                    }}
-                                                >
-                                                    Editar paquete
-                                                </Boton>
-                                            </>
-                                        ) : null}
+                                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-borde bg-fondo/40 px-6 py-4">
                                         <Boton
                                             variante="fantasma"
-                                            onClick={cerrarVistaPrevia}
+                                            onClick={() => {
+                                                const id =
+                                                    paqueteVistaPrevia.idpaquete;
+                                                cerrarVistaPrevia();
+                                                navegar(
+                                                    `/catalogo?vista=admin&paquete=${id}`,
+                                                );
+                                            }}
                                         >
-                                            Cerrar vista previa
+                                            👁 Ver como cliente en la tienda ↗
                                         </Boton>
+
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            {paqueteVistaPrevia.estado ===
+                                            "ACTIVO" ? (
+                                                <>
+                                                    <Boton
+                                                        variante="secundario"
+                                                        onClick={() =>
+                                                            iniciarSubidaImagenRapida(
+                                                                paqueteVistaPrevia,
+                                                            )
+                                                        }
+                                                    >
+                                                        Subir / cambiar imágenes (1 a 5)
+                                                    </Boton>
+                                                    <Boton
+                                                        onClick={() => {
+                                                            const p =
+                                                                paqueteVistaPrevia;
+                                                            cerrarVistaPrevia();
+                                                            abrirFormulario(p);
+                                                        }}
+                                                    >
+                                                        Editar paquete
+                                                    </Boton>
+                                                </>
+                                            ) : null}
+                                            <Boton
+                                                variante="fantasma"
+                                                onClick={cerrarVistaPrevia}
+                                            >
+                                                Cerrar vista previa
+                                            </Boton>
+                                        </div>
                                     </div>
                                 </>
                             );
