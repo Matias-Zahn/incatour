@@ -167,11 +167,16 @@ export class PaqueteRoutes {
     // CU-13: Baja de Paquete
     router.patch("/:id/baja", controller.darDeBaja);
 
-    // Subir imagen del paquete (JPG, PNG, WEBP, máx 3MB)
+    // Subir imagen del paquete al crearlo (JPG, PNG, WEBP, máx 3MB)
     router.post(
       "/:id/imagen",
-      autenticar,
-      requierePerfil("ADMIN"),
+      subirImagenPaquete.single("imagen"),
+      controller.subirImagen
+    );
+
+    // Modificar / Reemplazar imagen de un paquete ya existente (CU-12)
+    router.put(
+      "/:id/imagen",
       subirImagenPaquete.single("imagen"),
       controller.subirImagen
     );
