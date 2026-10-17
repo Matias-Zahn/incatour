@@ -24,7 +24,19 @@ export class CatalogoRepository {
         },
         servicios: {
           include: {
-            servicio: true
+            servicio: {
+              include: {
+                transporte: true
+              }
+            }
+          }
+        },
+        salidas: {
+          where: {
+            estado: "PUBLICADA"
+          },
+          orderBy: {
+            fechaInicio: "asc"
           }
         },
         garantiasEstablecimiento: {

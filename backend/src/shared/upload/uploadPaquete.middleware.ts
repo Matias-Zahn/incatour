@@ -12,7 +12,6 @@ let contadorFoto = 1;
 
 const storageCarrusel = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const reqImg = req as RequestConIndiceImagen;
     const id = req.params.id;
     const dir = path.join(BASE_IMG_PATH, id as string);
     fs.mkdirSync(dir, { recursive: true });
@@ -24,7 +23,11 @@ const storageCarrusel = multer.diskStorage({
       try {
         const archivos = fs.readdirSync(dir);
         for (const arch of archivos) {
-          if (arch.startsWith("principal.") || arch.startsWith("foto_")) {
+          if (
+            arch.startsWith("principal.") ||
+            arch.startsWith("foto_") ||
+            arch.startsWith("imagen_")
+          ) {
             fs.unlinkSync(path.join(dir, arch));
           }
         }

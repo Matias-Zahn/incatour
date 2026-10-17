@@ -203,170 +203,117 @@ export const manejadoresPaquetes = [
         });
     }),
 
-    // POST /api/paquetes/:id/imagen (alta) y PUT /api/paquetes/:id/imagen (modificación CU-12)
+    // POST / PUT /api/paquetes/:id/carrusel y /api/paquetes/:id/imagen
     http.post(
-        construirUrl("/paquetes/:id/imagen"),
+        construirUrl("/paquetes/:id/carrusel"),
         async ({ params, request }) => {
             await delay(200);
             const id = Number(params.id);
-            if (!Number.isInteger(id) || id <= 0) {
-                return respuestaError("El ID proporcionado no es válido.", 400);
-            }
-
-            const actual = paquetes.find(
-                (item) => item.idpaquete === id && item.estado === "ACTIVO",
-            );
-            if (!actual) {
-                return respuestaError(
-                    "Paquete no encontrado o inactivo.",
-                    404,
-                );
-            }
-
             const formData = await request.formData();
-            const archivos = formData
-                .getAll("imagen")
-                .filter((item): item is File => item instanceof File);
+            const archivos = [
+                ...formData.getAll("imagenes"),
+                ...formData.getAll("imagen"),
+            ].filter((item): item is File => item instanceof File);
 
             if (archivos.length === 0) {
                 return respuestaError(
-                    "Debe adjuntar entre 1 y 5 archivos de imagen en el campo 'imagen'.",
+                    "Debe adjuntar al menos una imagen en el campo 'imagenes'.",
                     400,
                 );
             }
-            if (archivos.length > 5) {
-                return respuestaError(
-                    "Se permiten como máximo 5 imágenes por paquete turístico.",
-                    400,
-                );
-            }
-
-            const formatosPermitidos = [
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            ];
-            for (const archivo of archivos) {
-                if (!formatosPermitidos.includes(archivo.type)) {
-                    return respuestaError(
-                        "Formato no soportado. Solo se permiten imágenes JPG, PNG o WEBP.",
-                        400,
-                    );
-                }
-                if (archivo.size > 3 * 1024 * 1024) {
-                    return respuestaError(
-                        "El archivo supera el tamaño máximo permitido",
-                        400,
-                    );
-                }
-            }
-
-            const nombresArchivos = archivos.map((archivo, idx) => {
+            const urls = archivos.slice(0, 5).map((archivo, idx) => {
                 const ext =
                     archivo.name.split(".").pop()?.toLowerCase() || "jpg";
-                return idx === 0
-                    ? `principal.${ext}`
-                    : `imagen_${idx + 1}.${ext}`;
+                const nombre =
+                    idx === 0 ? `principal.${ext}` : `foto_${idx + 1}.${ext}`;
+                return `/imagenes/paquetes/${id}/${nombre}`;
             });
-            const urls = nombresArchivos.map(
-                (nombre) => `/imagenes/paquetes/${id}/${nombre}`,
-            );
-
             return HttpResponse.json({
-                mensaje:
-                    archivos.length === 1
-                        ? "Imagen del paquete subida exitosamente."
-                        : `${archivos.length} imágenes del paquete subidas exitosamente.`,
+                mensaje: `Carrusel subido exitosamente con ${urls.length} imagen(es).`,
                 data: {
                     idpaquete: id,
-                    archivo: nombresArchivos[0]!,
-                    url: urls[0]!,
-                    archivos: nombresArchivos,
-                    urls,
+                    totalImagenes: urls.length,
+                    principal: urls[0],
+                    carrusel: urls,
                 },
             });
         },
     ),
 
     http.put(
-        construirUrl("/paquetes/:id/imagen"),
+        construirUrl("/paquetes/:id/carrusel"),
         async ({ params, request }) => {
             await delay(200);
             const id = Number(params.id);
-            if (!Number.isInteger(id) || id <= 0) {
-                return respuestaError("El ID proporcionado no es válido.", 400);
-            }
-
-            const actual = paquetes.find(
-                (item) => item.idpaquete === id && item.estado === "ACTIVO",
-            );
-            if (!actual) {
-                return respuestaError(
-                    "Paquete no encontrado o inactivo.",
-                    404,
-                );
-            }
-
             const formData = await request.formData();
-            const archivos = formData
-                .getAll("imagen")
-                .filter((item): item is File => item instanceof File);
+            const archivos = [
+                ...formData.getAll("imagenes"),
+                ...formData.getAll("imagen"),
+            ].filter((item): item is File => item instanceof File);
 
             if (archivos.length === 0) {
                 return respuestaError(
-                    "Debe adjuntar entre 1 y 5 archivos de imagen en el campo 'imagen'.",
+                    "Debe adjuntar al menos una imagen en el campo 'imagenes'.",
                     400,
                 );
             }
-            if (archivos.length > 5) {
-                return respuestaError(
-                    "Se permiten como máximo 5 imágenes por paquete turístico.",
-                    400,
-                );
-            }
-
-            const formatosPermitidos = [
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            ];
-            for (const archivo of archivos) {
-                if (!formatosPermitidos.includes(archivo.type)) {
-                    return respuestaError(
-                        "Formato no soportado. Solo se permiten imágenes JPG, PNG o WEBP.",
-                        400,
-                    );
-                }
-                if (archivo.size > 3 * 1024 * 1024) {
-                    return respuestaError(
-                        "El archivo supera el tamaño máximo permitido",
-                        400,
-                    );
-                }
-            }
-
-            const nombresArchivos = archivos.map((archivo, idx) => {
+            const urls = archivos.slice(0, 5).map((archivo, idx) => {
                 const ext =
                     archivo.name.split(".").pop()?.toLowerCase() || "jpg";
-                return idx === 0
-                    ? `principal.${ext}`
-                    : `imagen_${idx + 1}.${ext}`;
+                const nombre =
+                    idx === 0 ? `principal.${ext}` : `foto_${idx + 1}.${ext}`;
+                return `/imagenes/paquetes/${id}/${nombre}`;
             });
-            const urls = nombresArchivos.map(
-                (nombre) => `/imagenes/paquetes/${id}/${nombre}`,
-            );
-
             return HttpResponse.json({
-                mensaje:
-                    archivos.length === 1
-                        ? "Imagen del paquete subida exitosamente."
-                        : `${archivos.length} imágenes del paquete subidas exitosamente.`,
+                mensaje: `Carrusel subido exitosamente con ${urls.length} imagen(es).`,
                 data: {
                     idpaquete: id,
-                    archivo: nombresArchivos[0]!,
-                    url: urls[0]!,
-                    archivos: nombresArchivos,
-                    urls,
+                    totalImagenes: urls.length,
+                    principal: urls[0],
+                    carrusel: urls,
+                },
+            });
+        },
+    ),
+
+    http.put(
+        construirUrl("/paquetes/:id/carrusel/:nombreFoto"),
+        async ({ params, request }) => {
+            await delay(200);
+            const id = Number(params.id);
+            const nombreFoto = String(params.nombreFoto || "principal");
+            const formData = await request.formData();
+            const archivo = formData.get("imagen");
+            if (!(archivo instanceof File)) {
+                return respuestaError(
+                    "Debe adjuntar el nuevo archivo de imagen en el campo 'imagen'.",
+                    400,
+                );
+            }
+            const ext = archivo.name.split(".").pop()?.toLowerCase() || "jpg";
+            const url = `/imagenes/paquetes/${id}/${nombreFoto}.${ext}`;
+            return HttpResponse.json({
+                mensaje: `La foto '${nombreFoto}' fue reemplazada exitosamente.`,
+                data: {
+                    idpaquete: id,
+                    fotoModificada: nombreFoto,
+                    url,
+                },
+            });
+        },
+    ),
+
+    http.delete(
+        construirUrl("/paquetes/:id/carrusel/:nombreFoto"),
+        async ({ params }) => {
+            await delay(200);
+            const id = Number(params.id);
+            const nombreFoto = String(params.nombreFoto || "foto_2");
+            return HttpResponse.json({
+                mensaje: `La foto '${nombreFoto}' fue eliminada exitosamente.`,
+                data: {
+                    idpaquete: id,
+                    fotoEliminada: nombreFoto,
                 },
             });
         },

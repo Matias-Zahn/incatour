@@ -7,9 +7,12 @@ import {
     DIAS_SEMANA,
     FIN_DE_SEMANA,
     TODOS_LOS_DIAS,
+    extraerNombreFotoCarrusel,
     parsearDiasDisponibles,
     resolverUrlImagenPaquete,
     serializarDiasDisponibles,
+    useEliminarFotoIndividualPaquete,
+    useModificarFotoIndividualPaquete,
     type CodigoDia,
     type DatosCrearPaquete,
     type DatosModificarPaquete,
@@ -162,13 +165,139 @@ function FormularioPaquete({
     const [imagenesArchivos, setImagenesArchivos] = useState<File[]>([]);
     const [vistasPrevias, setVistasPrevias] = useState<string[]>([]);
     const [errorValidacion, setErrorValidacion] = useState("");
+    const [mensajeFotoIndividual, setMensajeFotoIndividual] = useState("");
+    const [imagenesServidorEditadas, setImagenesServidorEditadas] = useState<
+        string[] | null
+    >(null);
+    const [tienePropiasEditado, setTienePropiasEditado] = useState<
+        boolean | null
+    >(null);
+
+    const mutacionModificarFoto = useModificarFotoIndividualPaquete();
+    const mutacionEliminarFoto = useEliminarFotoIndividualPaquete();
 
     const imagenesActualesPaquete: string[] =
-        paqueteEnEdicion?.imagenes && paqueteEnEdicion.imagenes.length > 0
+        imagenesServidorEditadas ??
+        (paqueteEnEdicion?.imagenes && paqueteEnEdicion.imagenes.length > 0
             ? paqueteEnEdicion.imagenes
             : paqueteEnEdicion?.imagenPrincipal
               ? [paqueteEnEdicion.imagenPrincipal]
-              : [];
+              : []);
+
+    const tieneImagenesPropiasActual =
+        tienePropiasEditado ?? Boolean(paqueteEnEdicion?.tieneImagenesPropias);
+
+    const SLOTS_CARRUSEL = [
+        "principal",
+        "foto_2",
+        "foto_3",
+        "foto_4",
+        "foto_5",
+    ] as const;
+
+    function obtenerProximoSlotLibre(): string {
+        const usados = new Set(
+            imagenesActualesPaquete.map((url, idx) =>
+                extraerNombreFotoCarrusel(url, idx),
+            ),
+        );
+        for (const slot of SLOTS_CARRUSEL) {
+            if (!usados.has(slot)) return slot;
+        }
+        return `foto_${Math.min(5, imagenesActualesPaquete.length + 1)}`;
+    }
+
+    async function manejarReemplazarFotoIndividual(
+        nombreFoto: string,
+        indice: number,
+        evento: React.ChangeEvent<HTMLInputElement>,
+    ) {
+        const archivo = evento.target.files?.[0];
+        evento.target.value = "";
+        if (!archivo || !paqueteEnEdicion) return;
+
+        setErrorValidacion("");
+        setMensajeFotoIndividual("");
+
+        if (!FORMATOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
+            setErrorValidacion(
+                `El archivo "${archivo.name}" no tiene un formato válido (JPG, PNG o WEBP).`,
+            );
+            return;
+        }
+        if (archivo.size > TAMANO_MAXIMO_IMAGEN_BYTES) {
+            setErrorValidacion(
+                `El archivo "${archivo.name}" supera el límite de 3 MB.`,
+            );
+            return;
+        }
+
+        try {
+            const res = await mutacionModificarFoto.mutateAsync({
+                id: paqueteEnEdicion.idpaquete,
+                nombreFoto,
+                archivo,
+            });
+            const urlConCacheBust = `${res.url}?v=${Date.now()}`;
+            setImagenesServidorEditadas((prev) => {
+                const base = [...(prev ?? imagenesActualesPaquete)];
+                if (indice >= 0 && indice < base.length) {
+                    base[indice] = urlConCacheBust;
+                } else {
+                    base.push(urlConCacheBust);
+                }
+                return base;
+            });
+            setTienePropiasEditado(true);
+            setMensajeFotoIndividual(
+                indice >= 0
+                    ? `✓ Se actualizó "${nombreFoto === "principal" ? "Portada principal" : nombreFoto}" correctamente.`
+                    : `✓ Se agregó una nueva foto (${nombreFoto}) a la galería del paquete.`,
+            );
+        } catch (err) {
+            setErrorValidacion(
+                err instanceof Error
+                    ? err.message
+                    : "No se pudo actualizar la foto individual.",
+            );
+        }
+    }
+
+    async function manejarEliminarFotoIndividual(
+        nombreFoto: string,
+        indice: number,
+    ) {
+        if (!paqueteEnEdicion) return;
+        if (imagenesActualesPaquete.length <= 1) {
+            setErrorValidacion(
+                "El paquete debe conservar como mínimo 1 imagen. Si querés cambiarla, usá el botón «Cambiar».",
+            );
+            return;
+        }
+
+        setErrorValidacion("");
+        setMensajeFotoIndividual("");
+
+        try {
+            await mutacionEliminarFoto.mutateAsync({
+                id: paqueteEnEdicion.idpaquete,
+                nombreFoto,
+            });
+            setImagenesServidorEditadas((prev) => {
+                const base = [...(prev ?? imagenesActualesPaquete)];
+                return base.filter((_, idx) => idx !== indice);
+            });
+            setMensajeFotoIndividual(
+                `✓ Se eliminó "${nombreFoto === "principal" ? "Portada principal" : nombreFoto}" de la galería.`,
+            );
+        } catch (err) {
+            setErrorValidacion(
+                err instanceof Error
+                    ? err.message
+                    : "No se pudo eliminar la foto del carrusel.",
+            );
+        }
+    }
 
     const circuitoSeleccionado = circuitos.find(
         (c) => c.idcircuito === idcircuito,
@@ -1097,53 +1226,152 @@ function FormularioPaquete({
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold uppercase tracking-wide text-navegacion">
-                                    Imágenes actuales del paquete ({imagenesActualesPaquete.length})
+                                    Imágenes actuales del paquete ({imagenesActualesPaquete.length} / {MAX_IMAGENES_PAQUETE})
                                 </span>
                                 <span
                                     className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                        paqueteEnEdicion?.tieneImagenesPropias
+                                        tieneImagenesPropiasActual
                                             ? "bg-green-50 text-exito"
                                             : "bg-slate-200 text-texto-suave"
                                     }`}
                                 >
-                                    {paqueteEnEdicion?.tieneImagenesPropias
+                                    {tieneImagenesPropiasActual
                                         ? "Galería propia cargada"
                                         : "Imagen de catálogo por defecto"}
                                 </span>
                             </div>
                             <span className="text-xs text-texto-suave">
                                 {imagenesArchivos.length > 0
-                                    ? "⚠ Al guardar se reemplazarán por las nuevas imágenes seleccionadas abajo."
-                                    : "Si no seleccionás archivos nuevos, se conservarán estas imágenes."}
+                                    ? "⚠ Al guardar el formulario se reemplazará todo el carrusel por el lote de abajo."
+                                    : "Podés cambiar o eliminar una foto individual al instante, o subir un carrusel nuevo abajo."}
                             </span>
                         </div>
 
+                        {mensajeFotoIndividual ? (
+                            <p className="rounded bg-green-50 px-3 py-1.5 text-xs font-semibold text-exito">
+                                {mensajeFotoIndividual}
+                            </p>
+                        ) : null}
+
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-                            {imagenesActualesPaquete.map((urlImg, idx) => (
-                                <div
-                                    key={`${urlImg}-${idx}`}
-                                    className="group relative overflow-hidden rounded-control border border-borde bg-white shadow-xs"
-                                >
-                                    <img
-                                        src={resolverUrlImagenPaquete(urlImg)}
-                                        alt={`Imagen actual ${idx + 1} de ${paqueteEnEdicion?.nombrePaquete ?? "paquete"}`}
-                                        className="h-24 w-full object-cover"
-                                    />
-                                    <div className="flex items-center justify-between bg-white px-2 py-1 text-[11px]">
-                                        <span
-                                            className={`font-semibold ${
-                                                idx === 0
-                                                    ? "text-marca-oscura"
-                                                    : "text-texto-suave"
-                                            }`}
-                                        >
-                                            {idx === 0
-                                                ? "★ Portada actual"
-                                                : `Foto #${idx + 1}`}
-                                        </span>
+                            {imagenesActualesPaquete.map((urlImg, idx) => {
+                                const nombreFotoSlot =
+                                    extraerNombreFotoCarrusel(urlImg, idx);
+                                const ocupado =
+                                    mutacionModificarFoto.isPending ||
+                                    mutacionEliminarFoto.isPending;
+
+                                return (
+                                    <div
+                                        key={`${urlImg}-${idx}`}
+                                        className="group relative flex flex-col overflow-hidden rounded-control border border-borde bg-white shadow-xs"
+                                    >
+                                        <div className="relative">
+                                            <img
+                                                src={resolverUrlImagenPaquete(
+                                                    urlImg,
+                                                )}
+                                                alt={`Imagen actual ${idx + 1} de ${paqueteEnEdicion?.nombrePaquete ?? "paquete"}`}
+                                                className="h-24 w-full object-cover"
+                                            />
+                                            <span
+                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                                                    idx === 0
+                                                        ? "bg-marca text-white"
+                                                        : "bg-navegacion/80 text-white"
+                                                }`}
+                                            >
+                                                {idx === 0
+                                                    ? "★ Portada"
+                                                    : `Foto #${idx + 1}`}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-1 bg-white px-2 py-1.5 text-[11px]">
+                                            <label
+                                                className={`cursor-pointer font-semibold text-marca-oscura hover:underline ${
+                                                    ocupado
+                                                        ? "pointer-events-none opacity-50"
+                                                        : ""
+                                                }`}
+                                                title={`Reemplazar únicamente ${nombreFotoSlot}`}
+                                            >
+                                                Cambiar
+                                                <input
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/webp"
+                                                    disabled={ocupado}
+                                                    onChange={(e) =>
+                                                        manejarReemplazarFotoIndividual(
+                                                            nombreFotoSlot,
+                                                            idx,
+                                                            e,
+                                                        )
+                                                    }
+                                                    className="sr-only"
+                                                />
+                                            </label>
+
+                                            {tieneImagenesPropiasActual &&
+                                            imagenesActualesPaquete.length >
+                                                1 ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={ocupado}
+                                                    onClick={() =>
+                                                        manejarEliminarFotoIndividual(
+                                                            nombreFotoSlot,
+                                                            idx,
+                                                        )
+                                                    }
+                                                    className="font-semibold text-peligro hover:underline disabled:opacity-50"
+                                                    title={`Eliminar ${nombreFotoSlot} de la galería`}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            ) : (
+                                                <span className="text-[10px] text-texto-suave">
+                                                    Mín. 1 foto
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
+
+                            {imagenesActualesPaquete.length <
+                            MAX_IMAGENES_PAQUETE ? (
+                                <label
+                                    className={`flex min-h-[124px] cursor-pointer flex-col items-center justify-center gap-1 rounded-control border border-dashed border-marca/40 bg-white/80 p-2 text-center text-xs font-semibold text-marca-oscura transition hover:border-marca hover:bg-marca-suave/40 ${
+                                        mutacionModificarFoto.isPending
+                                            ? "pointer-events-none opacity-50"
+                                            : ""
+                                    }`}
+                                >
+                                    <span className="text-lg leading-none">
+                                        +
+                                    </span>
+                                    <span>Sumar 1 foto</span>
+                                    <span className="text-[10px] font-normal text-texto-suave">
+                                        Slot {obtenerProximoSlotLibre()}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        disabled={
+                                            mutacionModificarFoto.isPending
+                                        }
+                                        onChange={(e) =>
+                                            manejarReemplazarFotoIndividual(
+                                                obtenerProximoSlotLibre(),
+                                                -1,
+                                                e,
+                                            )
+                                        }
+                                        className="sr-only"
+                                    />
+                                </label>
+                            ) : null}
                         </div>
                     </div>
                 ) : null}
