@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { solicitarApi } from "./clienteApi";
+import { solicitarApiConAuth } from "./paqueteService";
 
 export const nivelesDificultad = ["Baja", "Media", "Alta"] as const;
 
@@ -65,13 +65,6 @@ type RespuestaDatos<T> = {
     data: T;
 };
 
-function cabecerasAuth(): HeadersInit {
-    const token =
-        (typeof window !== "undefined" ? localStorage.getItem("token") : null) ??
-        import.meta.env.VITE_DEV_TOKEN;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 function respuestaDatos<T>(respuesta: RespuestaDatos<T>): T {
     return respuesta.data;
 }
@@ -93,17 +86,14 @@ function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCir
 }
 
 export function listarCircuitos(): Promise<Circuito[]> {
-    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos", {
-        headers: cabecerasAuth(),
-    })
+    return solicitarApiConAuth<RespuestaDatos<CircuitoApi[]>>("/circuitos")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarCircuito));
 }
 
 export function registrarCircuito(datos: DatosCircuito): Promise<Circuito> {
-    return solicitarApi<RespuestaDatos<CircuitoApi>>("/circuitos", {
+    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>("/circuitos", {
         method: "POST",
-        headers: cabecerasAuth(),
         body: JSON.stringify(limpiarPayloadCircuito(datos)),
     })
         .then(respuestaDatos)
@@ -114,9 +104,8 @@ export function modificarCircuito(
     id: number,
     datos: Partial<DatosCircuito>,
 ): Promise<Circuito> {
-    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
+    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
         method: "PUT",
-        headers: cabecerasAuth(),
         body: JSON.stringify(limpiarPayloadCircuito(datos)),
     })
         .then(respuestaDatos)
@@ -124,9 +113,8 @@ export function modificarCircuito(
 }
 
 export function darDeBajaCircuito(id: number): Promise<Circuito> {
-    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}/baja`, {
+    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}/baja`, {
         method: "PATCH",
-        headers: cabecerasAuth(),
     })
         .then(respuestaDatos)
         .then(normalizarCircuito);
@@ -134,11 +122,8 @@ export function darDeBajaCircuito(id: number): Promise<Circuito> {
 
 // CU-05: Consultar y reemplazar secuencia completa de etapas del circuito
 export function listarEtapasCircuito(idCircuito: number): Promise<EtapaCircuito[]> {
-    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
+    return solicitarApiConAuth<RespuestaDatos<EtapaCircuito[]>>(
         `/circuitos/${idCircuito}/etapas`,
-        {
-            headers: cabecerasAuth(),
-        },
     ).then(respuestaDatos);
 }
 
@@ -146,11 +131,10 @@ export function guardarSecuenciaEtapas(
     idCircuito: number,
     etapas: DatosEtapaCircuito[],
 ): Promise<EtapaCircuito[]> {
-    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
+    return solicitarApiConAuth<RespuestaDatos<EtapaCircuito[]>>(
         `/circuitos/${idCircuito}/etapas`,
         {
             method: "PUT",
-            headers: cabecerasAuth(),
             body: JSON.stringify({
                 etapas: etapas.map((etapa, indice) => ({
                     numeroOrden: indice + 1,
