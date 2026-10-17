@@ -92,8 +92,48 @@ import { PaqueteController } from "./paquete.controller";
  *           type: integer
  *     responses:
  *       200:
- *         description: Paquete dado de baja exitosamente
+ * /api/paquetes/{id}/imagen:
+ *   post:
+ *     summary: Subir imagen de un paquete turístico
+ *     description: >
+ *       **RESTRINGIDO A ADMINISTRADOR.** Permite subir un archivo de imagen (JPG, PNG o WEBP, máx 3 MB).
+ *       La imagen se almacena en /public/imagenes/paquetes/{id}/ y se sirve directamente vía Express.
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - imagen
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Imagen subida exitosamente
+ *       400:
+ *         description: Formato inválido o archivo no proporcionado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Requiere rol ADMIN
+ *       404:
+ *         description: Paquete no encontrado
  */
+import { subirImagenPaquete } from "../../../shared/upload/uploadPaquete.middleware";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
+
 export class PaqueteRoutes {
   static get getRoutes(): Router {
     const router = Router();
@@ -113,6 +153,15 @@ export class PaqueteRoutes {
 
     // CU-13: Baja de Paquete
     router.patch("/:id/baja", controller.darDeBaja);
+
+    // Subir imagen del paquete (JPG, PNG, WEBP, máx 3MB)
+    router.post(
+      "/:id/imagen",
+      autenticar,
+      requierePerfil("ADMIN"),
+      subirImagenPaquete.single("imagen"),
+      controller.subirImagen
+    );
 
     return router;
   }
