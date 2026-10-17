@@ -12,7 +12,8 @@ import {
  * - Cupo diario: 500 personas, contando turistas, guías y porteadores.
  * - new AutoridadMock(true) simula que la autoridad no responde (timeout del CU-37).
  *
- * ponytail: estado en memoria, se pierde al reiniciar el servidor; pasar a tablas propias cuando moleste.
+ * Guarda el estado en memoria: es la versión para los tests unitarios. El servidor usa
+ * AutoridadSimulada (autoridad.simulada.ts), que cumple el mismo contrato con tablas propias.
  */
 const CUPO_DIARIO = 500;
 
