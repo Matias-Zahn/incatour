@@ -20,71 +20,84 @@ export const esquemaProveedor = z.object({
     estado: z.enum(["ACTIVO", "INACTIVO"]),
 });
 
+/** Cuerpo de alta (POST /proveedores). */
+export type ProveedorCrear = DatosProveedor;
+/** Cuerpo de modificación (PUT /proveedores/:id): solo lo que cambia. */
+export type ProveedorModificar = Partial<DatosProveedor>;
 export type DatosProveedor = z.infer<typeof esquemaProveedor>;
 export type Proveedor = DatosProveedor & {
-    id: number;
     idproveedor: number;
-    cantidadServicios: number;
 };
 
-type ProveedorApi = Omit<Proveedor, "id">;
-const normalizarProveedor = (proveedor: ProveedorApi): Proveedor => ({
-    ...proveedor,
-    id: proveedor.idproveedor,
-});
+/** Éxito de una consulta: `{ data }`. */
+type RespuestaDatos<T> = { data: T };
+/** Éxito de una acción: `{ mensaje, data }`. Los errores (`{ error }`) los lanza clienteApi como ErrorApi. */
+type RespuestaAccion<T> = { mensaje: string; data: T };
 
-export function listarProveedores(): Promise<Proveedor[]> {
-    return solicitarApi<{ data: ProveedorApi[] }>("/proveedores")
-        .then(respuestaDatos)
-        .then((datos) => datos.map(normalizarProveedor));
+/** Filtros opcionales de GET /proveedores (van por query string). */
+export type FiltrosProveedor = {
+    tipoProveedor?: (typeof tiposProveedor)[number];
+    estado?: "ACTIVO" | "INACTIVO";
+    localidad?: string;
+};
+
+export function listarProveedores(filtros: FiltrosProveedor = {}): Promise<Proveedor[]> {
+    const parametros = new URLSearchParams();
+    Object.entries(filtros).forEach(([clave, valor]) => {
+        if (valor) parametros.set(clave, valor);
+    });
+    const consulta = parametros.toString();
+    return solicitarApi<RespuestaDatos<Proveedor[]>>(
+        `/proveedores${consulta ? `?${consulta}` : ""}`,
+    ).then(respuestaDatos);
 }
 
-export function obtenerProveedor(id: number): Promise<Proveedor> {
-    return solicitarApi<{ data: ProveedorApi }>(`/proveedores/${id}`)
-        .then(respuestaDatos)
-        .then(normalizarProveedor);
+export function obtenerProveedor(idproveedor: number): Promise<Proveedor> {
+    return solicitarApi<RespuestaDatos<Proveedor>>(`/proveedores/${idproveedor}`).then(
+        respuestaDatos,
+    );
 }
 
-export function registrarProveedor(datos: DatosProveedor): Promise<Proveedor> {
-    return solicitarApi<{ data: ProveedorApi }>("/proveedores", {
+export function registrarProveedor(datos: ProveedorCrear): Promise<Proveedor> {
+    return solicitarApi<RespuestaAccion<Proveedor>>("/proveedores", {
         method: "POST",
         body: JSON.stringify(datos),
-    }).then(respuestaDatos).then(normalizarProveedor);
+    }).then(respuestaDatos);
 }
 
 export function modificarProveedor(
-    id: number,
-    datos: Partial<DatosProveedor>,
+    idproveedor: number,
+    datos: ProveedorModificar,
 ): Promise<Proveedor> {
-    return solicitarApi<{ data: ProveedorApi }>(`/proveedores/${id}`, {
+    return solicitarApi<RespuestaAccion<Proveedor>>(`/proveedores/${idproveedor}`, {
         method: "PUT",
         body: JSON.stringify(datos),
-    }).then(respuestaDatos).then(normalizarProveedor);
+    }).then(respuestaDatos);
 }
 
-export function darDeBajaProveedor(id: number): Promise<Proveedor> {
-    return solicitarApi<{ data: ProveedorApi }>(`/proveedores/${id}/baja`, {
+export function darDeBajaProveedor(idproveedor: number): Promise<Proveedor> {
+    return solicitarApi<RespuestaAccion<Proveedor>>(`/proveedores/${idproveedor}/baja`, {
         method: "PATCH",
-    }).then(respuestaDatos).then(normalizarProveedor);
+    }).then(respuestaDatos);
 }
 
 export const clavesProveedores = {
     todos: ["proveedores"] as const,
-    uno: (id: number) => ["proveedores", id] as const,
+    uno: (idproveedor: number) => ["proveedores", idproveedor] as const,
 };
 
-export function useProveedores() {
+export function useProveedores(filtros: FiltrosProveedor = {}) {
     return useQuery({
-        queryKey: clavesProveedores.todos,
-        queryFn: listarProveedores,
+        queryKey: [...clavesProveedores.todos, "lista", filtros] as const,
+        queryFn: () => listarProveedores(filtros),
     });
 }
 
-export function useProveedor(id: number) {
+export function useProveedor(idproveedor: number) {
     return useQuery({
-        queryKey: clavesProveedores.uno(id),
-        queryFn: () => obtenerProveedor(id),
-        enabled: Number.isInteger(id) && id > 0,
+        queryKey: clavesProveedores.uno(idproveedor),
+        queryFn: () => obtenerProveedor(idproveedor),
+        enabled: Number.isInteger(idproveedor) && idproveedor > 0,
     });
 }
 
@@ -99,8 +112,8 @@ export function useRegistrarProveedor() {
 export function useModificarProveedor() {
     const clienteConsultas = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, datos }: { id: number; datos: Partial<DatosProveedor> }) =>
-            modificarProveedor(id, datos),
+        mutationFn: ({ idproveedor, datos }: { idproveedor: number; datos: ProveedorModificar }) =>
+            modificarProveedor(idproveedor, datos),
         onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: clavesProveedores.todos }),
     });
 }

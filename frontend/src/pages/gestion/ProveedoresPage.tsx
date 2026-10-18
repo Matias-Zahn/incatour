@@ -13,12 +13,23 @@ import {
     useProveedores,
     useRegistrarProveedor,
 } from "../../services/proveedorService";
-import type { DatosProveedor, Proveedor } from "../../services/proveedorService";
+import { tiposProveedor } from "../../services/proveedorService";
+import type {
+    DatosProveedor,
+    FiltrosProveedor,
+    Proveedor,
+} from "../../services/proveedorService";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
 function ProveedoresPage() {
-    const { data: proveedores = [], isPending, isError, error } = useProveedores();
+    const [filtroTipo, setFiltroTipo] = useState<FiltrosProveedor["tipoProveedor"]>();
+    const [filtroEstado, setFiltroEstado] = useState<FiltrosProveedor["estado"]>();
+    const hayFiltros = Boolean(filtroTipo ?? filtroEstado);
+    const { data: proveedores = [], isPending, isError, error } = useProveedores({
+        tipoProveedor: filtroTipo,
+        estado: filtroEstado,
+    });
     const registrar = useRegistrarProveedor();
     const modificar = useModificarProveedor();
     const darDeBaja = useDarDeBajaProveedor();
@@ -57,13 +68,32 @@ function ProveedoresPage() {
         };
 
         if (proveedorEnEdicion) {
+            // El contrato pide enviar solo lo que cambia (PUT parcial).
+            const cambios = (Object.keys(datos) as (keyof DatosProveedor)[]).reduce<
+                Partial<DatosProveedor>
+            >(
+                (acumulado, campo) =>
+                    datos[campo] === proveedorEnEdicion[campo]
+                        ? acumulado
+                        : { ...acumulado, [campo]: datos[campo] },
+                {},
+            );
+            if (Object.keys(cambios).length === 0) {
+                cerrarFormulario();
+                return;
+            }
             modificar.mutate(
-                { id: proveedorEnEdicion.id, datos },
+                { idproveedor: proveedorEnEdicion.idproveedor, datos: cambios },
                 opciones,
             );
         } else {
             registrar.mutate(datos, opciones);
         }
+    }
+
+    function reactivarProveedor(proveedor: Proveedor) {
+        modificar.reset();
+        modificar.mutate({ idproveedor: proveedor.idproveedor, datos: { estado: "ACTIVO" } });
     }
 
     function abrirDialogoBaja(proveedor: Proveedor) {
@@ -79,11 +109,13 @@ function ProveedoresPage() {
             return;
         }
 
-        darDeBaja.mutate(proveedorSeleccionado.id, {
+        darDeBaja.mutate(proveedorSeleccionado.idproveedor, {
             onSuccess: () => {
                 setProveedorSeleccionado(null);
                 setPaginaActual(1);
             },
+            // Cierra el diálogo para que se vea el motivo del bloqueo (CU-17).
+            onError: () => setProveedorSeleccionado(null),
         });
     }
 
@@ -110,6 +142,9 @@ function ProveedoresPage() {
     const estado = isPending ? "cargando" : isError ? "error" : "exito";
     const sinProveedoresRegistrados =
         estado === "exito" && proveedores.length === 0;
+    const mensajeVacio = hayFiltros
+        ? "No hay proveedores que coincidan con los filtros seleccionados."
+        : "Todavía no hay proveedores registrados.";
     const sinResultadosBusqueda =
         estado === "exito" &&
         proveedores.length > 0 &&
@@ -151,8 +186,14 @@ function ProveedoresPage() {
                 </Alerta>
             ) : null}
 
-            {estado === "exito" && proveedores.length > 0 ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {modificar.isError && !formularioAbierto ? (
+                <Alerta tipo="error" titulo="No se pudo reactivar el proveedor">
+                    {modificar.error.message}
+                </Alerta>
+            ) : null}
+
+            {estado === "exito" && (proveedores.length > 0 || hayFiltros) ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative w-full max-w-md">
                         <label htmlFor="buscar-proveedor" className="sr-only">
                             Buscar proveedor
@@ -169,13 +210,58 @@ function ProveedoresPage() {
                         />
                     </div>
 
-                    {busqueda ? (
+                    <label htmlFor="filtro-tipo" className="sr-only">
+                        Filtrar por rubro
+                    </label>
+                    <select
+                        id="filtro-tipo"
+                        value={filtroTipo ?? ""}
+                        onChange={(evento) => {
+                            setFiltroTipo(
+                                (evento.target.value || undefined) as FiltrosProveedor["tipoProveedor"],
+                            );
+                            setPaginaActual(1);
+                        }}
+                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                    >
+                        <option value="">Todos los rubros</option>
+                        {tiposProveedor.map((tipo) => (
+                            <option key={tipo} value={tipo}>
+                                {tipo}
+                            </option>
+                        ))}
+                    </select>
+
+                    <label htmlFor="filtro-estado" className="sr-only">
+                        Filtrar por estado
+                    </label>
+                    <select
+                        id="filtro-estado"
+                        value={filtroEstado ?? ""}
+                        onChange={(evento) => {
+                            setFiltroEstado(
+                                (evento.target.value || undefined) as FiltrosProveedor["estado"],
+                            );
+                            setPaginaActual(1);
+                        }}
+                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                    >
+                        <option value="">Todos los estados</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                    </select>
+
+                    {busqueda || hayFiltros ? (
                         <Boton
                             variante="fantasma"
                             className="self-start text-xs text-texto-suave sm:self-auto"
-                            onClick={() => manejarCambioBusqueda("")}
+                            onClick={() => {
+                                manejarCambioBusqueda("");
+                                setFiltroTipo(undefined);
+                                setFiltroEstado(undefined);
+                            }}
                         >
-                            Limpiar búsqueda
+                            Limpiar filtros
                         </Boton>
                     ) : null}
                 </div>
@@ -189,7 +275,7 @@ function ProveedoresPage() {
             ) : sinProveedoresRegistrados ? (
                 <EstadoListado
                     estado="vacio"
-                    mensaje="Todavía no hay proveedores registrados."
+                    mensaje={mensajeVacio}
                 />
             ) : sinResultadosBusqueda ? (
                 <EstadoListado
@@ -199,7 +285,11 @@ function ProveedoresPage() {
             ) : (
                 <div className="overflow-x-auto">
                     <Tabla
-                        filas={proveedoresPaginados}
+                        filas={proveedoresPaginados.map((proveedor) => ({
+                            ...proveedor,
+                            // Tabla (compartida) usa `id` como key de la fila.
+                            id: proveedor.idproveedor,
+                        }))}
                         columnas={[
                             {
                                 clave: "razonSocial",
@@ -237,16 +327,26 @@ function ProveedoresPage() {
                                         >
                                             Editar
                                         </Boton>
-                                        <Boton
-                                            variante="peligro"
-                                            className="px-3 py-1.5 text-xs"
-                                            onClick={() =>
-                                                abrirDialogoBaja(proveedor)
-                                            }
-                                            disabled={proveedor.estado === "INACTIVO"}
-                                        >
-                                            Dar de baja
-                                        </Boton>
+                                        {proveedor.estado === "INACTIVO" ? (
+                                            <Boton
+                                                variante="secundario"
+                                                className="px-3 py-1.5 text-xs"
+                                                onClick={() => reactivarProveedor(proveedor)}
+                                                disabled={modificar.isPending}
+                                            >
+                                                Reactivar
+                                            </Boton>
+                                        ) : (
+                                            <Boton
+                                                variante="peligro"
+                                                className="px-3 py-1.5 text-xs"
+                                                onClick={() =>
+                                                    abrirDialogoBaja(proveedor)
+                                                }
+                                            >
+                                                Dar de baja
+                                            </Boton>
+                                        )}
                                     </div>
                                 ),
                             },
