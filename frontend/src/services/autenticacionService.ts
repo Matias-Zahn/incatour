@@ -10,11 +10,10 @@ export const esquemaLogin = z.object({
 
 export type DatosLogin = z.infer<typeof esquemaLogin>;
 
-/** Excepción del contrato: el login devuelve `{ usuario, token }` sin `data`. */
-type RespuestaLogin = { usuario: UsuarioSesion; token: string };
+type RespuestaLogin = { data: { usuario: UsuarioSesion; token: string } };
 
 export async function iniciarSesion(datos: DatosLogin): Promise<UsuarioSesion> {
-    const { usuario, token } = await solicitarApi<RespuestaLogin>("/auth/login", {
+    const { data: { usuario, token } } = await solicitarApi<RespuestaLogin>("/auth/login", {
         method: "POST",
         body: JSON.stringify(datos),
     });

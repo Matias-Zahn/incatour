@@ -19,8 +19,10 @@ export const manejadoresAutenticacion = [
             );
         }
         return HttpResponse.json({
-            usuario: cuenta.usuario,
-            token: generarTokenMock(cuenta.usuario.rol),
+            data: {
+                usuario: cuenta.usuario,
+                token: generarTokenMock(cuenta.usuario.rol),
+            },
         });
     }),
 ];
