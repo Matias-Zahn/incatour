@@ -1,0 +1,93 @@
+import type { Circuito, Etapa } from "../../services/etapaService";
+
+export const circuitosSemilla: Circuito[] = [
+    {
+        id: 1,
+        idcircuito: 1,
+        nombreCircuito: "Camino Inca Clásico",
+        duracionDias: 4,
+        dificultad: "MEDIA",
+        minimoGuias: 1,
+        parametrosPorteadores: "1 porteador cada 2 pasajeros",
+        estado: "ACTIVO",
+    },
+    {
+        id: 2,
+        idcircuito: 2,
+        nombreCircuito: "Salkantay Trek a Machu Picchu",
+        duracionDias: 5,
+        dificultad: "ALTA",
+        minimoGuias: 2,
+        parametrosPorteadores: "1 porteador cada 3 pasajeros",
+        estado: "ACTIVO",
+    },
+    {
+        id: 3,
+        idcircuito: 3,
+        nombreCircuito: "Valle Sagrado y Maras Moray",
+        duracionDias: 2,
+        dificultad: "BAJA",
+        minimoGuias: 1,
+        parametrosPorteadores: null,
+        estado: "ACTIVO",
+    },
+];
+
+export const etapasSemilla: Etapa[] = [
+    {
+        id: 1,
+        idcircuito: 1,
+        numeroOrden: 1,
+        puntoInicio: "Km 82 (Piscacucho)",
+        puntoFin: "Wayllabamba",
+        campamentoPrevisto: "Campamento Wayllabamba",
+    },
+    {
+        id: 2,
+        idcircuito: 1,
+        numeroOrden: 2,
+        puntoInicio: "Wayllabamba",
+        puntoFin: "Pacaymayo",
+        campamentoPrevisto: "Campamento Pacaymayo",
+    },
+    {
+        id: 3,
+        idcircuito: 1,
+        numeroOrden: 3,
+        puntoInicio: "Pacaymayo",
+        puntoFin: "Wiñay Wayna",
+        campamentoPrevisto: "Campamento Wiñay Wayna",
+    },
+    {
+        id: 4,
+        idcircuito: 1,
+        numeroOrden: 4,
+        puntoInicio: "Wiñay Wayna",
+        puntoFin: "Machu Picchu",
+        campamentoPrevisto: "",
+    },
+    {
+        id: 1,
+        idcircuito: 2,
+        numeroOrden: 1,
+        puntoInicio: "Mollepata",
+        puntoFin: "Soraypampa",
+        campamentoPrevisto: "Campamento Soraypampa",
+    },
+    {
+        id: 2,
+        idcircuito: 2,
+        numeroOrden: 2,
+        puntoInicio: "Soraypampa",
+        puntoFin: "Chaullay",
+        campamentoPrevisto: "Campamento Chaullay",
+    },
+    {
+        id: 3,
+        idcircuito: 2,
+        numeroOrden: 3,
+        puntoInicio: "Chaullay",
+        puntoFin: "Aguas Calientes",
+        campamentoPrevisto: "Hotel Aguas Calientes",
+    },
+];

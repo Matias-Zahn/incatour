@@ -9,7 +9,7 @@ type ElementoNavegacion = {
 
 const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Inicio", icono: "⌂", ruta: "/" },
-    { etiqueta: "Circuitos", icono: "⌁" },
+    { etiqueta: "Circuitos", icono: "⌁", ruta: "/gestion/circuitos" },
     { etiqueta: "Paquetes turísticos", icono: "▣" },
     { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: "◫" },
