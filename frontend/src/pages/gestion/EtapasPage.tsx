@@ -7,6 +7,7 @@ import EstadoListado from "../../components/EstadoListado";
 import FormularioEtapa from "../../components/FormularioEtapa";
 import Tabla from "../../components/Tabla";
 import {
+    detectarDiscontinuidadesEspaciales,
     esquemaSecuenciaEtapas,
     useCircuitos,
     useConfirmarSecuenciaCompleta,
@@ -27,7 +28,12 @@ function reenumerarSecuencia(lista: Etapa[], idcircuito: number): Etapa[] {
 function EtapasPage() {
     const params = useParams();
     const navegar = useNavigate();
-    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos();
+    const {
+        data: circuitos = [],
+        isPending: cargandoCircuitos,
+        isError: errorCircuitos,
+        error: detalleErrorCircuitos,
+    } = useCircuitos();
 
     const idParam = Number(params.idCircuito);
     const idCircuitoActivo =
@@ -38,12 +44,13 @@ function EtapasPage() {
     const circuitoSeleccionado = circuitos.find(
         (circuito) => circuito.idcircuito === idCircuitoActivo,
     );
+    const circuitoInactivo = circuitoSeleccionado?.estado === "INACTIVO";
 
     const {
         data: etapasServidor = [],
         isPending: cargandoEtapas,
-        isError,
-        error,
+        isError: errorEtapas,
+        error: detalleErrorEtapas,
     } = useEtapas(idCircuitoActivo);
 
     const confirmarSecuencia = useConfirmarSecuenciaCompleta(idCircuitoActivo);
@@ -60,6 +67,11 @@ function EtapasPage() {
     const borradorActual = borradoresPorCircuito[idCircuitoActivo];
     const etapas = borradorActual ?? etapasServidor;
     const tieneCambiosPendientes = borradorActual !== undefined;
+
+    const discontinuidades = detectarDiscontinuidadesEspaciales(etapas);
+    const mapaDiscontinuidades = new Map(
+        discontinuidades.map((item) => [item.numeroOrdenActual, item]),
+    );
 
     function actualizarBorrador(nuevaSecuencia: Etapa[]) {
         setBorradoresPorCircuito((previo) => ({
@@ -89,14 +101,18 @@ function EtapasPage() {
     }
 
     function abrirAlta() {
+        if (circuitoInactivo) return;
         setEtapaEnEdicion(null);
         setErrorValidacion("");
+        setMensajeExito("");
         setFormularioAbierto(true);
     }
 
     function abrirEdicion(etapa: Etapa) {
+        if (circuitoInactivo) return;
         setEtapaEnEdicion(etapa);
         setErrorValidacion("");
+        setMensajeExito("");
         setFormularioAbierto(true);
     }
 
@@ -142,6 +158,7 @@ function EtapasPage() {
     }
 
     function moverEtapa(numeroOrden: number, direccion: -1 | 1) {
+        if (circuitoInactivo) return;
         const indice = etapas.findIndex((item) => item.numeroOrden === numeroOrden);
         const destino = indice + direccion;
         if (indice < 0 || destino < 0 || destino >= etapas.length) return;
@@ -151,6 +168,29 @@ function EtapasPage() {
         copia[indice] = copia[destino]!;
         copia[destino] = actual;
         actualizarBorrador(copia);
+    }
+
+    function encadenarEtapaConAnterior(numeroOrden: number) {
+        const indice = etapas.findIndex((item) => item.numeroOrden === numeroOrden);
+        if (indice <= 0) return;
+        const anterior = etapas[indice - 1]!;
+        const actualizada = etapas.map((etapa, idx) =>
+            idx === indice ? { ...etapa, puntoInicio: anterior.puntoFin } : etapa,
+        );
+        actualizarBorrador(actualizada);
+    }
+
+    function encadenarContinuidadEspacial() {
+        if (etapas.length <= 1) return;
+        const encadenadas = etapas.map((etapa, indice) => {
+            if (indice === 0) return etapa;
+            const anterior = etapas[indice - 1]!;
+            return {
+                ...etapa,
+                puntoInicio: anterior.puntoFin,
+            };
+        });
+        actualizarBorrador(encadenadas);
     }
 
     function confirmarQuitarEtapa() {
@@ -163,6 +203,7 @@ function EtapasPage() {
     }
 
     function guardarSecuenciaCompleta() {
+        if (circuitoInactivo) return;
         setErrorValidacion("");
         setMensajeExito("");
 
@@ -176,12 +217,12 @@ function EtapasPage() {
         }
 
         confirmarSecuencia.mutate(validacion.data.etapas, {
-            onSuccess: () => {
+            onSuccess: (resultado) => {
                 setBorradoresPorCircuito((previo) => ({
                     ...previo,
                     [idCircuitoActivo]: undefined,
                 }));
-                setMensajeExito("Secuencia de etapas establecida exitosamente.");
+                setMensajeExito(resultado.mensaje);
             },
             onError: (err: Error) => {
                 setErrorValidacion(err.message);
@@ -191,8 +232,11 @@ function EtapasPage() {
 
     const ultimaEtapa = etapas[etapas.length - 1];
     const puntoInicioSugerido = ultimaEtapa ? ultimaEtapa.puntoFin : "";
+    const hayError = errorCircuitos || errorEtapas;
+    const mensajeErrorCarga =
+        detalleErrorEtapas?.message ?? detalleErrorCircuitos?.message;
     const estado =
-        cargandoCircuitos || cargandoEtapas ? "cargando" : isError ? "error" : "exito";
+        cargandoCircuitos || cargandoEtapas ? "cargando" : hayError ? "error" : "exito";
 
     return (
         <section className="mx-auto max-w-7xl space-y-6">
@@ -210,7 +254,16 @@ function EtapasPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <Boton variante="secundario" onClick={abrirAlta}>
+                    <Boton
+                        variante="secundario"
+                        onClick={abrirAlta}
+                        disabled={circuitoInactivo || confirmarSecuencia.isPending}
+                        title={
+                            circuitoInactivo
+                                ? "No se pueden agregar etapas a un circuito inactivo"
+                                : undefined
+                        }
+                    >
                         Agregar etapa
                     </Boton>
                     {tieneCambiosPendientes ? (
@@ -224,7 +277,16 @@ function EtapasPage() {
                     ) : null}
                     <Boton
                         onClick={guardarSecuenciaCompleta}
-                        disabled={confirmarSecuencia.isPending || etapas.length === 0}
+                        disabled={
+                            circuitoInactivo ||
+                            confirmarSecuencia.isPending ||
+                            etapas.length === 0
+                        }
+                        title={
+                            circuitoInactivo
+                                ? "El circuito no está activo"
+                                : undefined
+                        }
                     >
                         {confirmarSecuencia.isPending
                             ? "Guardando secuencia..."
@@ -234,7 +296,7 @@ function EtapasPage() {
             </header>
 
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
-                <label className="grid gap-1 text-xs font-semibold text-texto-suave sm:min-w-72">
+                <label className="grid gap-1 text-xs font-semibold text-texto-suave sm:min-w-80">
                     Circuito turístico
                     <select
                         value={idCircuitoActivo}
@@ -244,14 +306,15 @@ function EtapasPage() {
                         {circuitos.map((circuito) => (
                             <option key={circuito.idcircuito} value={circuito.idcircuito}>
                                 {circuito.nombreCircuito} ({circuito.duracionDias} días ·{" "}
-                                {circuito.dificultad})
+                                {circuito.dificultad}
+                                {circuito.estado === "INACTIVO" ? " · INACTIVO" : ""})
                             </option>
                         ))}
                     </select>
                 </label>
 
                 {circuitoSeleccionado ? (
-                    <div className="flex flex-wrap gap-6 text-sm text-texto-suave">
+                    <div className="flex flex-wrap items-center gap-6 text-sm text-texto-suave">
                         <div>
                             <span className="font-semibold text-texto">Duración:</span>{" "}
                             {circuitoSeleccionado.duracionDias} días
@@ -261,16 +324,38 @@ function EtapasPage() {
                             {circuitoSeleccionado.dificultad}
                         </div>
                         <div>
+                            <span className="font-semibold text-texto">Mínimo guías:</span>{" "}
+                            {circuitoSeleccionado.minimoGuias}
+                        </div>
+                        <div>
                             <span className="font-semibold text-texto">Estado:</span>{" "}
-                            {circuitoSeleccionado.estado}
+                            <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    circuitoSeleccionado.estado === "ACTIVO"
+                                        ? "bg-marca/10 text-marca"
+                                        : "bg-borde text-texto-suave"
+                                }`}
+                            >
+                                {circuitoSeleccionado.estado}
+                            </span>
                         </div>
                         <div>
                             <span className="font-semibold text-texto">Etapas en secuencia:</span>{" "}
-                            {etapas.length}
+                            <span className="font-semibold text-texto">{etapas.length}</span>{" "}
+                            / {circuitoSeleccionado.duracionDias} días
                         </div>
                     </div>
                 ) : null}
             </div>
+
+            {circuitoInactivo ? (
+                <Alerta
+                    tipo="informacion"
+                    titulo="Circuito inactivo (modo de solo lectura)"
+                >
+                    Este circuito se encuentra dado de baja (`INACTIVO`). Podés consultar su secuencia de etapas, pero no se admiten modificaciones (CU-05).
+                </Alerta>
+            ) : null}
 
             {tieneCambiosPendientes ? (
                 <Alerta
@@ -279,6 +364,31 @@ function EtapasPage() {
                 >
                     Modificaste la secuencia en borrador. Hacé clic en{" "}
                     <strong>Guardar secuencia completa</strong> para reemplazar todas las etapas del circuito en el servidor.
+                </Alerta>
+            ) : null}
+
+            {discontinuidades.length > 0 ? (
+                <Alerta
+                    tipo="advertencia"
+                    titulo="Discontinuidad espacial detectada en la secuencia (CU-05)"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span>
+                            El fin de la etapa #{discontinuidades[0]!.numeroOrdenAnterior} (
+                            <strong>{discontinuidades[0]!.puntoFinAnterior}</strong>) no coincide con el inicio de la etapa #{discontinuidades[0]!.numeroOrdenActual} (
+                            <strong>{discontinuidades[0]!.puntoInicioActual}</strong>).
+                        </span>
+                        {!circuitoInactivo ? (
+                            <Boton
+                                type="button"
+                                variante="secundario"
+                                className="px-3 py-1.5 text-xs"
+                                onClick={encadenarContinuidadEspacial}
+                            >
+                                Encadenar tramos automáticamente
+                            </Boton>
+                        ) : null}
+                    </div>
                 </Alerta>
             ) : null}
 
@@ -294,9 +404,10 @@ function EtapasPage() {
                 </Alerta>
             ) : null}
 
-            {formularioAbierto ? (
+            {formularioAbierto && !circuitoInactivo ? (
                 <FormularioEtapa
                     etapaEnEdicion={etapaEnEdicion}
+                    etapasActuales={etapas}
                     numeroOrdenSugerido={etapas.length + 1}
                     puntoInicioSugerido={puntoInicioSugerido}
                     alGuardar={guardarEtapaEnBorrador}
@@ -311,7 +422,7 @@ function EtapasPage() {
             {estado !== "exito" ? (
                 <EstadoListado
                     estado={estado}
-                    mensaje={estado === "error" ? error?.message : undefined}
+                    mensaje={estado === "error" ? mensajeErrorCarga : undefined}
                 />
             ) : etapas.length === 0 ? (
                 <EstadoListado
@@ -335,6 +446,47 @@ function EtapasPage() {
                             {
                                 clave: "puntoInicio",
                                 titulo: "Punto de inicio",
+                                renderizar: (etapa) => {
+                                    const discontinuidad = mapaDiscontinuidades.get(
+                                        etapa.numeroOrden,
+                                    );
+                                    return (
+                                        <div>
+                                            <p
+                                                className={`font-medium ${
+                                                    discontinuidad
+                                                        ? "text-peligro"
+                                                        : "text-texto"
+                                                }`}
+                                            >
+                                                {etapa.puntoInicio}
+                                            </p>
+                                            {discontinuidad ? (
+                                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-peligro">
+                                                    <span>
+                                                        Se esperaba &apos;
+                                                        {discontinuidad.puntoFinAnterior}
+                                                        &apos; (fin de etapa #
+                                                        {discontinuidad.numeroOrdenAnterior})
+                                                    </span>
+                                                    {!circuitoInactivo ? (
+                                                        <button
+                                                            type="button"
+                                                            className="font-semibold text-marca hover:underline"
+                                                            onClick={() =>
+                                                                encadenarEtapaConAnterior(
+                                                                    etapa.numeroOrden,
+                                                                )
+                                                            }
+                                                        >
+                                                            Corregir
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    );
+                                },
                             },
                             {
                                 clave: "puntoFin",
@@ -361,7 +513,7 @@ function EtapasPage() {
                                             variante="fantasma"
                                             className="px-2.5 py-1 text-xs"
                                             onClick={() => moverEtapa(etapa.numeroOrden, -1)}
-                                            disabled={etapa.numeroOrden === 1}
+                                            disabled={circuitoInactivo || etapa.numeroOrden === 1}
                                             title="Subir etapa"
                                         >
                                             ↑
@@ -370,7 +522,10 @@ function EtapasPage() {
                                             variante="fantasma"
                                             className="px-2.5 py-1 text-xs"
                                             onClick={() => moverEtapa(etapa.numeroOrden, 1)}
-                                            disabled={etapa.numeroOrden === etapas.length}
+                                            disabled={
+                                                circuitoInactivo ||
+                                                etapa.numeroOrden === etapas.length
+                                            }
                                             title="Bajar etapa"
                                         >
                                             ↓
@@ -379,6 +534,7 @@ function EtapasPage() {
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
                                             onClick={() => abrirEdicion(etapa)}
+                                            disabled={circuitoInactivo}
                                         >
                                             Editar
                                         </Boton>
@@ -386,6 +542,7 @@ function EtapasPage() {
                                             variante="peligro"
                                             className="px-3 py-1.5 text-xs"
                                             onClick={() => setEtapaAEliminar(etapa)}
+                                            disabled={circuitoInactivo}
                                         >
                                             Quitar
                                         </Boton>
@@ -414,3 +571,4 @@ function EtapasPage() {
 }
 
 export default EtapasPage;
+

@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Boton from "./Boton";
 import { esquemaEtapa, type DatosEtapa, type Etapa } from "../services/etapaService";
 
 type FormularioEtapaProps = {
     etapaEnEdicion?: Etapa | null;
+    etapasActuales?: Etapa[];
     numeroOrdenSugerido: number;
     puntoInicioSugerido?: string;
     alGuardar: (datos: DatosEtapa) => void;
@@ -15,6 +16,7 @@ type FormularioEtapaProps = {
 
 function FormularioEtapa({
     etapaEnEdicion,
+    etapasActuales = [],
     numeroOrdenSugerido,
     puntoInicioSugerido = "",
     alGuardar,
@@ -25,6 +27,8 @@ function FormularioEtapa({
         register,
         handleSubmit,
         reset,
+        control,
+        setValue,
         formState: { errors },
     } = useForm<DatosEtapa>({
         resolver: zodResolver(esquemaEtapa),
@@ -61,6 +65,24 @@ function FormularioEtapa({
         );
     }, [etapaEnEdicion, numeroOrdenSugerido, puntoInicioSugerido, reset]);
 
+    const ordenSeleccionado = useWatch({ control, name: "numeroOrden" });
+    const puntoInicioActual = useWatch({ control, name: "puntoInicio" }) ?? "";
+    const puntoFinActual = useWatch({ control, name: "puntoFin" }) ?? "";
+
+    const baseSinActual = etapaEnEdicion
+        ? etapasActuales.filter((item) => item.numeroOrden !== etapaEnEdicion.numeroOrden)
+        : etapasActuales;
+    const indiceInsercion = Math.max(
+        0,
+        Math.min(baseSinActual.length, (Number(ordenSeleccionado) || 1) - 1),
+    );
+    const etapaPrevia = indiceInsercion > 0 ? baseSinActual[indiceInsercion - 1] : undefined;
+    const etapaPosterior =
+        indiceInsercion < baseSinActual.length ? baseSinActual[indiceInsercion] : undefined;
+
+    const puntoInicioEsperado = etapaPrevia?.puntoFin.trim() ?? "";
+    const puntoFinEsperado = etapaPosterior?.puntoInicio.trim() ?? "";
+
     return (
         <form
             className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta"
@@ -73,7 +95,7 @@ function FormularioEtapa({
                         : `Agregar etapa #${numeroOrdenSugerido} a la secuencia`}
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
-                    Recordá que el punto de inicio de cada etapa debe coincidir con el punto de fin de la etapa anterior.
+                    Recordá que el punto de inicio de cada etapa debe coincidir con el punto de fin de la etapa anterior (continuidad espacial CU-05).
                 </p>
             </div>
 
@@ -131,6 +153,26 @@ function FormularioEtapa({
                             {errors.puntoInicio.message}
                         </span>
                     ) : null}
+                    {puntoInicioEsperado &&
+                    puntoInicioActual.trim() !== puntoInicioEsperado ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-advertencia/40 bg-advertencia/10 px-2.5 py-1.5 text-xs font-normal text-texto">
+                            <span>
+                                Fin de la etapa previa:{" "}
+                                <strong>{puntoInicioEsperado}</strong>
+                            </span>
+                            <button
+                                type="button"
+                                className="font-semibold text-marca hover:underline"
+                                onClick={() =>
+                                    setValue("puntoInicio", puntoInicioEsperado, {
+                                        shouldValidate: true,
+                                    })
+                                }
+                            >
+                                Usar este punto
+                            </button>
+                        </div>
+                    ) : null}
                 </label>
 
                 <label className="grid gap-2 text-sm font-semibold text-texto">
@@ -148,6 +190,25 @@ function FormularioEtapa({
                         <span className="text-xs font-normal text-peligro" role="alert">
                             {errors.puntoFin.message}
                         </span>
+                    ) : null}
+                    {puntoFinEsperado && puntoFinActual.trim() !== puntoFinEsperado ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-advertencia/40 bg-advertencia/10 px-2.5 py-1.5 text-xs font-normal text-texto">
+                            <span>
+                                Inicio de la etapa siguiente:{" "}
+                                <strong>{puntoFinEsperado}</strong>
+                            </span>
+                            <button
+                                type="button"
+                                className="font-semibold text-marca hover:underline"
+                                onClick={() =>
+                                    setValue("puntoFin", puntoFinEsperado, {
+                                        shouldValidate: true,
+                                    })
+                                }
+                            >
+                                Usar este punto
+                            </button>
+                        </div>
                     ) : null}
                 </label>
             </div>
@@ -170,3 +231,4 @@ function FormularioEtapa({
 }
 
 export default FormularioEtapa;
+

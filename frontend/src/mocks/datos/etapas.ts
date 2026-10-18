@@ -31,7 +31,23 @@ export const circuitosSemilla: Circuito[] = [
         parametrosPorteadores: null,
         estado: "ACTIVO",
     },
+    {
+        id: 4,
+        idcircuito: 4,
+        nombreCircuito: "Choquequirao Expedición Histórica",
+        duracionDias: 4,
+        dificultad: "ALTA",
+        minimoGuias: 2,
+        parametrosPorteadores: "1 porteador cada 2 pasajeros",
+        estado: "INACTIVO",
+    },
 ];
+
+/**
+ * IDs de circuitos que ya tienen paquetes comerciales en estado ACTIVO,
+ * para simular la regla `validarCircuitoSinReservasActivas` (CU-05) en MSW.
+ */
+export const circuitosConPaquetesActivos = new Set<number>([3]);
 
 export const etapasSemilla: Etapa[] = [
     {
@@ -90,4 +106,37 @@ export const etapasSemilla: Etapa[] = [
         puntoFin: "Aguas Calientes",
         campamentoPrevisto: "Hotel Aguas Calientes",
     },
+    {
+        id: 1,
+        idcircuito: 3,
+        numeroOrden: 1,
+        puntoInicio: "Cusco",
+        puntoFin: "Urubamba",
+        campamentoPrevisto: "Hotel Valle Sagrado",
+    },
+    {
+        id: 2,
+        idcircuito: 3,
+        numeroOrden: 2,
+        puntoInicio: "Urubamba",
+        puntoFin: "Ollantaytambo",
+        campamentoPrevisto: "",
+    },
+    {
+        id: 1,
+        idcircuito: 4,
+        numeroOrden: 1,
+        puntoInicio: "Capuliyoc",
+        puntoFin: "Chiquisca",
+        campamentoPrevisto: "Campamento Chiquisca",
+    },
+    {
+        id: 2,
+        idcircuito: 4,
+        numeroOrden: 2,
+        puntoInicio: "Chiquisca",
+        puntoFin: "Choquequirao",
+        campamentoPrevisto: "Campamento Choquequirao",
+    },
 ];
+

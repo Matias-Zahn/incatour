@@ -6,10 +6,20 @@ import {
     type DatosEtapa,
     type Etapa,
 } from "../../services/etapaService";
-import { circuitosSemilla, etapasSemilla } from "../datos/etapas";
+import { exigirRol } from "../autorizacion";
+import {
+    circuitosConPaquetesActivos,
+    circuitosSemilla,
+    etapasSemilla,
+} from "../datos/etapas";
 
 const circuitos: Circuito[] = [...circuitosSemilla];
 let etapas: Etapa[] = [...etapasSemilla];
+
+const leerId = (valor: string | readonly string[] | undefined): number | null => {
+    const n = Number(valor);
+    return Number.isInteger(n) && n > 0 ? n : null;
+};
 
 function serializarEtapa(etapa: Etapa) {
     return {
@@ -22,17 +32,23 @@ function serializarEtapa(etapa: Etapa) {
 }
 
 export const manejadoresEtapas = [
-    http.get(construirUrl("/circuitos"), async () => {
+    http.get(construirUrl("/circuitos"), async ({ request }) => {
         await delay();
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
         return HttpResponse.json({
             data: circuitos,
         });
     }),
 
-    http.get(construirUrl("/circuitos/:idcircuito/etapas"), async ({ params }) => {
+    http.get(construirUrl("/circuitos/:idcircuito/etapas"), async ({ params, request }) => {
         await delay();
-        const idcircuito = Number(params.idcircuito);
-        if (!Number.isInteger(idcircuito) || idcircuito <= 0) {
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const idcircuito = leerId(params.idcircuito);
+        if (!idcircuito) {
             return HttpResponse.json(
                 { error: "El ID del circuito no es válido." },
                 { status: 400 },
@@ -54,10 +70,32 @@ export const manejadoresEtapas = [
 
     http.put(construirUrl("/circuitos/:idcircuito/etapas"), async ({ params, request }) => {
         await delay();
-        const idcircuito = Number(params.idcircuito);
-        if (!Number.isInteger(idcircuito) || idcircuito <= 0) {
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const idcircuito = leerId(params.idcircuito);
+        if (!idcircuito) {
             return HttpResponse.json(
                 { error: "El ID del circuito no es válido." },
+                { status: 400 },
+            );
+        }
+
+        const cuerpo = (await request.json()) as { etapas?: unknown } | unknown[];
+        const arregloRecibido = Array.isArray(cuerpo)
+            ? (cuerpo as DatosEtapa[])
+            : (cuerpo?.etapas as DatosEtapa[] | undefined);
+
+        if (!Array.isArray(arregloRecibido)) {
+            return HttpResponse.json(
+                { error: "El campo 'etapas' debe ser un arreglo." },
+                { status: 400 },
+            );
+        }
+
+        if (arregloRecibido.length === 0) {
+            return HttpResponse.json(
+                { error: "La secuencia de etapas no puede estar vacía." },
                 { status: 400 },
             );
         }
@@ -70,8 +108,14 @@ export const manejadoresEtapas = [
             );
         }
 
-        const cuerpo = (await request.json()) as { etapas?: DatosEtapa[] } | DatosEtapa[];
-        const arregloRecibido = Array.isArray(cuerpo) ? cuerpo : cuerpo.etapas;
+        if (circuitosConPaquetesActivos.has(idcircuito)) {
+            return HttpResponse.json(
+                {
+                    error: "No se pueden modificar las etapas: el circuito ya tiene paquetes comerciales activos.",
+                },
+                { status: 400 },
+            );
+        }
 
         const validacion = esquemaSecuenciaEtapas.safeParse({ etapas: arregloRecibido });
         if (!validacion.success) {
@@ -107,3 +151,4 @@ export const manejadoresEtapas = [
         });
     }),
 ];
+

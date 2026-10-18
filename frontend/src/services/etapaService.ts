@@ -17,7 +17,7 @@ export type Circuito = {
 
 export const esquemaEtapa = z.object({
     numeroOrden: z
-        .number()
+        .number({ message: "El orden debe ser un número entero positivo." })
         .int("El orden debe ser un número entero.")
         .min(1, "El número de orden debe ser al menos 1."),
     puntoInicio: z
@@ -63,7 +63,7 @@ export const esquemaSecuenciaEtapas = z
                 contexto.addIssue({
                     code: "custom",
                     path: ["etapas", i + 1, "puntoInicio"],
-                    message: `Discontinuidad espacial: el fin de la etapa ${actual.numeroOrden} ('${actual.puntoFin}') debe coincidir con el inicio de la etapa ${siguiente.numeroOrden} ('${siguiente.puntoInicio}').`,
+                    message: `Discontinuidad espacial: El fin de la etapa ${actual.numeroOrden} ('${actual.puntoFin.trim()}') no coincide con el inicio de la etapa ${siguiente.numeroOrden} ('${siguiente.puntoInicio.trim()}').`,
                 });
                 return;
             }
@@ -82,6 +82,18 @@ export type Etapa = {
     campamentoPrevisto: string;
 };
 
+export type DiscontinuidadEspacial = {
+    numeroOrdenActual: number;
+    numeroOrdenAnterior: number;
+    puntoFinAnterior: string;
+    puntoInicioActual: string;
+};
+
+export type ResultadoConfirmarSecuencia = {
+    mensaje: string;
+    data: Etapa[];
+};
+
 type EtapaApi = {
     idcircuito?: number;
     numeroOrden: number;
@@ -91,9 +103,8 @@ type EtapaApi = {
 };
 
 type CircuitoApi = Omit<Circuito, "id">;
-type Respuesta<T> = { data: T };
-
-const extraer = <T,>(respuesta: Respuesta<T>): T => respuesta.data;
+type RespuestaDatos<T> = { data: T };
+type RespuestaAccion<T> = { mensaje?: string; data: T };
 
 export function normalizarEtapa(etapa: EtapaApi, idCircuitoFallback = 0): Etapa {
     return {
@@ -113,20 +124,43 @@ function normalizarCircuito(circuito: CircuitoApi): Circuito {
     };
 }
 
+/**
+ * Detecta tramos consecutivos donde el punto de fin de la etapa N
+ * no coincide con el punto de inicio de la etapa N+1 (regla CU-05).
+ */
+export function detectarDiscontinuidadesEspaciales(etapas: Etapa[]): DiscontinuidadEspacial[] {
+    const ordenadas = [...etapas].sort((a, b) => a.numeroOrden - b.numeroOrden);
+    const discontinuidades: DiscontinuidadEspacial[] = [];
+
+    for (let i = 1; i < ordenadas.length; i++) {
+        const anterior = ordenadas[i - 1]!;
+        const actual = ordenadas[i]!;
+        if (anterior.puntoFin.trim() !== actual.puntoInicio.trim()) {
+            discontinuidades.push({
+                numeroOrdenActual: actual.numeroOrden,
+                numeroOrdenAnterior: anterior.numeroOrden,
+                puntoFinAnterior: anterior.puntoFin.trim(),
+                puntoInicioActual: actual.puntoInicio.trim(),
+            });
+        }
+    }
+
+    return discontinuidades;
+}
+
 export function consultarCircuitos(): Promise<Circuito[]> {
-    return solicitarApi<Respuesta<CircuitoApi[]>>("/circuitos")
-        .then(extraer)
-        .then((datos) => datos.map(normalizarCircuito));
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos").then((respuesta) =>
+        respuesta.data.map(normalizarCircuito),
+    );
 }
 
 export function consultarEtapas(idcircuito: number): Promise<Etapa[]> {
-    return solicitarApi<Respuesta<EtapaApi[]>>(`/circuitos/${idcircuito}/etapas`)
-        .then(extraer)
-        .then((datos) =>
-            datos
+    return solicitarApi<RespuestaDatos<EtapaApi[]>>(`/circuitos/${idcircuito}/etapas`).then(
+        (respuesta) =>
+            respuesta.data
                 .map((etapa) => normalizarEtapa(etapa, idcircuito))
                 .sort((a, b) => a.numeroOrden - b.numeroOrden),
-        );
+    );
 }
 
 export const listarEtapas = consultarEtapas;
@@ -134,7 +168,7 @@ export const listarEtapas = consultarEtapas;
 export function confirmarSecuenciaCompleta(
     idcircuito: number,
     etapas: DatosEtapa[],
-): Promise<Etapa[]> {
+): Promise<ResultadoConfirmarSecuencia> {
     const etapasNormalizadas = etapas.map((etapa, indice) => ({
         numeroOrden: etapa.numeroOrden ?? indice + 1,
         puntoInicio: etapa.puntoInicio.trim(),
@@ -142,16 +176,15 @@ export function confirmarSecuenciaCompleta(
         campamentoPrevisto: etapa.campamentoPrevisto?.trim() || null,
     }));
 
-    return solicitarApi<Respuesta<EtapaApi[]>>(`/circuitos/${idcircuito}/etapas`, {
+    return solicitarApi<RespuestaAccion<EtapaApi[]>>(`/circuitos/${idcircuito}/etapas`, {
         method: "PUT",
         body: JSON.stringify({ etapas: etapasNormalizadas }),
-    })
-        .then(extraer)
-        .then((datos) =>
-            datos
-                .map((etapa) => normalizarEtapa(etapa, idcircuito))
-                .sort((a, b) => a.numeroOrden - b.numeroOrden),
-        );
+    }).then((respuesta) => ({
+        mensaje: respuesta.mensaje ?? "Secuencia de etapas establecida exitosamente",
+        data: respuesta.data
+            .map((etapa) => normalizarEtapa(etapa, idcircuito))
+            .sort((a, b) => a.numeroOrden - b.numeroOrden),
+    }));
 }
 
 export const reemplazarEtapas = confirmarSecuenciaCompleta;
@@ -187,3 +220,4 @@ export function useConfirmarSecuenciaCompleta(idcircuito: number) {
 }
 
 export const useReemplazarEtapas = useConfirmarSecuenciaCompleta;
+
