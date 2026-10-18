@@ -2,7 +2,6 @@ import { delay, http, HttpResponse } from "msw";
 import { construirUrl } from "../../services/clienteApi";
 import type {
     DatosCircuito,
-    DatosEtapaCircuito,
 } from "../../services/circuitoService";
 import { circuitosIniciales, type CircuitoMock } from "../datos/circuitos";
 
@@ -214,101 +213,18 @@ export const manejadoresCircuitos = [
             data: dadoDeBaja,
         });
     }),
-
-    // CU-05: GET /api/circuitos/:idcircuito/etapas
-    http.get(
-        construirUrl("/circuitos/:idcircuito/etapas"),
-        async ({ params }) => {
-            await delay(150);
-            const idCircuito = Number(params.idcircuito);
-            const circuito = circuitos.find(
-                (item) => item.idcircuito === idCircuito,
-            );
-            if (!circuito) {
-                return respuestaError("El circuito no existe.", 404);
-            }
-            return HttpResponse.json({ data: circuito.etapas ?? [] });
-        },
-    ),
-
-    // CU-05: PUT /api/circuitos/:idcircuito/etapas
-    http.put(
-        construirUrl("/circuitos/:idcircuito/etapas"),
-        async ({ params, request }) => {
-            await delay(200);
-            const idCircuito = Number(params.idcircuito);
-            const circuito = circuitos.find(
-                (item) => item.idcircuito === idCircuito,
-            );
-            if (!circuito || circuito.estado !== "ACTIVO") {
-                return respuestaError(
-                    "El circuito no existe o no está activo.",
-                    404,
-                );
-            }
-            if (circuito.tienePaquetesActivos) {
-                return respuestaError(
-                    "No se pueden modificar las etapas: el circuito ya tiene paquetes comerciales activos.",
-                    400,
-                );
-            }
-
-            const cuerpo = (await request.json()) as {
-                etapas?: DatosEtapaCircuito[];
-            };
-            const lista = cuerpo.etapas;
-            if (!Array.isArray(lista) || lista.length === 0) {
-                return respuestaError(
-                    "La secuencia de etapas no puede estar vacía.",
-                    400,
-                );
-            }
-
-            const ordenadas = [...lista].sort(
-                (a, b) => a.numeroOrden - b.numeroOrden,
-            );
-            for (let i = 0; i < ordenadas.length; i++) {
-                if (ordenadas[i].numeroOrden !== i + 1) {
-                    return respuestaError(
-                        `La correlatividad temporal falló. Se esperaba la etapa ${
-                            i + 1
-                        } pero se encontró la ${ordenadas[i].numeroOrden}.`,
-                        400,
-                    );
-                }
-                if (
-                    i < ordenadas.length - 1 &&
-                    ordenadas[i].puntoFin !== ordenadas[i + 1].puntoInicio
-                ) {
-                    return respuestaError(
-                        `Discontinuidad espacial: El fin de la etapa ${
-                            ordenadas[i].numeroOrden
-                        } ('${ordenadas[i].puntoFin}') no coincide con el inicio de la etapa ${
-                            ordenadas[i + 1].numeroOrden
-                        } ('${ordenadas[i + 1].puntoInicio}').`,
-                        400,
-                    );
-                }
-            }
-
-            const nuevasEtapas = ordenadas.map((etapa) => ({
-                idcircuito: idCircuito,
-                numeroOrden: etapa.numeroOrden,
-                puntoInicio: etapa.puntoInicio,
-                puntoFin: etapa.puntoFin,
-                campamentoPrevisto: etapa.campamentoPrevisto ?? null,
-            }));
-
-            circuitos = circuitos.map((item) =>
-                item.idcircuito === idCircuito
-                    ? { ...item, etapas: nuevasEtapas }
-                    : item,
-            );
-
-            return HttpResponse.json({
-                mensaje: "Secuencia de etapas establecida exitosamente",
-                data: nuevasEtapas,
-            });
-        },
-    ),
 ];
+
+export function obtenerCircuitoMock(idcircuito: number): CircuitoMock | undefined {
+    return circuitos.find((c) => c.idcircuito === idcircuito);
+}
+
+export function actualizarEtapasCircuitoMock(
+    idcircuito: number,
+    etapas: CircuitoMock["etapas"],
+): void {
+    circuitos = circuitos.map((item) =>
+        item.idcircuito === idcircuito ? { ...item, etapas } : item,
+    );
+}
+

@@ -1,27 +1,28 @@
 import { delay, http, HttpResponse } from "msw";
 import { construirUrl } from "../../services/clienteApi";
+import type { EtapaCircuito } from "../../services/circuitoService";
 import {
     esquemaSecuenciaEtapas,
-    type Circuito,
     type DatosEtapa,
-    type Etapa,
 } from "../../services/etapaService";
 import { exigirRol } from "../autorizacion";
 import {
-    circuitosConPaquetesActivos,
-    circuitosSemilla,
-    etapasSemilla,
-} from "../datos/etapas";
-
-const circuitos: Circuito[] = [...circuitosSemilla];
-let etapas: Etapa[] = [...etapasSemilla];
+    actualizarEtapasCircuitoMock,
+    obtenerCircuitoMock,
+} from "./circuitos";
 
 const leerId = (valor: string | readonly string[] | undefined): number | null => {
     const n = Number(valor);
     return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-function serializarEtapa(etapa: Etapa) {
+function serializarEtapa(etapa: {
+    idcircuito: number;
+    numeroOrden: number;
+    puntoInicio: string;
+    puntoFin: string;
+    campamentoPrevisto?: string | null;
+}) {
     return {
         idcircuito: etapa.idcircuito,
         numeroOrden: etapa.numeroOrden,
@@ -32,18 +33,9 @@ function serializarEtapa(etapa: Etapa) {
 }
 
 export const manejadoresEtapas = [
-    http.get(construirUrl("/circuitos"), async ({ request }) => {
-        await delay();
-        const denegado = exigirRol(request, "ADMIN");
-        if (denegado) return denegado;
-
-        return HttpResponse.json({
-            data: circuitos,
-        });
-    }),
-
+    // CU-05: GET /api/circuitos/:idcircuito/etapas
     http.get(construirUrl("/circuitos/:idcircuito/etapas"), async ({ params, request }) => {
-        await delay();
+        await delay(150);
         const denegado = exigirRol(request, "ADMIN");
         if (denegado) return denegado;
 
@@ -55,21 +47,22 @@ export const manejadoresEtapas = [
             );
         }
 
-        const circuito = circuitos.find((item) => item.idcircuito === idcircuito);
+        const circuito = obtenerCircuitoMock(idcircuito);
         if (!circuito) {
             return HttpResponse.json({ error: "El circuito no existe." }, { status: 404 });
         }
 
-        const etapasDelCircuito = etapas
-            .filter((etapa) => etapa.idcircuito === idcircuito)
+        const etapas = (circuito.etapas ?? [])
+            .slice()
             .sort((a, b) => a.numeroOrden - b.numeroOrden)
             .map(serializarEtapa);
 
-        return HttpResponse.json({ data: etapasDelCircuito });
+        return HttpResponse.json({ data: etapas });
     }),
 
+    // CU-05: PUT /api/circuitos/:idcircuito/etapas
     http.put(construirUrl("/circuitos/:idcircuito/etapas"), async ({ params, request }) => {
-        await delay();
+        await delay(200);
         const denegado = exigirRol(request, "ADMIN");
         if (denegado) return denegado;
 
@@ -77,6 +70,23 @@ export const manejadoresEtapas = [
         if (!idcircuito) {
             return HttpResponse.json(
                 { error: "El ID del circuito no es válido." },
+                { status: 400 },
+            );
+        }
+
+        const circuito = obtenerCircuitoMock(idcircuito);
+        if (!circuito || circuito.estado !== "ACTIVO") {
+            return HttpResponse.json(
+                { error: "El circuito no existe o no está activo." },
+                { status: 404 },
+            );
+        }
+
+        if (circuito.tienePaquetesActivos) {
+            return HttpResponse.json(
+                {
+                    error: "No se pueden modificar las etapas: el circuito ya tiene paquetes comerciales activos.",
+                },
                 { status: 400 },
             );
         }
@@ -100,23 +110,6 @@ export const manejadoresEtapas = [
             );
         }
 
-        const circuito = circuitos.find((item) => item.idcircuito === idcircuito);
-        if (!circuito || circuito.estado !== "ACTIVO") {
-            return HttpResponse.json(
-                { error: "El circuito no existe o no está activo." },
-                { status: 404 },
-            );
-        }
-
-        if (circuitosConPaquetesActivos.has(idcircuito)) {
-            return HttpResponse.json(
-                {
-                    error: "No se pueden modificar las etapas: el circuito ya tiene paquetes comerciales activos.",
-                },
-                { status: 400 },
-            );
-        }
-
         const validacion = esquemaSecuenciaEtapas.safeParse({ etapas: arregloRecibido });
         if (!validacion.success) {
             return HttpResponse.json(
@@ -129,21 +122,17 @@ export const manejadoresEtapas = [
             );
         }
 
-        const nuevasOrdenadas: Etapa[] = [...validacion.data.etapas]
+        const nuevasOrdenadas: EtapaCircuito[] = [...validacion.data.etapas]
             .sort((a, b) => a.numeroOrden - b.numeroOrden)
             .map((etapa) => ({
-                id: etapa.numeroOrden,
                 idcircuito,
                 numeroOrden: etapa.numeroOrden,
                 puntoInicio: etapa.puntoInicio.trim(),
                 puntoFin: etapa.puntoFin.trim(),
-                campamentoPrevisto: etapa.campamentoPrevisto?.trim() ?? "",
+                campamentoPrevisto: etapa.campamentoPrevisto?.trim() || null,
             }));
 
-        etapas = [
-            ...etapas.filter((etapa) => etapa.idcircuito !== idcircuito),
-            ...nuevasOrdenadas,
-        ];
+        actualizarEtapasCircuitoMock(idcircuito, nuevasOrdenadas);
 
         return HttpResponse.json({
             mensaje: "Secuencia de etapas establecida exitosamente",
@@ -151,4 +140,3 @@ export const manejadoresEtapas = [
         });
     }),
 ];
-
