@@ -36,9 +36,10 @@ export type CuentaGuia = {
 };
 
 type CuentaGuiaApi = Omit<CuentaGuia, "id">;
-type Respuesta<T> = { data: T };
+type RespuestaDatos<T> = { data: T };
+type RespuestaAccion<T> = { mensaje: string; data: T };
 
-const extraer = <T,>(respuesta: Respuesta<T>): T => respuesta.data;
+const extraer = <T,>(respuesta: RespuestaDatos<T>): T => respuesta.data;
 
 export function normalizarCuentaGuia(cuenta: CuentaGuiaApi): CuentaGuia {
     return {
@@ -58,7 +59,7 @@ function construirQueryCuentasGuia(filtros: FiltrosCuentaGuia = {}): string {
 }
 
 export function consultarUsuariosGuia(filtros: FiltrosCuentaGuia = {}): Promise<CuentaGuia[]> {
-    return solicitarApi<Respuesta<CuentaGuiaApi[]>>(
+    return solicitarApi<RespuestaDatos<CuentaGuiaApi[]>>(
         `/cuentas-guia${construirQueryCuentasGuia(filtros)}`,
     )
         .then(extraer)
@@ -68,7 +69,7 @@ export function consultarUsuariosGuia(filtros: FiltrosCuentaGuia = {}): Promise<
 export const listarCuentasGuia = consultarUsuariosGuia;
 
 export function darDeBajaCuenta(idusuario: number): Promise<CuentaGuia> {
-    return solicitarApi<Respuesta<CuentaGuiaApi>>(`/cuentas-guia/${idusuario}/baja`, {
+    return solicitarApi<RespuestaAccion<CuentaGuiaApi>>(`/cuentas-guia/${idusuario}/baja`, {
         method: "PATCH",
     })
         .then(extraer)
@@ -79,7 +80,7 @@ export const darDeBajaCuentaGuia = darDeBajaCuenta;
 
 export const clavesCuentasGuia = {
     todas: ["cuentas-guia"] as const,
-    lista: (filtros?: FiltrosCuentaGuia) => ["cuentas-guia", filtros ?? {}] as const,
+    lista: (filtros?: FiltrosCuentaGuia) => ["cuentas-guia", "lista", filtros ?? {}] as const,
 };
 
 export function useCuentasGuia(filtros?: FiltrosCuentaGuia) {

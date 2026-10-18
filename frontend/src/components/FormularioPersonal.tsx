@@ -61,6 +61,11 @@ function FormularioAltaPersonal({
                 <p className="mt-1 text-sm text-texto-suave">
                     Completá el legajo del personal y, si es guía, sus credenciales de acceso y habilitación.
                 </p>
+                <p className="mt-2 rounded-control border border-borde bg-fondo px-3 py-2 text-xs text-texto-suave">
+                    {rolSeleccionado === "Guía"
+                        ? "Al registrar un guía se crean en una única operación su legajo operativo, su habilitación y su cuenta de usuario con rol GUIA."
+                        : "Los porteadores no requieren cuenta de acceso al sistema: solo se registrará su legajo operativo con pasaporte vigente."}
+                </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -319,7 +324,7 @@ function FormularioEdicionPersonal({
             <div className="mb-5">
                 <h2 className="font-bold text-navegacion">Editar personal operativo</h2>
                 <p className="mt-1 text-sm text-texto-suave">
-                    Rol: <span className="font-semibold text-texto">{personal.rol}</span> · Actualizá los datos del legajo.
+                    Rol: <span className="font-semibold text-texto">{personal.rol}</span> · Actualizá los datos del legajo (el rol y el estado no pueden modificarse desde esta edición).
                 </p>
             </div>
 

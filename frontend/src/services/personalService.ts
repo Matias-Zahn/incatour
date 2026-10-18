@@ -9,9 +9,11 @@ export type EstadoPersonal = "ACTIVO" | "INACTIVO";
 
 const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
 
-function esFechaFuturaOVigente(valor: string): boolean {
-    const fecha = new Date(valor);
-    if (Number.isNaN(fecha.getTime())) return false;
+export function esFechaFuturaOVigente(valor: string): boolean {
+    const partes = valor.slice(0, 10).split("-").map(Number);
+    if (partes.length !== 3 || partes.some((n) => Number.isNaN(n))) return false;
+    const [anio, mes, dia] = partes as [number, number, number];
+    const fecha = new Date(anio, mes - 1, dia);
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     return fecha >= hoy;
@@ -23,13 +25,13 @@ export const esquemaCrearPersonal = z
             .string()
             .trim()
             .min(1, "El nombre es obligatorio.")
-            .max(64, "El nombre no puede superar los 64 caracteres.")
+            .max(64, "El nombre debe tener entre 1 y 64 caracteres.")
             .regex(regexSoloLetras, "El nombre solo puede contener letras y espacios."),
         apellido: z
             .string()
             .trim()
             .min(1, "El apellido es obligatorio.")
-            .max(64, "El apellido no puede superar los 64 caracteres.")
+            .max(64, "El apellido debe tener entre 1 y 64 caracteres.")
             .regex(regexSoloLetras, "El apellido solo puede contener letras y espacios."),
         email: z.string().trim().optional(),
         contrasenia: z.string().optional(),
@@ -39,7 +41,10 @@ export const esquemaCrearPersonal = z
             .string()
             .trim()
             .min(1, "La fecha de vencimiento del pasaporte es obligatoria.")
-            .refine(esFechaFuturaOVigente, "El pasaporte no puede estar vencido."),
+            .refine(
+                esFechaFuturaOVigente,
+                "No se puede registrar personal con un pasaporte vencido.",
+            ),
         rolOperativo: z.enum(rolesPersonal),
         nroHabilitacion: z.string().trim().optional(),
         fechaHabilitacion: z.string().trim().optional(),
@@ -51,7 +56,7 @@ export const esquemaCrearPersonal = z
             contexto.addIssue({
                 code: "custom",
                 path: ["email"],
-                message: "El email es obligatorio para un guía.",
+                message: "El email es requerido para un guía.",
             });
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email)) {
             contexto.addIssue({
@@ -73,7 +78,7 @@ export const esquemaCrearPersonal = z
             contexto.addIssue({
                 code: "custom",
                 path: ["nroHabilitacion"],
-                message: "El número de habilitación es obligatorio para un guía.",
+                message: "El número de habilitación es requerido para un guía.",
             });
         }
 
@@ -81,13 +86,13 @@ export const esquemaCrearPersonal = z
             contexto.addIssue({
                 code: "custom",
                 path: ["fechaHabilitacion"],
-                message: "La fecha de habilitación es obligatoria para un guía.",
+                message: "La fecha de la habilitación es requerida para un guía.",
             });
         } else if (!esFechaFuturaOVigente(datos.fechaHabilitacion)) {
             contexto.addIssue({
                 code: "custom",
                 path: ["fechaHabilitacion"],
-                message: "La habilitación no puede estar vencida.",
+                message: "No se puede registrar un guía con la habilitación vencida.",
             });
         }
     });
@@ -97,7 +102,7 @@ export const esquemaModificarPersonal = z.object({
         .string()
         .trim()
         .min(1, "El nombre completo es obligatorio.")
-        .max(128, "El nombre completo no puede superar los 128 caracteres.")
+        .max(128, "El nombre completo debe tener entre 1 y 128 caracteres.")
         .regex(regexSoloLetras, "El nombre completo solo puede contener letras y espacios."),
     nroPasaporte: z.string().trim().min(1, "El número de pasaporte es obligatorio.").max(40),
     nacionalidad: z.string().trim().min(1, "La nacionalidad es obligatoria.").max(64),
@@ -119,6 +124,7 @@ export const esquemaModificarPersonal = z.object({
 
 export type DatosCrearPersonal = z.infer<typeof esquemaCrearPersonal>;
 export type DatosModificarPersonal = z.infer<typeof esquemaModificarPersonal>;
+export type PersonalModificar = Partial<DatosModificarPersonal>;
 
 export type GuiaPersonal = {
     nroHabilitacion: string;
@@ -137,6 +143,21 @@ export type Personal = {
     guia: GuiaPersonal | null;
     nroHabilitacion?: string;
     fechaHabilitacion?: string;
+};
+
+export type CredencialesAccesoGuia = {
+    idusuario: number;
+    email: string;
+    nombre: string;
+    apellido: string;
+    rol: string;
+    estado: EstadoPersonal;
+};
+
+export type ResultadoCrearPersonal = {
+    mensaje: string;
+    perfilOperativo: Personal;
+    credencialesAcceso: CredencialesAccesoGuia | null;
 };
 
 export type FiltrosPersonal = {
@@ -159,21 +180,16 @@ type PersonalApi = {
     } | null;
 };
 
-type Respuesta<T> = { data: T };
+type RespuestaDatos<T> = { data: T };
+type RespuestaAccion<T> = { mensaje: string; data: T };
+/** Excepción del contrato API: POST /api/personal devuelve { mensaje, perfilOperativo, credencialesAcceso } sin data. */
 type RespuestaCrearPersonalApi = {
     mensaje: string;
     perfilOperativo: PersonalApi;
-    credencialesAcceso: {
-        idusuario: number;
-        email: string;
-        nombre: string;
-        apellido: string;
-        rol: string;
-        estado: EstadoPersonal;
-    } | null;
+    credencialesAcceso: CredencialesAccesoGuia | null;
 };
 
-const extraer = <T,>(respuesta: Respuesta<T>): T => respuesta.data;
+const extraer = <T,>(respuesta: RespuestaDatos<T>): T => respuesta.data;
 
 function normalizarFechaIso(fecha: string | null | undefined): string {
     if (!fecha) return "";
@@ -213,22 +229,35 @@ function construirQueryPersonal(filtros: FiltrosPersonal = {}): string {
 }
 
 export function consultarPersonal(filtros: FiltrosPersonal = {}): Promise<Personal[]> {
-    return solicitarApi<Respuesta<PersonalApi[]>>(`/personal${construirQueryPersonal(filtros)}`)
+    return solicitarApi<RespuestaDatos<PersonalApi[]>>(
+        `/personal${construirQueryPersonal(filtros)}`,
+    )
         .then(extraer)
         .then((datos) => datos.map(normalizarPersonal));
 }
 
 export const listarPersonal = consultarPersonal;
 
-export function crearPersonal(datos: DatosCrearPersonal): Promise<Personal> {
+export function crearPersonal(datos: DatosCrearPersonal): Promise<ResultadoCrearPersonal> {
     const cuerpo =
         datos.rolOperativo === "Guía"
-            ? datos
+            ? {
+                  nombre: datos.nombre.trim(),
+                  apellido: datos.apellido.trim(),
+                  email: datos.email?.trim().toLowerCase(),
+                  contrasenia: datos.contrasenia,
+                  nroPasaporte: datos.nroPasaporte.trim(),
+                  nacionalidad: datos.nacionalidad.trim(),
+                  fechaVencimientoPasaporte: datos.fechaVencimientoPasaporte,
+                  rolOperativo: datos.rolOperativo,
+                  nroHabilitacion: datos.nroHabilitacion?.trim(),
+                  fechaHabilitacion: datos.fechaHabilitacion,
+              }
             : {
-                  nombre: datos.nombre,
-                  apellido: datos.apellido,
-                  nroPasaporte: datos.nroPasaporte,
-                  nacionalidad: datos.nacionalidad,
+                  nombre: datos.nombre.trim(),
+                  apellido: datos.apellido.trim(),
+                  nroPasaporte: datos.nroPasaporte.trim(),
+                  nacionalidad: datos.nacionalidad.trim(),
                   fechaVencimientoPasaporte: datos.fechaVencimientoPasaporte,
                   rolOperativo: datos.rolOperativo,
               };
@@ -236,29 +265,29 @@ export function crearPersonal(datos: DatosCrearPersonal): Promise<Personal> {
     return solicitarApi<RespuestaCrearPersonalApi>("/personal", {
         method: "POST",
         body: JSON.stringify(cuerpo),
-    }).then((respuesta) => normalizarPersonal(respuesta.perfilOperativo));
+    }).then((respuesta) => ({
+        mensaje: respuesta.mensaje,
+        perfilOperativo: normalizarPersonal(respuesta.perfilOperativo),
+        credencialesAcceso: respuesta.credencialesAcceso,
+    }));
 }
 
 export const registrarPersonal = crearPersonal;
 
 export function modificarPersonal(
     id: number,
-    datos: Partial<DatosModificarPersonal>,
+    datos: PersonalModificar,
 ): Promise<Personal> {
-    const cuerpo: Partial<DatosModificarPersonal> = { ...datos };
-    if (!cuerpo.nroHabilitacion) delete cuerpo.nroHabilitacion;
-    if (!cuerpo.fechaHabilitacion) delete cuerpo.fechaHabilitacion;
-
-    return solicitarApi<Respuesta<PersonalApi>>(`/personal/${id}`, {
+    return solicitarApi<RespuestaAccion<PersonalApi>>(`/personal/${id}`, {
         method: "PUT",
-        body: JSON.stringify(cuerpo),
+        body: JSON.stringify(datos),
     })
         .then(extraer)
         .then(normalizarPersonal);
 }
 
 export function darDeBajaPersonal(id: number): Promise<Personal> {
-    return solicitarApi<Respuesta<PersonalApi>>(`/personal/${id}/baja`, {
+    return solicitarApi<RespuestaAccion<PersonalApi>>(`/personal/${id}/baja`, {
         method: "PATCH",
     })
         .then(extraer)
@@ -269,7 +298,7 @@ export const darDeBaja = darDeBajaPersonal;
 
 export const clavesPersonal = {
     todos: ["personal"] as const,
-    lista: (filtros?: FiltrosPersonal) => ["personal", filtros ?? {}] as const,
+    lista: (filtros?: FiltrosPersonal) => ["personal", "lista", filtros ?? {}] as const,
 };
 
 export function usePersonal(filtros?: FiltrosPersonal) {
@@ -295,7 +324,7 @@ export const useRegistrarPersonal = useCrearPersonal;
 export function useModificarPersonal() {
     const consultas = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, datos }: { id: number; datos: Partial<DatosModificarPersonal> }) =>
+        mutationFn: ({ id, datos }: { id: number; datos: PersonalModificar }) =>
             modificarPersonal(id, datos),
         onSuccess: () => {
             consultas.invalidateQueries({ queryKey: clavesPersonal.todos });

@@ -45,12 +45,48 @@ export const personalSemilla: Personal[] = [
         nroHabilitacion: "HAB-002",
         fechaHabilitacion: "2027-11-30",
     },
+    {
+        id: 4,
+        idpersonal: 4,
+        nombreCompleto: "Javier Condori",
+        nroPasaporte: "P345678",
+        nacionalidad: "Peruana",
+        fechaVencimientoPasaporte: "2029-04-10",
+        estado: "ACTIVO",
+        rol: "Guía",
+        guia: {
+            nroHabilitacion: "HAB-003",
+            fechaHabilitacion: "2025-05-10",
+        },
+        nroHabilitacion: "HAB-003",
+        fechaHabilitacion: "2025-05-10",
+    },
+    {
+        id: 5,
+        idpersonal: 5,
+        nombreCompleto: "Pedro Yupanqui",
+        nroPasaporte: "P901234",
+        nacionalidad: "Peruana",
+        fechaVencimientoPasaporte: "2030-11-05",
+        estado: "ACTIVO",
+        rol: "Porteador",
+        guia: null,
+    },
 ];
+
+/**
+ * Cantidad de salidas no finalizadas (PUBLICADA, ABIERTA, CERRADA, EN_CURSO)
+ * por idpersonal para simular las validaciones de CU-25 y CU-46 en MSW.
+ */
+export const salidasActivasPorPersonal: Record<number, number> = {
+    3: 1,
+    5: 1,
+};
 
 export const cuentasGuiaSemilla: CuentaGuia[] = [
     {
-        id: 4,
-        idusuario: 4,
+        id: 3,
+        idusuario: 3,
         email: "carlos.guia@incatour.com",
         nombre: "Carlos",
         apellido: "Mamani",
@@ -72,8 +108,8 @@ export const cuentasGuiaSemilla: CuentaGuia[] = [
         puedeDarseDeBaja: true,
     },
     {
-        id: 5,
-        idusuario: 5,
+        id: 4,
+        idusuario: 4,
         email: "rosa.guia@incatour.com",
         nombre: "Rosa",
         apellido: "Huamán",
@@ -94,4 +130,28 @@ export const cuentasGuiaSemilla: CuentaGuia[] = [
         salidasPendientes: 1,
         puedeDarseDeBaja: false,
     },
+    {
+        id: 5,
+        idusuario: 5,
+        email: "javier.guia@incatour.com",
+        nombre: "Javier",
+        apellido: "Condori",
+        rol: "GUIA",
+        estado: "ACTIVO",
+        creadoEn: "2026-02-20T09:15:00.000Z",
+        guia: {
+            idpersonal: 4,
+            nombreCompleto: "Javier Condori",
+            nroPasaporte: "P345678",
+            estadoPersonal: "ACTIVO",
+        },
+        habilitacion: {
+            nroHabilitacion: "HAB-003",
+            fechaHabilitacion: "2025-05-10T00:00:00.000Z",
+            situacion: "VENCIDA",
+        },
+        salidasPendientes: 0,
+        puedeDarseDeBaja: true,
+    },
 ];
+

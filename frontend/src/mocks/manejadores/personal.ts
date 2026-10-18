@@ -4,19 +4,34 @@ import type { CuentaGuia, SituacionHabilitacion } from "../../services/cuentaGui
 import {
     esquemaCrearPersonal,
     esquemaModificarPersonal,
+    rolesPersonal,
     type DatosCrearPersonal,
     type DatosModificarPersonal,
     type Personal,
 } from "../../services/personalService";
-import { cuentasGuiaSemilla, personalSemilla } from "../datos/personal";
+import { cuentasMock, exigirRol } from "../autorizacion";
+import {
+    cuentasGuiaSemilla,
+    personalSemilla,
+    salidasActivasPorPersonal,
+} from "../datos/personal";
 
 let listaPersonal: Personal[] = [...personalSemilla];
 let cuentasGuia: CuentaGuia[] = [...cuentasGuiaSemilla];
 
+const leerId = (valor: string | readonly string[] | undefined): number | null => {
+    const n = Number(valor);
+    return Number.isInteger(n) && n > 0 ? n : null;
+};
+
 function calcularSituacionHabilitacion(fecha: string | null | undefined): SituacionHabilitacion {
     if (!fecha) return "SIN_DATOS";
-    const fechaHab = new Date(fecha);
-    if (Number.isNaN(fechaHab.getTime())) return "SIN_DATOS";
+    const soloFecha = fecha.slice(0, 10);
+    const partes = soloFecha.split("-").map(Number);
+    if (partes.length !== 3 || partes.some((n) => Number.isNaN(n))) return "SIN_DATOS";
+    const [anio, mes, dia] = partes;
+    const fechaHab = new Date(anio, mes - 1, dia);
+    fechaHab.setHours(0, 0, 0, 0);
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     return fechaHab >= hoy ? "VIGENTE" : "VENCIDA";
@@ -44,16 +59,43 @@ function serializarPersonal(item: Personal) {
 export const manejadoresPersonal = [
     http.get(construirUrl("/personal"), async ({ request }) => {
         await delay();
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
         const url = new URL(request.url, window.location.origin);
         const rol = url.searchParams.get("rol");
         const estado = url.searchParams.get("estado");
         const habilitacionVigente = url.searchParams.get("habilitacionVigente");
 
+        if (rol && !rolesPersonal.includes(rol as (typeof rolesPersonal)[number])) {
+            return HttpResponse.json(
+                { error: "El rol debe ser 'Guía' o 'Porteador'" },
+                { status: 400 },
+            );
+        }
+        if (estado && estado !== "ACTIVO" && estado !== "INACTIVO") {
+            return HttpResponse.json(
+                { error: "El estado debe ser ACTIVO o INACTIVO" },
+                { status: 400 },
+            );
+        }
+        if (
+            habilitacionVigente !== null &&
+            habilitacionVigente !== "" &&
+            habilitacionVigente !== "true" &&
+            habilitacionVigente !== "false"
+        ) {
+            return HttpResponse.json(
+                { error: "habilitacionVigente debe ser true o false" },
+                { status: 400 },
+            );
+        }
+
         const filtrados = listaPersonal
             .filter((persona) => {
                 if (rol && persona.rol !== rol) return false;
                 if (estado && persona.estado !== estado) return false;
-                if (habilitacionVigente !== null && habilitacionVigente !== "") {
+                if (habilitacionVigente === "true" || habilitacionVigente === "false") {
                     if (persona.rol !== "Guía" || !persona.guia) return false;
                     const vigente =
                         calcularSituacionHabilitacion(persona.guia.fechaHabilitacion) === "VIGENTE";
@@ -71,6 +113,9 @@ export const manejadoresPersonal = [
 
     http.post(construirUrl("/personal"), async ({ request }) => {
         await delay();
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
         const cuerpo = (await request.json()) as DatosCrearPersonal;
         const validacion = esquemaCrearPersonal.safeParse(cuerpo);
         if (!validacion.success) {
@@ -92,9 +137,10 @@ export const manejadoresPersonal = [
         }
 
         if (datos.rolOperativo === "Guía" && datos.email) {
-            const emailDuplicado = cuentasGuia.some(
-                (cuenta) => cuenta.email.toLowerCase() === datos.email!.toLowerCase(),
-            );
+            const emailNormalizado = datos.email.toLowerCase();
+            const emailDuplicado =
+                cuentasGuia.some((cuenta) => cuenta.email.toLowerCase() === emailNormalizado) ||
+                cuentasMock.some((item) => item.usuario.email.toLowerCase() === emailNormalizado);
             if (emailDuplicado) {
                 return HttpResponse.json(
                     { error: "El email ya está registrado en el sistema" },
@@ -132,7 +178,11 @@ export const manejadoresPersonal = [
         let credencialesAcceso = null;
         if (datos.rolOperativo === "Guía") {
             const nuevoIdUsuario =
-                Math.max(3, ...cuentasGuia.map((cuenta) => cuenta.idusuario)) + 1;
+                Math.max(
+                    3,
+                    ...cuentasGuia.map((cuenta) => cuenta.idusuario),
+                    ...cuentasMock.map((item) => item.usuario.idusuario),
+                ) + 1;
             const fechaHab = datos.fechaHabilitacion ?? null;
             const nuevaCuenta: CuentaGuia = {
                 id: nuevoIdUsuario,
@@ -158,6 +208,16 @@ export const manejadoresPersonal = [
                 puedeDarseDeBaja: true,
             };
             cuentasGuia = [...cuentasGuia, nuevaCuenta];
+            cuentasMock.push({
+                contrasenia: datos.contrasenia ?? "guia1234",
+                usuario: {
+                    idusuario: nuevoIdUsuario,
+                    email: nuevaCuenta.email,
+                    nombre: nuevaCuenta.nombre,
+                    apellido: nuevaCuenta.apellido,
+                    rol: "GUIA",
+                },
+            });
             credencialesAcceso = {
                 idusuario: nuevoIdUsuario,
                 email: nuevaCuenta.email,
@@ -180,7 +240,31 @@ export const manejadoresPersonal = [
 
     http.put(construirUrl("/personal/:id"), async ({ params, request }) => {
         await delay();
-        const id = Number(params.id);
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const id = leerId(params.id);
+        if (!id) {
+            return HttpResponse.json(
+                { error: "El ID debe ser un número entero positivo" },
+                { status: 400 },
+            );
+        }
+
+        const cuerpoCrudo = (await request.json()) as Record<string, unknown>;
+        if ("rol" in cuerpoCrudo || "rolOperativo" in cuerpoCrudo) {
+            return HttpResponse.json(
+                { error: "El rol no se puede modificar" },
+                { status: 400 },
+            );
+        }
+        if ("estado" in cuerpoCrudo) {
+            return HttpResponse.json(
+                { error: "El estado se cambia con la baja (CU-25)" },
+                { status: 400 },
+            );
+        }
+
         const existente = listaPersonal.find((persona) => persona.idpersonal === id);
         if (!existente) {
             return HttpResponse.json({ error: "El personal no existe" }, { status: 404 });
@@ -192,7 +276,7 @@ export const manejadoresPersonal = [
             );
         }
 
-        const cuerpo = (await request.json()) as Partial<DatosModificarPersonal>;
+        const cuerpo = cuerpoCrudo as Partial<DatosModificarPersonal>;
         const validacion = esquemaModificarPersonal.partial().safeParse(cuerpo);
         if (!validacion.success || Object.keys(cuerpo).length === 0) {
             return HttpResponse.json(
@@ -282,9 +366,19 @@ export const manejadoresPersonal = [
         });
     }),
 
-    http.patch(construirUrl("/personal/:id/baja"), async ({ params }) => {
+    http.patch(construirUrl("/personal/:id/baja"), async ({ params, request }) => {
         await delay();
-        const id = Number(params.id);
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const id = leerId(params.id);
+        if (!id) {
+            return HttpResponse.json(
+                { error: "El ID debe ser un número entero positivo" },
+                { status: 400 },
+            );
+        }
+
         const existente = listaPersonal.find((persona) => persona.idpersonal === id);
         if (!existente) {
             return HttpResponse.json({ error: "El personal no existe" }, { status: 404 });
@@ -297,10 +391,12 @@ export const manejadoresPersonal = [
         }
 
         const cuentaAsociada = cuentasGuia.find((cuenta) => cuenta.guia.idpersonal === id);
-        if (cuentaAsociada && cuentaAsociada.salidasPendientes > 0) {
+        const salidasActivas =
+            salidasActivasPorPersonal[id] ?? cuentaAsociada?.salidasPendientes ?? 0;
+        if (salidasActivas > 0) {
             return HttpResponse.json(
                 {
-                    error: `No se puede dar de baja: está asignado a ${cuentaAsociada.salidasPendientes} salida(s) que todavía no finalizaron`,
+                    error: `No se puede dar de baja: está asignado a ${salidasActivas} salida(s) que todavía no finalizaron`,
                 },
                 { status: 400 },
             );
@@ -322,6 +418,14 @@ export const manejadoresPersonal = [
                       }
                     : cuenta,
             );
+            const indiceMock = cuentasMock.findIndex(
+                (item) =>
+                    item.usuario.idusuario === cuentaAsociada.idusuario ||
+                    item.usuario.email.toLowerCase() === cuentaAsociada.email.toLowerCase(),
+            );
+            if (indiceMock !== -1) {
+                cuentasMock.splice(indiceMock, 1);
+            }
         }
 
         return HttpResponse.json({
@@ -332,33 +436,69 @@ export const manejadoresPersonal = [
 
     http.get(construirUrl("/cuentas-guia"), async ({ request }) => {
         await delay();
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
         const url = new URL(request.url, window.location.origin);
         const rol = url.searchParams.get("rol");
         const estado = url.searchParams.get("estado");
         const habilitacion = url.searchParams.get("habilitacion");
         const busqueda = url.searchParams.get("busqueda")?.trim().toLowerCase();
 
-        const filtradas = cuentasGuia.filter((cuenta) => {
-            if (rol && cuenta.rol !== rol) return false;
-            if (estado && cuenta.estado !== estado) return false;
-            if (habilitacion && cuenta.habilitacion.situacion !== habilitacion) return false;
-            if (busqueda) {
-                const coincide =
-                    cuenta.nombre.toLowerCase().includes(busqueda) ||
-                    cuenta.apellido.toLowerCase().includes(busqueda) ||
-                    cuenta.email.toLowerCase().includes(busqueda) ||
-                    cuenta.guia.nombreCompleto.toLowerCase().includes(busqueda);
-                if (!coincide) return false;
-            }
-            return true;
-        });
+        if (rol && rol !== "GUIA") {
+            return HttpResponse.json(
+                { error: "El filtro de rol solo admite el valor 'GUIA'." },
+                { status: 400 },
+            );
+        }
+        if (estado && estado !== "ACTIVO" && estado !== "INACTIVO") {
+            return HttpResponse.json(
+                { error: "El estado debe ser 'ACTIVO' o 'INACTIVO'." },
+                { status: 400 },
+            );
+        }
+        if (habilitacion && habilitacion !== "VIGENTE" && habilitacion !== "VENCIDA") {
+            return HttpResponse.json(
+                { error: "El filtro de habilitación debe ser 'VIGENTE' o 'VENCIDA'." },
+                { status: 400 },
+            );
+        }
+
+        const filtradas = cuentasGuia
+            .filter((cuenta) => {
+                if (rol && cuenta.rol !== rol) return false;
+                if (estado && cuenta.estado !== estado) return false;
+                if (habilitacion && cuenta.habilitacion.situacion !== habilitacion) return false;
+                if (busqueda) {
+                    const coincide =
+                        cuenta.nombre.toLowerCase().includes(busqueda) ||
+                        cuenta.apellido.toLowerCase().includes(busqueda) ||
+                        cuenta.email.toLowerCase().includes(busqueda);
+                    if (!coincide) return false;
+                }
+                return true;
+            })
+            .sort((a, b) => {
+                const cmpApellido = a.apellido.localeCompare(b.apellido);
+                return cmpApellido !== 0 ? cmpApellido : a.nombre.localeCompare(b.nombre);
+            });
 
         return HttpResponse.json({ data: filtradas });
     }),
 
-    http.patch(construirUrl("/cuentas-guia/:idusuario/baja"), async ({ params }) => {
+    http.patch(construirUrl("/cuentas-guia/:idusuario/baja"), async ({ params, request }) => {
         await delay();
-        const idusuario = Number(params.idusuario);
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const idusuario = leerId(params.idusuario);
+        if (!idusuario) {
+            return HttpResponse.json(
+                { error: "El ID de usuario debe ser un número entero positivo." },
+                { status: 400 },
+            );
+        }
+
         const cuenta = cuentasGuia.find((item) => item.idusuario === idusuario);
         if (!cuenta) {
             return HttpResponse.json(
@@ -390,9 +530,19 @@ export const manejadoresPersonal = [
             item.idusuario === idusuario ? actualizada : item,
         );
 
+        const indiceMock = cuentasMock.findIndex(
+            (item) =>
+                item.usuario.idusuario === idusuario ||
+                item.usuario.email.toLowerCase() === cuenta.email.toLowerCase(),
+        );
+        if (indiceMock !== -1) {
+            cuentasMock.splice(indiceMock, 1);
+        }
+
         return HttpResponse.json({
             mensaje: "Cuenta de guía dada de baja exitosamente",
             data: actualizada,
         });
     }),
 ];
+

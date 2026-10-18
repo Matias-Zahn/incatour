@@ -22,6 +22,7 @@ function CuentasGuiaPage() {
     const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
     const [cuentaSeleccionada, setCuentaSeleccionada] = useState<CuentaGuia | null>(null);
+    const [ultimaCuentaBaja, setUltimaCuentaBaja] = useState<CuentaGuia | null>(null);
 
     const filtrosConsulta: FiltrosCuentaGuia = {
         ...(filtroEstado ? { estado: filtroEstado } : {}),
@@ -34,10 +35,15 @@ function CuentasGuiaPage() {
 
     function confirmarBaja() {
         if (!cuentaSeleccionada) return;
+        setUltimaCuentaBaja(null);
         darDeBaja.mutate(cuentaSeleccionada.idusuario, {
-            onSuccess: () => {
+            onSuccess: (cuentaActualizada) => {
+                setUltimaCuentaBaja(cuentaActualizada);
                 setCuentaSeleccionada(null);
                 setPaginaActual(1);
+            },
+            onError: () => {
+                setCuentaSeleccionada(null);
             },
         });
     }
@@ -84,6 +90,17 @@ function CuentasGuiaPage() {
                     </p>
                 </div>
             </header>
+
+            {ultimaCuentaBaja ? (
+                <Alerta tipo="exito" titulo="Cuenta de guía dada de baja exitosamente">
+                    Se desactivó el acceso al sistema de{" "}
+                    <span className="font-semibold">
+                        {ultimaCuentaBaja.nombre} {ultimaCuentaBaja.apellido}
+                    </span>{" "}
+                    ({ultimaCuentaBaja.email}). Su legajo operativo permanece en estado{" "}
+                    <span className="font-semibold">{ultimaCuentaBaja.guia.estadoPersonal}</span> y se conserva su historial de salidas.
+                </Alerta>
+            ) : null}
 
             {darDeBaja.isError ? (
                 <Alerta tipo="error" titulo="No se pudo dar de baja la cuenta de guía">
@@ -193,7 +210,10 @@ function CuentasGuiaPage() {
                                             Pasaporte: {cuenta.guia.nroPasaporte}
                                         </p>
                                         <p className="text-xs text-texto-suave">
-                                            Legajo: {cuenta.guia.estadoPersonal}
+                                            Legajo:{" "}
+                                            <span className="font-semibold text-texto">
+                                                {cuenta.guia.estadoPersonal}
+                                            </span>
                                         </p>
                                     </div>
                                 ),
@@ -205,7 +225,15 @@ function CuentasGuiaPage() {
                                     <div>
                                         <p className="font-medium text-texto">
                                             {cuenta.habilitacion.nroHabilitacion ?? "Sin número"} ·{" "}
-                                            <span className="text-xs font-semibold">
+                                            <span
+                                                className={`text-xs font-semibold ${
+                                                    cuenta.habilitacion.situacion === "VIGENTE"
+                                                        ? "text-marca"
+                                                        : cuenta.habilitacion.situacion === "VENCIDA"
+                                                          ? "text-peligro"
+                                                          : "text-texto-suave"
+                                                }`}
+                                            >
                                                 {cuenta.habilitacion.situacion}
                                             </span>
                                         </p>
@@ -221,10 +249,39 @@ function CuentasGuiaPage() {
                             {
                                 clave: "salidasPendientes",
                                 titulo: "Salidas pendientes",
+                                renderizar: (cuenta) => (
+                                    <div>
+                                        <span
+                                            className={`font-semibold ${
+                                                cuenta.salidasPendientes > 0
+                                                    ? "text-peligro"
+                                                    : "text-texto"
+                                            }`}
+                                        >
+                                            {cuenta.salidasPendientes}
+                                        </span>
+                                        {cuenta.salidasPendientes > 0 ? (
+                                            <p className="text-xs text-texto-suave">
+                                                Bloquea la baja
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                ),
                             },
                             {
                                 clave: "estado",
                                 titulo: "Estado cuenta",
+                                renderizar: (cuenta) => (
+                                    <span
+                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            cuenta.estado === "ACTIVO"
+                                                ? "bg-marca/10 text-marca"
+                                                : "bg-borde text-texto-suave"
+                                        }`}
+                                    >
+                                        {cuenta.estado}
+                                    </span>
+                                ),
                             },
                             {
                                 clave: "idusuario",
@@ -233,7 +290,10 @@ function CuentasGuiaPage() {
                                     <Boton
                                         variante="peligro"
                                         className="px-3 py-1.5 text-xs"
-                                        onClick={() => setCuentaSeleccionada(cuenta)}
+                                        onClick={() => {
+                                            darDeBaja.reset();
+                                            setCuentaSeleccionada(cuenta);
+                                        }}
                                         disabled={!cuenta.puedeDarseDeBaja}
                                         title={
                                             cuenta.estado === "INACTIVO"
@@ -265,7 +325,7 @@ function CuentasGuiaPage() {
                 titulo="Confirmar baja de cuenta de guía"
                 descripcion={
                     cuentaSeleccionada
-                        ? `¿Querés dar de baja la cuenta de acceso de ${cuentaSeleccionada.nombre} ${cuentaSeleccionada.apellido} (${cuentaSeleccionada.email})? El guía ya no podrá iniciar sesión, pero se conservará su historial.`
+                        ? `¿Querés dar de baja la cuenta de acceso de ${cuentaSeleccionada.nombre} ${cuentaSeleccionada.apellido} (${cuentaSeleccionada.email})? El guía ya no podrá iniciar sesión, pero se conservará su legajo operativo e historial de salidas.`
                         : ""
                 }
                 textoConfirmar={darDeBaja.isPending ? "Procesando..." : "Dar de baja"}
@@ -278,3 +338,4 @@ function CuentasGuiaPage() {
 }
 
 export default CuentasGuiaPage;
+

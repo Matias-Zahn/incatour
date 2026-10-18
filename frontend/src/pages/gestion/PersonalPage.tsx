@@ -8,6 +8,7 @@ import FormularioPersonal from "../../components/FormularioPersonal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
+    esFechaFuturaOVigente,
     rolesPersonal,
     useCrearPersonal,
     useDarDeBajaPersonal,
@@ -18,6 +19,8 @@ import {
     type EstadoPersonal,
     type FiltrosPersonal,
     type Personal,
+    type PersonalModificar,
+    type ResultadoCrearPersonal,
     type RolPersonal,
 } from "../../services/personalService";
 
@@ -48,10 +51,13 @@ function PersonalPage() {
     const [personalEnEdicion, setPersonalEnEdicion] = useState<Personal | null>(null);
     const [personalSeleccionado, setPersonalSeleccionado] = useState<Personal | null>(null);
     const [errorFormulario, setErrorFormulario] = useState("");
+    const [ultimoRegistro, setUltimoRegistro] = useState<ResultadoCrearPersonal | null>(null);
 
     function abrirFormulario(persona?: Personal) {
         setPersonalEnEdicion(persona ?? null);
         setErrorFormulario("");
+        setUltimoRegistro(null);
+        darDeBaja.reset();
         setFormularioAbierto(true);
     }
 
@@ -63,17 +69,57 @@ function PersonalPage() {
 
     function manejarCrear(datos: DatosCrearPersonal) {
         crear.mutate(datos, {
-            onSuccess: cerrarFormulario,
+            onSuccess: (resultado) => {
+                setUltimoRegistro(resultado);
+                cerrarFormulario();
+            },
             onError: (e: Error) => setErrorFormulario(e.message),
         });
     }
 
     function manejarModificar(datos: DatosModificarPersonal) {
         if (!personalEnEdicion) return;
+
+        const cambios: PersonalModificar = {};
+        if (datos.nombreCompleto.trim() !== personalEnEdicion.nombreCompleto) {
+            cambios.nombreCompleto = datos.nombreCompleto.trim();
+        }
+        if (datos.nroPasaporte.trim() !== personalEnEdicion.nroPasaporte) {
+            cambios.nroPasaporte = datos.nroPasaporte.trim();
+        }
+        if (datos.nacionalidad.trim() !== personalEnEdicion.nacionalidad) {
+            cambios.nacionalidad = datos.nacionalidad.trim();
+        }
+        if (datos.fechaVencimientoPasaporte !== personalEnEdicion.fechaVencimientoPasaporte) {
+            cambios.fechaVencimientoPasaporte = datos.fechaVencimientoPasaporte;
+        }
+
+        if (personalEnEdicion.rol === "Guía") {
+            const habActual = personalEnEdicion.guia?.nroHabilitacion ?? "";
+            const fechaHabActual = personalEnEdicion.guia?.fechaHabilitacion ?? "";
+            const nuevaHab = datos.nroHabilitacion?.trim() ?? "";
+            const nuevaFechaHab = datos.fechaHabilitacion ?? "";
+
+            if (nuevaHab && nuevaHab !== habActual) {
+                cambios.nroHabilitacion = nuevaHab;
+            }
+            if (nuevaFechaHab && nuevaFechaHab !== fechaHabActual) {
+                cambios.fechaHabilitacion = nuevaFechaHab;
+            }
+        }
+
+        if (Object.keys(cambios).length === 0) {
+            cerrarFormulario();
+            return;
+        }
+
         modificar.mutate(
-            { id: personalEnEdicion.idpersonal, datos },
+            { id: personalEnEdicion.idpersonal, datos: cambios },
             {
-                onSuccess: cerrarFormulario,
+                onSuccess: () => {
+                    setUltimoRegistro(null);
+                    cerrarFormulario();
+                },
                 onError: (e: Error) => setErrorFormulario(e.message),
             },
         );
@@ -81,10 +127,14 @@ function PersonalPage() {
 
     function confirmarBaja() {
         if (!personalSeleccionado) return;
+        setUltimoRegistro(null);
         darDeBaja.mutate(personalSeleccionado.idpersonal, {
             onSuccess: () => {
                 setPersonalSeleccionado(null);
                 setPaginaActual(1);
+            },
+            onError: () => {
+                setPersonalSeleccionado(null);
             },
         });
     }
@@ -160,6 +210,32 @@ function PersonalPage() {
                     guardando={guardando}
                     errorServidor={errorFormulario}
                 />
+            ) : null}
+
+            {ultimoRegistro ? (
+                <Alerta tipo="exito" titulo={ultimoRegistro.mensaje}>
+                    {ultimoRegistro.credencialesAcceso ? (
+                        <>
+                            Se creó el legajo de guía de{" "}
+                            <span className="font-semibold">
+                                {ultimoRegistro.perfilOperativo.nombreCompleto}
+                            </span>{" "}
+                            junto con su cuenta de acceso{" "}
+                            <span className="font-semibold">
+                                {ultimoRegistro.credencialesAcceso.email}
+                            </span>{" "}
+                            (rol {ultimoRegistro.credencialesAcceso.rol}).
+                        </>
+                    ) : (
+                        <>
+                            Se creó el legajo operativo de{" "}
+                            <span className="font-semibold">
+                                {ultimoRegistro.perfilOperativo.nombreCompleto}
+                            </span>{" "}
+                            ({ultimoRegistro.perfilOperativo.rol}).
+                        </>
+                    )}
+                </Alerta>
             ) : null}
 
             {darDeBaja.isError ? (
@@ -289,23 +365,48 @@ function PersonalPage() {
                             {
                                 clave: "guia",
                                 titulo: "Habilitación",
-                                renderizar: (persona) =>
-                                    persona.guia ? (
+                                renderizar: (persona) => {
+                                    if (!persona.guia) {
+                                        return (
+                                            <span className="text-xs text-texto-suave">No aplica</span>
+                                        );
+                                    }
+                                    const vigente = esFechaFuturaOVigente(
+                                        persona.guia.fechaHabilitacion,
+                                    );
+                                    return (
                                         <div>
                                             <p className="font-medium text-texto">
-                                                {persona.guia.nroHabilitacion}
+                                                {persona.guia.nroHabilitacion} ·{" "}
+                                                <span
+                                                    className={`text-xs font-semibold ${
+                                                        vigente ? "text-marca" : "text-peligro"
+                                                    }`}
+                                                >
+                                                    {vigente ? "VIGENTE" : "VENCIDA"}
+                                                </span>
                                             </p>
                                             <p className="text-xs text-texto-suave">
                                                 Vence {persona.guia.fechaHabilitacion}
                                             </p>
                                         </div>
-                                    ) : (
-                                        <span className="text-xs text-texto-suave">No aplica</span>
-                                    ),
+                                    );
+                                },
                             },
                             {
                                 clave: "estado",
                                 titulo: "Estado",
+                                renderizar: (persona) => (
+                                    <span
+                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            persona.estado === "ACTIVO"
+                                                ? "bg-marca/10 text-marca"
+                                                : "bg-borde text-texto-suave"
+                                        }`}
+                                    >
+                                        {persona.estado}
+                                    </span>
+                                ),
                             },
                             {
                                 clave: "idpersonal",
@@ -317,14 +418,27 @@ function PersonalPage() {
                                             className="px-3 py-1.5 text-xs"
                                             onClick={() => abrirFormulario(persona)}
                                             disabled={persona.estado === "INACTIVO"}
+                                            title={
+                                                persona.estado === "INACTIVO"
+                                                    ? "No se puede modificar personal dado de baja"
+                                                    : undefined
+                                            }
                                         >
                                             Editar
                                         </Boton>
                                         <Boton
                                             variante="peligro"
                                             className="px-3 py-1.5 text-xs"
-                                            onClick={() => setPersonalSeleccionado(persona)}
+                                            onClick={() => {
+                                                darDeBaja.reset();
+                                                setPersonalSeleccionado(persona);
+                                            }}
                                             disabled={persona.estado === "INACTIVO"}
+                                            title={
+                                                persona.estado === "INACTIVO"
+                                                    ? "El personal ya está dado de baja"
+                                                    : undefined
+                                            }
                                         >
                                             Dar de baja
                                         </Boton>
