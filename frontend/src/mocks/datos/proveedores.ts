@@ -1,9 +1,37 @@
 import type { Proveedor } from "../../services/proveedorService";
 
 export const proveedoresSemilla: Proveedor[] = [
-    { id: 1, nombre: "Andes Travel", contacto: "contacto@andes.com" },
-    { id: 2, nombre: "Camino Inca Tours", contacto: "info@caminoinca.com" },
-    { id: 3, nombre: "Transportes Urubamba", contacto: "reservas@urubamba.pe" },
-    { id: 4, nombre: "Hostal Machu Picchu", contacto: "hola@hostalmp.pe" },
-    { id: 5, nombre: "Porteadores Qhapaq Ñan", contacto: "equipo@qhapaqnan.pe" },
+    {
+        idproveedor: 1,
+        tipoProveedor: "ALOJAMIENTO",
+        razonSocial: "Hoteles del Cusco",
+        localidad: "Cusco",
+        datosContacto: "reservas@hoteles-cusco.pe",
+        canalComunicacion: "Correo electrónico",
+        estado: "ACTIVO",
+    },
+    {
+        idproveedor: 2,
+        tipoProveedor: "TRANSPORTE",
+        razonSocial: "Transportes Urubamba",
+        localidad: "Urubamba",
+        datosContacto: "+51 984 555 111",
+        canalComunicacion: "WhatsApp",
+        estado: "ACTIVO",
+    },
+    {
+        idproveedor: 3,
+        tipoProveedor: "EQUIPAMIENTO",
+        razonSocial: "Andes Outdoor",
+        localidad: "Cusco",
+        datosContacto: "ventas@andes-outdoor.pe",
+        canalComunicacion: "Correo electrónico",
+        estado: "ACTIVO",
+    },
 ];
+
+/** Proveedores con solicitudes de alojamiento pendientes (bloquean la baja, CU-17). */
+export const proveedoresConSolicitudesPendientes = new Set<number>([1]);
+
+/** Proveedores con servicios asignados a salidas activas o en curso (bloquean la baja, CU-17). */
+export const proveedoresConSalidasActivas = new Set<number>([2]);

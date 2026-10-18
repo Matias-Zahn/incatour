@@ -14,7 +14,7 @@ const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: "◫" },
     { etiqueta: "Reservas y pagos", icono: "▤", ruta: "/gestion/solicitudes" },
-    { etiqueta: "Personal", icono: "♙" },
+    { etiqueta: "Personal", icono: "♙", ruta: "/gestion/personal" },
     { etiqueta: "Reseñas y evaluaciones", icono: "☆", ruta: "/gestion/evaluaciones" },
 ];
 

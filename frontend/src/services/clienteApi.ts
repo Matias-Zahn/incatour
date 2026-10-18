@@ -1,3 +1,5 @@
+import { limpiarSesion, obtenerToken } from "./sesionService";
+
 const URL_BASE: string = import.meta.env.VITE_API_URL ?? "/api";
 
 export class ErrorApi extends Error {
@@ -15,10 +17,19 @@ export function construirUrl(ruta: string): string {
     return `${URL_BASE}${ruta}`;
 }
 
+/** Rutas públicas: no llevan token y un 401 no implica sesión vencida. */
+const RUTAS_PUBLICAS = ["/auth/login", "/catalogo", "/clientes"];
+
 /**
  * Cliente HTTP único: es el único lugar del front que usa fetch.
  * Con MSW activo las peticiones se interceptan; apuntando VITE_API_URL
  * al back real, el resto del código no cambia.
+ *
+ * - Agrega `Authorization: Bearer <token>` a cada pedido administrativo.
+ * - Respeta headers explícitos pasados en opciones (e.g. checkout de cliente).
+ * - Si el body es FormData, no fuerza Content-Type para permitir multipart boundary.
+ * - Extrae mensajes de error de cuerpo.error o cuerpo.mensaje y los lanza como ErrorApi.
+ * - Ante un 401 en llamadas autenticadas con la sesión de administración, limpia la sesión y redirige al login.
  */
 export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
     const esFormData =
@@ -27,17 +38,49 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
         ? {}
         : { "Content-Type": "application/json" };
 
+    const esRutaPublica = RUTAS_PUBLICAS.some((publica) => ruta.startsWith(publica));
+
+    const tieneAuthEnOpciones = (() => {
+        if (!opciones.headers) return false;
+        if (opciones.headers instanceof Headers) {
+            return opciones.headers.has("Authorization");
+        }
+        if (Array.isArray(opciones.headers)) {
+            return opciones.headers.some(([clave]) => clave.toLowerCase() === "authorization");
+        }
+        return Object.keys(opciones.headers).some((clave) => clave.toLowerCase() === "authorization");
+    })();
+
+    const token = obtenerToken();
+    const cabeceraAuth: HeadersInit =
+        token && !esRutaPublica && !tieneAuthEnOpciones
+            ? { Authorization: `Bearer ${token}` }
+            : {};
+
     const respuesta = await fetch(construirUrl(ruta), {
         ...opciones,
-        headers: { ...cabecerasBase, ...opciones.headers },
+        headers: {
+            ...cabecerasBase,
+            ...cabeceraAuth,
+            ...opciones.headers,
+        },
     });
 
     if (!respuesta.ok) {
+        if (respuesta.status === 401 && !esRutaPublica && !tieneAuthEnOpciones) {
+            limpiarSesion();
+            if (typeof window !== "undefined") {
+                window.location.assign("/login");
+            }
+        }
         let mensaje = "Ocurrió un error inesperado.";
         try {
             const cuerpo = (await respuesta.json()) as { error?: string; mensaje?: string };
-            if (cuerpo.error) mensaje = cuerpo.error;
-            else if (cuerpo.mensaje) mensaje = cuerpo.mensaje;
+            if (cuerpo.error) {
+                mensaje = cuerpo.error;
+            } else if (cuerpo.mensaje) {
+                mensaje = cuerpo.mensaje;
+            }
         } catch {
             // respuesta sin cuerpo JSON
         }
