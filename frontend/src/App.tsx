@@ -1,5 +1,7 @@
 import LayoutGestion from "./components/LayoutGestion";
+import CuentasGuiaPage from "./pages/gestion/CuentasGuiaPage";
 import InicioGestionPage from "./pages/gestion/InicioGestionPage";
+import PersonalPage from "./pages/gestion/PersonalPage";
 import ProveedoresPage from "./pages/gestion/ProveedoresPage";
 import ServiciosPage from "./pages/gestion/ServiciosPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -29,6 +31,22 @@ function App() {
           element={
             <LayoutGestion seccion="Proveedores">
               <ServiciosPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/personal"
+          element={
+            <LayoutGestion seccion="Personal">
+              <PersonalPage />
+            </LayoutGestion>
+          }
+        />
+        <Route
+          path="/gestion/cuentas-guia"
+          element={
+            <LayoutGestion seccion="Personal">
+              <CuentasGuiaPage />
             </LayoutGestion>
           }
         />
