@@ -33,10 +33,20 @@ export class AuthRoutes {
      *             schema:
      *               type: object
      *               properties:
-     *                 usuario:
+     *                 data:
      *                   type: object
-     *                 token:
-     *                   type: string
+     *                   properties:
+     *                     usuario:
+     *                       type: object
+     *                       properties:
+     *                         idusuario: { type: integer, example: 1 }
+     *                         email: { type: string, example: admin@incatour.com }
+     *                         nombre: { type: string }
+     *                         apellido: { type: string }
+     *                         rol: { type: string, enum: [ADMIN, CLIENTE, GUIA] }
+     *                     token:
+     *                       type: string
+     *                       description: JWT de 8 horas. Va en cada pedido como Authorization Bearer.
      *       401:
      *         description: Credenciales inválidas o cuenta inactiva.
      */

@@ -14,7 +14,7 @@ export class DevolucionEquipamientoController {
       }
 
       const resultado = await service.obtenerEquipamientoAsignado(idsalida);
-      return res.status(200).json(resultado);
+      return res.status(200).json({ data: resultado });
     } catch (error) {
       next(error);
     }
@@ -35,7 +35,8 @@ export class DevolucionEquipamientoController {
       const usuarioEmail = req.usuarioAutenticado?.email ?? "admin@incatour.com";
       const resultado = await service.registrarDevolucion(idsalida, dto!, usuarioEmail);
 
-      return res.status(200).json(resultado);
+      const { mensaje, ...data } = resultado;
+      return res.status(200).json({ mensaje, data });
     } catch (error) {
       next(error);
     }

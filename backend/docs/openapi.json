@@ -1705,6 +1705,11 @@
         "tags": [
           "Solicitudes de Alojamiento"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de solicitudes pendientes"
@@ -1718,6 +1723,11 @@
         "description": "Busca hoteles compatibles con las garantías del paquete, excluyendo los ya rechazados.",
         "tags": [
           "Solicitudes de Alojamiento"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -1748,6 +1758,11 @@
         "description": "Registra la aceptación o rechazo por parte del proveedor. Si es rechazada, genera un reintento automático.",
         "tags": [
           "Solicitudes de Alojamiento"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -3968,6 +3983,11 @@
         "tags": [
           "Temporadas"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de temporadas",
@@ -3993,6 +4013,11 @@
         "summary": "Crear temporada (CU-07)",
         "tags": [
           "Temporadas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4058,6 +4083,11 @@
         "description": "Debe enviarse al menos un campo. La fecha de inicio debe quedar anterior a la de fin.",
         "tags": [
           "Temporadas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -4127,6 +4157,11 @@
         "tags": [
           "Temporadas"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -4171,6 +4206,11 @@
         "tags": [
           "Paquetes"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de paquetes obtenida exitosamente"
@@ -4181,6 +4221,11 @@
         "summary": "Crear Paquete Turístico (CU-11)",
         "tags": [
           "Paquetes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4237,6 +4282,11 @@
         "tags": [
           "Paquetes"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -4257,6 +4307,11 @@
         "summary": "Modificar Paquete (CU-12)",
         "tags": [
           "Paquetes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -4291,6 +4346,11 @@
         "tags": [
           "Paquetes"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -4302,8 +4362,66 @@
           }
         ],
         "responses": {
+          "200": null
+        }
+      }
+    },
+    "/api/paquetes/{id}/imagen": {
+      "post": {
+        "summary": "Subir imagen de un paquete turístico",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Permite subir un archivo de imagen (JPG, PNG o WEBP, máx 3 MB). La imagen se almacena en /public/imagenes/paquetes/{id}/ y se sirve directamente vía Express.\n",
+        "tags": [
+          "Paquetes"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "imagen"
+                ],
+                "properties": {
+                  "imagen": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
           "200": {
-            "description": "Paquete dado de baja exitosamente"
+            "description": "Imagen subida exitosamente"
+          },
+          "400": {
+            "description": "Formato inválido o archivo no proporcionado"
+          },
+          "401": {
+            "description": "No autenticado"
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "404": {
+            "description": "Paquete no encontrado"
           }
         }
       }
@@ -4313,6 +4431,11 @@
         "summary": "Listar etapas de un circuito",
         "tags": [
           "Etapas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -4335,6 +4458,11 @@
         "description": "Borra las etapas actuales y las reemplaza por las nuevas provistas, validando correlatividad.",
         "tags": [
           "Etapas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -4386,6 +4514,11 @@
         "tags": [
           "Circuitos"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de circuitos",
@@ -4411,6 +4544,11 @@
         "summary": "Crear circuito turístico (CU-02)",
         "tags": [
           "Circuitos"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4485,6 +4623,11 @@
         "tags": [
           "Circuitos"
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -4558,6 +4701,11 @@
         "description": "Baja lógica. No se permite si el circuito tiene paquetes activos asociados.",
         "tags": [
           "Circuitos"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -5078,11 +5226,41 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "usuario": {
-                      "type": "object"
-                    },
-                    "token": {
-                      "type": "string"
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "usuario": {
+                          "type": "object",
+                          "properties": {
+                            "idusuario": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "email": {
+                              "type": "string",
+                              "example": "admin@incatour.com"
+                            },
+                            "nombre": {
+                              "type": "string"
+                            },
+                            "apellido": {
+                              "type": "string"
+                            },
+                            "rol": {
+                              "type": "string",
+                              "enum": [
+                                "ADMIN",
+                                "CLIENTE",
+                                "GUIA"
+                              ]
+                            }
+                          }
+                        },
+                        "token": {
+                          "type": "string",
+                          "description": "JWT de 8 horas. Va en cada pedido como Authorization Bearer."
+                        }
+                      }
                     }
                   }
                 }

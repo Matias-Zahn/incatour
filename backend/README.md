@@ -56,6 +56,9 @@ DB_PASSWORD=postgrespassword
 DB_NAME=incatour_db
 JWT_SEED=incatour_secreto_desarrollo_local_123
 
+# Autoridad simulada: true simula que la autoridad no responde (FA2 de los CU-36 y CU-37)
+AUTORIDAD_CAIDA=false
+
 # URL de conexión para Prisma ORM
 DATABASE_URL="postgresql://postgres:postgrespassword@localhost:5432/incatour_db?schema=public"
 ```

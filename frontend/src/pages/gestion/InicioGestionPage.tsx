@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import Boton from "../../components/Boton";
 
 type Metrica = {
@@ -99,6 +100,8 @@ const estiloEstado: Record<Actividad["estado"] | Salida["estado"], string> = {
 };
 
 function InicioGestionPage() {
+    const navigate = useNavigate();
+
     return (
         <section className="mx-auto max-w-7xl space-y-8">
             <header className="flex flex-wrap items-end justify-between gap-4">
@@ -114,7 +117,17 @@ function InicioGestionPage() {
                     </p>
                 </div>
 
-                <Boton>Crear nueva salida</Boton>
+                <div className="flex flex-wrap gap-2">
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/catalogo?vista=admin")}
+                    >
+                        👁 Ver tienda como cliente
+                    </Boton>
+                    <Boton onClick={() => navigate("/gestion/paquetes")}>
+                        Gestionar paquetes turísticos
+                    </Boton>
+                </div>
             </header>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -145,7 +158,11 @@ function InicioGestionPage() {
                                 Salidas programadas para los próximos días
                             </p>
                         </div>
-                        <Boton className="px-3 py-1.5 text-xs" variante="fantasma">
+                        <Boton
+                            className="px-3 py-1.5 text-xs"
+                            variante="fantasma"
+                            onClick={() => navigate("/gestion/evaluaciones")}
+                        >
                             Ver todas
                         </Boton>
                     </div>
@@ -217,9 +234,42 @@ function InicioGestionPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <Boton variante="secundario">Administrar proveedores</Boton>
-                    <Boton variante="secundario">Gestionar personal</Boton>
-                    <Boton variante="secundario">Revisar reservas</Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/circuitos")}
+                    >
+                        Administrar circuitos
+                    </Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/temporadas")}
+                    >
+                        Gestionar temporadas
+                    </Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/paquetes")}
+                    >
+                        Paquetes turísticos
+                    </Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/proveedores")}
+                    >
+                        Administrar proveedores
+                    </Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/solicitudes")}
+                    >
+                        Revisar solicitudes de alojamiento
+                    </Boton>
+                    <Boton
+                        variante="secundario"
+                        onClick={() => navigate("/gestion/evaluaciones")}
+                    >
+                        Reseñas y evaluaciones
+                    </Boton>
                 </div>
             </article>
         </section>

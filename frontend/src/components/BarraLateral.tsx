@@ -10,12 +10,12 @@ type ElementoNavegacion = {
 const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Inicio", icono: "⌂", ruta: "/" },
     { etiqueta: "Circuitos", icono: "⌁", ruta: "/gestion/circuitos" },
-    { etiqueta: "Paquetes turísticos", icono: "▣" },
+    { etiqueta: "Paquetes turísticos", icono: "▣", ruta: "/gestion/paquetes" },
     { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: "◫" },
-    { etiqueta: "Reservas y pagos", icono: "▤" },
+    { etiqueta: "Reservas y pagos", icono: "▤", ruta: "/gestion/solicitudes" },
     { etiqueta: "Personal", icono: "♙", ruta: "/gestion/personal" },
-    { etiqueta: "Reseñas y evaluaciones", icono: "☆" },
+    { etiqueta: "Reseñas y evaluaciones", icono: "☆", ruta: "/gestion/evaluaciones" },
 ];
 
 type BarraLateralProps = {
@@ -74,6 +74,16 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                     ))}
                 </ul>
             </nav>
+
+            <div className="border-t border-white/20 px-3 py-3">
+                <NavLink
+                    to="/catalogo?vista=admin"
+                    className="flex w-full items-center justify-between rounded-control bg-white/15 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-white/25"
+                >
+                    <span>👁 Ver tienda como cliente</span>
+                    <span aria-hidden="true">↗</span>
+                </NavLink>
+            </div>
 
             <div className="border-t border-white/20 px-5 py-4 text-xs text-white/80">
                 <p>Usuario de gestión</p>

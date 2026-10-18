@@ -11,12 +11,16 @@ import { PaqueteController } from "./paquete.controller";
  *   get:
  *     summary: Consultar paquetes turísticos (CU-10)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de paquetes obtenida exitosamente
  *   post:
  *     summary: Crear Paquete Turístico (CU-11)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -52,6 +56,8 @@ import { PaqueteController } from "./paquete.controller";
  *   get:
  *     summary: Obtener paquete por ID
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -64,6 +70,8 @@ import { PaqueteController } from "./paquete.controller";
  *   put:
  *     summary: Modificar Paquete (CU-12)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -84,6 +92,8 @@ import { PaqueteController } from "./paquete.controller";
  *   patch:
  *     summary: Dar de baja Paquete (CU-13)
  *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -92,12 +102,62 @@ import { PaqueteController } from "./paquete.controller";
  *           type: integer
  *     responses:
  *       200:
- *         description: Paquete dado de baja exitosamente
+ * /api/paquetes/{id}/imagen:
+ *   post:
+ *     summary: Subir imagen de un paquete turístico
+ *     description: >
+ *       **RESTRINGIDO A ADMINISTRADOR.** Permite subir un archivo de imagen (JPG, PNG o WEBP, máx 3 MB).
+ *       La imagen se almacena en /public/imagenes/paquetes/{id}/ y se sirve directamente vía Express.
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - imagen
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Imagen subida exitosamente
+ *       400:
+ *         description: Formato inválido o archivo no proporcionado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: Requiere rol ADMIN
+ *       404:
+ *         description: Paquete no encontrado
  */
+import {
+  subirImagenPaquete,
+  subirCarruselPaquete,
+  modificarFotoEspecifica,
+} from "../../../shared/upload/uploadPaquete.middleware";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
+
 export class PaqueteRoutes {
   static get getRoutes(): Router {
     const router = Router();
     const controller = new PaqueteController();
+
+    // Consulta de imágenes del paquete (PÚBLICO para catálogo y cliente)
+    router.get("/:id/imagenes", controller.consultarImagenes);
+
+    // Gestión interna: solo el administrador
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // CU-10: Consultar paquetes activos
     router.get("/", controller.consultarPaquetes);
@@ -113,6 +173,24 @@ export class PaqueteRoutes {
 
     // CU-13: Baja de Paquete
     router.patch("/:id/baja", controller.darDeBaja);
+
+    // Subir imagen individual (portada principal)
+    router.post("/:id/imagen", subirImagenPaquete.single("imagen"), controller.subirImagen);
+    router.put("/:id/imagen", subirImagenPaquete.single("imagen"), controller.subirImagen);
+
+    // Subir / Modificar carrusel de fotos (de 1 a 5 fotos, la 1° es la principal)
+    router.post("/:id/carrusel", subirCarruselPaquete.array("imagenes", 5), controller.subirCarrusel);
+    router.put("/:id/carrusel", subirCarruselPaquete.array("imagenes", 5), controller.subirCarrusel);
+
+    // Reemplazar una foto en particular del carrusel (ej: foto_2, principal)
+    router.put(
+      "/:id/carrusel/:nombreFoto",
+      modificarFotoEspecifica.single("imagen"),
+      controller.modificarFotoIndividual
+    );
+
+    // Eliminar una foto en particular del carrusel (ej: foto_2, principal)
+    router.delete("/:id/carrusel/:nombreFoto", controller.eliminarFotoIndividual);
 
     return router;
   }

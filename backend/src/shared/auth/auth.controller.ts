@@ -12,7 +12,7 @@ export class AuthController {
       if (error) throw CustomError.badRequest(error);
 
       const resultado = await service.login(dto!);
-      return res.status(200).json(resultado);
+      return res.status(200).json({ data: resultado });
     } catch (error) {
       next(error);
     }

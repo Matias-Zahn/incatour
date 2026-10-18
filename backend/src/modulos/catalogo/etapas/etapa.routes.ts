@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 import { EtapaController } from "./etapa.controller";
 
 /**
@@ -11,6 +12,8 @@ import { EtapaController } from "./etapa.controller";
  *   get:
  *     summary: Listar etapas de un circuito
  *     tags: [Etapas]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: idcircuito
@@ -24,6 +27,8 @@ import { EtapaController } from "./etapa.controller";
  *     summary: Reemplazo masivo de etapas (CU-05)
  *     description: Borra las etapas actuales y las reemplaza por las nuevas provistas, validando correlatividad.
  *     tags: [Etapas]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: idcircuito
@@ -57,6 +62,9 @@ export class EtapaRoutes {
     // cuando este router se monta desde app.ts o circuito.routes.ts
     const router = Router({ mergeParams: true });
     const controller = new EtapaController();
+
+    // Gestión interna: solo el administrador (el catálogo público va por /api/catalogo)
+    router.use(autenticar, requierePerfil("ADMIN"));
 
     // GET /api/circuitos/:idcircuito/etapas
     router.get("/", controller.consultarEtapas);

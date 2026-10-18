@@ -4,10 +4,21 @@ import { envs } from "./config/envs";
 import { manejadorErrores } from "./error/manejadorErrores";
 import { setupSwagger } from "./config/swagger";
 
+import path from "path";
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Servir archivos estáticos de imágenes (logo, catálogo)
+app.use(
+  "/imagenes",
+  express.static(path.resolve(process.cwd(), "public/imagenes"), {
+    maxAge: "7d",
+    index: false,
+  })
+);
 
 setupSwagger(app);
 
@@ -17,8 +28,8 @@ app.get("/api/", (req, res) => {
 
 // Autoridad
 import { configurarAutoridad } from "./modulos/salidas/autoridad.wiring";
-import { AutoridadMock } from "./integraciones/autoridad/autoridad.mock";
-configurarAutoridad(new AutoridadMock());
+import { AutoridadSimulada } from "./integraciones/autoridad/autoridad.simulada";
+configurarAutoridad(new AutoridadSimulada());
 
 //Modulo Auth
 import { AuthRoutes } from "./shared/auth/auth.routes";
