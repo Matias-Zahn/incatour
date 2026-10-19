@@ -1,5 +1,6 @@
 import { delay, http, HttpResponse } from "msw";
 import { construirUrl } from "../../services/clienteApi";
+import { exigirRol } from "../autorizacion";
 import type {
     CrearReservaPayload,
     PaqueteCatalogoPublico,
@@ -157,7 +158,7 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
 let proximoIdReserva = 100;
 
 export const manejadoresCatalogoReservas = [
-    // CU-28: GET /api/catalogo
+    // CU-26: GET /api/catalogo
     http.get(construirUrl("/catalogo"), async () => {
         await delay(150);
         const data = catalogoMockInicial.map((p) => ({
@@ -173,6 +174,8 @@ export const manejadoresCatalogoReservas = [
 
     // CU-30: POST /api/reservas
     http.post(construirUrl("/reservas"), async ({ request }) => {
+        const denegado = exigirRol(request, "CLIENTE");
+        if (denegado) return denegado;
         await delay(300);
         const body = (await request.json()) as CrearReservaPayload;
 

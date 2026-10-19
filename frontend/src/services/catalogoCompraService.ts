@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { construirUrl, solicitarApi } from "./clienteApi";
+import { solicitarApi } from "./clienteApi";
 import { clavesPaquetes } from "./paqueteService";
 
 export type TarifaCatalogoPublico = {
@@ -111,67 +111,7 @@ type RespuestaCrearReserva = {
     data: ResultadoReservaConfirmada;
 };
 
-let tokenClienteCache: string | null = null;
-let promesaTokenCliente: Promise<string | null> | null = null;
-
-function leerRolDeJwt(token: string): string | null {
-    try {
-        const partes = token.split(".");
-        if (partes.length < 2) return null;
-        const payloadJson = atob(
-            partes[1].replace(/-/g, "+").replace(/_/g, "/"),
-        );
-        const payload = JSON.parse(payloadJson) as { rol?: string };
-        return payload.rol ?? null;
-    } catch {
-        return null;
-    }
-}
-
-async function obtenerTokenCliente(
-    forzarRenovacion = false,
-): Promise<string | null> {
-    if (!forzarRenovacion && typeof window !== "undefined") {
-        const guardado = localStorage.getItem("token");
-        if (guardado && leerRolDeJwt(guardado) === "CLIENTE") {
-            return guardado;
-        }
-    }
-
-    if (!forzarRenovacion && tokenClienteCache) {
-        return tokenClienteCache;
-    }
-
-    if (!promesaTokenCliente) {
-        promesaTokenCliente = fetch(construirUrl("/auth/login"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                email: "juan@test.com",
-                contrasenia: "hash123",
-            }),
-        })
-            .then(async (res) => {
-                if (!res.ok) return null;
-                const cuerpo = (await res.json()) as {
-                    token?: string;
-                    data?: { token?: string };
-                };
-                const token = cuerpo.data?.token ?? cuerpo.token ?? null;
-                if (token) {
-                    tokenClienteCache = token;
-                }
-                return token;
-            })
-            .catch(() => null)
-            .finally(() => {
-                promesaTokenCliente = null;
-            });
-    }
-
-    return promesaTokenCliente;
-}
-
+// CU-26: Consultar catálogo público de paquetes turísticos
 export async function listarCatalogoPublico(): Promise<
     PaqueteCatalogoPublico[]
 > {
@@ -179,37 +119,15 @@ export async function listarCatalogoPublico(): Promise<
     return res.data ?? [];
 }
 
+// CU-30: Comprar un paquete turístico (usa el token de sesionService a través de solicitarApi)
 export async function crearReservaPaquete(
     payload: CrearReservaPayload,
 ): Promise<{ mensaje: string; reserva: ResultadoReservaConfirmada }> {
-    const token = await obtenerTokenCliente(false);
-    const headers: HeadersInit = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
-
-    try {
-        const res = await solicitarApi<RespuestaCrearReserva>("/reservas", {
-            method: "POST",
-            headers,
-            body: JSON.stringify(payload),
-        });
-        return { mensaje: res.mensaje, reserva: res.data };
-    } catch (err) {
-        const estado = (err as { estado?: number })?.estado;
-        if (estado === 401 || estado === 403) {
-            const tokenRenovado = await obtenerTokenCliente(true);
-            const headersRenovados: HeadersInit = tokenRenovado
-                ? { Authorization: `Bearer ${tokenRenovado}` }
-                : {};
-            const res = await solicitarApi<RespuestaCrearReserva>("/reservas", {
-                method: "POST",
-                headers: headersRenovados,
-                body: JSON.stringify(payload),
-            });
-            return { mensaje: res.mensaje, reserva: res.data };
-        }
-        throw err;
-    }
+    const res = await solicitarApi<RespuestaCrearReserva>("/reservas", {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+    return { mensaje: res.mensaje, reserva: res.data };
 }
 
 export const clavesCatalogoCompra = {

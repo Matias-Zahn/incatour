@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { solicitarApiConAuth } from "./paqueteService";
+import { solicitarApi } from "./clienteApi";
 
 export const nivelesDificultad = ["Baja", "Media", "Alta"] as const;
 
@@ -86,13 +86,13 @@ function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCir
 }
 
 export function listarCircuitos(): Promise<Circuito[]> {
-    return solicitarApiConAuth<RespuestaDatos<CircuitoApi[]>>("/circuitos")
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarCircuito));
 }
 
 export function registrarCircuito(datos: DatosCircuito): Promise<Circuito> {
-    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>("/circuitos", {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>("/circuitos", {
         method: "POST",
         body: JSON.stringify(limpiarPayloadCircuito(datos)),
     })
@@ -104,7 +104,7 @@ export function modificarCircuito(
     id: number,
     datos: Partial<DatosCircuito>,
 ): Promise<Circuito> {
-    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
         method: "PUT",
         body: JSON.stringify(limpiarPayloadCircuito(datos)),
     })
@@ -113,7 +113,7 @@ export function modificarCircuito(
 }
 
 export function darDeBajaCircuito(id: number): Promise<Circuito> {
-    return solicitarApiConAuth<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}/baja`, {
+    return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}/baja`, {
         method: "PATCH",
     })
         .then(respuestaDatos)
@@ -122,7 +122,7 @@ export function darDeBajaCircuito(id: number): Promise<Circuito> {
 
 // CU-05: Consultar y reemplazar secuencia completa de etapas del circuito
 export function listarEtapasCircuito(idCircuito: number): Promise<EtapaCircuito[]> {
-    return solicitarApiConAuth<RespuestaDatos<EtapaCircuito[]>>(
+    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
         `/circuitos/${idCircuito}/etapas`,
     ).then(respuestaDatos);
 }
@@ -131,7 +131,7 @@ export function guardarSecuenciaEtapas(
     idCircuito: number,
     etapas: DatosEtapaCircuito[],
 ): Promise<EtapaCircuito[]> {
-    return solicitarApiConAuth<RespuestaDatos<EtapaCircuito[]>>(
+    return solicitarApi<RespuestaDatos<EtapaCircuito[]>>(
         `/circuitos/${idCircuito}/etapas`,
         {
             method: "PUT",

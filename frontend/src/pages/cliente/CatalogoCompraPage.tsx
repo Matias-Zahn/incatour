@@ -15,6 +15,7 @@ import {
     formatearDiasLegibles,
     resolverUrlImagenPaquete,
 } from "../../services/paqueteService";
+import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
 
 type PasajeroFormulario = PasajeroReservaInput & {
     pesoDeclarado: number;
@@ -107,6 +108,34 @@ function formatearFechaCorta(iso: string): string {
     });
 }
 
+function sumarDiasIso(iso: string, dias: number): string {
+    const fecha = new Date(iso);
+    if (Number.isNaN(fecha.getTime())) return iso;
+    const copia = new Date(fecha.getTime());
+    copia.setUTCDate(copia.getUTCDate() + dias);
+    return copia.toISOString();
+}
+
+function derivarFechasAlojamiento(
+    fechaInicioIso: string,
+    fechaFinIso: string,
+    nochesPrevias: number,
+    nochesPosteriores: number,
+): {
+    estadiaPrevia: string | null;
+    estadiaPosterior: string | null;
+} {
+    const estadiaPrevia =
+        nochesPrevias > 0
+            ? `${formatearFechaCorta(sumarDiasIso(fechaInicioIso, -nochesPrevias))} al ${formatearFechaCorta(fechaInicioIso)} (${nochesPrevias} ${nochesPrevias === 1 ? "noche" : "noches"})`
+            : null;
+    const estadiaPosterior =
+        nochesPosteriores > 0
+            ? `${formatearFechaCorta(fechaFinIso)} al ${formatearFechaCorta(sumarDiasIso(fechaFinIso, nochesPosteriores))} (${nochesPosteriores} ${nochesPosteriores === 1 ? "noche" : "noches"})`
+            : null;
+    return { estadiaPrevia, estadiaPosterior };
+}
+
 function obtenerImagenesPaqueteCatalogo(
     paquete: PaqueteCatalogoPublico,
 ): string[] {
@@ -137,6 +166,9 @@ function CatalogoCompraPage() {
     const [parametrosUrl] = useSearchParams();
     const esVistaPreviaAdmin = parametrosUrl.get("vista") === "admin";
     const idPaquetePreseleccionado = Number(parametrosUrl.get("paquete") ?? 0);
+    const usuarioSesion = obtenerToken() ? obtenerUsuario() : null;
+    const esSesionCliente = usuarioSesion?.rol === "CLIENTE";
+    const esAdmin = esVistaPreviaAdmin || usuarioSesion?.rol === "ADMIN";
 
     const {
         data: paquetes = [],
@@ -146,12 +178,15 @@ function CatalogoCompraPage() {
     } = useCatalogoPublico();
     const mutacionReserva = useCrearReservaPaquete();
 
-    // Filtros del escaparate (CU-28)
+    // Filtros del escaparate (CU-26 · RF-27: duración, dificultad y rango de fechas)
     const [busqueda, setBusqueda] = useState("");
     const [filtroDificultad, setFiltroDificultad] = useState("TODAS");
+    const [filtroDuracion, setFiltroDuracion] = useState("TODAS");
+    const [fechaDesde, setFechaDesde] = useState("");
+    const [fechaHasta, setFechaHasta] = useState("");
     const [soloConSalidas, setSoloConSalidas] = useState(false);
 
-    // Modal de detalle e itinerario (CU-29)
+    // Modal de detalle e itinerario (CU-26)
     const [paqueteDetalle, setPaqueteDetalle] =
         useState<PaqueteCatalogoPublico | null>(null);
     const [indiceFotoDetalle, setIndiceFotoDetalle] = useState(0);
@@ -358,6 +393,13 @@ function CatalogoCompraPage() {
         evento.preventDefault();
         setErrorCompra("");
 
+        if (!obtenerToken() || obtenerUsuario()?.rol !== "CLIENTE") {
+            setErrorCompra(
+                "Para confirmar la compra debés iniciar sesión con una cuenta de perfil CLIENTE (por ejemplo: juan@test.com / hash123).",
+            );
+            return;
+        }
+
         if (!paqueteEnCompra || !salidaActiva) {
             setErrorCompra(
                 "Seleccioná una salida programada disponible para continuar con la compra.",
@@ -490,14 +532,112 @@ function CatalogoCompraPage() {
         }
     }
 
-    // Filtrado del catálogo
+    function descargarComprobanteReserva() {
+        if (!reservaConfirmada) return;
+        const { resultado, paquete, salida, pasajeros: nomina } =
+            reservaConfirmada;
+        const fechasAloj = derivarFechasAlojamiento(
+            salida.fechaInicio,
+            salida.fechaFin,
+            paquete.nochesAlojamiento.previas,
+            paquete.nochesAlojamiento.posteriores,
+        );
+        const titularTexto = usuarioSesion
+            ? `${usuarioSesion.nombre} ${usuarioSesion.apellido} (${usuarioSesion.email})`
+            : "Cliente titular autenticado";
+
+        const lineas = [
+            "=================================================================",
+            "           INCATOUR - COMPROBANTE DE PAGO Y RESERVA (CU-30)      ",
+            "=================================================================",
+            `Nro. de Reserva:         ${resultado.nroReserva}`,
+            `Estado de Reserva:       ${resultado.estado}`,
+            `Fecha de Emisión:        ${new Date().toLocaleString("es-AR")}`,
+            `Titular de la Reserva:   ${titularTexto}`,
+            "-----------------------------------------------------------------",
+            "1. PAQUETE Y SALIDA CONTRATADA",
+            `Paquete:                 ${paquete.nombre} (${paquete.codigo})`,
+            `Circuito:                ${paquete.circuito.nombre} (${paquete.circuito.dias} días · Dificultad ${paquete.circuito.dificultad})`,
+            `Salida Programada:       ${salida.nroSalida}`,
+            `Inicio del Recorrido:    ${formatearFechaCorta(salida.fechaInicio)}`,
+            `Fin del Recorrido:       ${formatearFechaCorta(salida.fechaFin)}`,
+            `Temporada Aplicada:      ${salida.temporadaNombre}`,
+            "-----------------------------------------------------------------",
+            "2. ALOJAMIENTO Y FECHAS DERIVADAS (Paso 6 y 15 CU-30)",
+            `Garantía de Alojamiento: ${paquete.nochesAlojamiento.garantia}`,
+            `Estado del Alojamiento:  ${resultado.estadoAlojamiento}`,
+            `Estadía Previa:          ${fechasAloj.estadiaPrevia ?? "Sin noches previas incluidas"}`,
+            `Estadía Posterior:       ${fechasAloj.estadiaPosterior ?? "Sin noches posteriores incluidas"}`,
+            ...(resultado.estadoAlojamiento === "PENDIENTE"
+                ? [
+                      `Nota de Alojamiento:     Las noches quedan sujetas a la confirmación del proveedor antes de la salida (Solicitud SOL-${resultado.nroReserva}).`,
+                  ]
+                : []),
+            "-----------------------------------------------------------------",
+            `3. NÓMINA DE PASAJEROS (${resultado.cantidadPasajeros})`,
+            ...nomina.map(
+                (p, i) =>
+                    `  ${i + 1}. ${p.nombreCompleto} | Pasaporte: ${p.nroPasaporte} (${p.nacionalidad}) | Vence: ${p.fechaVencimientoPasaporte} | Equipaje: ${p.pesoDeclarado} kg`,
+            ),
+            "-----------------------------------------------------------------",
+            "4. LIQUIDACIÓN, PAGO Y CONDICIONES COMERCIALES CONGELADAS",
+            `Total Abonado Congelado: ${resultado.moneda} ${resultado.precioCongelado.toFixed(2)}`,
+            `Medio de Pago:           TARJETA (Estado: APROBADA)`,
+            `Transacción Pasarela:    ${resultado.transaccionPasarela}`,
+            `Condiciones Vigentes:    ${paquete.condiciones || "Tarifa y condiciones comerciales congeladas al momento de la confirmación."}`,
+            "=================================================================",
+        ];
+
+        const blob = new Blob([lineas.join("\n")], {
+            type: "text/plain;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement("a");
+        enlace.href = url;
+        enlace.download = `Comprobante-${resultado.nroReserva}.txt`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+        URL.revokeObjectURL(url);
+    }
+
+    // Filtrado del catálogo (RF-27: duración, dificultad y rango de fechas)
     const termino = busqueda.trim().toLowerCase();
+    const hayFiltrosActivos =
+        termino !== "" ||
+        filtroDificultad !== "TODAS" ||
+        filtroDuracion !== "TODAS" ||
+        fechaDesde !== "" ||
+        fechaHasta !== "" ||
+        soloConSalidas;
+
     const paquetesFiltrados = paquetes.filter((p) => {
         if (
             filtroDificultad !== "TODAS" &&
             p.circuito.dificultad.toUpperCase() !== filtroDificultad
         ) {
             return false;
+        }
+        if (filtroDuracion === "HASTA_3" && p.circuito.dias > 3) {
+            return false;
+        }
+        if (
+            filtroDuracion === "4_A_5" &&
+            (p.circuito.dias < 4 || p.circuito.dias > 5)
+        ) {
+            return false;
+        }
+        if (filtroDuracion === "6_O_MAS" && p.circuito.dias < 6) {
+            return false;
+        }
+        if (fechaDesde || fechaHasta) {
+            const salidasRango = (p.salidasDisponibles ?? []).filter((s) => {
+                const fechaIsoDia = s.fechaInicio.slice(0, 10);
+                if (fechaDesde && fechaIsoDia < fechaDesde) return false;
+                if (fechaHasta && fechaIsoDia > fechaHasta) return false;
+                return true;
+            });
+            if (salidasRango.length === 0) return false;
         }
         if (
             soloConSalidas &&
@@ -542,7 +682,13 @@ function CatalogoCompraPage() {
                 <div>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-marca-activa px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-marca-oscura">
-                            Tienda Oficial · Expediciones Camino del Inca
+                            {esAdmin
+                                ? paqueteEnCompra || reservaConfirmada
+                                    ? "Compra de Paquete · CU-30"
+                                    : "Catálogo Público · CU-26"
+                                : paqueteEnCompra || reservaConfirmada
+                                  ? "Reserva de Paquete"
+                                  : "Catálogo de Paquetes"}
                         </span>
                         {esVistaPreviaAdmin ? (
                             <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
@@ -588,7 +734,9 @@ function CatalogoCompraPage() {
                             </span>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wide text-exito">
-                                    Comprobante oficial de compra · CU-30
+                                    {esAdmin
+                                        ? "Comprobante oficial de pago y resumen de reserva · CU-30"
+                                        : "Comprobante oficial de pago y reserva"}
                                 </p>
                                 <h2 className="text-2xl font-bold text-navegacion">
                                     Reserva #{reservaConfirmada.resultado.nroReserva}
@@ -614,100 +762,167 @@ function CatalogoCompraPage() {
                         </div>
                     </div>
 
-                    <div className="grid gap-6 md:grid-cols-3">
-                        <div className="rounded-control border border-borde bg-fondo/50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                Paquete y Circuito
-                            </p>
-                            <p className="mt-1 text-base font-bold text-navegacion">
-                                {reservaConfirmada.paquete.nombre} (
-                                {reservaConfirmada.paquete.codigo})
-                            </p>
-                            <p className="mt-1 text-xs text-texto-suave">
-                                {reservaConfirmada.paquete.circuito.nombre} ·{" "}
-                                {reservaConfirmada.paquete.circuito.dias} días ·
-                                Dificultad{" "}
-                                {reservaConfirmada.paquete.circuito.dificultad}
-                            </p>
-                            <p className="mt-2 text-xs text-texto">
-                                <strong>Garantía hotelera:</strong>{" "}
-                                {
-                                    reservaConfirmada.paquete.nochesAlojamiento
-                                        .garantia
-                                }
-                            </p>
-                        </div>
+                    {(() => {
+                        const fechasAlojConfirmadas = derivarFechasAlojamiento(
+                            reservaConfirmada.salida.fechaInicio,
+                            reservaConfirmada.salida.fechaFin,
+                            reservaConfirmada.paquete.nochesAlojamiento.previas,
+                            reservaConfirmada.paquete.nochesAlojamiento
+                                .posteriores,
+                        );
+                        return (
+                            <div className="grid gap-6 md:grid-cols-3">
+                                <div className="rounded-control border border-borde bg-fondo/50 p-4">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
+                                        Paquete y Alojamiento
+                                    </p>
+                                    <p className="mt-1 text-base font-bold text-navegacion">
+                                        {reservaConfirmada.paquete.nombre} (
+                                        {reservaConfirmada.paquete.codigo})
+                                    </p>
+                                    <p className="mt-1 text-xs text-texto-suave">
+                                        {
+                                            reservaConfirmada.paquete.circuito
+                                                .nombre
+                                        }{" "}
+                                        ·{" "}
+                                        {reservaConfirmada.paquete.circuito.dias}{" "}
+                                        días · Dificultad{" "}
+                                        {
+                                            reservaConfirmada.paquete.circuito
+                                                .dificultad
+                                        }
+                                    </p>
+                                    <p className="mt-2 text-xs text-texto">
+                                        <strong>Garantía hotelera:</strong>{" "}
+                                        {
+                                            reservaConfirmada.paquete
+                                                .nochesAlojamiento.garantia
+                                        }
+                                    </p>
+                                    {fechasAlojConfirmadas.estadiaPrevia ? (
+                                        <p className="mt-1 text-xs text-texto">
+                                            <strong>Alojamiento previo:</strong>{" "}
+                                            {fechasAlojConfirmadas.estadiaPrevia}
+                                        </p>
+                                    ) : null}
+                                    {fechasAlojConfirmadas.estadiaPosterior ? (
+                                        <p className="mt-0.5 text-xs text-texto">
+                                            <strong>
+                                                Alojamiento posterior:
+                                            </strong>{" "}
+                                            {
+                                                fechasAlojConfirmadas.estadiaPosterior
+                                            }
+                                        </p>
+                                    ) : null}
+                                </div>
 
-                        <div className="rounded-control border border-borde bg-fondo/50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                Salida Programada
-                            </p>
-                            <p className="mt-1 text-base font-bold text-navegacion">
-                                {reservaConfirmada.salida.nroSalida}
-                            </p>
-                            <p className="mt-1 text-xs text-texto">
-                                <strong>Inicio:</strong>{" "}
-                                {formatearFechaCorta(
-                                    reservaConfirmada.salida.fechaInicio,
-                                )}
-                            </p>
-                            <p className="mt-0.5 text-xs text-texto">
-                                <strong>Fin del recorrido:</strong>{" "}
-                                {formatearFechaCorta(
-                                    reservaConfirmada.salida.fechaFin,
-                                )}
-                            </p>
-                            <p className="mt-2 text-xs text-texto-suave">
-                                Temporada:{" "}
-                                {reservaConfirmada.salida.temporadaNombre}
-                            </p>
-                        </div>
+                                <div className="rounded-control border border-borde bg-fondo/50 p-4">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
+                                        Salida Programada
+                                    </p>
+                                    <p className="mt-1 text-base font-bold text-navegacion">
+                                        {reservaConfirmada.salida.nroSalida}
+                                    </p>
+                                    <p className="mt-1 text-xs text-texto">
+                                        <strong>Inicio del recorrido:</strong>{" "}
+                                        {formatearFechaCorta(
+                                            reservaConfirmada.salida.fechaInicio,
+                                        )}
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-texto">
+                                        <strong>Fin del recorrido:</strong>{" "}
+                                        {formatearFechaCorta(
+                                            reservaConfirmada.salida.fechaFin,
+                                        )}
+                                    </p>
+                                    <p className="mt-2 text-xs text-texto-suave">
+                                        Temporada aplicada:{" "}
+                                        <strong>
+                                            {
+                                                reservaConfirmada.salida
+                                                    .temporadaNombre
+                                            }
+                                        </strong>
+                                    </p>
+                                </div>
 
-                        <div className="rounded-control border border-borde bg-fondo/50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                Transacción y Total Congelado
-                            </p>
-                            <p className="mt-1 text-2xl font-bold text-navegacion">
-                                {reservaConfirmada.resultado.moneda}{" "}
-                                {reservaConfirmada.resultado.precioCongelado.toFixed(
-                                    2,
-                                )}
-                            </p>
-                            <p className="mt-1 text-xs text-texto-suave">
-                                Transacción pasarela:{" "}
-                                <code className="rounded bg-white px-1.5 py-0.5 font-mono text-texto">
-                                    {
-                                        reservaConfirmada.resultado
-                                            .transaccionPasarela
-                                    }
-                                </code>
-                            </p>
-                            <p className="mt-1 text-xs text-texto-suave">
-                                Pasajeros confirmados:{" "}
-                                <strong>
-                                    {
-                                        reservaConfirmada.resultado
-                                            .cantidadPasajeros
-                                    }
-                                </strong>
-                            </p>
-                        </div>
-                    </div>
+                                <div className="rounded-control border border-borde bg-fondo/50 p-4">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
+                                        Transacción y Total Congelado
+                                    </p>
+                                    <p className="mt-1 text-2xl font-bold text-navegacion">
+                                        {reservaConfirmada.resultado.moneda}{" "}
+                                        {reservaConfirmada.resultado.precioCongelado.toFixed(
+                                            2,
+                                        )}
+                                    </p>
+                                    <p className="mt-1 text-xs text-texto-suave">
+                                        Transacción pasarela:{" "}
+                                        <code className="rounded bg-white px-1.5 py-0.5 font-mono text-texto">
+                                            {
+                                                reservaConfirmada.resultado
+                                                    .transaccionPasarela
+                                            }
+                                        </code>
+                                    </p>
+                                    <p className="mt-1 text-xs text-texto-suave">
+                                        Pasajeros confirmados:{" "}
+                                        <strong>
+                                            {
+                                                reservaConfirmada.resultado
+                                                    .cantidadPasajeros
+                                            }
+                                        </strong>
+                                    </p>
+                                    {reservaConfirmada.paquete.condiciones ? (
+                                        <p className="mt-2 border-t border-borde pt-1.5 text-[11px] text-texto-suave">
+                                            <strong>
+                                                Condiciones congeladas:
+                                            </strong>{" "}
+                                            {
+                                                reservaConfirmada.paquete
+                                                    .condiciones
+                                            }
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {reservaConfirmada.resultado.estadoAlojamiento ===
                     "PENDIENTE" ? (
                         <Alerta
                             tipo="informacion"
-                            titulo="Solicitud de alojamiento generada automáticamente (CU-33)"
+                            titulo={
+                                esAdmin
+                                    ? "Alojamiento sujeto a confirmación del proveedor (Paso 15.3 · CU-30)"
+                                    : "Alojamiento sujeto a confirmación hotelera"
+                            }
                         >
-                            Como esta salida requiere confirmación con el
-                            establecimiento hotelero, el sistema registró
-                            automáticamente una solicitud pendiente (
-                            <code>
-                                SOL-{reservaConfirmada.resultado.nroReserva}
-                            </code>
-                            ) para que el equipo de gestión la resuelva en{" "}
-                            <strong>Reservas y pagos</strong>.
+                            {esAdmin ? (
+                                <>
+                                    Las noches de alojamiento de tu reserva quedan
+                                    sujetas a la confirmación del proveedor hotelero,
+                                    que se obtendrá antes de la fecha de salida. El
+                                    sistema generó automáticamente la solicitud
+                                    pendiente (
+                                    <code>
+                                        SOL-{reservaConfirmada.resultado.nroReserva}
+                                    </code>
+                                    ) con la localidad, categoría y tipo de habitación
+                                    garantizados para su gestión (CU-34).
+                                </>
+                            ) : (
+                                <>
+                                    Las noches de alojamiento incluidas en tu reserva quedan
+                                    sujetas a la confirmación del establecimiento hotelero,
+                                    la cual será gestionada por nuestro equipo antes de la fecha
+                                    de tu salida. Te mantendremos informado por correo electrónico.
+                                </>
+                            )}
                         </Alerta>
                     ) : null}
 
@@ -740,8 +955,15 @@ function CatalogoCompraPage() {
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-3 border-t border-borde pt-4">
-                        {reservaConfirmada.resultado.estadoAlojamiento ===
-                        "PENDIENTE" ? (
+                        <Boton
+                            variante="secundario"
+                            onClick={descargarComprobanteReserva}
+                        >
+                            ⬇ Descargar comprobante y resumen (.txt)
+                        </Boton>
+                        {esAdmin &&
+                        reservaConfirmada.resultado.estadoAlojamiento ===
+                            "PENDIENTE" ? (
                             <Boton
                                 variante="secundario"
                                 onClick={() => navegar("/gestion/solicitudes")}
@@ -1314,6 +1536,56 @@ function CatalogoCompraPage() {
                                     {paqueteEnCompra.nochesAlojamiento.garantia}
                                 </span>
                             </div>
+                            {salidaActiva
+                                ? (() => {
+                                      const fechas = derivarFechasAlojamiento(
+                                          salidaActiva.fechaInicio,
+                                          salidaActiva.fechaFin,
+                                          paqueteEnCompra.nochesAlojamiento
+                                              .previas,
+                                          paqueteEnCompra.nochesAlojamiento
+                                              .posteriores,
+                                      );
+                                      return (
+                                          <>
+                                              <div className="flex justify-between gap-2">
+                                                  <span className="text-texto-suave">
+                                                      Alojamiento previo:
+                                                  </span>
+                                                  <span className="text-right font-semibold text-texto">
+                                                      {fechas.estadiaPrevia ??
+                                                          "No incluido"}
+                                                  </span>
+                                              </div>
+                                              <div className="flex justify-between gap-2">
+                                                  <span className="text-texto-suave">
+                                                      Alojamiento posterior:
+                                                  </span>
+                                                  <span className="text-right font-semibold text-texto">
+                                                      {fechas.estadiaPosterior ??
+                                                          "No incluido"}
+                                                  </span>
+                                              </div>
+                                              <p className="text-[11px] text-texto-suave">
+                                                  Las noches de alojamiento las
+                                                  define el paquete y no se
+                                                  pueden modificar durante la
+                                                  compra.
+                                              </p>
+                                          </>
+                                      );
+                                  })()
+                                : null}
+                            {paqueteEnCompra.condiciones ? (
+                                <p className="rounded-control border border-borde bg-fondo/50 p-2 text-[11px] text-texto">
+                                    <strong>Condiciones comerciales:</strong>{" "}
+                                    {paqueteEnCompra.condiciones}
+                                    <span className="block text-texto-suave">
+                                        Quedan congeladas en tu reserva al
+                                        confirmar el pago.
+                                    </span>
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="space-y-2 border-t border-borde pt-3 text-sm">
@@ -1352,6 +1624,38 @@ function CatalogoCompraPage() {
                             </div>
                         </div>
 
+                        {!esSesionCliente ? (
+                            <div className="space-y-2 rounded-control border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                                <p className="font-semibold">
+                                    Sesión de cliente requerida para abonar
+                                </p>
+                                <p>
+                                    Ingresá con tu cuenta de cliente (por
+                                    ejemplo:{" "}
+                                    <code className="font-mono font-bold">
+                                        juan@test.com
+                                    </code>{" "}
+                                    /{" "}
+                                    <code className="font-mono font-bold">
+                                        hash123
+                                    </code>
+                                    ) para emitir la reserva.
+                                </p>
+                                <Boton
+                                    type="button"
+                                    variante="secundario"
+                                    className="w-full"
+                                    onClick={() =>
+                                        navegar("/login", {
+                                            state: { desde: "/catalogo" },
+                                        })
+                                    }
+                                >
+                                    Iniciar sesión como cliente →
+                                </Boton>
+                            </div>
+                        ) : null}
+
                         <Boton
                             type="submit"
                             className="w-full py-3"
@@ -1368,7 +1672,7 @@ function CatalogoCompraPage() {
                 </form>
             ) : null}
 
-            {/* VISTA C: ESCAPARATE DEL CATÁLOGO PÚBLICO (CU-28) */}
+            {/* VISTA C: ESCAPARATE DEL CATÁLOGO PÚBLICO (CU-26) */}
             {!reservaConfirmada && !paqueteEnCompra ? (
                 <>
                     {/* BARRA DE BÚSQUEDA Y FILTROS */}
@@ -1431,6 +1735,64 @@ function CatalogoCompraPage() {
                                 />
                                 Solo con salidas abiertas
                             </label>
+                        </div>
+
+                        <div className="flex w-full flex-wrap items-end gap-3 border-t border-borde pt-3 text-xs">
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Duración del circuito
+                                <select
+                                    value={filtroDuracion}
+                                    onChange={(e) =>
+                                        setFiltroDuracion(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                >
+                                    <option value="TODAS">Todas</option>
+                                    <option value="HASTA_3">Hasta 3 días</option>
+                                    <option value="4_A_5">4 a 5 días</option>
+                                    <option value="6_O_MAS">6 días o más</option>
+                                </select>
+                            </label>
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Salidas desde
+                                <input
+                                    type="date"
+                                    value={fechaDesde}
+                                    max={fechaHasta || undefined}
+                                    onChange={(e) =>
+                                        setFechaDesde(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Salidas hasta
+                                <input
+                                    type="date"
+                                    value={fechaHasta}
+                                    min={fechaDesde || undefined}
+                                    onChange={(e) =>
+                                        setFechaHasta(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
+                            {hayFiltrosActivos ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setBusqueda("");
+                                        setFiltroDificultad("TODAS");
+                                        setFiltroDuracion("TODAS");
+                                        setFechaDesde("");
+                                        setFechaHasta("");
+                                        setSoloConSalidas(false);
+                                    }}
+                                    className="rounded-control px-3 py-1.5 font-semibold text-marca-oscura hover:underline"
+                                >
+                                    Limpiar filtros
+                                </button>
+                            ) : null}
                         </div>
                     </div>
 
@@ -1698,7 +2060,7 @@ function CatalogoCompraPage() {
                 </>
             ) : null}
 
-            {/* MODAL DE DETALLE COMPLETO E ITINERARIO DEL PAQUETE (CU-29) */}
+            {/* MODAL DE DETALLE COMPLETO E ITINERARIO DEL PAQUETE (CU-26) */}
             {paqueteDetalle ? (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-navegacion/60 p-4 backdrop-blur-xs"

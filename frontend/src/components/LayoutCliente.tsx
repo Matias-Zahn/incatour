@@ -1,18 +1,35 @@
 import type { ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+    limpiarSesion,
+    obtenerToken,
+    obtenerUsuario,
+} from "../services/sesionService";
 
 type LayoutClienteProps = {
     children: ReactNode;
 };
 
 function LayoutCliente({ children }: LayoutClienteProps) {
+    const navegar = useNavigate();
     const [searchParams] = useSearchParams();
     const esVistaPreviaAdmin = searchParams.get("vista") === "admin";
+    const tieneToken = Boolean(obtenerToken());
+    const usuario = tieneToken ? obtenerUsuario() : null;
+
+    const iniciales = usuario
+        ? `${usuario.nombre.charAt(0)}${usuario.apellido.charAt(0)}`.toUpperCase()
+        : "IT";
+
+    function manejarCerrarSesion() {
+        limpiarSesion();
+        navegar("/login");
+    }
 
     return (
         <div className="flex min-h-screen flex-col bg-fondo">
             {/* BANNER DE VISTA PREVIA CUANDO EL ADMIN ENTRA A VER CÓMO LO VE EL CLIENTE */}
-            {esVistaPreviaAdmin ? (
+            {esVistaPreviaAdmin || usuario?.rol === "ADMIN" ? (
                 <div className="border-b border-marca-oscura bg-navegacion px-4 py-2.5 text-xs text-white">
                     <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
@@ -20,9 +37,10 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                 Vista previa de Administrador
                             </span>
                             <span className="text-white/90">
-                                Estás visualizando el portal público y el flujo
-                                de compra exactamente como lo ve el cliente
-                                final.
+                                Estás visualizando el catálogo público (CU-26) y
+                                el flujo de compra (CU-30) como lo ve el
+                                cliente. Para comprar, ingresá con una cuenta de
+                                perfil CLIENTE.
                             </span>
                         </div>
 
@@ -73,35 +91,47 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                 }
                                 className="rounded-control bg-marca-activa px-3 py-1.5 text-marca-oscura"
                             >
-                                Paquetes turísticos
+                                {esVistaPreviaAdmin || usuario?.rol === "ADMIN"
+                                    ? "Catálogo público (CU-26)"
+                                    : "Catálogo de paquetes"}
                             </Link>
                         </nav>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2.5 rounded-full border border-borde bg-fondo/70 px-3.5 py-1.5">
-                            <span className="grid size-7 place-items-center rounded-full bg-marca text-xs font-bold text-white">
-                                JP
-                            </span>
-                            <div className="text-left text-xs">
-                                <p className="font-bold leading-tight text-navegacion">
-                                    Juan Pérez
-                                </p>
-                                <p className="text-[11px] text-texto-suave">
-                                    Cliente · CLI-001
-                                </p>
-                            </div>
-                        </div>
+                        {usuario ? (
+                            <>
+                                <div className="flex items-center gap-2.5 rounded-full border border-borde bg-fondo/70 px-3.5 py-1.5">
+                                    <span className="grid size-7 place-items-center rounded-full bg-marca text-xs font-bold text-white">
+                                        {iniciales}
+                                    </span>
+                                    <div className="text-left text-xs">
+                                        <p className="font-bold leading-tight text-navegacion">
+                                            {usuario.nombre} {usuario.apellido}
+                                        </p>
+                                        <p className="text-[11px] text-texto-suave">
+                                            Perfil: {usuario.rol}
+                                        </p>
+                                    </div>
+                                </div>
 
-                        {!esVistaPreviaAdmin ? (
+                                <button
+                                    type="button"
+                                    onClick={manejarCerrarSesion}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs font-semibold text-texto-suave transition hover:bg-fondo hover:text-navegacion"
+                                >
+                                    Cerrar sesión
+                                </button>
+                            </>
+                        ) : (
                             <Link
-                                to="/gestion/paquetes"
-                                className="rounded-control border border-borde bg-white px-3 py-2 text-xs font-semibold text-texto-suave transition hover:bg-fondo hover:text-navegacion"
-                                title="Cambiar a la vista de administración"
+                                to="/login"
+                                state={{ desde: "/catalogo" }}
+                                className="rounded-control bg-marca px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-marca-oscura"
                             >
-                                Ir a Panel Admin →
+                                Iniciar sesión
                             </Link>
-                        ) : null}
+                        )}
                     </div>
                 </div>
             </header>

@@ -17,9 +17,6 @@ export async function iniciarSesion(datos: DatosLogin): Promise<UsuarioSesion> {
         method: "POST",
         body: JSON.stringify(datos),
     });
-    if (usuario.rol !== "ADMIN") {
-        throw new Error("Este panel es solo para administradores.");
-    }
     guardarSesion(token, usuario);
     return usuario;
 }

@@ -1,4 +1,4 @@
-import { solicitarApiConAuth } from "./paqueteService";
+import { solicitarApi } from "./clienteApi";
 
 export interface SalidaResumenAdmin {
   idsalida: number;
@@ -140,7 +140,7 @@ export const COMENTARIOS_RAPIDOS_EVALUACION = [
 
 // Auxiliar para poblar el selector de salidas sin pedir IDs manuales
 export async function listarSalidasParaEvaluacion(): Promise<SalidaResumenAdmin[]> {
-  const res = await solicitarApiConAuth<{ data: SalidaResumenAdmin[] }>("/salidas");
+  const res = await solicitarApi<{ data: SalidaResumenAdmin[] }>("/salidas");
   return res.data ?? [];
 }
 
@@ -148,7 +148,7 @@ export async function listarSalidasParaEvaluacion(): Promise<SalidaResumenAdmin[
 export async function consultarEvaluablesSalida(
   idSalida: number,
 ): Promise<EvaluablesSalidaRespuesta> {
-  const res = await solicitarApiConAuth<{ data: EvaluablesSalidaRespuesta }>(
+  const res = await solicitarApi<{ data: EvaluablesSalidaRespuesta }>(
     `/salidas/${idSalida}/evaluaciones`,
   );
   return res.data;
@@ -159,7 +159,7 @@ export async function registrarEvaluacionSalida(
   idSalida: number,
   payload: EvaluarPayload,
 ): Promise<EvaluacionRegistrada> {
-  const res = await solicitarApiConAuth<{ mensaje: string; data: EvaluacionRegistrada }>(
+  const res = await solicitarApi<{ mensaje: string; data: EvaluacionRegistrada }>(
     `/salidas/${idSalida}/evaluaciones`,
     {
       method: "POST",
@@ -182,7 +182,7 @@ export async function consultarReseniasYEvaluaciones(
   if (filtros.fechaHasta) params.set("fechaHasta", String(filtros.fechaHasta));
 
   const query = params.toString();
-  const res = await solicitarApiConAuth<{ data: ConsultaReseniasRespuesta }>(
+  const res = await solicitarApi<{ data: ConsultaReseniasRespuesta }>(
     `/resenias${query ? `?${query}` : ""}`,
   );
   return res.data;

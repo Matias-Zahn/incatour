@@ -29,13 +29,26 @@ function Login() {
         document.title = "Ingresar · IncaTour";
     }, []);
 
-    if (obtenerToken() && obtenerUsuario()?.rol === "ADMIN") {
-        return <Navigate to={destino} replace />;
+    const usuarioActual = obtenerUsuario();
+    if (obtenerToken() && usuarioActual) {
+        const rutaPorRol = usuarioActual.rol === "CLIENTE" ? "/catalogo" : "/";
+        return (
+            <Navigate
+                to={destino !== "/" ? destino : rutaPorRol}
+                replace
+            />
+        );
     }
 
     function enviar(datos: DatosLogin) {
         iniciarSesion.mutate(datos, {
-            onSuccess: () => navegar(destino, { replace: true }),
+            onSuccess: (usuario) => {
+                const rutaPorRol =
+                    usuario.rol === "CLIENTE" ? "/catalogo" : "/";
+                navegar(destino !== "/" ? destino : rutaPorRol, {
+                    replace: true,
+                });
+            },
         });
     }
 
