@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { construirUrl, solicitarApi } from "./clienteApi";
+import { solicitarApi } from "./clienteApi";
 import type { Circuito } from "./circuitoService";
 import type { Temporada } from "./temporadaService";
 
@@ -202,103 +202,6 @@ type RespuestaDatos<T> = {
     data: T;
 };
 
-let promesaTokenDev: Promise<string | null> | null = null;
-
-function esTokenAdminVigente(token: string): boolean {
-    try {
-        const partes = token.split(".");
-        if (partes.length !== 3 || !partes[1]) return false;
-        const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
-        const payload = JSON.parse(atob(base64)) as {
-            exp?: number;
-            rol?: string;
-        };
-        if (payload.exp && payload.exp * 1000 <= Date.now() + 30_000) {
-            return false;
-        }
-        if (payload.rol && payload.rol !== "ADMIN") {
-            return false;
-        }
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-async function obtenerTokenAutenticado(forzarRenovacion = false): Promise<string | null> {
-    if (typeof window !== "undefined") {
-        if (forzarRenovacion) {
-            localStorage.removeItem("token");
-        } else {
-            const guardado = localStorage.getItem("token");
-            if (guardado && esTokenAdminVigente(guardado)) {
-                return guardado;
-            }
-            if (guardado) {
-                localStorage.removeItem("token");
-            }
-        }
-    }
-    if (import.meta.env.VITE_DEV_TOKEN) {
-        return import.meta.env.VITE_DEV_TOKEN as string;
-    }
-    if (!import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS !== "false") {
-        return null;
-    }
-    if (!promesaTokenDev) {
-        promesaTokenDev = fetch(construirUrl("/auth/login"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                email: "admin@incatour.com",
-                contrasenia: "AdminIncaTour123",
-            }),
-        })
-            .then(async (res) => {
-                if (!res.ok) return null;
-                const cuerpo = (await res.json()) as { data?: { token?: string } };
-                const token = cuerpo.data?.token;
-                if (token && typeof window !== "undefined") {
-                    localStorage.setItem("token", token);
-                }
-                return token ?? null;
-            })
-            .catch(() => null)
-            .finally(() => {
-                promesaTokenDev = null;
-            });
-    }
-    return promesaTokenDev;
-}
-
-export async function cabecerasAuthAsync(forzarRenovacion = false): Promise<HeadersInit> {
-    const token = await obtenerTokenAutenticado(forzarRenovacion);
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-export async function solicitarApiConAuth<T>(
-    ruta: string,
-    opciones: RequestInit = {},
-): Promise<T> {
-    const headers = await cabecerasAuthAsync(false);
-    try {
-        return await solicitarApi<T>(ruta, {
-            ...opciones,
-            headers: { ...headers, ...opciones.headers },
-        });
-    } catch (err) {
-        const estado = (err as { estado?: number })?.estado;
-        if (estado === 401 || estado === 403) {
-            const headersRenovados = await cabecerasAuthAsync(true);
-            return solicitarApi<T>(ruta, {
-                ...opciones,
-                headers: { ...headersRenovados, ...opciones.headers },
-            });
-        }
-        throw err;
-    }
-}
-
 function respuestaDatos<T>(respuesta: RespuestaDatos<T>): T {
     return respuesta.data;
 }
@@ -319,13 +222,13 @@ export type RespuestaSubirImagenPaquete = {
 };
 
 export async function listarPaquetes(): Promise<Paquete[]> {
-    return solicitarApiConAuth<RespuestaDatos<PaqueteApi[]>>("/paquetes")
+    return solicitarApi<RespuestaDatos<PaqueteApi[]>>("/paquetes")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarPaquete));
 }
 
 export async function obtenerPaquetePorId(id: number): Promise<Paquete> {
-    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`)
+    return solicitarApi<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`)
         .then(respuestaDatos)
         .then(normalizarPaquete);
 }
@@ -333,7 +236,7 @@ export async function obtenerPaquetePorId(id: number): Promise<Paquete> {
 export async function registrarPaquete(
     datos: DatosCrearPaquete,
 ): Promise<Paquete> {
-    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>("/paquetes", {
+    return solicitarApi<RespuestaDatos<PaqueteApi>>("/paquetes", {
         method: "POST",
         body: JSON.stringify(datos),
     })
@@ -345,7 +248,7 @@ export async function modificarPaquete(
     id: number,
     datos: DatosModificarPaquete,
 ): Promise<Paquete> {
-    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`, {
+    return solicitarApi<RespuestaDatos<PaqueteApi>>(`/paquetes/${id}`, {
         method: "PUT",
         body: JSON.stringify(datos),
     })
@@ -354,7 +257,7 @@ export async function modificarPaquete(
 }
 
 export async function darDeBajaPaquete(id: number): Promise<Paquete> {
-    return solicitarApiConAuth<RespuestaDatos<PaqueteApi>>(
+    return solicitarApi<RespuestaDatos<PaqueteApi>>(
         `/paquetes/${id}/baja`,
         {
             method: "PATCH",
@@ -392,7 +295,7 @@ export async function subirImagenPaquete(
         formData.append("imagenes", archivo);
     }
 
-    return solicitarApiConAuth<
+    return solicitarApi<
         RespuestaDatos<{
             idpaquete: number;
             totalImagenes?: number;
@@ -427,7 +330,7 @@ export async function modificarFotoIndividualPaquete(
     const formData = new FormData();
     formData.append("imagen", archivo);
 
-    return solicitarApiConAuth<
+    return solicitarApi<
         RespuestaDatos<{ idpaquete: number; fotoModificada: string; url: string }>
     >(`/paquetes/${idPaquete}/carrusel/${nombreFoto}`, {
         method: "PUT",
@@ -439,7 +342,7 @@ export async function eliminarFotoIndividualPaquete(
     idPaquete: number,
     nombreFoto: string,
 ): Promise<{ idpaquete: number; fotoEliminada: string }> {
-    return solicitarApiConAuth<
+    return solicitarApi<
         RespuestaDatos<{ idpaquete: number; fotoEliminada: string }>
     >(`/paquetes/${idPaquete}/carrusel/${nombreFoto}`, {
         method: "DELETE",
@@ -450,7 +353,7 @@ export async function listarServiciosDisponiblesCatalogo(): Promise<
     ServicioDisponiblePaquete[]
 > {
     try {
-        const resProveedores = await solicitarApiConAuth<
+        const resProveedores = await solicitarApi<
             RespuestaDatos<
                 {
                     idproveedor: number;
@@ -464,7 +367,7 @@ export async function listarServiciosDisponiblesCatalogo(): Promise<
         const proveedores = resProveedores.data ?? [];
         const listasPorProveedor = await Promise.all(
             proveedores.map((prov) =>
-                solicitarApiConAuth<RespuestaDatos<ServicioDisponiblePaquete[]>>(
+                solicitarApi<RespuestaDatos<ServicioDisponiblePaquete[]>>(
                     `/proveedores/${prov.idproveedor}/servicios?estado=ACTIVO`,
                 )
                     .then((r) => r.data ?? [])

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { solicitarApiConAuth } from "./paqueteService";
+import { solicitarApi } from "./clienteApi";
 
 export const esquemaTemporada = z
     .object({
@@ -57,13 +57,13 @@ function normalizarTemporada(temporada: TemporadaApi): Temporada {
 }
 
 export function listarTemporadas(): Promise<Temporada[]> {
-    return solicitarApiConAuth<RespuestaDatos<TemporadaApi[]>>("/temporadas")
+    return solicitarApi<RespuestaDatos<TemporadaApi[]>>("/temporadas")
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarTemporada));
 }
 
 export function registrarTemporada(datos: DatosTemporada): Promise<Temporada> {
-    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>("/temporadas", {
+    return solicitarApi<RespuestaDatos<TemporadaApi>>("/temporadas", {
         method: "POST",
         body: JSON.stringify(datos),
     })
@@ -75,7 +75,7 @@ export function modificarTemporada(
     id: number,
     datos: Partial<DatosTemporada>,
 ): Promise<Temporada> {
-    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>(`/temporadas/${id}`, {
+    return solicitarApi<RespuestaDatos<TemporadaApi>>(`/temporadas/${id}`, {
         method: "PUT",
         body: JSON.stringify(datos),
     })
@@ -84,7 +84,7 @@ export function modificarTemporada(
 }
 
 export function darDeBajaTemporada(id: number): Promise<Temporada> {
-    return solicitarApiConAuth<RespuestaDatos<TemporadaApi>>(
+    return solicitarApi<RespuestaDatos<TemporadaApi>>(
         `/temporadas/${id}/baja`,
         {
             method: "PATCH",

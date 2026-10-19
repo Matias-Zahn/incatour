@@ -77,11 +77,11 @@ export const MOTIVOS_RECHAZO_FRECUENTES = [
 
 type SolicitudApi = Omit<SolicitudPendiente, "id">;
 
-import { solicitarApiConAuth } from "./paqueteService";
+import { solicitarApi } from "./clienteApi";
 
 // CU-33: Consultar solicitudes de alojamiento pendientes
 export async function listarSolicitudesPendientes(): Promise<SolicitudPendiente[]> {
-  const res = await solicitarApiConAuth<{
+  const res = await solicitarApi<{
     mensaje?: string;
     cantidad?: number;
     data: SolicitudApi[];
@@ -93,7 +93,7 @@ export async function listarSolicitudesPendientes(): Promise<SolicitudPendiente[
 export async function consultarOpcionesSolicitud(
   idSolicitud: number,
 ): Promise<OpcionesGestionSolicitud> {
-  const res = await solicitarApiConAuth<{ data: OpcionesGestionSolicitud }>(`/solicitudes/${idSolicitud}/opciones`);
+  const res = await solicitarApi<{ data: OpcionesGestionSolicitud }>(`/solicitudes/${idSolicitud}/opciones`);
   return res.data;
 }
 
@@ -103,7 +103,7 @@ export async function resolverSolicitud(
   idSolicitud: number,
   payload: ResolverSolicitudPayload,
 ): Promise<RespuestaResolucionSolicitud> {
-  const { mensaje, data } = await solicitarApiConAuth<{
+  const { mensaje, data } = await solicitarApi<{
     mensaje: string;
     data: Omit<RespuestaResolucionSolicitud, "mensaje">;
   }>(`/solicitudes/${idSolicitud}/resolver`, {
