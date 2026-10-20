@@ -65,8 +65,12 @@ export class CrearSalidaDto {
     const tamanoMaximo = entero(obj.tamanoMaximo);
     if (!tamanoMaximo) return ["tamanoMaximo es requerido y debe ser un entero positivo"];
 
-    const fechaInicio = new Date(String(obj.fechaInicio));
-    if (obj.fechaInicio === undefined || isNaN(fechaInicio.getTime())) {
+    // Solo cuenta el día calendario (el cupo de la autoridad es por día UTC): se descarta la hora y la zona
+    const fechaInicio =
+      typeof obj.fechaInicio === "string" && /^\d{4}-\d{2}-\d{2}/.test(obj.fechaInicio)
+        ? new Date(obj.fechaInicio.slice(0, 10))
+        : new Date(NaN);
+    if (isNaN(fechaInicio.getTime())) {
       return ["fechaInicio es requerida y debe ser una fecha válida (AAAA-MM-DD)"];
     }
 
