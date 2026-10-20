@@ -65,7 +65,8 @@ export class SalidaRoutes {
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación de personal que exige el circuito,
      *       el total de lugares a bloquear ante la autoridad y los alojamientos que cumplen la garantía
-     *       del paquete y confirman por bloqueo de plazas. No modifica nada.
+     *       del paquete y confirman por bloqueo de plazas. También informa cuántos lugares libres tiene la autoridad
+     *       ese día (`cupoAutoridad`, `null` si la autoridad no responde). No modifica nada.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -84,6 +85,7 @@ export class SalidaRoutes {
      *                 tamanoMaximo: 8
      *                 dotacion: { guias: 2, porteadores: 4 }
      *                 totalLugares: 14
+     *                 cupoAutoridad: { lugaresDisponibles: 500, alcanza: true }
      *                 alojamientos:
      *                   - { idservicio: 1, nombreServicio: Hotel Montaña, localidad: Cusco, categoria: 3 Estrellas, capacidadDisponible: 10, alcanza: true }
      *       400: { description: Datos inválidos, fecha pasada, paquete inactivo, sin tarifa vigente o sin parámetros de dotación. }

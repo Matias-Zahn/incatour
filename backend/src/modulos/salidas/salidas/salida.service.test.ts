@@ -78,3 +78,28 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("elegí uno");
   });
 });
+
+describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    autoridad = actual.autoridad = new AutoridadMock();
+    repo.buscarPaquete.mockResolvedValue(paquete);
+    repo.buscarAlojamientosConBloqueo.mockResolvedValue([]);
+  });
+
+  it("informa los lugares libres de la autoridad ese día y si alcanzan", async () => {
+    await autoridad.solicitarBloqueoCupo(new Date(FECHA), 490);
+
+    const r = await new SalidaService().consultarOpcionesSalida(dto());
+
+    expect(r.cupoAutoridad).toEqual({ lugaresDisponibles: 10, alcanza: false });
+  });
+
+  it("con la autoridad caída no falla: cupoAutoridad queda en null", async () => {
+    actual.autoridad = new AutoridadMock(true);
+
+    const r = await new SalidaService().consultarOpcionesSalida(dto());
+
+    expect(r.cupoAutoridad).toBeNull();
+  });
+});

@@ -89,7 +89,7 @@ Muchas pantallas no son un solo endpoint: primero se consulta, y después se con
 
 | CU | Pantalla | Paso 1 (consultar) | Paso 2 (confirmar) |
 |---|---|---|---|
-| 36 | Crear salida | `GET /api/salidas/opciones?idpaquete&fechaInicio&tamanoMaximo`: dotación, total de lugares y alojamientos | `POST /api/salidas` con `idalojamiento` elegido de las opciones |
+| 36 | Crear salida | `GET /api/salidas/opciones?idpaquete&fechaInicio&tamanoMaximo`: dotación, total de lugares, cupo libre de la autoridad (`cupoAutoridad`, null si no responde) y alojamientos | `POST /api/salidas` con `idalojamiento` elegido de las opciones |
 | 40 | Asignar recursos | `GET /api/salidas/{id}/asignacion`: dotación, sobrantes, personal, transportes y camping disponibles | `POST /api/salidas/{id}/asignacion` con `personalIds`, `idtransporte` e `itemsCamping` |
 | 38 | Reemplazar personal | `GET /api/salidas/{id}/personal`, y después `GET /api/salidas/{id}/personal/{idpersonal}/reemplazantes` | `POST /api/salidas/{id}/reemplazos` con `idoriginal`, `idreemplazante` y `motivo` |
 | 37 | Cancelar salida | `GET /api/salidas/{id}/cancelacion`: impacto (reservas y reembolsos) | `POST /api/salidas/{id}/cancelar` con el motivo |

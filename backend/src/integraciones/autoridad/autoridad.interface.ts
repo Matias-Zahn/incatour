@@ -32,6 +32,7 @@ export interface IApiAutoridad {
     fechaInicio: Date,
     totalLugares: number,
   ): Promise<ResultadoBloqueo>;
+  consultarDisponibilidad(fechaInicio: Date): Promise<number>; // lugares libres ese día
   liberarLugaresSobrantes(idBloqueo: string, sobrantes: number): Promise<void>;
   liberarTotalidadCupos(idBloqueo: string): Promise<void>;
   solicitarEmisionNominal(

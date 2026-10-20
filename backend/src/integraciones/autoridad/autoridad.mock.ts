@@ -57,6 +57,11 @@ export class AutoridadMock implements IApiAutoridad {
     return { aprobado: true, idBloqueo };
   }
 
+  async consultarDisponibilidad(fechaInicio: Date): Promise<number> {
+    this.verificarConexion();
+    return CUPO_DIARIO - (this.ocupadosPorDia.get(diaDelCupo(fechaInicio)) ?? 0);
+  }
+
   async liberarLugaresSobrantes(
     idBloqueo: string,
     sobrantes: number,

@@ -52,6 +52,12 @@ export class AutoridadSimulada implements IApiAutoridad {
     });
   }
 
+  async consultarDisponibilidad(fechaInicio: Date): Promise<number> {
+    this.verificarConexion();
+    const dia = await db.autoridadCupoDiario.findUnique({ where: { fecha: diaDelCupo(fechaInicio) } });
+    return CUPO_DIARIO - (dia?.ocupados ?? 0);
+  }
+
   async liberarLugaresSobrantes(idBloqueo: string, sobrantes: number): Promise<void> {
     this.verificarConexion();
     validarCantidad(sobrantes);
