@@ -57,4 +57,13 @@ export class NotificadorMock implements INotificador {
     console.log("");
     return true;
   }
+
+  async enviarEmailInvitacionResenia(email: string, nroSalida: string, nombrePaquete: string): Promise<boolean> {
+    await esperar();
+    console.log(`
+📧 [NOTIFICADOR] Enviando INVITACIÓN A RESEÑAR a: ${email}`);
+    console.log(`   └─ Salida: ${nroSalida} (${nombrePaquete})
+`);
+    return true;
+  }
 }
