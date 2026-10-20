@@ -79,7 +79,14 @@ export class ProveedorRepository {
   // CU-17, flujo alternativo 1: solicitudes de alojamiento pendientes de confirmación
   async tieneSolicitudesPendientes(id: number): Promise<boolean> {
     const count = await db.solicitud.count({
-      where: { estado: ESTADO_SOLICITUD.PENDIENTE, servicio: { idproveedor: id } },
+      // El hotel de la solicitud sale de sus gestiones o de la garantía por establecimiento del paquete
+      where: {
+        estado: ESTADO_SOLICITUD.PENDIENTE,
+        OR: [
+          { gestiones: { some: { servicio: { idproveedor: id } } } },
+          { reserva: { salida: { paquete: { garantiasEstablecimiento: { some: { servicio: { idproveedor: id } } } } } } },
+        ],
+      },
     });
     return count > 0;
   }

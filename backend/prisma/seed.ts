@@ -59,6 +59,7 @@ async function main() {
       tipoProveedor: "Operador",
       razonSocial: "Andes Travel",
       localidad: "Cusco",
+      datosContacto: "reservas@andestravel.com · +51 84 123456",
       estado: "ACTIVO",
     },
   });
