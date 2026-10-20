@@ -112,4 +112,5 @@ Para mantener la organización y evitar conflictos en el código entre los 5 mie
 
 ## 📚 Documentación Interna
 * ⚙️ **[Guía del Backend (`backend/README.md`)](./backend/README.md)**
+* 🤖 **[Trabajar el back con IA y corregir errores (`backend/docs/TRABAJO_CON_IA.md`)](./backend/docs/TRABAJO_CON_IA.md)**
 * 🎨 **[Guía del Frontend (`frontend/README.md`)](./frontend/README.md)**

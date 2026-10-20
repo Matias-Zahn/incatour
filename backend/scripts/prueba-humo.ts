@@ -17,11 +17,13 @@ import path from "path";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
-const PUERTO = 3999;
+// HUMO_DB y HUMO_PUERTO permiten correr varias pruebas a la vez (una por worktree)
+const HUMO_DB = process.env.HUMO_DB ?? "incatour_humo";
+const PUERTO = Number(process.env.HUMO_PUERTO ?? 3999);
 const BASE = `http://localhost:${PUERTO}/api`;
-const DB_URL = process.env.DATABASE_URL!.replace(/\/[^/?]+(\?|$)/, "/incatour_humo$1");
-const env = { ...process.env, DATABASE_URL: DB_URL, PORT: String(PUERTO), DB_NAME: "incatour_humo" };
-const LOG = path.join(os.tmpdir(), "incatour-humo-back.log");
+const DB_URL = process.env.DATABASE_URL!.replace(/\/[^/?]+(\?|$)/, `/${HUMO_DB}$1`);
+const env = { ...process.env, DATABASE_URL: DB_URL, PORT: String(PUERTO), DB_NAME: HUMO_DB };
+const LOG = path.join(os.tmpdir(), `${HUMO_DB}-back.log`);
 
 const fallas: string[] = [];
 const avisos: string[] = [];
@@ -286,7 +288,7 @@ async function esperarServidor() {
 }
 
 async function main() {
-  console.log("Reseteando incatour_humo (migraciones + seed)...");
+  console.log(`Reseteando ${HUMO_DB} (migraciones + seed)...`);
   execSync("npx prisma migrate reset --force --skip-generate --skip-seed", { env, stdio: "ignore" });
   execSync("npx tsx prisma/seed.ts", { env, stdio: "ignore" });
   const server = spawn("npx", ["tsx", "src/app.ts"], { env, shell: true, stdio: ["ignore", "pipe", "pipe"] });
