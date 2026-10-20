@@ -17,6 +17,61 @@ export type SalidaGuiaResumen = {
     pasajeros: number;
 };
 
+// ==========================================
+// Formateadores y utilidades de presentación
+// ==========================================
+
+export const etiquetasEstadoSalida: Record<string, string> = {
+    PUBLICADA: "Publicada",
+    EN_CURSO: "En curso",
+    FINALIZADA: "Finalizada",
+    CANCELADA: "Cancelada",
+    CERRADA: "Cerrada",
+    PROGRAMADA: "Programada",
+    ABIERTA: "Abierta",
+};
+
+export function formatearEstadoSalida(estado?: string | null): string {
+    if (!estado) return "Sin estado";
+    const normalizado = estado.trim().toUpperCase();
+    return etiquetasEstadoSalida[normalizado] ?? estado;
+}
+
+export function estilosEstadoSalida(estado?: string | null): string {
+    switch (estado?.trim().toUpperCase()) {
+        case "EN_CURSO":
+            return "bg-emerald-100 text-emerald-800";
+        case "PUBLICADA":
+            return "bg-blue-100 text-blue-800";
+        case "CERRADA":
+        case "PROGRAMADA":
+            return "bg-amber-100 text-amber-800";
+        case "FINALIZADA":
+            return "bg-slate-100 text-slate-700";
+        case "CANCELADA":
+            return "bg-rose-100 text-rose-800";
+        default:
+            return "bg-slate-100 text-slate-800";
+    }
+}
+
+/** Formatea fechas que vienen en UTC desde el backend evitando desfases por huso horario local */
+export function formatearFechaSalida(fechaIso?: string | null): string {
+    if (!fechaIso) return "--/--/----";
+    try {
+        const f = new Date(fechaIso);
+        if (isNaN(f.getTime())) return fechaIso;
+        return f.toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            timeZone: "UTC",
+        });
+    } catch {
+        return fechaIso;
+    }
+}
+
 export type ItinerarioEtapa = {
     numeroOrden: number;
     puntoInicio: string;
@@ -354,6 +409,7 @@ const CLAVE_HISTORIAL_LOCAL_INCIDENTES = "incatour.guia.historial_incidentes";
 export function obtenerBorradorAvance(
     idsalida: number,
 ): Partial<DatosAvanceForm> | null {
+    if (!Number.isInteger(idsalida) || idsalida <= 0) return null;
     try {
         const guardado = localStorage.getItem(`${CLAVE_BORRADOR_AVANCE}_${idsalida}`);
         return guardado ? (JSON.parse(guardado) as Partial<DatosAvanceForm>) : null;
@@ -385,6 +441,7 @@ export function limpiarBorradorAvance(idsalida: number): void {
 }
 
 export function obtenerAvancesOffline(idsalida: number): AvanceOffline[] {
+    if (!Number.isInteger(idsalida) || idsalida <= 0) return [];
     try {
         const guardado = localStorage.getItem(`${CLAVE_AVANCES_OFFLINE}_${idsalida}`);
         return guardado ? (JSON.parse(guardado) as AvanceOffline[]) : [];
@@ -439,6 +496,7 @@ export type RegistroHistorialAvance = {
 export function obtenerHistorialLocalAvances(
     idsalida: number,
 ): RegistroHistorialAvance[] {
+    if (!Number.isInteger(idsalida) || idsalida <= 0) return [];
     try {
         const guardado = localStorage.getItem(
             `${CLAVE_HISTORIAL_LOCAL_AVANCES}_${idsalida}`,
@@ -479,6 +537,7 @@ export type RegistroHistorialIncidente = {
 export function obtenerHistorialLocalIncidentes(
     idsalida: number,
 ): RegistroHistorialIncidente[] {
+    if (!Number.isInteger(idsalida) || idsalida <= 0) return [];
     try {
         const guardado = localStorage.getItem(
             `${CLAVE_HISTORIAL_LOCAL_INCIDENTES}_${idsalida}`,

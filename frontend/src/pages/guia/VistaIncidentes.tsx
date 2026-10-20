@@ -7,8 +7,10 @@ import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import {
     agregarHistorialLocalIncidente,
     esquemaIncidente,
+    estilosEstadoSalida,
     etiquetasNivelGravedad,
     etiquetasTipoIncidente,
+    formatearEstadoSalida,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
     tiposIncidente,
@@ -29,13 +31,15 @@ import {
 type VistaIncidentesProps = {
     salidaActual: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
+    cargando?: boolean;
 };
 
 export function VistaIncidentes({
     salidaActual,
     detalleSalida,
+    cargando = false,
 }: VistaIncidentesProps) {
-    const idsalida = salidaActual?.idsalida ?? 2;
+    const idsalida = salidaActual?.idsalida ?? 0;
     const registrarIncidenteMutation = useRegistrarIncidente();
     const { data: pasajerosSalida = [] } = usePasajerosSalida(idsalida);
 
@@ -49,29 +53,10 @@ export function VistaIncidentes({
 
     const [pasajerosSeleccionados, setPasajerosSeleccionados] = useState<number[]>([]);
 
-    // Carga perezosa de historial de incidentes
+    // Carga perezosa de historial de incidentes real sin datos inventados
     const [historialIncidentes, setHistorialIncidentes] = useState<
         RegistroHistorialIncidente[]
-    >(() => {
-        const local = obtenerHistorialLocalIncidentes(idsalida);
-        if (local.length > 0) return local;
-        return [
-            {
-                id: "inc_1",
-                tipoIncidente: "CLIMA",
-                nivelGravedad: "MEDIO",
-                descripcion: "Retraso por tormenta de granizo en el paso de montaña",
-                fechaHora: "07/12/2026",
-            },
-            {
-                id: "inc_2",
-                tipoIncidente: "SALUD",
-                nivelGravedad: "BAJO",
-                descripcion: "Malestar de altura leve de pasajero asistido con té de coca",
-                fechaHora: "06/12/2026",
-            },
-        ];
-    });
+    >(() => (idsalida > 0 ? obtenerHistorialLocalIncidentes(idsalida) : []));
 
     const fechaHoy = new Date().toISOString().slice(0, 10);
     const horaActual = new Date().toTimeString().slice(0, 5);
@@ -95,6 +80,26 @@ export function VistaIncidentes({
     });
 
     const textoDescripcion = useWatch({ control, name: "descripcion" }) ?? "";
+
+    if (!salidaActual || idsalida <= 0) {
+        return (
+            <section aria-label="Notificar incidente operativo (CU-50)" className="space-y-6">
+                <header className="border-b border-borde/60 pb-4">
+                    <h1 className="text-2xl font-bold text-navegacion md:text-3xl">
+                        Notificar incidente
+                    </h1>
+                    <p className="text-sm text-texto-suave">
+                        Reporta cualquier incidente ocurrido durante la salida
+                    </p>
+                </header>
+                <div className="rounded-tarjeta border border-borde bg-white p-8 text-center text-sm text-texto-suave shadow-tarjeta">
+                    {cargando
+                        ? "Cargando información de la salida..."
+                        : "No tienes una salida asignada seleccionada para notificar incidentes."}
+                </div>
+            </section>
+        );
+    }
 
     function alternarPasajero(idpasajero: number) {
         setPasajerosSeleccionados((prev) =>
@@ -179,7 +184,7 @@ export function VistaIncidentes({
     const listaPasajeros =
         pasajerosSalida.length > 0
             ? pasajerosSalida
-            : detalleSalida?.nomina.map((p) => ({
+            : detalleSalida?.nomina?.map((p) => ({
                   idpasajero: p.idpasajero,
                   nombreCompleto: p.nombreCompleto,
                   nroPasaporte: p.nroPasaporte,
@@ -221,15 +226,19 @@ export function VistaIncidentes({
                 </div>
                 <div>
                     <h2 className="text-base font-bold text-navegacion">
-                        Salida actual: {salidaActual?.nroSalida ?? "SAL-2026-002"}
+                        Salida actual: {salidaActual.nroSalida}
                     </h2>
                     <p className="text-xs text-texto-suave">
-                        {salidaActual?.circuito ?? "Camino del Inca Clásico"}
+                        {salidaActual.circuito} {salidaActual.paquete ? `· ${salidaActual.paquete}` : ""}
                     </p>
                 </div>
                 <div>
-                    <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                        {salidaActual?.estado === "EN_CURSO" ? "En curso" : "Activa"}
+                    <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${estilosEstadoSalida(
+                            salidaActual.estado,
+                        )}`}
+                    >
+                        {formatearEstadoSalida(salidaActual.estado)}
                     </span>
                 </div>
             </article>
@@ -419,6 +428,13 @@ export function VistaIncidentes({
                                             </tr>
                                         );
                                     })}
+                                    {listaPasajeros.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="py-4 text-center text-xs text-texto-suave">
+                                                No hay pasajeros registrados para esta salida
+                                            </td>
+                                        </tr>
+                                    ) : null}
                                 </tbody>
                             </table>
                         </div>
@@ -447,13 +463,15 @@ export function VistaIncidentes({
                                     Últimos reportes de esta salida
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setModalHistorialAbierto(true)}
-                                className="text-xs font-bold text-marca hover:underline"
-                            >
-                                Ver historial
-                            </button>
+                            {historialIncidentes.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setModalHistorialAbierto(true)}
+                                    className="text-xs font-bold text-marca hover:underline"
+                                >
+                                    Ver historial
+                                </button>
+                            ) : null}
                         </div>
 
                         <div className="mt-3 divide-y divide-borde/50">
@@ -479,6 +497,12 @@ export function VistaIncidentes({
                                     </p>
                                 </div>
                             ))}
+
+                            {historialIncidentes.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-texto-suave">
+                                    No hay incidentes reportados en esta salida
+                                </p>
+                            ) : null}
                         </div>
                     </article>
                 </div>
@@ -512,7 +536,7 @@ export function VistaIncidentes({
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                                    Salida {salidaActual?.nroSalida}
+                                    Salida {salidaActual.nroSalida}
                                 </p>
                                 <h2 className="text-lg font-bold text-navegacion">
                                     Pasajeros de la salida
@@ -567,6 +591,13 @@ export function VistaIncidentes({
                                             </tr>
                                         );
                                     })}
+                                    {listaPasajeros.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="py-6 text-center text-xs text-texto-suave">
+                                                No hay pasajeros registrados para esta salida
+                                            </td>
+                                        </tr>
+                                    ) : null}
                                 </tbody>
                             </table>
                         </div>
@@ -603,7 +634,7 @@ export function VistaIncidentes({
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                                    {salidaActual?.circuito ?? "Camino del Inca"}
+                                    {salidaActual.circuito}
                                 </p>
                                 <h2 className="text-lg font-bold text-navegacion">
                                     Historial de incidentes
@@ -641,6 +672,12 @@ export function VistaIncidentes({
                                     </p>
                                 </div>
                             ))}
+
+                            {historialIncidentes.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-texto-suave">
+                                    No hay incidentes reportados en esta salida
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="mt-6 flex justify-end">

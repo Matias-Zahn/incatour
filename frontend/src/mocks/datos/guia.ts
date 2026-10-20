@@ -5,6 +5,16 @@ import type {
 
 export const salidasGuiaSemilla: SalidaGuiaResumen[] = [
     {
+        idsalida: 1,
+        nroSalida: "SAL-2026-001",
+        paquete: "Inca Clásico Standard",
+        circuito: "Camino del Inca Clásico",
+        fechaInicio: "2026-11-15T00:00:00.000Z",
+        fechaFin: "2026-11-18T00:00:00.000Z",
+        estado: "PUBLICADA",
+        pasajeros: 1,
+    },
+    {
         idsalida: 2,
         nroSalida: "SAL-2026-002",
         paquete: "Inca Clásico Standard",
@@ -14,19 +24,85 @@ export const salidasGuiaSemilla: SalidaGuiaResumen[] = [
         estado: "EN_CURSO",
         pasajeros: 12,
     },
-    {
-        idsalida: 3,
-        nroSalida: "SAL-2026-003",
-        paquete: "Machu Picchu Express",
-        circuito: "Camino Inca Corto",
-        fechaInicio: "2026-12-15T00:00:00.000Z",
-        fechaFin: "2026-12-17T00:00:00.000Z",
-        estado: "PROGRAMADA",
-        pasajeros: 8,
-    },
 ];
 
 export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
+    1: {
+        salida: {
+            idsalida: 1,
+            nroSalida: "SAL-2026-001",
+            paquete: "Inca Clásico Standard",
+            circuito: "Camino del Inca Clásico",
+            duracionDias: 4,
+            fechaInicio: "2026-11-15T00:00:00.000Z",
+            fechaFin: "2026-11-18T00:00:00.000Z",
+            estado: "PUBLICADA",
+        },
+        itinerario: [
+            {
+                numeroOrden: 1,
+                puntoInicio: "Km 82",
+                puntoFin: "Wayllabamba",
+                campamentoPrevisto: "Wayllabamba Camp",
+                estadoTramo: null,
+                fechaHoraLlegada: null,
+            },
+            {
+                numeroOrden: 2,
+                puntoInicio: "Wayllabamba",
+                puntoFin: "Pacaymayo",
+                campamentoPrevisto: "Pacaymayo Camp",
+                estadoTramo: null,
+                fechaHoraLlegada: null,
+            },
+            {
+                numeroOrden: 3,
+                puntoInicio: "Pacaymayo",
+                puntoFin: "Phuyupatamarca",
+                campamentoPrevisto: "Phuyupatamarca Camp",
+                estadoTramo: null,
+                fechaHoraLlegada: null,
+            },
+            {
+                numeroOrden: 4,
+                puntoInicio: "Phuyupatamarca",
+                puntoFin: "Machu Picchu",
+                campamentoPrevisto: "Aguas Calientes",
+                estadoTramo: null,
+                fechaHoraLlegada: null,
+            },
+        ],
+        nomina: [
+            {
+                idpasajero: 1,
+                nombreCompleto: "Turista Uno",
+                nroPasaporte: "TP-001",
+                nacionalidad: "Argentina",
+                nroReserva: "RES-0001",
+                contacto: { titular: "Juan Pérez", email: "juan@test.com" },
+            },
+        ],
+        personal: [
+            {
+                idpersonal: 1,
+                nombreCompleto: "Carlos Mamani",
+                rol: "Guía",
+            },
+        ],
+        servicios: [
+            {
+                tipo: "TRANSPORTE",
+                nombreServicio: "Minibus Sprinter Cusco - Km 82",
+            },
+        ],
+        equipamiento: [
+            {
+                nombreServicio: "Carpas Alta Montaña",
+                tipoEquipamiento: "Carpa 4 Estaciones",
+                cantidad: 2,
+            },
+        ],
+    },
     2: {
         salida: {
             idsalida: 2,
@@ -89,97 +165,12 @@ export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
                 nroReserva: "RES-102",
                 contacto: { titular: "Maria Garcia", email: "maria@test.com" },
             },
-            {
-                idpasajero: 3,
-                nombreCompleto: "Pedro Rodriguez",
-                nroPasaporte: "PS1122334",
-                nacionalidad: "Chile",
-                nroReserva: "RES-103",
-                contacto: { titular: "Pedro Rodriguez", email: "pedro@test.com" },
-            },
-            {
-                idpasajero: 4,
-                nombreCompleto: "Lucia Fernandez",
-                nroPasaporte: "PS4455667",
-                nacionalidad: "Uruguay",
-                nroReserva: "RES-104",
-                contacto: { titular: "Lucia Fernandez", email: "lucia@test.com" },
-            },
-            {
-                idpasajero: 5,
-                nombreCompleto: "Carlos Mendoza",
-                nroPasaporte: "PS7654321",
-                nacionalidad: "Perú",
-                nroReserva: "RES-105",
-                contacto: { titular: "Carlos Mendoza", email: "carlos@test.com" },
-            },
-            {
-                idpasajero: 6,
-                nombreCompleto: "Ana Torres",
-                nroPasaporte: "PS8877665",
-                nacionalidad: "Colombia",
-                nroReserva: "RES-106",
-                contacto: { titular: "Ana Torres", email: "ana@test.com" },
-            },
-            {
-                idpasajero: 7,
-                nombreCompleto: "Diego Alvarez",
-                nroPasaporte: "PS3344556",
-                nacionalidad: "México",
-                nroReserva: "RES-107",
-                contacto: { titular: "Diego Alvarez", email: "diego@test.com" },
-            },
-            {
-                idpasajero: 8,
-                nombreCompleto: "Sofia Benitez",
-                nroPasaporte: "PS5566778",
-                nacionalidad: "Paraguay",
-                nroReserva: "RES-108",
-                contacto: { titular: "Sofia Benitez", email: "sofia@test.com" },
-            },
-            {
-                idpasajero: 9,
-                nombreCompleto: "Martin Morales",
-                nroPasaporte: "PS9988776",
-                nacionalidad: "Bolivia",
-                nroReserva: "RES-109",
-                contacto: { titular: "Martin Morales", email: "martin@test.com" },
-            },
-            {
-                idpasajero: 10,
-                nombreCompleto: "Camila Ruiz",
-                nroPasaporte: "PS2233445",
-                nacionalidad: "Argentina",
-                nroReserva: "RES-110",
-                contacto: { titular: "Camila Ruiz", email: "camila@test.com" },
-            },
-            {
-                idpasajero: 11,
-                nombreCompleto: "Gabriel Silva",
-                nroPasaporte: "PS6677889",
-                nacionalidad: "Brasil",
-                nroReserva: "RES-111",
-                contacto: { titular: "Gabriel Silva", email: "gabriel@test.com" },
-            },
-            {
-                idpasajero: 12,
-                nombreCompleto: "Valeria Castro",
-                nroPasaporte: "PS0011223",
-                nacionalidad: "Ecuador",
-                nroReserva: "RES-112",
-                contacto: { titular: "Valeria Castro", email: "valeria@test.com" },
-            },
         ],
         personal: [
             {
                 idpersonal: 1,
                 nombreCompleto: "Carlos Mamani",
-                rol: "Guía Principal",
-            },
-            {
-                idpersonal: 2,
-                nombreCompleto: "Rosa Ramos",
-                rol: "Guía Asistente",
+                rol: "Guía",
             },
         ],
         servicios: [
@@ -187,26 +178,12 @@ export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
                 tipo: "TRANSPORTE",
                 nombreServicio: "Minibus Sprinter Cusco - Km 82",
             },
-            {
-                tipo: "CAMPING",
-                nombreServicio: "Campamento Integral Camino Inca",
-            },
         ],
         equipamiento: [
             {
                 nombreServicio: "Carpas Alta Montaña",
                 tipoEquipamiento: "Carpa (para 3 personas)",
                 cantidad: 4,
-            },
-            {
-                nombreServicio: "Bolsas Térmicas",
-                tipoEquipamiento: "Bolsa de dormir",
-                cantidad: 12,
-            },
-            {
-                nombreServicio: "Cocina de Campamento",
-                tipoEquipamiento: "Kit de cocina",
-                cantidad: 2,
             },
         ],
     },

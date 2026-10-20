@@ -1,6 +1,9 @@
-import type {
-    DetalleSalidaGuia,
-    SalidaGuiaResumen,
+import {
+    estilosEstadoSalida,
+    formatearEstadoSalida,
+    formatearFechaSalida,
+    type DetalleSalidaGuia,
+    type SalidaGuiaResumen,
 } from "../../services/guiaService";
 import { IconoCalendario, IconoMontana } from "./IconosGuia";
 
@@ -17,34 +20,32 @@ export function VistaInicio({
     detalleSalida,
     cargando,
 }: VistaInicioProps) {
-    const etapasTotales = detalleSalida?.itinerario.length ?? 4;
+    const etapasTotales = detalleSalida?.itinerario?.length ?? 0;
     const etapasCompletadas =
-        detalleSalida?.itinerario.filter(
+        detalleSalida?.itinerario?.filter(
             (e) => e.estadoTramo === "COMPLETADO",
-        ).length ?? 2;
-    const porcentajeProgreso = Math.round(
-        (etapasCompletadas / Math.max(etapasTotales, 1)) * 100,
-    );
+        ).length ?? 0;
+    const porcentajeProgreso =
+        etapasTotales > 0
+            ? Math.round((etapasCompletadas / etapasTotales) * 100)
+            : 0;
 
-    const pasajerosResumen = detalleSalida?.nomina.slice(0, 3) ?? [
-        { idpasajero: 1, nroPasaporte: "PS1234567", nombreCompleto: "Juan Perez" },
-        { idpasajero: 2, nroPasaporte: "PS9876543", nombreCompleto: "Maria Garcia" },
-        { idpasajero: 3, nroPasaporte: "PS1122334", nombreCompleto: "Pedro Rodriguez" },
-    ];
+    const pasajerosResumen = detalleSalida?.nomina?.slice(0, 5) ?? [];
 
-    function formatearFecha(fechaIso?: string): string {
-        if (!fechaIso) return "--/--/----";
-        try {
-            const f = new Date(fechaIso);
-            return f.toLocaleDateString("es-ES", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            });
-        } catch {
-            return fechaIso;
-        }
-    }
+    const novedadesReales = (detalleSalida?.itinerario ?? [])
+        .filter((e) => e.estadoTramo !== null)
+        .map((e) => ({
+            id: `etapa_${e.numeroOrden}`,
+            titulo: `Etapa ${e.numeroOrden}: ${formatearEstadoSalida(e.estadoTramo)}`,
+            subtitulo: `${e.puntoInicio} → ${e.puntoFin}${
+                e.fechaHoraLlegada
+                    ? ` · Llegada: ${new Date(e.fechaHoraLlegada).toLocaleString("es-ES", {
+                          timeZone: "UTC",
+                      })}`
+                    : ""
+            }`,
+            demorado: e.estadoTramo === "DEMORADO",
+        }));
 
     return (
         <section aria-label="Inicio del Portal del Guía" className="space-y-6">
@@ -78,10 +79,12 @@ export function VistaInicio({
                         </p>
                     </div>
                     <div>
-                        <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                            {salidaActual.estado === "EN_CURSO"
-                                ? "En curso"
-                                : salidaActual.estado}
+                        <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${estilosEstadoSalida(
+                                salidaActual.estado,
+                            )}`}
+                        >
+                            {formatearEstadoSalida(salidaActual.estado)}
                         </span>
                     </div>
 
@@ -92,7 +95,7 @@ export function VistaInicio({
                                     Fecha de inicio
                                 </span>
                                 <span className="font-bold text-texto">
-                                    {formatearFecha(salidaActual.fechaInicio)}
+                                    {formatearFechaSalida(salidaActual.fechaInicio)}
                                 </span>
                             </div>
                             <div>
@@ -120,7 +123,11 @@ export function VistaInicio({
                         </div>
                     </div>
                 </article>
-            ) : null}
+            ) : (
+                <div className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave shadow-tarjeta">
+                    No tienes una salida asignada en curso en este momento.
+                </div>
+            )}
 
             <div>
                 <h2 className="mb-3 text-base font-bold text-navegacion">
@@ -135,14 +142,21 @@ export function VistaInicio({
                         <h3 className="text-sm font-bold text-navegacion">
                             Salida en curso actual
                         </h3>
-                        <p className="mt-1 text-xs text-texto-suave">
-                            {salidaActual?.circuito ?? "Camino del Inca Clásico"}
-                        </p>
-                        <p className="mt-2 text-xs font-semibold text-texto">
-                            {salidaActual
-                                ? `${formatearFecha(salidaActual.fechaInicio)} · ${salidaActual.pasajeros} pasajeros`
-                                : "07/12 · 12/12"}
-                        </p>
+                        {salidaActual ? (
+                            <>
+                                <p className="mt-1 text-xs text-texto-suave">
+                                    {salidaActual.circuito}
+                                </p>
+                                <p className="mt-2 text-xs font-semibold text-texto">
+                                    {formatearFechaSalida(salidaActual.fechaInicio)} ·{" "}
+                                    {salidaActual.pasajeros} pasajeros
+                                </p>
+                            </>
+                        ) : (
+                            <p className="mt-2 text-xs text-texto-suave">
+                                No hay salida en curso asignada
+                            </p>
+                        )}
                     </article>
 
                     {/* Próxima salida */}
@@ -153,14 +167,21 @@ export function VistaInicio({
                         <h3 className="text-sm font-bold text-navegacion">
                             Próxima salida asignada
                         </h3>
-                        <p className="mt-1 text-xs text-texto-suave">
-                            {proximaSalida?.circuito ?? "Machu Picchu Express"}
-                        </p>
-                        <p className="mt-2 text-xs font-semibold text-texto">
-                            {proximaSalida
-                                ? formatearFecha(proximaSalida.fechaInicio)
-                                : "15/12/2026"}
-                        </p>
+                        {proximaSalida ? (
+                            <>
+                                <p className="mt-1 text-xs text-texto-suave">
+                                    {proximaSalida.circuito}{" "}
+                                    {proximaSalida.paquete ? `· ${proximaSalida.paquete}` : ""}
+                                </p>
+                                <p className="mt-2 text-xs font-semibold text-texto">
+                                    {formatearFechaSalida(proximaSalida.fechaInicio)}
+                                </p>
+                            </>
+                        ) : (
+                            <p className="mt-2 text-xs text-texto-suave">
+                                No hay próximas salidas asignadas
+                            </p>
+                        )}
                     </article>
 
                     {/* Ruta estilizada SVG */}
@@ -242,6 +263,16 @@ export function VistaInicio({
                                         </td>
                                     </tr>
                                 ))}
+                                {pasajerosResumen.length === 0 ? (
+                                    <tr>
+                                        <td
+                                            colSpan={3}
+                                            className="py-6 text-center text-xs text-texto-suave"
+                                        >
+                                            No hay pasajeros registrados para esta salida
+                                        </td>
+                                    </tr>
+                                ) : null}
                             </tbody>
                         </table>
                     </div>
@@ -253,29 +284,34 @@ export function VistaInicio({
                         Novedades recientes
                     </h3>
                     <div className="mt-3 space-y-3">
-                        <div className="flex items-start gap-3 border-b border-borde/50 pb-3">
-                            <span className="mt-1 size-2.5 shrink-0 rounded-full bg-rose-500 ring-4 ring-rose-100" />
-                            <div>
-                                <p className="text-xs font-bold text-navegacion">
-                                    Incidente reportado
-                                </p>
-                                <p className="text-[11px] text-texto-suave">
-                                    Atención operativa registrada por el guía
-                                </p>
+                        {novedadesReales.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex items-start gap-3 border-b border-borde/50 pb-3 last:border-b-0 last:pb-0"
+                            >
+                                <span
+                                    className={`mt-1 size-2.5 shrink-0 rounded-full ${
+                                        item.demorado
+                                            ? "bg-amber-500 ring-4 ring-amber-100"
+                                            : "bg-emerald-500 ring-4 ring-emerald-100"
+                                    }`}
+                                />
+                                <div>
+                                    <p className="text-xs font-bold text-navegacion">
+                                        {item.titulo}
+                                    </p>
+                                    <p className="text-[11px] text-texto-suave">
+                                        {item.subtitulo}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                        ))}
 
-                        <div className="flex items-start gap-3">
-                            <span className="mt-1 size-2.5 shrink-0 rounded-full bg-amber-500 ring-4 ring-amber-100" />
-                            <div>
-                                <p className="text-xs font-bold text-navegacion">
-                                    Ajuste por clima o itinerario
-                                </p>
-                                <p className="text-[11px] text-texto-suave">
-                                    Etapa monitoreada en ruta hacia Machu Picchu
-                                </p>
-                            </div>
-                        </div>
+                        {novedadesReales.length === 0 ? (
+                            <p className="py-6 text-center text-xs text-texto-suave">
+                                No hay novedades recientes registradas
+                            </p>
+                        ) : null}
                     </div>
                 </article>
             </div>

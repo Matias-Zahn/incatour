@@ -7,6 +7,8 @@ import {
     agregarHistorialLocalAvance,
     eliminarAvanceOffline,
     esquemaAvance,
+    estilosEstadoSalida,
+    formatearEstadoSalida,
     guardarAvanceOffline,
     guardarBorradorAvance,
     limpiarBorradorAvance,
@@ -31,13 +33,15 @@ import {
 type VistaAvancesProps = {
     salidaActual: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
+    cargando?: boolean;
 };
 
 export function VistaAvances({
     salidaActual,
     detalleSalida,
+    cargando = false,
 }: VistaAvancesProps) {
-    const idsalida = salidaActual?.idsalida ?? 2;
+    const idsalida = salidaActual?.idsalida ?? 0;
     const registrarAvanceMutation = useRegistrarAvance();
 
     const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
@@ -48,10 +52,11 @@ export function VistaAvances({
 
     // Carga perezosa de estado inicial evitando cascading renders
     const [avancesPendientes, setAvancesPendientes] = useState<AvanceOffline[]>(() =>
-        obtenerAvancesOffline(idsalida),
+        idsalida > 0 ? obtenerAvancesOffline(idsalida) : [],
     );
 
     const [historialAvances, setHistorialAvances] = useState<RegistroHistorialAvance[]>(() => {
+        if (idsalida <= 0) return [];
         const local = obtenerHistorialLocalAvances(idsalida);
         if (local.length > 0) return local;
         if (detalleSalida?.itinerario) {
@@ -62,7 +67,9 @@ export function VistaAvances({
                     etapa: `Etapa ${e.numeroOrden}: ${e.puntoInicio} → ${e.puntoFin}`,
                     estadoTramo: (e.estadoTramo as EstadoTramo) ?? "COMPLETADO",
                     fechaHora: e.fechaHoraLlegada
-                        ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES")
+                        ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES", {
+                              timeZone: "UTC",
+                          })
                         : "Completado previamente",
                     offline: false,
                 }));
@@ -76,7 +83,7 @@ export function VistaAvances({
     const fechaHoy = new Date().toISOString().slice(0, 10);
     const horaActual = new Date().toTimeString().slice(0, 5);
 
-    const borrador = obtenerBorradorAvance(idsalida);
+    const borrador = idsalida > 0 ? obtenerBorradorAvance(idsalida) : null;
 
     const {
         register,
@@ -99,7 +106,11 @@ export function VistaAvances({
 
     // Guardado automático del borrador en localStorage
     useEffect(() => {
-        if (valoresFormulario && (valoresFormulario.numeroOrden || valoresFormulario.estadoTramo)) {
+        if (
+            idsalida > 0 &&
+            valoresFormulario &&
+            (valoresFormulario.numeroOrden || valoresFormulario.estadoTramo)
+        ) {
             guardarBorradorAvance(idsalida, valoresFormulario);
         }
     }, [valoresFormulario, idsalida]);
@@ -107,6 +118,7 @@ export function VistaAvances({
     const etapasDisponibles = detalleSalida?.itinerario ?? [];
 
     const sincronizarPendientes = useCallback(async () => {
+        if (idsalida <= 0) return;
         const pendientes = obtenerAvancesOffline(idsalida);
         if (pendientes.length === 0) return;
 
@@ -146,6 +158,7 @@ export function VistaAvances({
 
     // Sincronización automática cuando el navegador vuelve a tener conexión
     useEffect(() => {
+        if (idsalida <= 0) return;
         function manejarOnline() {
             const pendientes = obtenerAvancesOffline(idsalida);
             if (pendientes.length > 0) {
@@ -166,6 +179,26 @@ export function VistaAvances({
             setValue("numeroOrden", siguienteEtapa.numeroOrden);
         }
     }, [siguienteEtapa, borrador, setValue]);
+
+    if (!salidaActual || idsalida <= 0) {
+        return (
+            <section aria-label="Registrar avances y novedades (CU-49)" className="space-y-6">
+                <header className="border-b border-borde/60 pb-4">
+                    <h1 className="text-2xl font-bold text-navegacion md:text-3xl">
+                        Registrar avances y novedades del recorrido
+                    </h1>
+                    <p className="text-sm text-texto-suave">
+                        Mantén actualizada la información de la salida y el itinerario
+                    </p>
+                </header>
+                <div className="rounded-tarjeta border border-borde bg-white p-8 text-center text-sm text-texto-suave shadow-tarjeta">
+                    {cargando
+                        ? "Cargando información de la salida..."
+                        : "No tienes una salida asignada seleccionada para registrar avances."}
+                </div>
+            </section>
+        );
+    }
 
     async function enviarAvance(datos: DatosAvanceForm) {
         setMensajeFeedback(null);
@@ -319,15 +352,19 @@ export function VistaAvances({
                 </div>
                 <div>
                     <h2 className="text-base font-bold text-navegacion">
-                        {salidaActual?.circuito ?? "Camino del Inca Clásico"}
+                        {salidaActual.circuito}
                     </h2>
                     <p className="text-xs text-texto-suave">
-                        {salidaActual?.nroSalida ?? "SAL-2026-002"} · {salidaActual?.paquete ?? "Inca Clásico Standard"}
+                        {salidaActual.nroSalida} · {salidaActual.paquete}
                     </p>
                 </div>
                 <div>
-                    <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                        {salidaActual?.estado === "EN_CURSO" ? "En curso" : "Activa"}
+                    <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${estilosEstadoSalida(
+                            salidaActual.estado,
+                        )}`}
+                    >
+                        {formatearEstadoSalida(salidaActual.estado)}
                     </span>
                 </div>
             </article>
@@ -381,7 +418,7 @@ export function VistaAvances({
                                     <option value="">Selecciona una etapa</option>
                                     {etapasDisponibles.map((etapa) => (
                                         <option key={etapa.numeroOrden} value={etapa.numeroOrden}>
-                                            Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin} {etapa.estadoTramo ? `(${etapa.estadoTramo})` : ""}
+                                            Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin} {etapa.estadoTramo ? `(${formatearEstadoSalida(etapa.estadoTramo)})` : ""}
                                         </option>
                                     ))}
                                 </select>
@@ -468,13 +505,15 @@ export function VistaAvances({
                                     Últimos registros del recorrido
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setModalHistorialAbierto(true)}
-                                className="text-xs font-bold text-marca hover:underline"
-                            >
-                                Ver todo
-                            </button>
+                            {historialAvances.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setModalHistorialAbierto(true)}
+                                    className="text-xs font-bold text-marca hover:underline"
+                                >
+                                    Ver todo
+                                </button>
+                            ) : null}
                         </div>
 
                         <div className="mt-4 divide-y divide-borde/50">
@@ -489,7 +528,7 @@ export function VistaAvances({
                                                     : "bg-amber-100 text-amber-800"
                                             }`}
                                         >
-                                            {item.estadoTramo}
+                                            {formatearEstadoSalida(item.estadoTramo)}
                                         </span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">
@@ -504,8 +543,8 @@ export function VistaAvances({
                             ))}
 
                             {historialAvances.length === 0 ? (
-                                <p className="py-4 text-center text-xs text-texto-suave">
-                                    Aún no hay avances registrados en esta salida.
+                                <p className="py-6 text-center text-xs text-texto-suave">
+                                    No hay avances registrados en esta salida
                                 </p>
                             ) : null}
                         </div>
@@ -514,7 +553,7 @@ export function VistaAvances({
                     <div className="mt-6 border-t border-borde/50 pt-3 text-center text-[11px] text-texto-suave">
                         {avancesPendientes.length > 0 ? (
                             <span className="text-amber-800 font-semibold">
-                                Hay avances pendientes de conectividad
+                                Hay {avancesPendientes.length} avance(s) pendiente(s) de señal
                             </span>
                         ) : (
                             <span>Todos los avances están sincronizados</span>
@@ -540,7 +579,7 @@ export function VistaAvances({
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                                    {salidaActual?.circuito ?? "Camino del Inca"}
+                                    {salidaActual.circuito}
                                 </p>
                                 <h2 className="text-lg font-bold text-navegacion">
                                     Historial de avances y novedades
@@ -567,7 +606,7 @@ export function VistaAvances({
                                                     : "bg-amber-100 text-amber-800"
                                             }`}
                                         >
-                                            {item.estadoTramo}
+                                            {formatearEstadoSalida(item.estadoTramo)}
                                         </span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">
@@ -580,6 +619,11 @@ export function VistaAvances({
                                     </div>
                                 </div>
                             ))}
+                            {historialAvances.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-texto-suave">
+                                    No hay avances registrados en esta salida
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="mt-6 flex justify-end">

@@ -1,7 +1,10 @@
 import { useState } from "react";
-import type {
-    DetalleSalidaGuia,
-    SalidaGuiaResumen,
+import {
+    estilosEstadoSalida,
+    formatearEstadoSalida,
+    formatearFechaSalida,
+    type DetalleSalidaGuia,
+    type SalidaGuiaResumen,
 } from "../../services/guiaService";
 import {
     IconoBolsaDormir,
@@ -31,20 +34,6 @@ export function VistaSalidas({
     cargando,
 }: VistaSalidasProps) {
     const [modalNominaAbierto, setModalNominaAbierto] = useState(false);
-
-    function formatearFecha(fechaIso?: string): string {
-        if (!fechaIso) return "--/--/----";
-        try {
-            const f = new Date(fechaIso);
-            return f.toLocaleDateString("es-ES", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            });
-        } catch {
-            return fechaIso;
-        }
-    }
 
     const salidaInfo = detalleSalida?.salida ?? salidaActual;
     const nomina = detalleSalida?.nomina ?? [];
@@ -106,14 +95,17 @@ export function VistaSalidas({
                                 Salida {salidaInfo.nroSalida}
                             </h2>
                             <p className="text-xs text-texto-suave">
-                                {salidaInfo.circuito} {salidaInfo.paquete ? `· ${salidaInfo.paquete}` : ""}
+                                {salidaInfo.circuito}{" "}
+                                {salidaInfo.paquete ? `· ${salidaInfo.paquete}` : ""}
                             </p>
                         </div>
                         <div>
-                            <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                                {salidaInfo.estado === "EN_CURSO"
-                                    ? "En curso"
-                                    : salidaInfo.estado}
+                            <span
+                                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${estilosEstadoSalida(
+                                    salidaInfo.estado,
+                                )}`}
+                            >
+                                {formatearEstadoSalida(salidaInfo.estado)}
                             </span>
                         </div>
                     </article>
@@ -140,7 +132,7 @@ export function VistaSalidas({
                                             <IconoReloj tamano={18} />
                                         </span>
                                         <span>
-                                            <b>Estado:</b> {salidaInfo.estado}
+                                            <b>Estado:</b> {formatearEstadoSalida(salidaInfo.estado)}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -148,7 +140,7 @@ export function VistaSalidas({
                                             <IconoCalendario tamano={18} />
                                         </span>
                                         <span>
-                                            <b>Inicio:</b> {formatearFecha(salidaInfo.fechaInicio)}
+                                            <b>Inicio:</b> {formatearFechaSalida(salidaInfo.fechaInicio)}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -203,6 +195,13 @@ export function VistaSalidas({
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {nomina.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={2} className="py-4 text-center text-xs text-texto-suave">
+                                                        No hay pasajeros registrados
+                                                    </td>
+                                                </tr>
+                                            ) : null}
                                         </tbody>
                                     </table>
                                 </div>
@@ -298,7 +297,7 @@ export function VistaSalidas({
                                                             : "bg-amber-100 text-amber-800"
                                                     }`}
                                                 >
-                                                    {etapa.estadoTramo}
+                                                    {formatearEstadoSalida(etapa.estadoTramo)}
                                                 </span>
                                             ) : (
                                                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
@@ -316,7 +315,10 @@ export function VistaSalidas({
                                         ) : null}
                                         {etapa.fechaHoraLlegada ? (
                                             <p className="mt-1 text-[11px] text-texto-suave">
-                                                Llegada: {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES")}
+                                                Llegada:{" "}
+                                                {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES", {
+                                                    timeZone: "UTC",
+                                                })}
                                             </p>
                                         ) : null}
                                     </div>
@@ -325,7 +327,11 @@ export function VistaSalidas({
                         </article>
                     ) : null}
                 </>
-            ) : null}
+            ) : (
+                <div className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave shadow-tarjeta">
+                    No hay información de salida disponible.
+                </div>
+            )}
 
             {/* Modal Nómina Completa de Pasajeros */}
             {modalNominaAbierto ? (
@@ -388,6 +394,13 @@ export function VistaSalidas({
                                             </td>
                                         </tr>
                                     ))}
+                                    {nomina.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="py-6 text-center text-xs text-texto-suave">
+                                                No hay pasajeros registrados
+                                            </td>
+                                        </tr>
+                                    ) : null}
                                 </tbody>
                             </table>
                         </div>

@@ -120,15 +120,19 @@ export default function PortalGuiaPage() {
 
                     {seccionActiva === "novedades" && (
                         <VistaAvances
+                            key={salidaActual?.idsalida ?? "sin_salida"}
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
+                            cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
 
                     {seccionActiva === "incidentes" && (
                         <VistaIncidentes
+                            key={salidaActual?.idsalida ?? "sin_salida"}
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
+                            cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
                 </div>
