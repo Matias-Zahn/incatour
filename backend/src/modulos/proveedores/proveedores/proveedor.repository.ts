@@ -65,10 +65,22 @@ export class ProveedorRepository {
   }
 
   async updateEstado(id: number, estado: string) {
-    return db.proveedor.update({
-      where: { idproveedor: id },
-      data: { estado },
-      include: { _count: { select: { servicios: true } } },
+    return db.$transaction(async (tx) => {
+      const proveedor = await tx.proveedor.update({
+        where: { idproveedor: id },
+        data: { estado },
+        include: { _count: { select: { servicios: true } } },
+      });
+
+      // CAT-10: Si el proveedor pasa a INACTIVO, se dan de baja en cascada todos sus servicios
+      if (estado === "INACTIVO") {
+        await tx.servicioBase.updateMany({
+          where: { idproveedor: id, estado: "ACTIVO" },
+          data: { estado: "INACTIVO" },
+        });
+      }
+
+      return proveedor;
     });
   }
 

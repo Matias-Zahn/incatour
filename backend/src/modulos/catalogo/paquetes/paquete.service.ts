@@ -66,17 +66,19 @@ export class PaqueteService {
         localidadGarantizada: dto.localidadGarantizada,
         categoriaGarantizada: dto.categoriaGarantizada,
         tipoHabitacionGarantizada: dto.tipoHabitacionGarantizada,
-        nochesPrevias: dto.nochesPrevias ?? 0,
-        nochesPosteriores: dto.nochesPosteriores ?? 0,
+        nochesPrevias: dto.nochesPrevias,
+        nochesPosteriores: dto.nochesPosteriores,
         diasDisponibles: dto.diasDisponibles,
       },
       dto.matrizPrecios,
-      dto.serviciosIncluidos ?? [],
+      dto.serviciosIncluidos
     );
   }
 
   /**
-   * CU-12: Modificar Paquete.
+   * CU-12: Modificar Paquete Turístico.
+   * Flujo Básico: modificar datos + reemplazar matriz de precios (si viene).
+   * RN: El cambio de precios rige solo para salidas futuras (nuevas reservas).
    */
   async modificarPaquete(id: number, dto: ModificarPaqueteDto) {
     const paquete = await this.repository.findById(id);
@@ -84,64 +86,86 @@ export class PaqueteService {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
 
-    // Construimos los datos a actualizar
-    const dataUpdate: Record<string, any> = {};
+    // Si mandan idservicioGarantizado o cambian a POR_ESTABLECIMIENTO, validar
+    const tipoGarantiaFinal = dto.tipoGarantia ?? paquete.tipoGarantia;
+    const idGarantizadoFinal = dto.idservicioGarantizado ?? paquete.idservicioGarantizado;
+
+    if (tipoGarantiaFinal === "POR_ESTABLECIMIENTO") {
+      if (!idGarantizadoFinal) {
+        throw CustomError.badRequest("Debe indicar el servicio de alojamiento a garantizar.");
+      }
+      await this.validarGarantiaAlojamiento(idGarantizadoFinal);
+    }
+
+    // Validar servicios incluidos si se envían
+    if (dto.serviciosIncluidos && dto.serviciosIncluidos.length > 0) {
+      await this.validarServiciosExisten(dto.serviciosIncluidos);
+    }
+
+    // 1. Actualizar datos básicos
+    const dataUpdate: any = {};
     if (dto.nombrePaquete) dataUpdate.nombrePaquete = dto.nombrePaquete;
     if (dto.condiciones !== undefined) dataUpdate.condiciones = dto.condiciones;
-    if (dto.nochesPrevias != null) dataUpdate.nochesPrevias = dto.nochesPrevias;
-    if (dto.nochesPosteriores != null) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
+    if (dto.tipoGarantia) dataUpdate.tipoGarantia = dto.tipoGarantia;
+    if (dto.idservicioGarantizado !== undefined) dataUpdate.idservicioGarantizado = dto.idservicioGarantizado;
+    if (dto.localidadGarantizada !== undefined) dataUpdate.localidadGarantizada = dto.localidadGarantizada;
+    if (dto.categoriaGarantizada !== undefined) dataUpdate.categoriaGarantizada = dto.categoriaGarantizada;
+    if (dto.tipoHabitacionGarantizada !== undefined) dataUpdate.tipoHabitacionGarantizada = dto.tipoHabitacionGarantizada;
+    if (dto.nochesPrevias !== undefined) dataUpdate.nochesPrevias = dto.nochesPrevias;
+    if (dto.nochesPosteriores !== undefined) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
 
-    // Si mandan nueva matriz de precios, reemplazamos las tarifas
-    if (dto.matrizPrecios) {
+    let resultado = paquete;
+    if (Object.keys(dataUpdate).length > 0) {
+      resultado = await this.repository.update(id, dataUpdate);
+    }
+
+    // 2. Si viene matrizPrecios, validar temporadas y reemplazar tarifas
+    if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
       await this.validarViabilidadComercial(dto.matrizPrecios);
       await this.repository.reemplazarTarifas(id, dto.matrizPrecios);
     }
 
-    // Si hay datos del paquete para actualizar
-    if (Object.keys(dataUpdate).length > 0) {
-      return this.repository.update(id, dataUpdate);
-    }
-
-    // Si solo se modificaron tarifas, devolver el paquete actualizado
     return this.repository.findById(id);
   }
 
   /**
-   * CU-13: Baja de Paquete.
-   * RN: No se puede dar de baja si tiene salidas activas.
+   * CU-13: Baja de Paquete Turístico (Baja Lógica).
+   * RN: No se puede dar de baja si tiene salidas activas (PUBLICADA, ABIERTA, CERRADA, EN_CURSO).
    */
   async darDeBajaPaquete(id: number) {
     const paquete = await this.repository.findById(id);
     if (!paquete || paquete.estado !== "ACTIVO") {
-      throw CustomError.notFound("Paquete no encontrado o ya inactivo.");
+      throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
 
+    // RN: Control de salidas activas asociadas
     const tieneSalidas = await this.repository.tieneSalidasActivas(id);
     if (tieneSalidas) {
-      throw CustomError.badRequest("No se puede dar de baja porque tiene salidas activas (abiertas, cerradas o en curso).");
+      throw CustomError.badRequest(
+        "No se puede dar de baja el paquete porque tiene salidas activas asociadas."
+      );
     }
 
     return this.repository.updateEstado(id, "INACTIVO");
   }
 
-  // ======================================================
-  // MÉTODOS PRIVADOS DE VALIDACIÓN (DSS)
-  // ======================================================
+  // ==================== MÉTODOS PRIVADOS DE VALIDACIÓN (DSS) ====================
 
   /**
-   * DSS: validarGarantiaAlojamiento(tipoGarantia, h.modalidadConfirmacion)
-   * RN: Solo puede indicarse un establecimiento determinado cuando su modalidad
+   * DSS: h = buscarPorId(alojamientoId) + validarGarantiaAlojamiento
+   * RN: Garantía Estricta de Alojamiento.
+   * Flujo Básico: Requiere que el alojamiento exista, esté activo y su modalidad
    *     de confirmación sea por "bloqueo de plazas".
    * Flujo Alternativo 2: Establecimiento que confirma a solicitud → RECHAZO.
    */
   private async validarGarantiaAlojamiento(idservicio: number) {
     const servicio = await db.servicioBase.findUnique({
       where: { idservicio: idservicio },
-      include: { alojamiento: true },
+      include: { alojamiento: true, proveedor: true },
     });
 
-    if (!servicio || servicio.estado !== "ACTIVO") {
+    if (!servicio || servicio.estado !== "ACTIVO" || servicio.proveedor?.estado !== "ACTIVO") {
       throw CustomError.notFound("El servicio de alojamiento garantizado no existe o no está activo.");
     }
 
@@ -179,14 +203,15 @@ export class PaqueteService {
   }
 
   /**
-   * Valida que los servicios incluidos existan y estén activos.
+   * Valida que los servicios incluidos existan, estén activos y pertenezcan a un proveedor activo (CAT-10).
    */
   private async validarServiciosExisten(ids: number[]) {
     for (const idservicio of ids) {
       const servicio = await db.servicioBase.findUnique({
         where: { idservicio },
+        include: { proveedor: true },
       });
-      if (!servicio || servicio.estado !== "ACTIVO") {
+      if (!servicio || servicio.estado !== "ACTIVO" || servicio.proveedor?.estado !== "ACTIVO") {
         throw CustomError.badRequest(
           `El servicio con ID ${idservicio} no existe o no está activo.`
         );
