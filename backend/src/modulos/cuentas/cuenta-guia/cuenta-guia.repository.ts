@@ -56,6 +56,133 @@ export class CuentaGuiaRepository {
     return db.guia.findUnique({ where: { idusuario }, include: INCLUDE_CUENTA });
   }
 
+  async findPersonalGuia(idpersonal: number) {
+    return db.personal.findUnique({
+      where: { idpersonal },
+      include: { guia: true },
+    });
+  }
+
+  async checkEmailExists(email: string) {
+    return db.usuario.findUnique({ where: { email } });
+  }
+
+  // CU-45: Crear cuenta de acceso para un guía ya registrado en el personal
+  async crearCuentaGuia(
+    idpersonal: number,
+    nombre: string,
+    apellido: string,
+    email: string,
+    contraseniaHasheada: string,
+    nroHabilitacion?: string,
+    fechaHabilitacion?: Date
+  ) {
+    return db.$transaction(async (tx) => {
+      const usuario = await tx.usuario.create({
+        data: {
+          nombre,
+          apellido,
+          email,
+          contrasenia: contraseniaHasheada,
+          rol: "GUIA",
+          estado: ESTADO.ACTIVO,
+        },
+      });
+
+      // Si el personal ya tiene fila en Guia, actualizamos su idusuario y habilitación si vino
+      const guiaExistente = await tx.guia.findUnique({ where: { idpersonal } });
+      if (guiaExistente) {
+        await tx.guia.update({
+          where: { idpersonal },
+          data: {
+            idusuario: usuario.idusuario,
+            ...(nroHabilitacion && { nroHabilitacion }),
+            ...(fechaHabilitacion && { fechaHabilitacion }),
+          },
+        });
+      } else {
+        await tx.guia.create({
+          data: {
+            idpersonal,
+            idusuario: usuario.idusuario,
+            nroHabilitacion: nroHabilitacion ?? null,
+            fechaHabilitacion: fechaHabilitacion ?? null,
+          },
+        });
+      }
+
+      return tx.guia.findUnique({
+        where: { idusuario: usuario.idusuario },
+        include: INCLUDE_CUENTA,
+      });
+    });
+  }
+
+  // Modificar cuenta de guía (por administrador)
+  async modificarCuenta(
+    idusuario: number,
+    idpersonal: number,
+    data: {
+      nombre?: string | undefined;
+      apellido?: string | undefined;
+      email?: string | undefined;
+      contraseniaHasheada?: string | undefined;
+      nroHabilitacion?: string | undefined;
+      fechaHabilitacion?: Date | undefined;
+      estado?: string | undefined;
+    }
+  ) {
+    return db.$transaction(async (tx) => {
+      const updateUsuario: {
+        nombre?: string;
+        apellido?: string;
+        email?: string;
+        contrasenia?: string;
+        estado?: string;
+      } = {};
+
+      if (data.nombre) updateUsuario.nombre = data.nombre;
+      if (data.apellido) updateUsuario.apellido = data.apellido;
+      if (data.email) updateUsuario.email = data.email;
+      if (data.contraseniaHasheada) updateUsuario.contrasenia = data.contraseniaHasheada;
+      if (data.estado) updateUsuario.estado = data.estado;
+
+      if (Object.keys(updateUsuario).length > 0) {
+        await tx.usuario.update({
+          where: { idusuario },
+          data: updateUsuario,
+        });
+
+        // Mantener sincronizado nombreCompleto en Personal si se actualizó nombre o apellido
+        if (data.nombre || data.apellido) {
+          const uActual = await tx.usuario.findUnique({ where: { idusuario } });
+          if (uActual) {
+            await tx.personal.update({
+              where: { idpersonal },
+              data: { nombreCompleto: `${uActual.nombre} ${uActual.apellido}` },
+            });
+          }
+        }
+      }
+
+      const updateGuia: { nroHabilitacion?: string; fechaHabilitacion?: Date } = {};
+      if (data.nroHabilitacion !== undefined) updateGuia.nroHabilitacion = data.nroHabilitacion;
+      if (data.fechaHabilitacion !== undefined) updateGuia.fechaHabilitacion = data.fechaHabilitacion;
+
+      if (Object.keys(updateGuia).length > 0) {
+        await tx.guia.update({
+          where: { idpersonal },
+          data: updateGuia,
+        });
+      }
+
+      return tx.guia.findUnique({
+        where: { idusuario },
+        include: INCLUDE_CUENTA,
+      });
+    });
+  }
+
   /**
    * CU-46: la verificación de salidas pendientes y la baja ocurren en la misma transacción,
    * para que una asignación que entre en el medio no quede con el guía sin cuenta.
