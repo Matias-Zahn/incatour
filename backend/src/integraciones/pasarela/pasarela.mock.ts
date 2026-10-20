@@ -23,13 +23,21 @@ export class PasarelaMock implements IPasarelaPagos {
   }
 
   // Pura: se evalúa después de la espera, así un dato raro no puede tirar dentro del setTimeout
-  private evaluar({ tarjeta }: SolicitudPago): RespuestaPago {
-    // Validaciones básicas de formato
-    if (typeof tarjeta.numero !== "string" || tarjeta.numero.length < 15) {
+  private evaluar({ tarjeta, monto }: SolicitudPago): RespuestaPago {
+    // Validaciones de formato
+    if (typeof tarjeta.numero !== "string" || !/^\d{15,16}$/.test(tarjeta.numero)) {
       return { aprobado: false, mensaje: "Número de tarjeta inválido" };
     }
-    if (typeof tarjeta.cvv !== "string" || tarjeta.cvv.length < 3) {
+    if (typeof tarjeta.cvv !== "string" || !/^\d{3,4}$/.test(tarjeta.cvv)) {
       return { aprobado: false, mensaje: "CVV inválido" };
+    }
+    const venc = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(String(tarjeta.vencimiento));
+    // Vale hasta fin del mes de vencimiento: el 1° del mes siguiente tiene que ser futuro
+    if (!venc || new Date(2000 + Number(venc[2]), Number(venc[1]), 1) <= new Date()) {
+      return { aprobado: false, mensaje: "Tarjeta vencida o con vencimiento inválido" };
+    }
+    if (!Number.isFinite(monto) || monto <= 0 || Number(monto.toFixed(2)) !== monto) {
+      return { aprobado: false, mensaje: "Monto inválido" };
     }
 
     // Lógica TRAMPA para testing de rollback

@@ -24,4 +24,22 @@ describe("PasarelaMock", () => {
     const r = await pagar(solicitud({ numero: 4111222233334444 }));
     expect(r.aprobado).toBe(false);
   });
+
+  it.each([
+    [{ vencimiento: "01/20" }, 100],
+    [{ vencimiento: "13/30" }, 100],
+    [{}, -5],
+    [{}, 0],
+    [{}, 10.555],
+    [{ numero: "4111-2222-3333-4444" }, 100],
+    [{ cvv: "12a" }, 100],
+  ])("rechaza tarjeta %o con monto %d", async (tarjeta, monto) => {
+    const r = await pagar(solicitud(tarjeta, monto));
+    expect(r.aprobado).toBe(false);
+  });
+
+  it("aprueba una tarjeta y un monto válidos", async () => {
+    const r = await pagar(solicitud());
+    expect(r.aprobado).toBe(true);
+  });
 });
