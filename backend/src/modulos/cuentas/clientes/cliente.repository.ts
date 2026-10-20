@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { ESTADO_RESERVA } from "../../../shared/constantes";
 import { CrearClienteDto, ModificarClienteDto } from "./cliente.dto";
 
 export class ClienteRepository {
@@ -103,9 +104,14 @@ export class ClienteRepository {
       where: { idcliente },
       include: {
         reservas: {
-          where: { estado: "Confirmada" }
-        }
-      }
+          where: {
+            OR: [
+              { estado: ESTADO_RESERVA.CONFIRMADA },
+              { estado: "Confirmada" },
+            ],
+          },
+        },
+      },
     });
     return cliente ? cliente.reservas.length > 0 : false;
   }
