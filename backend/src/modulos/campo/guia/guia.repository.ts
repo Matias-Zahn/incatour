@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_RESERVA, ESTADO_SALIDA } from "../../../shared/constantes";
+import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 
 export class GuiaRepository {
   // El token trae idusuario; el legajo se encuentra por Usuario → Guia → Personal
@@ -56,9 +56,16 @@ export class GuiaRepository {
     estadoTramo: string;
     fechaHoraLlegada: Date;
     ultimaEtapaAlcanzada: number | null;
+    ultimaEtapaLeida: number | null;
     estadoSalida: string;
   }) {
     return db.$transaction(async (tx) => {
+      // Se actualiza la salida primero y solo si nadie avanzó desde que se leyó: dos avances simultáneos no pasan los dos
+      const { count } = await tx.salida.updateMany({
+        where: { idsalida: p.idsalida, ultimaEtapaAlcanzada: p.ultimaEtapaLeida, estado: { in: SALIDAS_ACTIVAS } },
+        data: { estado: p.estadoSalida, ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada },
+      });
+      if (count === 0) return null;
       // fechaHoraReporte la pone la base (default now): así quedan separados el hecho y el aviso
       const avance = await tx.avance.create({
         data: {
@@ -69,11 +76,7 @@ export class GuiaRepository {
           fechaHoraLlegada: p.fechaHoraLlegada,
         },
       });
-      const salida = await tx.salida.update({
-        where: { idsalida: p.idsalida },
-        data: { estado: p.estadoSalida, ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada },
-        select: { idsalida: true, estado: true, ultimaEtapaAlcanzada: true },
-      });
+      const salida = { idsalida: p.idsalida, estado: p.estadoSalida, ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada };
       return { avance, salida };
     });
   }

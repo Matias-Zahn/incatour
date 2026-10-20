@@ -108,16 +108,19 @@ export class GuiaService {
     const completa = dto.estadoTramo === ESTADO_TRAMO.COMPLETADO;
     const ultimaDelCircuito = Math.max(...etapas.map((e) => e.numeroOrden));
 
-    return this.repository.registrarAvance({
+    const r = await this.repository.registrarAvance({
       idsalida,
       idcircuito: etapa.idcircuito,
       numeroOrden: dto.numeroOrden,
       estadoTramo: dto.estadoTramo,
       fechaHoraLlegada: dto.fechaHoraLlegada,
       ultimaEtapaAlcanzada: completa ? dto.numeroOrden : s.ultimaEtapaAlcanzada,
+      ultimaEtapaLeida: s.ultimaEtapaAlcanzada,
       estadoSalida:
         completa && dto.numeroOrden === ultimaDelCircuito ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
     });
+    if (!r) throw CustomError.conflict("Otro avance de esta salida se registró al mismo tiempo; volvé a consultar la salida");
+    return r;
   }
 
   // CU-50 FA1: pasajeros de la salida, para elegir a los afectados

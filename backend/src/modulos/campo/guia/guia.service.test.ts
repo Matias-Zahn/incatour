@@ -68,6 +68,14 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
     expect(r).toMatchObject({ idcircuito: 5, numeroOrden: 1, estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
   });
 
+  it("pasa al repositorio la etapa leída y rechaza con 409 si otro avance se coló (CTA-06)", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido());
+    repo.registrarAvance.mockResolvedValue(null);
+
+    await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.registrarAvance).toHaveBeenCalledWith(expect.objectContaining({ ultimaEtapaLeida: null }));
+  });
+
   it("completar la última etapa finaliza la salida", async () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 2 }));
 
