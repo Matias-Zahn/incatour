@@ -83,6 +83,16 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     expect(r.permisoNuevo).toMatch(/^PER-/);
   });
 
+  it("si el original ya salió y volvió a la salida, usa su permiso más reciente", async () => {
+    const viejo = { idpermisopersonal: 10, idpersonal: 1, nroPermiso: "PER-VIEJO", estadoTramite: "Dado de baja" };
+    repo.buscarSalida.mockResolvedValue({ ...salida(), permisos: [viejo, ...salida().permisos] });
+
+    const r = await new ReemplazoService().confirmarReemplazo(2, dto, "a");
+
+    expect(r.permisoDadoDeBaja).toBe(nroPermiso);
+    expect(repo.marcarPermisoDadoDeBaja).toHaveBeenCalledWith(50);
+  });
+
   it("compensación: si la base falla después de emitir, da de baja el permiso nuevo", async () => {
     repo.reemplazar.mockRejectedValue(new Error("fallo de la base"));
     const baja = vi.spyOn(autoridad, "darDeBajaPermiso");

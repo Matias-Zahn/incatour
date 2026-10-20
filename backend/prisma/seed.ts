@@ -336,21 +336,13 @@ async function main() {
     },
   });
 
-  const solicitud = await db.solicitud.create({
+  // Sin gestiones: se crean al resolverla (CU-34)
+  await db.solicitud.create({
     data: {
       idreserva: reserva.idreserva,
-      idservicio: servAloj.idservicio,
       nroSolicitud: "SOL-0001",
       estado: "PENDIENTE",
       cantidadPlazas: 1,
-      gestiones: {
-        create: [
-          {
-            idservicio: servAloj.idservicio,
-            resultado: "En Espera",
-          },
-        ],
-      },
     },
   });
 

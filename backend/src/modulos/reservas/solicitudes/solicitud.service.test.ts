@@ -19,8 +19,8 @@ const solicitud = (over: Record<string, unknown> = {}, paquete: Record<string, u
   idreserva: 20,
   estado: "PENDIENTE",
   cantidadPlazas: 2,
-  gestiones: [] as { resultado: string; idservicio: number | null }[],
   reserva: {
+    solicitudes: [] as { gestiones: { resultado: string; idservicio: number }[] }[],
     nroReserva: "RES-1",
     idsalida: 7,
     cliente: { nroCliente: "CLI-9" },
@@ -63,21 +63,18 @@ describe("SolicitudService", () => {
       ]);
     });
 
-    it("excluye los hoteles que ya rechazaron la solicitud", async () => {
-      repo.buscarPorId.mockResolvedValue(
-        solicitud({
-          gestiones: [
-            { resultado: "Rechazada", idservicio: 40 },
-            { resultado: "Aceptada", idservicio: 41 },
-            { resultado: "Rechazada", idservicio: null },
-          ],
-        })
-      );
+    it("excluye los hoteles que ya rechazaron, también en solicitudes anteriores de la reserva (-R)", async () => {
+      const s = solicitud();
+      s.reserva.solicitudes = [
+        { gestiones: [{ resultado: "Rechazada", idservicio: 40 }] }, // la original
+        { gestiones: [{ resultado: "Rechazada", idservicio: 43 }, { resultado: "Aceptada", idservicio: 41 }] }, // el reintento
+      ];
+      repo.buscarPorId.mockResolvedValue(s);
       repo.buscarServiciosCompatiblesExcluyendoRechazados.mockResolvedValue([hotel(42)]);
 
       await new SolicitudService().buscarServiciosCompatibles(5);
 
-      expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).toHaveBeenCalledWith("Doble", "3 estrellas", "Cusco", [40]);
+      expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).toHaveBeenCalledWith("Doble", "3 estrellas", "Cusco", [40, 43]);
     });
 
     it("404 si la solicitud no existe", async () => {

@@ -32,9 +32,10 @@ export class SolicitudService {
     }
 
     // Regla de negocio: excluir los que ya rechazaron (mirando la tabla de gestiones)
-    const rechazadosIds = solicitud.gestiones
-      .filter(g => g.resultado === "Rechazada" && g.idservicio)
-      .map(g => g.idservicio as number);
+    const rechazadosIds = solicitud.reserva.solicitudes
+      .flatMap(s => s.gestiones)
+      .filter(g => g.resultado === "Rechazada")
+      .map(g => g.idservicio);
 
     // Búsqueda en repositorio
     const serviciosCompatibles = await this.repository.buscarServiciosCompatiblesExcluyendoRechazados(

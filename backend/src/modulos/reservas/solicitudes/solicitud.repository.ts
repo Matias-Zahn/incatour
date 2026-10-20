@@ -33,10 +33,11 @@ export class SolicitudRepository {
                 paquete: true
               }
             },
-            cliente: true
+            cliente: true,
+            // Historial de toda la reserva: un reintento (-R) es otra solicitud y no trae los rechazos anteriores
+            solicitudes: { select: { gestiones: true } }
           }
-        },
-        gestiones: true // Para ver el historial de rechazos
+        }
       }
     });
   }
@@ -75,7 +76,6 @@ export class SolicitudRepository {
         where: { idsolicitud: solicitudId },
         data: { 
           estado: "CONFIRMADA",
-          idservicio: servicioId,
           gestiones: {
             create: {
               idservicio: servicioId,
@@ -111,7 +111,7 @@ export class SolicitudRepository {
             create: {
               idservicio: servicioId,
               resultado: "Rechazada",
-              observaciones: motivo
+              motivoRechazo: motivo
             }
           }
         }
@@ -121,7 +121,6 @@ export class SolicitudRepository {
       const nuevaSol = await tx.solicitud.create({
         data: {
           idreserva: reservaId,
-          idservicio: servicioId, // Set to old service temporarily to satisfy Prisma constraint
           nroSolicitud: `${solAnterior.nroSolicitud}-R`, // Sufijo para indicar que es reintento
           estado: "PENDIENTE",
           cantidadPlazas: cantPlazas

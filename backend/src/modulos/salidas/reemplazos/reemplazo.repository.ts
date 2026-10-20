@@ -9,7 +9,7 @@ export class ReemplazoRepository {
       where: { idsalida },
       include: {
         personalAsignado: { include: { personal: { include: { guia: true } } } },
-        permisos: true,
+        permisos: { orderBy: { idpermisopersonal: "asc" } },
         servicios: { include: { servicio: { select: { nombreServicio: true } } } },
         equipamientos: { include: { servicio: { select: { nombreServicio: true } } } },
       },
