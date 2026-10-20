@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { db } from "../../config/postgresDatabase";
 import {
   CUPO_DIARIO,
@@ -63,12 +64,13 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   async liberarTotalidadCupos(idBloqueo: string): Promise<void> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    // Los permisos del bloqueo se borran en cascada
-    await db.$transaction([
-      db.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: bloqueo.lugares } } }),
-      db.autoridadBloqueo.delete({ where: { idBloqueo } }),
-    ]);
+    // Idempotente: si el bloqueo ya no existe, no hay nada que liberar. Los permisos se borran en cascada
+    await db.$transaction(async (tx) => {
+      const bloqueo = await this.bloquearFila(tx, idBloqueo);
+      if (!bloqueo) return;
+      await tx.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: bloqueo.lugares } } });
+      await tx.autoridadBloqueo.delete({ where: { idBloqueo } });
+    });
   }
 
   async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<PermisoEmitido[]> {
@@ -111,6 +113,13 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   private armarPermiso(titular: TitularPermiso): PermisoEmitido {
     return { titular: { tipo: titular.tipo, id: titular.id }, nroPermiso: nuevoId("PER"), fechaEmision: new Date() };
+  }
+
+  // Toma el lock de la fila del bloqueo hasta que termine la transacción. Orden de locks: siempre bloqueo → cupo
+  private async bloquearFila(tx: Prisma.TransactionClient, idBloqueo: string) {
+    const [bloqueo] = await tx.$queryRaw<{ fecha: string; lugares: number }[]>`
+      SELECT fecha, lugares FROM autoridad.bloqueo WHERE "idBloqueo" = ${idBloqueo} FOR UPDATE`;
+    return bloqueo ?? null;
   }
 
   private async buscarBloqueo(idBloqueo: string) {

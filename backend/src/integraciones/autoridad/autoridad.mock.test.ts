@@ -62,6 +62,16 @@ describe("AutoridadMock", () => {
     expect(nuevo.nroPermiso).not.toBe(anterior!.nroPermiso);
   });
 
+  it("liberar la totalidad dos veces no falla y el cupo vuelve entero", async () => {
+    const autoridad = new AutoridadMock();
+    const idBloqueo = await bloquear(autoridad, 100);
+
+    await autoridad.liberarTotalidadCupos(idBloqueo);
+    await expect(autoridad.liberarTotalidadCupos(idBloqueo)).resolves.toBeUndefined();
+
+    expect((await autoridad.solicitarBloqueoCupo(DIA, 500)).aprobado).toBe(true);
+  });
+
   it.each([-10, 0, 1.5])("rechaza bloquear %d lugares", async (lugares) => {
     const autoridad = new AutoridadMock();
 

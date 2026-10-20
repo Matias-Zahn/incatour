@@ -72,7 +72,8 @@ export class AutoridadMock implements IApiAutoridad {
 
   async liberarTotalidadCupos(idBloqueo: string): Promise<void> {
     this.verificarConexion();
-    const bloqueo = this.buscarBloqueo(idBloqueo);
+    const bloqueo = this.bloqueos.get(idBloqueo);
+    if (!bloqueo) return; // idempotente: si ya se liberó, no hay nada que hacer
     this.liberarDelDia(bloqueo.fecha, bloqueo.lugares);
     this.bloqueos.delete(idBloqueo);
     for (const [nroPermiso, permiso] of this.permisos) {
