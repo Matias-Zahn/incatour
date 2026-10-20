@@ -60,3 +60,4 @@ export const tipoDeServicio = (s: {
 };
 
 export const redondear2 = (n: number) => Math.round(n * 100) / 100;
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
