@@ -69,6 +69,6 @@ export class ClienteService {
       throw CustomError.badRequest("No se puede dar de baja porque tiene reservas activas.");
     }
 
-    return this.repository.softDelete(id);
+    return this.repository.softDelete(id, cliente.idusuario);
   }
 }
