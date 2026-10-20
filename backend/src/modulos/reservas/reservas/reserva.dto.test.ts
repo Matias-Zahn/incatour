@@ -36,6 +36,8 @@ describe("CrearReservaDto (CU-30)", () => {
     [{ equipaje: [{ pesoDeclarado: -1 }] }, "pesoDeclarado debe ser un número mayor o igual a 0."],
     [{ tarjeta: { ...tarjeta, cvv: "" } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
     [{ tarjeta: undefined }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
+    [{ tarjeta: { ...tarjeta, numero: 4111222233334444 } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
+    [{ tarjeta: { ...tarjeta, cvv: 999 } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
   ])("rechaza %o", (cambio, mensaje) => {
     expect(error(cambio)).toBe(mensaje);
   });

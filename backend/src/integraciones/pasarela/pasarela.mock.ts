@@ -18,55 +18,36 @@ export class PasarelaMock implements IPasarelaPagos {
   async procesarPago(solicitud: SolicitudPago): Promise<RespuestaPago> {
     // Simulamos latencia de red (entre 500 y 1500 ms)
     const latencia = Math.floor(Math.random() * 1000) + 500;
-    
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const { tarjeta } = solicitud;
+    await new Promise((resolve) => setTimeout(resolve, latencia));
+    return this.evaluar(solicitud);
+  }
 
-        // Validaciones básicas de formato
-        if (!tarjeta.numero || tarjeta.numero.length < 15) {
-          return resolve({
-            aprobado: false,
-            mensaje: "Número de tarjeta inválido",
-          });
-        }
-        if (!tarjeta.cvv || tarjeta.cvv.length < 3) {
-          return resolve({
-            aprobado: false,
-            mensaje: "CVV inválido",
-          });
-        }
+  // Pura: se evalúa después de la espera, así un dato raro no puede tirar dentro del setTimeout
+  private evaluar({ tarjeta }: SolicitudPago): RespuestaPago {
+    // Validaciones básicas de formato
+    if (typeof tarjeta.numero !== "string" || tarjeta.numero.length < 15) {
+      return { aprobado: false, mensaje: "Número de tarjeta inválido" };
+    }
+    if (typeof tarjeta.cvv !== "string" || tarjeta.cvv.length < 3) {
+      return { aprobado: false, mensaje: "CVV inválido" };
+    }
 
-        // Lógica TRAMPA para testing de rollback
-        if (tarjeta.numero.endsWith("0000")) {
-          return resolve({
-            aprobado: false,
-            mensaje: "Rechazado por fondos insuficientes (Simulación)",
-          });
-        }
-        
-        if (tarjeta.numero.endsWith("1111")) {
-          return resolve({
-            aprobado: false,
-            mensaje: "Tarjeta reportada como robada (Simulación)",
-          });
-        }
+    // Lógica TRAMPA para testing de rollback
+    if (tarjeta.numero.endsWith("0000")) {
+      return { aprobado: false, mensaje: "Rechazado por fondos insuficientes (Simulación)" };
+    }
+    if (tarjeta.numero.endsWith("1111")) {
+      return { aprobado: false, mensaje: "Tarjeta reportada como robada (Simulación)" };
+    }
+    if (tarjeta.cvv === "999") {
+      return { aprobado: false, mensaje: "Fallo de validación de seguridad (Simulación)" };
+    }
 
-        if (tarjeta.cvv === "999") {
-          return resolve({
-            aprobado: false,
-            mensaje: "Fallo de validación de seguridad (Simulación)",
-          });
-        }
-
-        // Caso de éxito
-        resolve({
-          aprobado: true,
-          transaccionId: `TXN-${crypto.randomBytes(6).toString("hex").toUpperCase()}`,
-          mensaje: "Pago procesado exitosamente",
-        });
-
-      }, latencia);
-    });
+    // Caso de éxito
+    return {
+      aprobado: true,
+      transaccionId: `TXN-${crypto.randomBytes(6).toString("hex").toUpperCase()}`,
+      mensaje: "Pago procesado exitosamente",
+    };
   }
 }

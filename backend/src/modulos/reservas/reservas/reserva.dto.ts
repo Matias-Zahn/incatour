@@ -59,7 +59,11 @@ export class CrearReservaDto {
       }
     }
 
-    if (!tarjeta || !tarjeta.numero || !tarjeta.titular || !tarjeta.vencimiento || !tarjeta.cvv) {
+    if (
+      !tarjeta ||
+      typeof tarjeta !== "object" ||
+      [tarjeta.numero, tarjeta.titular, tarjeta.vencimiento, tarjeta.cvv].some((v) => typeof v !== "string" || !v.trim())
+    ) {
       return ["Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."];
     }
 
