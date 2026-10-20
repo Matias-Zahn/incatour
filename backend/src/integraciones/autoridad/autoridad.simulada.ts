@@ -52,14 +52,16 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   async liberarLugaresSobrantes(idBloqueo: string, sobrantes: number): Promise<void> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    if (sobrantes <= 0 || sobrantes > bloqueo.lugares) {
-      throw new Error(`Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares`);
-    }
-    await db.$transaction([
-      db.autoridadBloqueo.update({ where: { idBloqueo }, data: { lugares: { decrement: sobrantes } } }),
-      db.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: sobrantes } } }),
-    ]);
+    validarCantidad(sobrantes);
+    await db.$transaction(async (tx) => {
+      const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+      const libres = bloqueo.lugares - (await this.vigentes(tx, idBloqueo));
+      if (sobrantes > libres) {
+        throw new Error(`Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares y ${bloqueo.lugares - libres} permisos vigentes`);
+      }
+      await tx.autoridadBloqueo.update({ where: { idBloqueo }, data: { lugares: { decrement: sobrantes } } });
+      await tx.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: sobrantes } } });
+    });
   }
 
   async liberarTotalidadCupos(idBloqueo: string): Promise<void> {
@@ -75,15 +77,14 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<PermisoEmitido[]> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    if (nomina.length > bloqueo.lugares) {
-      throw new Error(`La nómina tiene ${nomina.length} personas y el bloqueo ${bloqueo.lugares} lugares`);
-    }
-    const permisos = nomina.map((titular) => this.armarPermiso(titular));
-    await db.autoridadPermiso.createMany({
-      data: permisos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
+    return db.$transaction(async (tx) => {
+      await this.verificarLugar(tx, idBloqueo, nomina.length);
+      const permisos = nomina.map((titular) => this.armarPermiso(titular));
+      await tx.autoridadPermiso.createMany({
+        data: permisos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
+      });
+      return permisos;
     });
-    return permisos;
   }
 
   async darDeBajaPermiso(idBloqueo: string, nroPermiso: string): Promise<void> {
@@ -104,10 +105,11 @@ export class AutoridadSimulada implements IApiAutoridad {
     }
     const nuevo = this.armarPermiso(reemplazante);
     // El permiso nuevo ocupa el mismo lugar que el anterior
-    await db.$transaction([
-      db.autoridadPermiso.delete({ where: { nroPermiso: nroPermisoAnterior } }),
-      db.autoridadPermiso.create({ data: { nroPermiso: nuevo.nroPermiso, idBloqueo } }),
-    ]);
+    await db.$transaction(async (tx) => {
+      await this.verificarLugar(tx, idBloqueo, 1);
+      await tx.autoridadPermiso.delete({ where: { nroPermiso: nroPermisoAnterior } });
+      await tx.autoridadPermiso.create({ data: { nroPermiso: nuevo.nroPermiso, idBloqueo } });
+    });
     return nuevo;
   }
 
@@ -122,10 +124,23 @@ export class AutoridadSimulada implements IApiAutoridad {
     return bloqueo ?? null;
   }
 
-  private async buscarBloqueo(idBloqueo: string) {
-    const bloqueo = await db.autoridadBloqueo.findUnique({ where: { idBloqueo } });
+  private async exigirBloqueo(tx: Prisma.TransactionClient, idBloqueo: string) {
+    const bloqueo = await this.bloquearFila(tx, idBloqueo);
     if (!bloqueo) throw new Error(`El bloqueo ${idBloqueo} no existe`);
     return bloqueo;
+  }
+
+  private vigentes(tx: Prisma.TransactionClient, idBloqueo: string) {
+    return tx.autoridadPermiso.count({ where: { idBloqueo, vigente: true } });
+  }
+
+  // Con el bloqueo lockeado, los permisos vigentes no pueden pasar sus lugares (dos pedidos en paralelo se serializan)
+  private async verificarLugar(tx: Prisma.TransactionClient, idBloqueo: string, aEmitir: number) {
+    const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+    const vigentes = await this.vigentes(tx, idBloqueo);
+    if (vigentes + aEmitir > bloqueo.lugares) {
+      throw new Error(`El bloqueo tiene ${bloqueo.lugares} lugares y ya hay ${vigentes} permisos vigentes: no entran ${aEmitir} más`);
+    }
   }
 
   private async buscarPermiso(idBloqueo: string, nroPermiso: string) {

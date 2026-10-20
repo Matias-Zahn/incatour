@@ -72,6 +72,26 @@ describe("AutoridadMock", () => {
     expect((await autoridad.solicitarBloqueoCupo(DIA, 500)).aprobado).toBe(true);
   });
 
+  it("no emite más permisos vigentes que lugares; con una baja previa sí", async () => {
+    const autoridad = new AutoridadMock();
+    const idBloqueo = await bloquear(autoridad, 2);
+    const [primero] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
+
+    await expect(autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)])).rejects.toThrow("lugares");
+
+    await autoridad.darDeBajaPermiso(idBloqueo, primero!.nroPermiso);
+    const [nuevo] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)]);
+    expect(nuevo!.titular.id).toBe(3);
+  });
+
+  it("no libera sobrantes que cubren permisos vigentes", async () => {
+    const autoridad = new AutoridadMock();
+    const idBloqueo = await bloquear(autoridad, 2);
+    await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
+
+    await expect(autoridad.liberarLugaresSobrantes(idBloqueo, 1)).rejects.toThrow("vigentes");
+  });
+
   it.each([-10, 0, 1.5])("rechaza bloquear %d lugares", async (lugares) => {
     const autoridad = new AutoridadMock();
 

@@ -61,9 +61,11 @@ export class AutoridadMock implements IApiAutoridad {
   ): Promise<void> {
     this.verificarConexion();
     const bloqueo = this.buscarBloqueo(idBloqueo);
-    if (sobrantes <= 0 || sobrantes > bloqueo.lugares) {
+    validarCantidad(sobrantes);
+    const libres = bloqueo.lugares - this.vigentes(idBloqueo);
+    if (sobrantes > libres) {
       throw new Error(
-        `Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares`,
+        `Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares y ${bloqueo.lugares - libres} permisos vigentes`,
       );
     }
     bloqueo.lugares -= sobrantes;
@@ -87,11 +89,7 @@ export class AutoridadMock implements IApiAutoridad {
   ): Promise<PermisoEmitido[]> {
     this.verificarConexion();
     const bloqueo = this.buscarBloqueo(idBloqueo);
-    if (nomina.length > bloqueo.lugares) {
-      throw new Error(
-        `La nómina tiene ${nomina.length} personas y el bloqueo ${bloqueo.lugares} lugares`,
-      );
-    }
+    this.verificarLugar(idBloqueo, bloqueo, nomina.length);
     return nomina.map((titular) => this.emitir(idBloqueo, titular));
   }
 
@@ -112,8 +110,23 @@ export class AutoridadMock implements IApiAutoridad {
         `El permiso ${nroPermisoAnterior} sigue vigente: primero hay que darlo de baja`,
       );
     }
+    this.verificarLugar(idBloqueo, this.buscarBloqueo(idBloqueo), 1);
     this.permisos.delete(nroPermisoAnterior); // su lugar pasa al permiso nuevo
     return this.emitir(idBloqueo, reemplazante);
+  }
+
+  private vigentes(idBloqueo: string) {
+    return [...this.permisos.values()].filter((p) => p.idBloqueo === idBloqueo && p.vigente).length;
+  }
+
+  // Los permisos vigentes no pueden pasar los lugares del bloqueo
+  private verificarLugar(idBloqueo: string, bloqueo: Bloqueo, aEmitir: number) {
+    const vigentes = this.vigentes(idBloqueo);
+    if (vigentes + aEmitir > bloqueo.lugares) {
+      throw new Error(
+        `El bloqueo tiene ${bloqueo.lugares} lugares y ya hay ${vigentes} permisos vigentes: no entran ${aEmitir} más`,
+      );
+    }
   }
 
   private emitir(idBloqueo: string, titular: TitularPermiso): PermisoEmitido {
