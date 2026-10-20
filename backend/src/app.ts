@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { envs } from "./config/envs";
-import { manejadorErrores } from "./error/manejadorErrores";
+import { manejadorErrores, rutaNoEncontrada } from "./error/manejadorErrores";
 import { setupSwagger } from "./config/swagger";
 
 import path from "path";
@@ -127,6 +127,7 @@ app.use("/api/incidentes", IncidenteRoutes.getRoutes);
 
 //ACA IRIAN las demas
 
+app.use(rutaNoEncontrada);
 app.use(manejadorErrores);
 
 app.listen(envs.PORT, () => {

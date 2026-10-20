@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
 import multer from "multer";
-import { manejadorErrores } from "./manejadorErrores";
+import { manejadorErrores, rutaNoEncontrada } from "./manejadorErrores";
 import { CustomError } from "./CustomError";
 
 // Respuesta falsa que guarda el código y el cuerpo
@@ -43,5 +43,20 @@ describe("manejadorErrores", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const r = responder(new Error("detalle interno de la base"));
     expect([r.estado, r.cuerpo.error]).toEqual([500, "Error interno del servidor"]);
+  });
+
+  it("un body que supera el límite de express.json es 413", () => {
+    const r = responder(Object.assign(new Error("request entity too large"), { type: "entity.too.large" }));
+    expect([r.estado, r.cuerpo.error]).toEqual([413, "El cuerpo de la petición es demasiado grande"]);
+  });
+
+  it("una ruta inexistente responde 404 en JSON", () => {
+    const r = { estado: 0, cuerpo: {} as { error?: string } };
+    const res = {
+      status: (c: number) => ((r.estado = c), res),
+      json: (b: { error?: string }) => ((r.cuerpo = b), res),
+    };
+    rutaNoEncontrada({} as Request, res as unknown as Response);
+    expect([r.estado, r.cuerpo.error]).toEqual([404, "Ruta no encontrada"]);
   });
 });

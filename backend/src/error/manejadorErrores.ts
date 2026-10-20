@@ -16,6 +16,9 @@ const MENSAJES_MULTER: Partial<Record<multer.ErrorCode, string>> = {
   LIMIT_UNEXPECTED_FILE: "El archivo tiene que enviarse en el campo indicado",
 };
 
+// Rutas que ningún router atendió: JSON en vez del HTML por defecto de Express
+export const rutaNoEncontrada = (req: Request, res: Response) => res.status(404).json({ error: "Ruta no encontrada" });
+
 export const manejadorErrores = (
   err: unknown,
   req: Request,
@@ -30,6 +33,11 @@ export const manejadorErrores = (
   // body con JSON mal formado (lo detecta express.json antes de llegar al controlador)
   if (err instanceof SyntaxError && "body" in err) {
     return res.status(400).json({ error: "El cuerpo de la petición no es un JSON válido" });
+  }
+
+  // body que supera el límite de express.json
+  if (typeof err === "object" && err !== null && "type" in err && err.type === "entity.too.large") {
+    return res.status(413).json({ error: "El cuerpo de la petición es demasiado grande" });
   }
 
   // reglas de la base que el código no llegó a validar antes (por ejemplo, dos pedidos a la vez)
