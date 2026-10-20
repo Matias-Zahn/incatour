@@ -40,7 +40,7 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     const b = await autoridad.solicitarBloqueoCupo(INICIO, 5);
     if (!b.aprobado) throw new Error("bloqueo");
     idBloqueo = b.idBloqueo;
-    const [emitido] = await autoridad.solicitarEmisionNominal(idBloqueo, [{ ...persona(1), tipo: "PERSONAL", id: 1 }]);
+    const { emitidos: [emitido] } = await autoridad.solicitarEmisionNominal(idBloqueo, [{ ...persona(1), tipo: "PERSONAL", id: 1 }]);
     nroPermiso = emitido!.nroPermiso;
     repo.buscarSalida.mockResolvedValue(salida());
     repo.buscarPersonal.mockResolvedValue(persona(9));

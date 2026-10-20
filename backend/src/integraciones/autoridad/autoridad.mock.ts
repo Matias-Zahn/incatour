@@ -4,8 +4,10 @@ import {
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
+  ResultadoEmision,
   TitularPermiso,
   diaDelCupo,
+  separarNomina,
   validarCantidad,
 } from "./autoridad.interface";
 
@@ -86,11 +88,12 @@ export class AutoridadMock implements IApiAutoridad {
   async solicitarEmisionNominal(
     idBloqueo: string,
     nomina: TitularPermiso[],
-  ): Promise<PermisoEmitido[]> {
+  ): Promise<ResultadoEmision> {
     this.verificarConexion();
     const bloqueo = this.buscarBloqueo(idBloqueo);
-    this.verificarLugar(idBloqueo, bloqueo, nomina.length);
-    return nomina.map((titular) => this.emitir(idBloqueo, titular));
+    const { aceptados, rechazados } = separarNomina(nomina, bloqueo.fecha);
+    this.verificarLugar(idBloqueo, bloqueo, aceptados.length);
+    return { emitidos: aceptados.map((titular) => this.emitir(idBloqueo, titular)), rechazados };
   }
 
   async darDeBajaPermiso(idBloqueo: string, nroPermiso: string): Promise<void> {

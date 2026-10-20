@@ -1,6 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
-import { PermisoEmitido, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
+import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { LogisticaRepository } from "../logistica/logistica.repository";
 import { calcularDotacion } from "../salidas/salida.dotacion";
@@ -103,10 +103,31 @@ export class AsignacionService {
     // Paso 14: emisión nominal. Va antes de la transacción porque es un servicio externo
     const autoridad = obtenerAutoridad();
     let permisos: PermisoEmitido[];
+    let rechazados: PermisoRechazado[];
     try {
-      permisos = await autoridad.solicitarEmisionNominal(salida.idbloqueo!, nomina);
+      ({ emitidos: permisos, rechazados } = await autoridad.solicitarEmisionNominal(salida.idbloqueo!, nomina));
     } catch {
       throw CustomError.serviceUnavailable("No fue posible emitir los permisos ante la autoridad. Reintentá más tarde");
+    }
+
+    // Si algo falla después de emitir, los permisos emitidos se dan de baja
+    const darDeBajaEmitidos = () =>
+      Promise.all(
+        permisos.map((p) =>
+          autoridad
+            .darDeBajaPermiso(salida.idbloqueo!, p.nroPermiso)
+            .catch((e) => console.error(`Compensación fallida: el permiso ${p.nroPermiso} quedó emitido`, e))
+        )
+      );
+
+    // ponytail: todo o nada hasta la fase 2 (registrar rechazados RF-47)
+    if (rechazados.length) {
+      await darDeBajaEmitidos();
+      const detalle = rechazados.map((r) => {
+        const t = nomina.find((n) => n.tipo === r.titular.tipo && n.id === r.titular.id);
+        return `${t?.nombreCompleto ?? `#${r.titular.id}`} (${r.motivo})`;
+      });
+      throw CustomError.badRequest(`La autoridad rechazó los permisos de: ${detalle.join(", ")}`);
     }
 
     let salidaActualizada;
@@ -122,14 +143,7 @@ export class AsignacionService {
         ),
       });
     } catch (error) {
-      // Compensación: la base falló, así que los permisos emitidos se dan de baja
-      await Promise.all(
-        permisos.map((p) =>
-          autoridad
-            .darDeBajaPermiso(salida.idbloqueo!, p.nroPermiso)
-            .catch((e) => console.error(`Compensación fallida: el permiso ${p.nroPermiso} quedó emitido`, e))
-        )
-      );
+      await darDeBajaEmitidos();
       throw error;
     }
 

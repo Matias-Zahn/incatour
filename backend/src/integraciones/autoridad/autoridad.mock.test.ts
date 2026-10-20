@@ -43,7 +43,7 @@ describe("AutoridadMock", () => {
   it("no emite el permiso del reemplazante si el anterior sigue vigente", async () => {
     const autoridad = new AutoridadMock();
     const idBloqueo = await bloquear(autoridad, 2);
-    const [anterior] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
+    const { emitidos: [anterior] } = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
 
     const reemplazo = autoridad.solicitarPermisoIndividual(idBloqueo, titular(3), anterior!.nroPermiso);
 
@@ -53,7 +53,7 @@ describe("AutoridadMock", () => {
   it("con el permiso anterior dado de baja, emite uno nuevo para el reemplazante", async () => {
     const autoridad = new AutoridadMock();
     const idBloqueo = await bloquear(autoridad, 2);
-    const [anterior] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
+    const { emitidos: [anterior] } = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
     await autoridad.darDeBajaPermiso(idBloqueo, anterior!.nroPermiso);
 
     const nuevo = await autoridad.solicitarPermisoIndividual(idBloqueo, titular(3), anterior!.nroPermiso);
@@ -75,12 +75,12 @@ describe("AutoridadMock", () => {
   it("no emite más permisos vigentes que lugares; con una baja previa sí", async () => {
     const autoridad = new AutoridadMock();
     const idBloqueo = await bloquear(autoridad, 2);
-    const [primero] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
+    const { emitidos: [primero] } = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
 
     await expect(autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)])).rejects.toThrow("lugares");
 
     await autoridad.darDeBajaPermiso(idBloqueo, primero!.nroPermiso);
-    const [nuevo] = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)]);
+    const { emitidos: [nuevo] } = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)]);
     expect(nuevo!.titular.id).toBe(3);
   });
 
@@ -90,6 +90,19 @@ describe("AutoridadMock", () => {
     await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), titular(2)]);
 
     await expect(autoridad.liberarLugaresSobrantes(idBloqueo, 1)).rejects.toThrow("vigentes");
+  });
+
+  it("emite a los titulares válidos y rechaza al del pasaporte vencido, sin ocuparle lugar", async () => {
+    const autoridad = new AutoridadMock();
+    const idBloqueo = await bloquear(autoridad, 2);
+    const vencido = { ...titular(2), fechaVencimientoPasaporte: new Date("2026-01-01") };
+
+    const { emitidos, rechazados } = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(1), vencido]);
+
+    expect(emitidos.map((e) => e.titular.id)).toEqual([1]);
+    expect(rechazados).toEqual([{ titular: { tipo: "PASAJERO", id: 2 }, motivo: expect.stringContaining("asaporte") }]);
+    const otro = await autoridad.solicitarEmisionNominal(idBloqueo, [titular(3)]);
+    expect(otro.emitidos).toHaveLength(1);
   });
 
   it.each([-10, 0, 1.5])("rechaza bloquear %d lugares", async (lugares) => {

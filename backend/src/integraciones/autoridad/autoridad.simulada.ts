@@ -6,8 +6,10 @@ import {
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
+  ResultadoEmision,
   TitularPermiso,
   diaDelCupo,
+  separarNomina,
   validarCantidad,
 } from "./autoridad.interface";
 
@@ -75,15 +77,17 @@ export class AutoridadSimulada implements IApiAutoridad {
     });
   }
 
-  async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<PermisoEmitido[]> {
+  async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<ResultadoEmision> {
     this.verificarConexion();
     return db.$transaction(async (tx) => {
-      await this.verificarLugar(tx, idBloqueo, nomina.length);
-      const permisos = nomina.map((titular) => this.armarPermiso(titular));
+      const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+      const { aceptados, rechazados } = separarNomina(nomina, bloqueo.fecha);
+      await this.verificarLugar(tx, idBloqueo, bloqueo, aceptados.length);
+      const emitidos = aceptados.map((titular) => this.armarPermiso(titular));
       await tx.autoridadPermiso.createMany({
-        data: permisos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
+        data: emitidos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
       });
-      return permisos;
+      return { emitidos, rechazados };
     });
   }
 
@@ -106,7 +110,7 @@ export class AutoridadSimulada implements IApiAutoridad {
     const nuevo = this.armarPermiso(reemplazante);
     // El permiso nuevo ocupa el mismo lugar que el anterior
     await db.$transaction(async (tx) => {
-      await this.verificarLugar(tx, idBloqueo, 1);
+      await this.verificarLugar(tx, idBloqueo, await this.exigirBloqueo(tx, idBloqueo), 1);
       await tx.autoridadPermiso.delete({ where: { nroPermiso: nroPermisoAnterior } });
       await tx.autoridadPermiso.create({ data: { nroPermiso: nuevo.nroPermiso, idBloqueo } });
     });
@@ -135,8 +139,7 @@ export class AutoridadSimulada implements IApiAutoridad {
   }
 
   // Con el bloqueo lockeado, los permisos vigentes no pueden pasar sus lugares (dos pedidos en paralelo se serializan)
-  private async verificarLugar(tx: Prisma.TransactionClient, idBloqueo: string, aEmitir: number) {
-    const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+  private async verificarLugar(tx: Prisma.TransactionClient, idBloqueo: string, bloqueo: { lugares: number }, aEmitir: number) {
     const vigentes = await this.vigentes(tx, idBloqueo);
     if (vigentes + aEmitir > bloqueo.lugares) {
       throw new Error(`El bloqueo tiene ${bloqueo.lugares} lugares y ya hay ${vigentes} permisos vigentes: no entran ${aEmitir} más`);
