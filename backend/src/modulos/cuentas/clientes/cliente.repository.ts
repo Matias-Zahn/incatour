@@ -48,24 +48,24 @@ export class ClienteRepository {
       });
 
       return { 
-        cliente, 
-        idusuario: usuario.idusuario, 
+        idcliente: cliente.idcliente,
+        idusuario: usuario.idusuario,
+        nroCliente: cliente.nroCliente,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
-        email: usuario.email 
+        email: usuario.email,
+        estado: cliente.estado
       };
     });
   }
 
   async update(idcliente: number, idusuario: number, data: ModificarClienteDto) {
     return db.$transaction(async (tx) => {
-      
-      const updateData: any = {};
+      const updateData: { nombre?: string; apellido?: string; email?: string } = {};
       if (data.nombre) updateData.nombre = data.nombre;
       if (data.apellido) updateData.apellido = data.apellido;
       if (data.email) updateData.email = data.email;
 
-      // 1. Si hay algo para actualizar, actualizamos la tabla Usuario
       if (Object.keys(updateData).length > 0) {
         await tx.usuario.update({
           where: { idusuario },
@@ -81,10 +81,20 @@ export class ClienteRepository {
     });
   }
 
-  async softDelete(idcliente: number) {
-    return db.cliente.update({
-      where: { idcliente },
-      data: { estado: "INACTIVO" },
+  async softDelete(idcliente: number, idusuario: number) {
+    return db.$transaction(async (tx) => {
+      // SEG-02: Marcar tanto Cliente como Usuario en INACTIVO
+      const cliente = await tx.cliente.update({
+        where: { idcliente },
+        data: { estado: "INACTIVO" },
+      });
+
+      await tx.usuario.update({
+        where: { idusuario },
+        data: { estado: "INACTIVO" },
+      });
+
+      return cliente;
     });
   }
 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { CustomError } from "../../error/CustomError";
 import { envs } from "../../config/envs";
+import { db } from "../../config/postgresDatabase";
 
 // Extendemos la interfaz de Request para agregar el usuario autenticado
 declare global {
@@ -21,12 +22,12 @@ declare global {
 /**
  * Middleware 1: autenticar
  * Verifica que la petición traiga un token JWT válido en el header Authorization.
- * Si es válido, carga los datos del usuario en req.usuarioAutenticado.
+ * Si es válido, comprueba en la base de datos que el usuario siga existiendo y permanezca ACTIVO (SEG-04).
  * Si no, corta la petición con 401.
  *
  * Uso en rutas: router.get("/", autenticar, controller.metodo)
  */
-export const autenticar = (req: Request, res: Response, next: NextFunction) => {
+export const autenticar = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers["authorization"];
 
@@ -43,6 +44,20 @@ export const autenticar = (req: Request, res: Response, next: NextFunction) => {
       rol: string;
     };
 
+    // SEG-04: Validar en tiempo real que el usuario exista y no haya sido dado de baja
+    const usuarioDb = await db.usuario.findUnique({
+      where: { idusuario: payload.idusuario },
+      select: {
+        idusuario: true,
+        estado: true,
+        cliente: { select: { estado: true } },
+      },
+    });
+
+    if (!usuarioDb || usuarioDb.estado === "INACTIVO" || usuarioDb.cliente?.estado === "INACTIVO") {
+      throw CustomError.unauthorized("Su cuenta ha sido desactivada o no existe");
+    }
+
     req.usuarioAutenticado = payload;
     next();
   } catch (error) {
@@ -58,21 +73,21 @@ export const autenticar = (req: Request, res: Response, next: NextFunction) => {
  * Debe usarse SIEMPRE después del middleware autenticar.
  * Si el rol no coincide, corta la petición con 403 Forbidden.
  *
- * Uso en rutas: router.post("/", autenticar, requierePerfil("ADMIN"), controller.metodo)
- * Múltiples roles: router.get("/", autenticar, requierePerfil("ADMIN", "GUIA"), controller.metodo)
+ * Uso en rutas: router.delete("/:id", autenticar, requierePerfil("ADMIN"), controller.metodo)
+ * O con varios: router.get("/perfil", autenticar, requierePerfil("ADMIN", "CLIENTE"), ...)
  */
 export const requierePerfil = (...rolesPermitidos: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const usuario = req.usuarioAutenticado;
 
     if (!usuario) {
-      return next(CustomError.unauthorized("No hay sesión activa"));
+      return next(CustomError.unauthorized("Usuario no autenticado"));
     }
 
     if (!rolesPermitidos.includes(usuario.rol)) {
       return next(
         CustomError.forbidden(
-          `Acceso denegado. Se requiere el perfil: ${rolesPermitidos.join(" o ")}`
+          `Acceso denegado. Se requiere uno de los siguientes perfiles: ${rolesPermitidos.join(", ")}`
         )
       );
     }
