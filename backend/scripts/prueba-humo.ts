@@ -6,6 +6,7 @@
  * A. Todos los GET del openapi.json con ids del seed: ninguno puede responder 5xx.
  * B. Cada escritura con cuerpo vacío: tiene que responder 4xx, nunca 5xx.
  * C. Un recorrido de negocio completo con datos válidos: cada paso tiene que responder 2xx.
+ * D. La autoridad simulada con pedidos en paralelo: el lock del bloqueo tiene que serializarlos.
  *
  * Resetea incatour_humo con las migraciones y el seed, y levanta el back en el puerto 3999.
  * La base de desarrollo no se toca. Uso, desde backend, con Docker levantado: npm run test:humo
@@ -280,6 +281,47 @@ async function faseC() {
   await paso("Baja cliente (CU-29)", "PATCH", `/clientes/${idDe(cliente, "idcliente")}/baja`);
 }
 
+// Fase D: usa AutoridadSimulada directo contra la base de la prueba (nunca incatour_db)
+async function faseD() {
+  // El cliente de Prisma lee DATABASE_URL al importarse: se pisa antes del import dinámico
+  process.env.DATABASE_URL = DB_URL;
+  const { AutoridadSimulada } = await import("../src/integraciones/autoridad/autoridad.simulada.js");
+  const { db } = await import("../src/config/postgresDatabase.js");
+  const autoridad = new AutoridadSimulada(false);
+  const controlar = (nombre: string, ok: boolean, detalle = "") => {
+    console.log(`${ok ? "✓" : "✗"} ${nombre}`);
+    if (!ok) fallas.push(`D ${nombre} ${detalle}`);
+  };
+  const titulares = (desde: number) => Array.from({ length: 6 }, (_, i) => ({
+    tipo: "PASAJERO" as const, id: desde + i, nombreCompleto: `Humo ${desde + i}`, nacionalidad: "Peruana",
+    nroPasaporte: `D${desde + i}`, fechaVencimientoPasaporte: new Date("2035-01-01"),
+  }));
+  const exactamenteUno = (r: PromiseSettledResult<unknown>[]) => r.filter((x) => x.status === "fulfilled").length === 1;
+
+  try {
+    const bloqueo = await autoridad.solicitarBloqueoCupo(new Date("2030-06-15"), 26);
+    controlar("Bloquear 26 lugares", bloqueo.aprobado);
+    if (!bloqueo.aprobado) return;
+    const id = bloqueo.idBloqueo;
+
+    const sobrantes = await Promise.allSettled([autoridad.liberarLugaresSobrantes(id, 20), autoridad.liberarLugaresSobrantes(id, 20)]);
+    controlar("Dos liberaciones de sobrantes en paralelo: solo una pasa", exactamenteUno(sobrantes));
+    const quedan = await db.autoridadBloqueo.findUnique({ where: { idBloqueo: id } });
+    controlar("Quedan 6 lugares en el bloqueo", quedan?.lugares === 6, `(quedan ${quedan?.lugares})`);
+
+    const emisiones = await Promise.allSettled([autoridad.solicitarEmisionNominal(id, titulares(1)), autoridad.solicitarEmisionNominal(id, titulares(11))]);
+    controlar("Dos emisiones de 6 en paralelo: solo una pasa", exactamenteUno(emisiones));
+
+    const liberaciones = await Promise.allSettled([autoridad.liberarTotalidadCupos(id), autoridad.liberarTotalidadCupos(id)]);
+    controlar("Liberar la totalidad dos veces: ambas resuelven", liberaciones.every((x) => x.status === "fulfilled"));
+
+    const negativo = await Promise.allSettled([autoridad.solicitarBloqueoCupo(new Date("2030-06-15"), -10)]);
+    controlar("Bloquear -10 lugares se rechaza", negativo[0]!.status === "rejected");
+  } finally {
+    await db.$disconnect();
+  }
+}
+
 async function esperarServidor() {
   for (let i = 0; i < 60; i++) {
     try { await fetch(`${BASE}/catalogo`); return; } catch { await new Promise((r) => setTimeout(r, 500)); }
@@ -302,6 +344,7 @@ async function main() {
     token.guia = await login("carlos.guia@incatour.com", "guia123");
     await faseA_B();
     await faseC();
+    await faseD();
   } catch (e) {
     fallas.push(`Corte: ${e instanceof Error ? e.message : e}`);
   } finally {
