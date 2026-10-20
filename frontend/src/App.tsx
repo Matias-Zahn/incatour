@@ -12,6 +12,7 @@ import ProveedoresPage from "./pages/gestion/ProveedoresPage";
 import ServiciosPage from "./pages/gestion/ServiciosPage";
 import SolicitudesPage from "./pages/gestion/SolicitudesPage";
 import TemporadasPage from "./pages/gestion/TemporadasPage";
+import PortalGuiaPage from "./pages/guia/PortalGuiaPage";
 import Login from "./pages/Login";
 import RutaProtegida from "./components/RutaProtegida";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -29,6 +30,13 @@ function App() {
             </LayoutCliente>
           }
         />
+        {/* Rutas exclusivas del perfil GUÍA (CU-48, CU-49, CU-50) */}
+        <Route element={<RutaProtegida roles={["GUIA"]} />}>
+          <Route path="/guia" element={<PortalGuiaPage />} />
+          <Route path="/guia/:seccion" element={<PortalGuiaPage />} />
+        </Route>
+
+        {/* Rutas exclusivas del perfil ADMIN */}
         <Route element={<RutaProtegida roles={["ADMIN"]} />}>
           <Route
             path="/"

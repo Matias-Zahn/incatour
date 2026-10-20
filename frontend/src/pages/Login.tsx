@@ -31,7 +31,12 @@ function Login() {
 
     const usuarioActual = obtenerUsuario();
     if (obtenerToken() && usuarioActual) {
-        const rutaPorRol = usuarioActual.rol === "CLIENTE" ? "/catalogo" : "/";
+        const rutaPorRol =
+            usuarioActual.rol === "CLIENTE"
+                ? "/catalogo"
+                : usuarioActual.rol === "GUIA"
+                  ? "/guia"
+                  : "/";
         return (
             <Navigate
                 to={destino !== "/" ? destino : rutaPorRol}
@@ -44,7 +49,11 @@ function Login() {
         iniciarSesion.mutate(datos, {
             onSuccess: (usuario) => {
                 const rutaPorRol =
-                    usuario.rol === "CLIENTE" ? "/catalogo" : "/";
+                    usuario.rol === "CLIENTE"
+                        ? "/catalogo"
+                        : usuario.rol === "GUIA"
+                          ? "/guia"
+                          : "/";
                 navegar(destino !== "/" ? destino : rutaPorRol, {
                     replace: true,
                 });
@@ -65,7 +74,7 @@ function Login() {
                     </p>
                     <h1 className="text-2xl font-bold text-navegacion">Ingresar</h1>
                     <p className="mt-1 text-sm text-texto-suave">
-                        Panel administrativo de gestión.
+                        Portal de acceso IncaTour.
                     </p>
                 </div>
 
@@ -110,4 +119,5 @@ function Login() {
         </main>
     );
 }
+
 export default Login;
