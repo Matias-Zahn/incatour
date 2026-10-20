@@ -14,7 +14,6 @@ export interface DatosConfirmacionReserva {
   solicitud?:
     | {
         nroSolicitud: string;
-        idservicio: number | null; // null cuando la garantía es por categoría
         criterios: string;
       }
     | undefined;
@@ -128,7 +127,6 @@ export class ReservaRepository {
                 nroSolicitud: d.solicitud.nroSolicitud,
                 estado: "PENDIENTE",
                 cantidadPlazas: d.pasajeros.length,
-                idservicio: d.solicitud.idservicio,
                 criterios: d.solicitud.criterios,
               },
             },

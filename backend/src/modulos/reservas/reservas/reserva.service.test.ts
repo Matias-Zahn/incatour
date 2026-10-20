@@ -130,7 +130,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
 
       expect(r.estadoAlojamiento).toBe("PENDIENTE");
       const datos = repo.confirmarReserva.mock.calls[0]![0];
-      expect(datos.solicitud).toMatchObject({ idservicio: 40, nroSolicitud: expect.stringMatching(/^SOL-RES-/) });
+      expect(datos.solicitud).toMatchObject({ nroSolicitud: expect.stringMatching(/^SOL-RES-/) });
       expect(datos.solicitud.criterios).toContain("Cusco");
     });
 

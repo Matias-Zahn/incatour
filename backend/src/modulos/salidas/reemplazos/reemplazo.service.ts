@@ -67,7 +67,8 @@ export class ReemplazoService {
     }
 
     // Pasos 16 a 19: si el original tenía permiso, se da de baja y se emite uno nuevo sobre el mismo lugar
-    const anterior = salida.permisos.find(
+    // El más reciente: si la persona ya salió y volvió a esta salida, tiene permisos viejos dados de baja
+    const anterior = salida.permisos.findLast(
       (p) => p.idpersonal === original.idpersonal && p.estadoTramite !== ESTADO_PERMISO.PERDIDO
     );
     const autoridad = obtenerAutoridad();

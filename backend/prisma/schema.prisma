@@ -66,7 +66,6 @@ model Reserva {
   pagos       Pago[]
   reembolsos  Reembolso[] // Relación con el nuevo modelo Reembolso
   solicitudes Solicitud[]
-  auditorias  RegistroAuditoria[]
   permisos    PermisoPasajero[] // Relación con los permisos de pasajero tramitados
 
   @@schema("public")
@@ -101,14 +100,12 @@ model Pago {
 model Solicitud {
   idsolicitud    Int     @id @default(autoincrement())
   idreserva      Int
-  idservicio     Int?
   nroSolicitud   String  @unique
   estado         String
   cantidadPlazas Int
   criterios      String?
 
   reserva   Reserva            @relation(fields: [idreserva], references: [idreserva])
-  servicio  ServicioBase?      @relation(fields: [idservicio], references: [idservicio])
   gestiones GestionSolicitud[]
 
   @@schema("public")
@@ -255,7 +252,6 @@ model Paquete {
   tarifas                  TarifaPaquete[]
   servicios                PaqueteServicio[]
   salidas                  Salida[]
-  auditorias               RegistroAuditoria[]
 
   @@schema("public")
 }
@@ -408,17 +404,13 @@ model IncidentePasajero {
 
 model RegistroAuditoria {
   idcambio    Int      @id @default(autoincrement())
-  idsalida    Int?
-  idreserva   Int?
-  idpaquete   Int?
+  idsalida    Int
   fechaActual DateTime @default(now())
   usuario     String
   motivo      String?
   cambios     Json // Almacena el snapshot de antes y después
 
-  salida  Salida?  @relation(fields: [idsalida], references: [idsalida])
-  reserva Reserva? @relation(fields: [idreserva], references: [idreserva])
-  paquete Paquete? @relation(fields: [idpaquete], references: [idpaquete])
+  salida Salida @relation(fields: [idsalida], references: [idsalida])
 
   @@schema("public")
 }
@@ -487,7 +479,6 @@ model ServicioBase {
   // Relaciones inversas
   paquetes                 PaqueteServicio[]
   garantiasEstablecimiento GarantiaEstablecimiento[]
-  solicitudes              Solicitud[]
   gestiones                GestionSolicitud[]
 
   salidas      SalidaServicio[]

@@ -87,7 +87,6 @@ export class ReservaService {
     }
 
     // 7. Pago aprobado: registrar la reserva completa en una sola transacción
-    const garantiaNominal = salida.paquete.garantiasEstablecimiento[0]?.idservicio;
     let reserva;
     try {
       reserva = await this.repository.confirmarReserva({
@@ -103,7 +102,6 @@ export class ReservaService {
           ? undefined
           : {
               nroSolicitud: `SOL-${nroReserva}`,
-              idservicio: garantiaNominal ?? null,
               criterios:
                 `Localidad: ${salida.paquete.localidadGarantizada ?? "-"} | ` +
                 `Categoría: ${salida.paquete.categoriaGarantizada ?? "-"} | ` +
