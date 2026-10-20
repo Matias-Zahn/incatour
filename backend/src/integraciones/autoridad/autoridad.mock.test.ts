@@ -62,6 +62,12 @@ describe("AutoridadMock", () => {
     expect(nuevo.nroPermiso).not.toBe(anterior!.nroPermiso);
   });
 
+  it.each([-10, 0, 1.5])("rechaza bloquear %d lugares", async (lugares) => {
+    const autoridad = new AutoridadMock();
+
+    await expect(autoridad.solicitarBloqueoCupo(DIA, lugares)).rejects.toThrow("entero mayor a 0");
+  });
+
   it("si la autoridad está caída, tira error", async () => {
     const autoridad = new AutoridadMock(true);
 

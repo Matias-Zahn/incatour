@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import {
+  CUPO_DIARIO,
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
   TitularPermiso,
+  diaDelCupo,
+  validarCantidad,
 } from "./autoridad.interface";
 
 /**
@@ -15,8 +18,6 @@ import {
  * Guarda el estado en memoria: es la versión para los tests unitarios. El servidor usa
  * AutoridadSimulada (autoridad.simulada.ts), que cumple el mismo contrato con tablas propias.
  */
-const CUPO_DIARIO = 500;
-
 interface Bloqueo {
   fecha: string; // "2026-11-15", para usarla como clave del Map
   lugares: number;
@@ -39,7 +40,8 @@ export class AutoridadMock implements IApiAutoridad {
     totalLugares: number,
   ): Promise<ResultadoBloqueo> {
     this.verificarConexion();
-    const fecha = fechaInicio.toISOString().slice(0, 10);
+    validarCantidad(totalLugares);
+    const fecha = diaDelCupo(fechaInicio);
     const ocupados = this.ocupadosPorDia.get(fecha) ?? 0;
     const disponibles = CUPO_DIARIO - ocupados;
 

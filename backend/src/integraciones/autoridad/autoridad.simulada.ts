@@ -1,10 +1,13 @@
 import crypto from "crypto";
 import { db } from "../../config/postgresDatabase";
 import {
+  CUPO_DIARIO,
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
   TitularPermiso,
+  diaDelCupo,
+  validarCantidad,
 } from "./autoridad.interface";
 
 /**
@@ -17,8 +20,6 @@ import {
  *
  * Los tests unitarios usan AutoridadMock (en memoria), que cumple el mismo contrato.
  */
-const CUPO_DIARIO = 500;
-
 const nuevoId = (prefijo: string) => `${prefijo}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 
 export class AutoridadSimulada implements IApiAutoridad {
@@ -26,7 +27,8 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   async solicitarBloqueoCupo(fechaInicio: Date, totalLugares: number): Promise<ResultadoBloqueo> {
     this.verificarConexion();
-    const fecha = fechaInicio.toISOString().slice(0, 10);
+    validarCantidad(totalLugares);
+    const fecha = diaDelCupo(fechaInicio);
 
     return db.$transaction(async (tx) => {
       await tx.autoridadCupoDiario.createMany({ data: [{ fecha }], skipDuplicates: true });
