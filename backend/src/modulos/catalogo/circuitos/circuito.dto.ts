@@ -22,6 +22,8 @@ export class CrearCircuitoDto {
     if (minimoGuias == null) return ["minimoGuias es requerido"];
     if (typeof minimoGuias !== "number" || minimoGuias <= 0) return ["minimoGuias debe ser un número mayor a 0"];
 
+    if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") return ["parametrosPorteadores debe ser un texto (ej. '1 por cada 2 pasajeros')"];
+
     return [undefined, new CrearCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
   }
 }
@@ -50,6 +52,8 @@ export class ModificarCircuitoDto {
     if (minimoGuias != null && (typeof minimoGuias !== "number" || minimoGuias <= 0)) {
       return ["minimoGuias debe ser un número mayor a 0"];
     }
+
+    if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") return ["parametrosPorteadores debe ser un texto (ej. '1 por cada 2 pasajeros')"];
 
     return [undefined, new ModificarCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
   }

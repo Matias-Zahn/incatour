@@ -8,7 +8,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "docs": "tsx scripts/exportar-openapi.ts",
     "test": "vitest run",
-    "test:concurrencia": "tsx scripts/prueba-concurrencia.ts"
+    "test:concurrencia": "tsx scripts/prueba-concurrencia.ts",
+    "test:humo": "tsx scripts/prueba-humo.ts"
   },
   "keywords": [],
   "author": "",

@@ -142,7 +142,16 @@ export class ServicioRepository {
   }
 
   async contarSolicitudesPendientes(idservicio: number): Promise<number> {
-    return db.solicitud.count({ where: { idservicio, estado: ESTADO_SOLICITUD.PENDIENTE } });
+    // El hotel de la solicitud sale de sus gestiones o de la garantía por establecimiento del paquete
+    return db.solicitud.count({
+      where: {
+        estado: ESTADO_SOLICITUD.PENDIENTE,
+        OR: [
+          { gestiones: { some: { idservicio } } },
+          { reserva: { salida: { paquete: { garantiasEstablecimiento: { some: { idservicio } } } } } },
+        ],
+      },
+    });
   }
 
   async contarGarantiasDePaquetesActivos(idservicio: number): Promise<number> {

@@ -352,8 +352,9 @@ model Salida {
 
 model SalidaServicio {
   idsalida   Int
-  idservicio Int
-  tipo       String
+  idservicio         Int
+  tipo               String
+  comprobanteReserva String? // Solo TRANSPORTE: comprobante de la reserva externa (CU-39)
 
   salida   Salida       @relation(fields: [idsalida], references: [idsalida])
   servicio ServicioBase @relation(fields: [idservicio], references: [idservicio])
@@ -451,6 +452,7 @@ model Proveedor {
   tipoProveedor     String
   razonSocial       String
   localidad         String
+  datosContacto     String
   canalComunicacion String?
   estado            String
   servicios         ServicioBase[]
