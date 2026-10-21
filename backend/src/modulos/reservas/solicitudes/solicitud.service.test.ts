@@ -34,7 +34,14 @@ const solicitud = (over: Record<string, unknown> = {}, paquete: Record<string, u
   ...over,
 });
 
-const hotel = (id: number) => ({ idservicio: id, nombreServicio: `Hotel ${id}`, proveedor: { razonSocial: `Proveedor ${id}` } });
+const hotel = (id: number) => ({
+  idservicio: id,
+  nombreServicio: `Hotel ${id}`,
+  localidad: "Cusco",
+  estado: "ACTIVO",
+  alojamiento: { categoria: "3 estrellas", tipoHabitacion: "Doble" },
+  proveedor: { razonSocial: `Proveedor ${id}` },
+});
 const dto = (obj: Record<string, unknown>) => ResolverSolicitudDto.create(obj)[1]!;
 
 describe("SolicitudService", () => {
@@ -42,7 +49,7 @@ describe("SolicitudService", () => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
     repo.buscarPorId.mockResolvedValue(solicitud());
-    repo.buscarServicio.mockResolvedValue({ nombreServicio: "Hotel 40", localidad: "Cusco" });
+    repo.buscarServicio.mockResolvedValue(hotel(40));
     notificador.enviarEmailAlojamientoConfirmado.mockResolvedValue(true);
   });
 
@@ -155,12 +162,12 @@ describe("SolicitudService", () => {
       expect(notificador.enviarEmailAlojamientoConfirmado).not.toHaveBeenCalled();
     });
 
-    it("rechaza resolver una solicitud inexistente", async () => {
+    it("404 al resolver una solicitud inexistente (RES-10)", async () => {
       repo.buscarPorId.mockResolvedValue(null);
 
       await expect(
         new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
-      ).rejects.toThrow("inválida o ya resuelta");
+      ).rejects.toMatchObject({ statusCode: 404 });
     });
 
     it("no permite resolver dos veces la misma solicitud", async () => {
@@ -168,7 +175,52 @@ describe("SolicitudService", () => {
 
       await expect(
         new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
-      ).rejects.toThrow("inválida o ya resuelta");
+      ).rejects.toThrow("no está PENDIENTE");
+      expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
+    });
+
+    it("RES-04: rechaza si el servicio no es de alojamiento o no está activo", async () => {
+      repo.buscarServicio.mockResolvedValue({ idservicio: 40, estado: "ACTIVO", alojamiento: null });
+
+      await expect(
+        new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("alojamiento"),
+      });
+      expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
+    });
+
+    it("RES-04: rechaza si el servicio no cumple con los criterios de localidad/categoría/habitación", async () => {
+      repo.buscarServicio.mockResolvedValue({
+        idservicio: 40,
+        estado: "ACTIVO",
+        localidad: "Lima", // El paquete pide Cusco
+        alojamiento: { categoria: "3 estrellas", tipoHabitacion: "Doble" },
+      });
+
+      await expect(
+        new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("criterios"),
+      });
+      expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
+    });
+
+    it("RES-04: rechaza al aceptar si el servicio ya fue rechazado anteriormente en esta reserva", async () => {
+      const s = solicitud();
+      s.reserva.solicitudes = [
+        { gestiones: [{ resultado: "Rechazada", idservicio: 40 }] },
+      ];
+      repo.buscarPorId.mockResolvedValue(s);
+
+      await expect(
+        new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("ya fue rechazado"),
+      });
       expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
     });
   });

@@ -11,6 +11,7 @@ export class EstablecerSecuenciaDto {
   private constructor(public etapas: EtapaIndividualDto[]) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, EstablecerSecuenciaDto?] {
+    if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
     const { etapas } = obj;
 
     if (!Array.isArray(etapas)) {
@@ -26,7 +27,7 @@ export class EstablecerSecuenciaDto {
     for (let i = 0; i < etapas.length; i++) {
       const e = etapas[i];
 
-      if (e.numeroOrden == null || typeof e.numeroOrden !== "number" || e.numeroOrden <= 0) {
+      if (e.numeroOrden == null || typeof e.numeroOrden !== "number" || !Number.isInteger(e.numeroOrden) || e.numeroOrden <= 0) {
         return [`La etapa en el índice ${i} tiene un 'numeroOrden' inválido.`];
       }
       
@@ -43,7 +44,7 @@ export class EstablecerSecuenciaDto {
           e.numeroOrden,
           e.puntoInicio,
           e.puntoFin,
-          e.campamentoPrevisto !== undefined ? String(e.campamentoPrevisto) : null
+          e.campamentoPrevisto != null ? String(e.campamentoPrevisto) : null
         )
       );
     }

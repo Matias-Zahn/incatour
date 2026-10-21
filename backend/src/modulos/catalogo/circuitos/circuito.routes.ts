@@ -43,6 +43,23 @@ import { CircuitoController } from "./circuito.controller";
  *     tags: [Circuitos]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: duracionDias
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por duración en días
+ *       - in: query
+ *         name: dificultad
+ *         schema:
+ *           type: string
+ *         description: Filtrar por dificultad (ej. Fácil, Moderada, Alta)
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVO, INACTIVO]
+ *         description: Filtrar por estado
  *     responses:
  *       200:
  *         description: Lista de circuitos

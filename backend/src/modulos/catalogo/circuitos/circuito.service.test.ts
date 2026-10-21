@@ -4,14 +4,28 @@ import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 
 const { repo } = vi.hoisted(() => ({
   repo: {
-    findAll: vi.fn(), findById: vi.fn(), existeNombre: vi.fn(), create: vi.fn(),
-    update: vi.fn(), updateEstado: vi.fn(), tienePaquetesActivos: vi.fn(),
+    findAll: vi.fn(),
+    findById: vi.fn(),
+    existeNombre: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateEstado: vi.fn(),
+    tienePaquetesActivos: vi.fn(),
+    tieneSalidas: vi.fn(),
   },
 }));
 vi.mock("./circuito.repository", () => ({ CircuitoRepository: class { constructor() { return repo; } } }));
 
 const crearDto = CrearCircuitoDto.create({ nombreCircuito: "Camino Inca", duracionDias: 4, dificultad: "MEDIA", minimoGuias: 1 })[1]!;
-const circuito = (estado = "ACTIVO") => ({ idcircuito: 1, nombreCircuito: "Camino Inca", estado });
+const circuito = (estado = "ACTIVO") => ({
+  idcircuito: 1,
+  nombreCircuito: "Camino Inca",
+  duracionDias: 4,
+  dificultad: "MEDIA",
+  minimoGuias: 1,
+  parametrosPorteadores: null,
+  estado,
+});
 
 describe("CircuitoService", () => {
   beforeEach(() => {
@@ -19,12 +33,15 @@ describe("CircuitoService", () => {
     repo.existeNombre.mockResolvedValue(false);
     repo.findById.mockResolvedValue(circuito());
     repo.tienePaquetesActivos.mockResolvedValue(false);
+    repo.tieneSalidas.mockResolvedValue(false);
   });
 
-  it("CU-01: devuelve los circuitos del repositorio", async () => {
+  it("CU-01: devuelve los circuitos del repositorio y pasa los filtros (CAT-13)", async () => {
     repo.findAll.mockResolvedValue([circuito()]);
 
-    await expect(new CircuitoService().consultarCircuitos()).resolves.toHaveLength(1);
+    const filtros = { dificultad: "Alta", estado: "INACTIVO" };
+    await expect(new CircuitoService().consultarCircuitos(filtros)).resolves.toHaveLength(1);
+    expect(repo.findAll).toHaveBeenCalledWith(filtros);
   });
 
   describe("crearCircuito (CU-02)", () => {
@@ -37,10 +54,10 @@ describe("CircuitoService", () => {
       expect(repo.create).toHaveBeenCalledWith(crearDto);
     });
 
-    it("rechaza un nombre que ya usa otro circuito activo", async () => {
+    it("rechaza un nombre que ya usa otro circuito activo con 409 (CAT-15)", async () => {
       repo.existeNombre.mockResolvedValue(true);
 
-      await expect(new CircuitoService().crearCircuito(crearDto)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(new CircuitoService().crearCircuito(crearDto)).rejects.toMatchObject({ statusCode: 409 });
       expect(repo.create).not.toHaveBeenCalled();
     });
   });
@@ -56,9 +73,40 @@ describe("CircuitoService", () => {
     });
 
     it("no consulta el nombre si no se cambia", async () => {
-      await new CircuitoService().modificarCircuito(1, ModificarCircuitoDto.create({ duracionDias: 5 })[1]!);
+      await new CircuitoService().modificarCircuito(1, ModificarCircuitoDto.create({ dificultad: "ALTA" })[1]!);
 
       expect(repo.existeNombre).not.toHaveBeenCalled();
+      expect(repo.update).toHaveBeenCalled();
+    });
+
+    it("rechaza cambiar la duración o dotación si el circuito tiene salidas (CAT-04, RF-03)", async () => {
+      repo.tieneSalidas.mockResolvedValue(true);
+
+      await expect(
+        new CircuitoService().modificarCircuito(1, ModificarCircuitoDto.create({ minimoGuias: 5 })[1]!)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("atributos estructurales"),
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("rechaza cambiar la duración o dotación si el circuito tiene paquetes activos (CAT-04, RF-03)", async () => {
+      repo.tienePaquetesActivos.mockResolvedValue(true);
+
+      await expect(
+        new CircuitoService().modificarCircuito(1, ModificarCircuitoDto.create({ duracionDias: 6 })[1]!)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("atributos estructurales"),
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("permite cambiar dificultad aunque tenga salidas asociadas (no es estructural)", async () => {
+      repo.tieneSalidas.mockResolvedValue(true);
+
+      await new CircuitoService().modificarCircuito(1, ModificarCircuitoDto.create({ dificultad: "BAJA" })[1]!);
       expect(repo.update).toHaveBeenCalled();
     });
 
@@ -75,10 +123,10 @@ describe("CircuitoService", () => {
       expect(repo.update).not.toHaveBeenCalled();
     });
 
-    it("rechaza un nombre duplicado", async () => {
+    it("rechaza un nombre duplicado con 409 (CAT-15)", async () => {
       repo.existeNombre.mockResolvedValue(true);
 
-      await expect(new CircuitoService().modificarCircuito(1, dto)).rejects.toThrow("Ya existe un circuito");
+      await expect(new CircuitoService().modificarCircuito(1, dto)).rejects.toMatchObject({ statusCode: 409 });
       expect(repo.update).not.toHaveBeenCalled();
     });
   });

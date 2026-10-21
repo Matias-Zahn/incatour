@@ -6,7 +6,10 @@ export class CrearTemporadaDto {
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearTemporadaDto?] {
-    const { nombre, fechaInicio, fechaFin } = obj;
+    if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
+
+    const nombre = obj.nombre ?? obj.nombreTemporada;
+    const { fechaInicio, fechaFin } = obj;
 
     if (!nombre || typeof nombre !== "string") return ["nombre es requerido y debe ser texto"];
     
@@ -34,7 +37,10 @@ export class ModificarTemporadaDto {
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarTemporadaDto?] {
-    const { nombre, fechaInicio, fechaFin } = obj;
+    if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
+
+    const nombre = obj.nombre ?? obj.nombreTemporada;
+    const { fechaInicio, fechaFin } = obj;
 
     if (!nombre && !fechaInicio && !fechaFin) {
       return ["Debe enviar al menos un campo para modificar"];

@@ -20,3 +20,6 @@ yarn-debug.log*
 
 # Docker volumes locales
 postgres_data/
+
+# Archivos subidos dinámicamente
+backend/public/imagenes/paquetes/

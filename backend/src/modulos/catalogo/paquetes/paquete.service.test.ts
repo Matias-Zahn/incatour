@@ -21,13 +21,14 @@ vi.mock("../../../config/postgresDatabase", () => ({ db }));
 const precios = [{ idtemporada: 1, monto: 800, moneda: "USD" }];
 const porCategoria = {
   idcircuito: 1, nombrePaquete: "Inca Clásico", tipoGarantia: "POR_CATEGORIA",
-  localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", matrizPrecios: precios,
+  localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", tipoHabitacionGarantizada: "Doble",
+  matrizPrecios: precios,
 };
 const crear = (obj: Record<string, unknown> = {}) => CrearPaqueteDto.create({ ...porCategoria, ...obj })[1]!;
 const porEstablecimiento = () =>
-  crear({ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 40, localidadGarantizada: undefined, categoriaGarantizada: undefined });
-const hotel = (modalidadConfirmacion = "BLOQUEO_PLAZAS", estado = "ACTIVO") => ({
-  idservicio: 40, estado, alojamiento: { modalidadConfirmacion },
+  crear({ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 40, localidadGarantizada: undefined, categoriaGarantizada: undefined, tipoHabitacionGarantizada: undefined });
+const hotel = (modalidadConfirmacion = "BLOQUEO_PLAZAS", estado = "ACTIVO", proveedorEstado = "ACTIVO") => ({
+  idservicio: 40, estado, alojamiento: { modalidadConfirmacion }, proveedor: { estado: proveedorEstado },
 });
 
 describe("PaqueteService", () => {
@@ -43,11 +44,13 @@ describe("PaqueteService", () => {
     repo.tieneSalidasActivas.mockResolvedValue(false);
   });
 
-  describe("consultas (CU-10)", () => {
-    it("lista los paquetes", async () => {
+  describe("consultarPaquetes (CU-10)", () => {
+    it("lista los paquetes y pasa filtros (CAT-13)", async () => {
       repo.findAll.mockResolvedValue([{ idpaquete: 1 }]);
 
-      await expect(new PaqueteService().consultarPaquetes()).resolves.toHaveLength(1);
+      const filtros = { estado: "INACTIVO", idcircuito: 1 };
+      await expect(new PaqueteService().consultarPaquetes(filtros)).resolves.toHaveLength(1);
+      expect(repo.findAll).toHaveBeenCalledWith(filtros);
     });
 
     it("404 al pedir un paquete inactivo", async () => {
@@ -86,7 +89,7 @@ describe("PaqueteService", () => {
     });
 
     it("rechaza garantizar un servicio que no es de alojamiento", async () => {
-      db.servicioBase.findUnique.mockResolvedValue({ idservicio: 40, estado: "ACTIVO", alojamiento: null });
+      db.servicioBase.findUnique.mockResolvedValue({ idservicio: 40, estado: "ACTIVO", alojamiento: null, proveedor: { estado: "ACTIVO" } });
 
       await expect(new PaqueteService().registrarNuevoPaquete(porEstablecimiento())).rejects.toThrow("no es un servicio de alojamiento");
     });
@@ -132,8 +135,27 @@ describe("PaqueteService", () => {
     it("actualiza solo los campos enviados", async () => {
       await new PaqueteService().modificarPaquete(10, modificar({ nombrePaquete: "Nuevo", nochesPrevias: 1 }));
 
-      expect(repo.update).toHaveBeenCalledWith(10, { nombrePaquete: "Nuevo", nochesPrevias: 1 });
+      expect(repo.update).toHaveBeenCalledWith(10, { nombrePaquete: "Nuevo", nochesPrevias: 1 }, undefined, undefined, undefined);
       expect(repo.reemplazarTarifas).not.toHaveBeenCalled();
+    });
+
+    it("permite modificar circuito, garantía y servicios incluidos (CAT-14)", async () => {
+      db.circuito.findUnique.mockResolvedValue({ idcircuito: 2, estado: "ACTIVO" });
+
+      await new PaqueteService().modificarPaquete(10, modificar({
+        idcircuito: 2,
+        serviciosIncluidos: [40],
+        tipoGarantia: "POR_ESTABLECIMIENTO",
+        idservicioGarantizado: 40,
+      }));
+
+      expect(repo.update).toHaveBeenCalledWith(
+        10,
+        { idcircuito: 2, tipoGarantia: "POR_ESTABLECIMIENTO" },
+        [40],
+        40,
+        "POR_ESTABLECIMIENTO"
+      );
     });
 
     it("con matriz nueva valida las temporadas y reemplaza las tarifas", async () => {
@@ -169,7 +191,7 @@ describe("PaqueteService", () => {
       expect(repo.updateEstado).toHaveBeenCalledWith(10, "INACTIVO");
     });
 
-    it("no permite la baja con salidas activas", async () => {
+    it("no permite la baja con salidas activas (CAT-02)", async () => {
       repo.tieneSalidasActivas.mockResolvedValue(true);
 
       await expect(new PaqueteService().darDeBajaPaquete(10)).rejects.toThrow("salidas activas");

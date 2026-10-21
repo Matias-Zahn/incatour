@@ -4278,6 +4278,36 @@
             "BearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            },
+            "description": "Filtrar por estado"
+          },
+          {
+            "in": "query",
+            "name": "idcircuito",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filtrar por ID de circuito"
+          },
+          {
+            "in": "query",
+            "name": "nombrePaquete",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por nombre del paquete"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de paquetes obtenida exitosamente"
@@ -4429,7 +4459,15 @@
           }
         ],
         "responses": {
-          "200": null
+          "200": {
+            "description": "Paquete dado de baja exitosamente"
+          },
+          "400": {
+            "description": "No se puede dar de baja porque tiene salidas activas"
+          },
+          "404": {
+            "description": "Paquete no encontrado o inactivo"
+          }
         }
       }
     },
@@ -4584,6 +4622,36 @@
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "duracionDias",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filtrar por duración en días"
+          },
+          {
+            "in": "query",
+            "name": "dificultad",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por dificultad (ej. Fácil, Moderada, Alta)"
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVO",
+                "INACTIVO"
+              ]
+            },
+            "description": "Filtrar por estado"
           }
         ],
         "responses": {
@@ -4818,6 +4886,42 @@
         "description": "Retorna todos los paquetes vigentes optimizados para el Frontend (Escaparate).",
         "tags": [
           "Catálogo Público"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dificultad",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrar por dificultad (ej. Fácil, Moderada, Alta)"
+          },
+          {
+            "in": "query",
+            "name": "duracionDias",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filtrar por duración en días"
+          },
+          {
+            "in": "query",
+            "name": "fechaDesde",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Fecha desde (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "fechaHasta",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Fecha hasta (YYYY-MM-DD)"
+          }
         ],
         "responses": {
           "200": {

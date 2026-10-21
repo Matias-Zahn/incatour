@@ -1,4 +1,4 @@
-interface PrecioTemporada {
+export interface PrecioTemporada {
   idtemporada: number;
   monto: number;
   moneda: string;
@@ -22,6 +22,8 @@ export class CrearPaqueteDto {
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearPaqueteDto?] {
+    if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
+
     const {
       idcircuito, nombrePaquete, condiciones, tipoGarantia,
       idservicioGarantizado, localidadGarantizada, categoriaGarantizada,
@@ -30,8 +32,8 @@ export class CrearPaqueteDto {
     } = obj;
 
     // --- Validaciones obligatorias ---
-    if (idcircuito == null || typeof idcircuito !== "number") {
-      return ["idcircuito es requerido y debe ser un número."];
+    if (idcircuito == null || typeof idcircuito !== "number" || !Number.isInteger(idcircuito) || idcircuito <= 0) {
+      return ["idcircuito es requerido y debe ser un número entero mayor a 0."];
     }
 
     if (!nombrePaquete || typeof nombrePaquete !== "string") {
@@ -47,10 +49,10 @@ export class CrearPaqueteDto {
       return [`tipoGarantia debe ser uno de: ${tiposValidos.join(", ")}.`];
     }
 
-    // --- Validaciones condicionales según tipo de garantía ---
+    // --- Validaciones condicionales según tipo de garantía (RF-06, CAT-08) ---
     if (tipoGarantia === "POR_ESTABLECIMIENTO") {
-      if (idservicioGarantizado == null || typeof idservicioGarantizado !== "number") {
-        return ["Con garantía por establecimiento, idservicioGarantizado es obligatorio."];
+      if (idservicioGarantizado == null || typeof idservicioGarantizado !== "number" || !Number.isInteger(idservicioGarantizado) || idservicioGarantizado <= 0) {
+        return ["Con garantía por establecimiento, idservicioGarantizado es obligatorio y debe ser un número entero mayor a 0."];
       }
     }
 
@@ -61,17 +63,23 @@ export class CrearPaqueteDto {
       if (!categoriaGarantizada || typeof categoriaGarantizada !== "string") {
         return ["Con garantía por categoría, categoriaGarantizada es obligatoria."];
       }
+      if (!tipoHabitacionGarantizada || typeof tipoHabitacionGarantizada !== "string") {
+        return ["Con garantía por categoría, tipoHabitacionGarantizada es obligatoria."];
+      }
+      if (idservicioGarantizado !== undefined && idservicioGarantizado !== null) {
+        return ["Con garantía por categoría, no debe indicarse idservicioGarantizado."];
+      }
     }
 
-    // --- Validación de noches (opcionales, pero si vienen deben ser >= 0) ---
-    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || nochesPrevias < 0)) {
-      return ["nochesPrevias debe ser un número mayor o igual a 0."];
+    // --- Validación de noches (opcionales, pero si vienen deben ser >= 0 y enteros, CAT-11) ---
+    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
+      return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
     }
-    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || nochesPosteriores < 0)) {
-      return ["nochesPosteriores debe ser un número mayor o igual a 0."];
+    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
+      return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
     }
 
-    // --- Validación de matriz de precios (RN: Viabilidad Comercial) ---
+    // --- Validación de matriz de precios (RN: Viabilidad Comercial, CAT-11) ---
     if (!Array.isArray(matrizPrecios) || matrizPrecios.length === 0) {
       return ["La matriz de precios es obligatoria y debe contener al menos una tarifa."];
     }
@@ -79,10 +87,12 @@ export class CrearPaqueteDto {
     const temporadasVistas = new Set<number>();
     for (let i = 0; i < matrizPrecios.length; i++) {
       const p = matrizPrecios[i];
-      if (p.idtemporada == null || typeof p.idtemporada !== "number") {
-        return [`matrizPrecios[${i}]: idtemporada es requerido.`];
+      if (p.idtemporada == null || typeof p.idtemporada !== "number" || !Number.isInteger(p.idtemporada) || p.idtemporada <= 0) {
+        return [`matrizPrecios[${i}]: idtemporada debe ser un número entero mayor a 0.`];
       }
-      if (p.monto == null || typeof p.monto !== "number" || p.monto <= 0) {
+      const monto = p.monto ?? p.precioPersona;
+      p.monto = monto;
+      if (monto == null || typeof monto !== "number" || monto <= 0) {
         return [`matrizPrecios[${i}]: monto debe ser un número mayor a 0.`];
       }
       if (!p.moneda || typeof p.moneda !== "string") {
@@ -94,14 +104,14 @@ export class CrearPaqueteDto {
       temporadasVistas.add(p.idtemporada);
     }
 
-    // --- Validación de servicios incluidos (opcional) ---
+    // --- Validación de servicios incluidos (opcional, CAT-11) ---
     if (serviciosIncluidos != null) {
       if (!Array.isArray(serviciosIncluidos)) {
         return ["serviciosIncluidos debe ser un arreglo de IDs de servicios."];
       }
       for (let i = 0; i < serviciosIncluidos.length; i++) {
-        if (typeof serviciosIncluidos[i] !== "number") {
-          return [`serviciosIncluidos[${i}]: debe ser un número (ID de servicio).`];
+        if (typeof serviciosIncluidos[i] !== "number" || !Number.isInteger(serviciosIncluidos[i]) || serviciosIncluidos[i] <= 0) {
+          return [`serviciosIncluidos[${i}]: debe ser un número entero mayor a 0 (ID de servicio).`];
         }
       }
     }
@@ -109,7 +119,8 @@ export class CrearPaqueteDto {
     return [undefined, new CrearPaqueteDto(
       idcircuito, nombrePaquete, tipoGarantia,
       matrizPrecios as PrecioTemporada[],
-      condiciones, idservicioGarantizado,
+      condiciones,
+      tipoGarantia === "POR_ESTABLECIMIENTO" ? idservicioGarantizado : undefined,
       localidadGarantizada, categoriaGarantizada,
       tipoHabitacionGarantizada,
       nochesPrevias ?? 0, nochesPosteriores ?? 0,
@@ -127,21 +138,59 @@ export class ModificarPaqueteDto {
     public nochesPosteriores?: number,
     public diasDisponibles?: string,
     public matrizPrecios?: PrecioTemporada[],
+    public idcircuito?: number,
+    public tipoGarantia?: string,
+    public idservicioGarantizado?: number,
+    public localidadGarantizada?: string,
+    public categoriaGarantizada?: string,
+    public tipoHabitacionGarantizada?: string,
+    public serviciosIncluidos?: number[],
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarPaqueteDto?] {
-    const { nombrePaquete, condiciones, nochesPrevias, nochesPosteriores, diasDisponibles, matrizPrecios } = obj;
+    if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
 
-    if (!nombrePaquete && condiciones === undefined && nochesPrevias == null &&
-        nochesPosteriores == null && diasDisponibles === undefined && matrizPrecios === undefined) {
+    const {
+      nombrePaquete, condiciones, nochesPrevias, nochesPosteriores,
+      diasDisponibles, matrizPrecios, idcircuito, tipoGarantia,
+      idservicioGarantizado, localidadGarantizada, categoriaGarantizada,
+      tipoHabitacionGarantizada, serviciosIncluidos,
+    } = obj;
+
+    if (
+      !nombrePaquete && condiciones === undefined && nochesPrevias == null &&
+      nochesPosteriores == null && diasDisponibles === undefined && matrizPrecios === undefined &&
+      idcircuito == null && tipoGarantia === undefined && idservicioGarantizado === undefined &&
+      localidadGarantizada === undefined && categoriaGarantizada === undefined &&
+      tipoHabitacionGarantizada === undefined && serviciosIncluidos === undefined
+    ) {
       return ["Debe enviar al menos un campo para modificar."];
     }
 
-    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || nochesPrevias < 0)) {
-      return ["nochesPrevias debe ser un número mayor o igual a 0."];
+    if (idcircuito != null && (typeof idcircuito !== "number" || !Number.isInteger(idcircuito) || idcircuito <= 0)) {
+      return ["idcircuito debe ser un número entero mayor a 0."];
     }
-    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || nochesPosteriores < 0)) {
-      return ["nochesPosteriores debe ser un número mayor o igual a 0."];
+
+    if (tipoGarantia !== undefined) {
+      const tiposValidos = ["POR_ESTABLECIMIENTO", "POR_CATEGORIA"];
+      if (!tiposValidos.includes(tipoGarantia)) {
+        return [`tipoGarantia debe ser uno de: ${tiposValidos.join(", ")}.`];
+      }
+    }
+
+    if (idservicioGarantizado != null && (typeof idservicioGarantizado !== "number" || !Number.isInteger(idservicioGarantizado) || idservicioGarantizado <= 0)) {
+      return ["idservicioGarantizado debe ser un número entero mayor a 0."];
+    }
+
+    if (tipoGarantia === "POR_CATEGORIA" && idservicioGarantizado !== undefined && idservicioGarantizado !== null) {
+      return ["Con garantía por categoría, no debe indicarse idservicioGarantizado."];
+    }
+
+    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
+      return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
+    }
+    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
+      return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
     }
 
     // Si mandan matrizPrecios en el PUT, validamos la estructura
@@ -152,10 +201,12 @@ export class ModificarPaqueteDto {
       const temporadasVistas = new Set<number>();
       for (let i = 0; i < matrizPrecios.length; i++) {
         const p = matrizPrecios[i];
-        if (p.idtemporada == null || typeof p.idtemporada !== "number") {
-          return [`matrizPrecios[${i}]: idtemporada es requerido.`];
+        if (p.idtemporada == null || typeof p.idtemporada !== "number" || !Number.isInteger(p.idtemporada) || p.idtemporada <= 0) {
+          return [`matrizPrecios[${i}]: idtemporada debe ser un número entero mayor a 0.`];
         }
-        if (p.monto == null || typeof p.monto !== "number" || p.monto <= 0) {
+        const monto = p.monto ?? p.precioPersona;
+        p.monto = monto;
+        if (monto == null || typeof monto !== "number" || monto <= 0) {
           return [`matrizPrecios[${i}]: monto debe ser mayor a 0.`];
         }
         if (!p.moneda || typeof p.moneda !== "string") {
@@ -168,9 +219,23 @@ export class ModificarPaqueteDto {
       }
     }
 
+    if (serviciosIncluidos !== undefined) {
+      if (!Array.isArray(serviciosIncluidos)) {
+        return ["serviciosIncluidos debe ser un arreglo de IDs de servicios."];
+      }
+      for (let i = 0; i < serviciosIncluidos.length; i++) {
+        if (typeof serviciosIncluidos[i] !== "number" || !Number.isInteger(serviciosIncluidos[i]) || serviciosIncluidos[i] <= 0) {
+          return [`serviciosIncluidos[${i}]: debe ser un número entero mayor a 0 (ID de servicio).`];
+        }
+      }
+    }
+
     return [undefined, new ModificarPaqueteDto(
       nombrePaquete, condiciones, nochesPrevias, nochesPosteriores, diasDisponibles,
       matrizPrecios as PrecioTemporada[] | undefined,
+      idcircuito, tipoGarantia, idservicioGarantizado,
+      localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada,
+      serviciosIncluidos,
     )];
   }
 }

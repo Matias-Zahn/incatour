@@ -3,8 +3,13 @@ import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 
 const precios = [{ idtemporada: 1, monto: 800, moneda: "USD" }];
 const base = {
-  idcircuito: 1, nombrePaquete: "Inca Clásico", tipoGarantia: "POR_CATEGORIA",
-  localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", matrizPrecios: precios,
+  idcircuito: 1,
+  nombrePaquete: "Inca Clásico",
+  tipoGarantia: "POR_CATEGORIA",
+  localidadGarantizada: "Cusco",
+  categoriaGarantizada: "3 estrellas",
+  tipoHabitacionGarantizada: "Doble",
+  matrizPrecios: precios,
 };
 const error = (cambio: Record<string, unknown>) => CrearPaqueteDto.create({ ...base, ...cambio })[0];
 
@@ -21,17 +26,24 @@ describe("CrearPaqueteDto", () => {
   });
 
   it.each([
-    [{ idcircuito: "1" }, "idcircuito es requerido y debe ser un número."],
+    [{ idcircuito: "1" }, "idcircuito es requerido y debe ser un número entero mayor a 0."],
+    [{ idcircuito: 1.5 }, "idcircuito es requerido y debe ser un número entero mayor a 0."],
     [{ nombrePaquete: "" }, "nombrePaquete es requerido."],
     [{ tipoGarantia: undefined }, "tipoGarantia es requerido ('POR_ESTABLECIMIENTO' o 'POR_CATEGORIA')."],
     [{ tipoGarantia: "OTRA" }, "tipoGarantia debe ser uno de: POR_ESTABLECIMIENTO, POR_CATEGORIA."],
-    [{ tipoGarantia: "POR_ESTABLECIMIENTO" }, "Con garantía por establecimiento, idservicioGarantizado es obligatorio."],
+    [{ tipoGarantia: "POR_ESTABLECIMIENTO" }, "Con garantía por establecimiento, idservicioGarantizado es obligatorio y debe ser un número entero mayor a 0."],
+    [{ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 2.5 }, "Con garantía por establecimiento, idservicioGarantizado es obligatorio y debe ser un número entero mayor a 0."],
     [{ localidadGarantizada: undefined }, "Con garantía por categoría, localidadGarantizada es obligatoria."],
     [{ categoriaGarantizada: undefined }, "Con garantía por categoría, categoriaGarantizada es obligatoria."],
-    [{ nochesPrevias: -1 }, "nochesPrevias debe ser un número mayor o igual a 0."],
-    [{ nochesPosteriores: "2" }, "nochesPosteriores debe ser un número mayor o igual a 0."],
+    [{ tipoHabitacionGarantizada: undefined }, "Con garantía por categoría, tipoHabitacionGarantizada es obligatoria."],
+    [{ tipoGarantia: "POR_CATEGORIA", idservicioGarantizado: 40 }, "Con garantía por categoría, no debe indicarse idservicioGarantizado."],
+    [{ nochesPrevias: -1 }, "nochesPrevias debe ser un número entero mayor o igual a 0."],
+    [{ nochesPrevias: 1.5 }, "nochesPrevias debe ser un número entero mayor o igual a 0."],
+    [{ nochesPosteriores: "2" }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
+    [{ nochesPosteriores: 2.5 }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
     [{ serviciosIncluidos: "40" }, "serviciosIncluidos debe ser un arreglo de IDs de servicios."],
-    [{ serviciosIncluidos: [40, "x"] }, "serviciosIncluidos[1]: debe ser un número (ID de servicio)."],
+    [{ serviciosIncluidos: [40, "x"] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
+    [{ serviciosIncluidos: [40, 2.5] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
   ])("rechaza %o", (cambio, mensaje) => {
     expect(error(cambio)).toBe(mensaje);
   });
@@ -40,7 +52,8 @@ describe("CrearPaqueteDto", () => {
     it.each([
       [undefined, "La matriz de precios es obligatoria y debe contener al menos una tarifa."],
       [[], "La matriz de precios es obligatoria y debe contener al menos una tarifa."],
-      [[{ monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada es requerido."],
+      [[{ monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
+      [[{ idtemporada: 1.5, monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
       [[{ idtemporada: 1, monto: 0, moneda: "USD" }], "matrizPrecios[0]: monto debe ser un número mayor a 0."],
       [[{ idtemporada: 1, monto: 10 }], "matrizPrecios[0]: moneda es requerida."],
       [[...precios, { idtemporada: 1, monto: 900, moneda: "USD" }], "matrizPrecios[1]: la temporada 1 está duplicada."],
@@ -62,6 +75,23 @@ describe("ModificarPaqueteDto", () => {
     expect(dto?.matrizPrecios).toEqual(precios);
   });
 
+  it("acepta modificar circuito, garantía y servicios incluidos (CAT-14)", () => {
+    const [err, dto] = ModificarPaqueteDto.create({
+      idcircuito: 2,
+      tipoGarantia: "POR_ESTABLECIMIENTO",
+      idservicioGarantizado: 15,
+      serviciosIncluidos: [7, 8],
+    });
+
+    expect(err).toBeUndefined();
+    expect(dto).toMatchObject({
+      idcircuito: 2,
+      tipoGarantia: "POR_ESTABLECIMIENTO",
+      idservicioGarantizado: 15,
+      serviciosIncluidos: [7, 8],
+    });
+  });
+
   it("si se envía la matriz, no puede venir vacía ni con temporadas repetidas", () => {
     expect(ModificarPaqueteDto.create({ matrizPrecios: [] })[0]).toBe("Si se envía matrizPrecios, debe contener al menos una tarifa.");
     expect(ModificarPaqueteDto.create({ matrizPrecios: [...precios, ...precios] })[0]).toBe(
@@ -69,7 +99,9 @@ describe("ModificarPaqueteDto", () => {
     );
   });
 
-  it("valida las noches", () => {
-    expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número mayor o igual a 0.");
+  it("valida las noches enteras (CAT-11)", () => {
+    expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
+    expect(ModificarPaqueteDto.create({ nochesPrevias: 1.5 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
+    expect(ModificarPaqueteDto.create({ nochesPosteriores: 2.5 })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
   });
 });
