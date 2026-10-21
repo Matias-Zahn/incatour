@@ -12,7 +12,7 @@ const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Circuitos", icono: "⌁", ruta: "/gestion/circuitos" },
     { etiqueta: "Paquetes turísticos", icono: "▣", ruta: "/gestion/paquetes" },
     { etiqueta: "Proveedores", icono: "▱", ruta: "/gestion/proveedores" },
-    { etiqueta: "Salidas", icono: "◫" },
+    { etiqueta: "Salidas", icono: "◫", ruta: "/gestion/salidas" },
     { etiqueta: "Reservas y pagos", icono: "▤", ruta: "/gestion/solicitudes" },
     { etiqueta: "Personal", icono: "♙", ruta: "/gestion/personal" },
     { etiqueta: "Reseñas y evaluaciones", icono: "☆", ruta: "/gestion/evaluaciones" },
