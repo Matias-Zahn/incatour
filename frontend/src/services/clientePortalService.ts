@@ -2,6 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { solicitarApi } from "./clienteApi";
 import { clavesCatalogoCompra } from "./catalogoCompraService";
+import {
+    guardarSesion,
+    limpiarSesion,
+    obtenerToken,
+    obtenerUsuario,
+} from "./sesionService";
 
 // ============================================================================
 // CU-27: Registrarse como cliente (POST /api/clientes)
@@ -73,10 +79,36 @@ type RespuestaRegistrarCliente = {
     data: ClienteRegistrado;
 };
 
+const CLAVE_IDCLIENTE = "incatour.idcliente";
+
+export function guardarIdClienteLocal(idcliente: number): void {
+    try {
+        localStorage.setItem(CLAVE_IDCLIENTE, String(idcliente));
+    } catch {
+        // Ignorar errores de almacenamiento
+    }
+}
+
+export function obtenerIdClienteLocal(): number | null {
+    try {
+        const valor = localStorage.getItem(CLAVE_IDCLIENTE);
+        if (!valor) return null;
+        const numero = Number(valor);
+        return Number.isInteger(numero) && numero > 0 ? numero : null;
+    } catch {
+        return null;
+    }
+}
+
+function cabecerasConToken(): HeadersInit {
+    const token = obtenerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function registrarCliente(
     payload: RegistrarClientePayload,
 ): Promise<RespuestaRegistrarCliente> {
-    return solicitarApi<RespuestaRegistrarCliente>("/clientes", {
+    const respuesta = await solicitarApi<RespuestaRegistrarCliente>("/clientes", {
         method: "POST",
         body: JSON.stringify({
             nombre: payload.nombre.trim(),
@@ -85,12 +117,166 @@ export async function registrarCliente(
             contrasenia: payload.contrasenia,
         }),
     });
+    if (respuesta.data?.cliente?.idcliente) {
+        guardarIdClienteLocal(respuesta.data.cliente.idcliente);
+    }
+    return respuesta;
 }
 
 export function useRegistrarCliente() {
     return useMutation({
         mutationFn: registrarCliente,
     });
+}
+
+// ============================================================================
+// CU-28: Modificar cuenta de cliente (GET /api/clientes/:id y PUT /api/clientes/:id)
+// CU-29: Baja cuenta de cliente (PATCH /api/clientes/:id/baja)
+// ============================================================================
+
+export type PerfilClienteDetalle = {
+    idcliente: number;
+    idusuario: number;
+    nroCliente: string;
+    estado: string;
+    usuario: {
+        nombre: string;
+        apellido: string;
+        email: string;
+    };
+};
+
+export const esquemaModificarCliente = z.object({
+    nombre: z
+        .string()
+        .trim()
+        .min(1, "El nombre debe tener entre 1 y 64 caracteres.")
+        .max(64, "El nombre debe tener entre 1 y 64 caracteres.")
+        .regex(
+            soloLetrasYEspaciosRegex,
+            "El nombre solo puede contener letras y espacios.",
+        ),
+    apellido: z
+        .string()
+        .trim()
+        .min(1, "El apellido debe tener entre 1 y 64 caracteres.")
+        .max(64, "El apellido debe tener entre 1 y 64 caracteres.")
+        .regex(
+            soloLetrasYEspaciosRegex,
+            "El apellido solo puede contener letras y espacios.",
+        ),
+    email: z
+        .string()
+        .trim()
+        .min(1, "El correo electrónico es obligatorio.")
+        .email("El formato del correo electrónico no es válido."),
+});
+
+export type DatosModificarClienteForm = z.infer<typeof esquemaModificarCliente>;
+
+export type ModificarClientePayload = {
+    idcliente: number;
+    nombre: string;
+    apellido: string;
+    email: string;
+};
+
+export async function consultarPerfilClienteActual(): Promise<PerfilClienteDetalle> {
+    const usuario = obtenerUsuario();
+    const candidatos = Array.from(
+        new Set(
+            [
+                obtenerIdClienteLocal(),
+                usuario?.idusuario === 2 ? 1 : null,
+                usuario?.idusuario ?? null,
+                1,
+            ].filter((id): id is number => typeof id === "number" && id > 0),
+        ),
+    );
+
+    let ultimoError: unknown = null;
+    for (const idCandidato of candidatos) {
+        try {
+            const res = await solicitarApi<{ data: PerfilClienteDetalle }>(
+                `/clientes/${idCandidato}`,
+                {
+                    headers: cabecerasConToken(),
+                },
+            );
+            if (res.data) {
+                guardarIdClienteLocal(res.data.idcliente);
+                return res.data;
+            }
+        } catch (err) {
+            ultimoError = err;
+        }
+    }
+
+    if (usuario) {
+        return {
+            idcliente: obtenerIdClienteLocal() ?? 1,
+            idusuario: usuario.idusuario,
+            nroCliente: "CLI-001",
+            estado: "ACTIVO",
+            usuario: {
+                nombre: usuario.nombre,
+                apellido: usuario.apellido,
+                email: usuario.email,
+            },
+        };
+    }
+
+    throw ultimoError instanceof Error
+        ? ultimoError
+        : new Error("No se pudo obtener la información de la cuenta.");
+}
+
+export async function modificarCuentaCliente(
+    payload: ModificarClientePayload,
+): Promise<{ mensaje: string; data: PerfilClienteDetalle }> {
+    const respuesta = await solicitarApi<{
+        mensaje: string;
+        data: PerfilClienteDetalle;
+    }>(`/clientes/${payload.idcliente}`, {
+        method: "PUT",
+        headers: cabecerasConToken(),
+        body: JSON.stringify({
+            nombre: payload.nombre.trim(),
+            apellido: payload.apellido.trim(),
+            email: payload.email.trim().toLowerCase(),
+        }),
+    });
+
+    // Sincronizar los datos del usuario en la sesión activa
+    const token = obtenerToken();
+    const usuarioActual = obtenerUsuario();
+    if (token && usuarioActual && respuesta.data?.usuario) {
+        guardarSesion(token, {
+            ...usuarioActual,
+            nombre: respuesta.data.usuario.nombre,
+            apellido: respuesta.data.usuario.apellido,
+            email: respuesta.data.usuario.email,
+        });
+    }
+
+    return respuesta;
+}
+
+export async function darDeBajaCuentaCliente(
+    idcliente: number,
+): Promise<{
+    mensaje: string;
+    data: { idcliente: number; estado: string };
+}> {
+    const respuesta = await solicitarApi<{
+        mensaje: string;
+        data: { idcliente: number; estado: string };
+    }>(`/clientes/${idcliente}/baja`, {
+        method: "PATCH",
+        headers: cabecerasConToken(),
+    });
+    limpiarSesion();
+    return respuesta;
 }
 
 // ============================================================================
@@ -402,6 +588,7 @@ export async function publicarReseniaCliente(
 // ============================================================================
 
 export const clavesPortalCliente = {
+    perfilCliente: ["cliente-perfil-actual"] as const,
     misReservas: (estado?: EstadoReservaCliente) =>
         ["cliente-mis-reservas", estado ?? "TODAS"] as const,
     detalleReserva: (idreserva: number | null) =>
@@ -410,6 +597,39 @@ export const clavesPortalCliente = {
         ["cliente-liquidacion-cancelacion", idreserva] as const,
     historialResenias: ["cliente-historial-resenias"] as const,
 };
+
+export function usePerfilClienteActual(habilitado = true) {
+    return useQuery({
+        queryKey: clavesPortalCliente.perfilCliente,
+        queryFn: consultarPerfilClienteActual,
+        enabled: habilitado,
+    });
+}
+
+export function useModificarCuentaCliente() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: modificarCuentaCliente,
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: clavesPortalCliente.perfilCliente,
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["cliente-mis-reservas"],
+            });
+        },
+    });
+}
+
+export function useDarDeBajaCuentaCliente() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: darDeBajaCuentaCliente,
+        onSuccess: () => {
+            queryClient.clear();
+        },
+    });
+}
 
 export function useMisReservas(estado?: EstadoReservaCliente, habilitado = true) {
     return useQuery({

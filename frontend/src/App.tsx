@@ -1,6 +1,7 @@
 import LayoutCliente from "./components/LayoutCliente";
 import LayoutGestion from "./components/LayoutGestion";
 import CatalogoCompraPage from "./pages/cliente/CatalogoCompraPage";
+import MiCuentaClientePage from "./pages/cliente/MiCuentaClientePage";
 import MisReseniasPage from "./pages/cliente/MisReseniasPage";
 import MisReservasPage from "./pages/cliente/MisReservasPage";
 import RegistroClientePage from "./pages/cliente/RegistroClientePage";
@@ -50,7 +51,7 @@ function App() {
           }
         />
 
-        {/* Rutas exclusivas del perfil CLIENTE (CU-31, CU-32, CU-47) */}
+        {/* Rutas exclusivas del perfil CLIENTE (CU-28, CU-29, CU-31, CU-32, CU-47) */}
         <Route element={<RutaProtegida roles={["CLIENTE"]} />}>
           <Route
             path="/mis-reservas"
@@ -81,6 +82,22 @@ function App() {
             element={
               <LayoutCliente>
                 <MisReseniasPage />
+              </LayoutCliente>
+            }
+          />
+          <Route
+            path="/mi-cuenta"
+            element={
+              <LayoutCliente>
+                <MiCuentaClientePage />
+              </LayoutCliente>
+            }
+          />
+          <Route
+            path="/cliente/cuenta"
+            element={
+              <LayoutCliente>
+                <MiCuentaClientePage />
               </LayoutCliente>
             }
           />

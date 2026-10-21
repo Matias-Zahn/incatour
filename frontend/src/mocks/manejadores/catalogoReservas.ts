@@ -9,6 +9,7 @@ import type {
 } from "../../services/catalogoCompraService";
 import type {
     ComprobanteReserva,
+    PerfilClienteDetalle,
     RegistrarClientePayload,
     ReservaClienteDetalle,
     ReservaClienteResumen,
@@ -160,6 +161,21 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             },
         ],
         salidasDisponibles: salidasPorPaqueteMock[2],
+    },
+];
+
+// Perfiles de clientes en memoria alineados con backend/prisma/seed.ts
+const clientesMock: PerfilClienteDetalle[] = [
+    {
+        idcliente: 1,
+        idusuario: 2,
+        nroCliente: "CLI-001",
+        estado: "ACTIVO",
+        usuario: {
+            nombre: "Juan",
+            apellido: "Pérez",
+            email: "juan@test.com",
+        },
     },
 ];
 
@@ -409,6 +425,18 @@ export const manejadoresCatalogoReservas = [
             },
         });
 
+        clientesMock.push({
+            idcliente,
+            idusuario,
+            nroCliente,
+            estado: "ACTIVO",
+            usuario: {
+                nombre,
+                apellido,
+                email,
+            },
+        });
+
         return HttpResponse.json(
             {
                 mensaje: "Cliente creado con éxito",
@@ -428,6 +456,214 @@ export const manejadoresCatalogoReservas = [
             { status: 201 },
         );
     }),
+
+    // CU-28: GET /api/clientes/:id (consultar perfil del cliente)
+    http.get(construirUrl("/clientes/:id"), async ({ request, params }) => {
+        const denegado = exigirRol(request, "CLIENTE");
+        if (denegado) return denegado;
+        await delay(120);
+
+        const id = Number(params.id);
+        const cliente =
+            clientesMock.find(
+                (c) => c.idcliente === id || c.idusuario === id,
+            ) ?? clientesMock[0];
+
+        if (!cliente) {
+            return HttpResponse.json(
+                { error: "Cliente no encontrado." },
+                { status: 404 },
+            );
+        }
+
+        return HttpResponse.json({ data: cliente });
+    }),
+
+    // CU-28: PUT /api/clientes/:id (modificar cuenta de cliente)
+    http.put(construirUrl("/clientes/:id"), async ({ request, params }) => {
+        const denegado = exigirRol(request, "CLIENTE");
+        if (denegado) return denegado;
+        await delay(200);
+
+        const id = Number(params.id);
+        const cliente =
+            clientesMock.find(
+                (c) => c.idcliente === id || c.idusuario === id,
+            ) ?? clientesMock[0];
+
+        if (!cliente) {
+            return HttpResponse.json(
+                { error: "Cliente no encontrado." },
+                { status: 404 },
+            );
+        }
+
+        if (cliente.estado === "INACTIVO") {
+            return HttpResponse.json(
+                { error: "No se puede modificar una cuenta inactiva." },
+                { status: 400 },
+            );
+        }
+
+        const body = (await request.json()) as {
+            nombre?: string;
+            apellido?: string;
+            email?: string;
+        };
+
+        const nombre = body.nombre?.trim();
+        const apellido = body.apellido?.trim();
+        const email = body.email?.trim().toLowerCase();
+
+        if (!nombre && !apellido && !email) {
+            return HttpResponse.json(
+                {
+                    error: "Debe proporcionar al menos un campo para modificar (nombre, apellido o email)",
+                },
+                { status: 400 },
+            );
+        }
+
+        const letrasRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (nombre !== undefined) {
+            if (nombre.length === 0 || nombre.length > 64) {
+                return HttpResponse.json(
+                    { error: "El nombre debe tener entre 1 y 64 caracteres" },
+                    { status: 400 },
+                );
+            }
+            if (!letrasRegex.test(nombre)) {
+                return HttpResponse.json(
+                    { error: "El nombre solo puede contener letras y espacios" },
+                    { status: 400 },
+                );
+            }
+        }
+
+        if (apellido !== undefined) {
+            if (apellido.length === 0 || apellido.length > 64) {
+                return HttpResponse.json(
+                    { error: "El apellido debe tener entre 1 y 64 caracteres" },
+                    { status: 400 },
+                );
+            }
+            if (!letrasRegex.test(apellido)) {
+                return HttpResponse.json(
+                    {
+                        error: "El apellido solo puede contener letras y espacios",
+                    },
+                    { status: 400 },
+                );
+            }
+        }
+
+        if (email !== undefined) {
+            if (!emailRegex.test(email)) {
+                return HttpResponse.json(
+                    { error: "El formato del correo electrónico no es válido" },
+                    { status: 400 },
+                );
+            }
+            const duplicado = cuentasMock.find(
+                (c) =>
+                    c.usuario.email.toLowerCase() === email &&
+                    c.usuario.idusuario !== cliente.idusuario,
+            );
+            if (duplicado) {
+                return HttpResponse.json(
+                    {
+                        error: "El correo electrónico ya está en uso por otra cuenta.",
+                    },
+                    { status: 400 },
+                );
+            }
+        }
+
+        if (nombre) cliente.usuario.nombre = nombre;
+        if (apellido) cliente.usuario.apellido = apellido;
+        if (email) cliente.usuario.email = email;
+
+        const cuenta = cuentasMock.find(
+            (c) => c.usuario.idusuario === cliente.idusuario,
+        );
+        if (cuenta) {
+            cuenta.usuario.nombre = cliente.usuario.nombre;
+            cuenta.usuario.apellido = cliente.usuario.apellido;
+            cuenta.usuario.email = cliente.usuario.email;
+        }
+
+        reservasClienteMock.forEach((r) => {
+            r.titular = { ...cliente.usuario };
+        });
+
+        return HttpResponse.json({
+            mensaje: "Cliente modificado",
+            data: cliente,
+        });
+    }),
+
+    // CU-29: PATCH /api/clientes/:id/baja (dar de baja lógica la cuenta de cliente)
+    http.patch(
+        construirUrl("/clientes/:id/baja"),
+        async ({ request, params }) => {
+            const denegado = exigirRol(request, "CLIENTE");
+            if (denegado) return denegado;
+            await delay(200);
+
+            const id = Number(params.id);
+            const cliente =
+                clientesMock.find(
+                    (c) => c.idcliente === id || c.idusuario === id,
+                ) ?? clientesMock[0];
+
+            if (!cliente) {
+                return HttpResponse.json(
+                    { error: "Cliente no encontrado." },
+                    { status: 404 },
+                );
+            }
+
+            if (cliente.estado === "INACTIVO") {
+                return HttpResponse.json(
+                    { error: "El cliente ya se encuentra inactivo." },
+                    { status: 400 },
+                );
+            }
+
+            const tieneReservasConfirmadas = reservasClienteMock.some(
+                (r) =>
+                    r.estado.toUpperCase() === "CONFIRMADA",
+            );
+            if (tieneReservasConfirmadas) {
+                return HttpResponse.json(
+                    {
+                        error: "No se puede dar de baja porque tiene reservas activas.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            cliente.estado = "INACTIVO";
+            const idxCuenta = cuentasMock.findIndex(
+                (c) => c.usuario.idusuario === cliente.idusuario,
+            );
+            if (idxCuenta !== -1) {
+                cuentasMock.splice(idxCuenta, 1);
+            }
+
+            return HttpResponse.json({
+                mensaje: "Cliente dado de baja",
+                data: {
+                    idcliente: cliente.idcliente,
+                    idusuario: cliente.idusuario,
+                    nroCliente: cliente.nroCliente,
+                    estado: "INACTIVO",
+                },
+            });
+        },
+    ),
 
     // CU-26: GET /api/catalogo
     http.get(construirUrl("/catalogo"), async () => {
@@ -852,9 +1088,9 @@ export const manejadoresCatalogoReservas = [
             condicionesComerciales: paquete?.condiciones ?? null,
             pagado: precioCongelado,
             titular: {
-                nombre: "Juan",
-                apellido: "Pérez",
-                email: "juan@test.com",
+                nombre: clientesMock[0]?.usuario.nombre ?? "Juan",
+                apellido: clientesMock[0]?.usuario.apellido ?? "Pérez",
+                email: clientesMock[0]?.usuario.email ?? "juan@test.com",
             },
             salida: {
                 idsalida: salida.idsalida,

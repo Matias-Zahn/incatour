@@ -77,6 +77,25 @@ function IconoResenias() {
     );
 }
 
+function IconoCuenta() {
+    return (
+        <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <circle cx="12" cy="8" r="5" />
+            <path d="M20 21a8 8 0 0 0-16 0" />
+        </svg>
+    );
+}
+
 function IconoRegistro() {
     return (
         <svg
@@ -217,6 +236,19 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                         </span>
                                         <span className="max-md:hidden">
                                             Publicar reseña
+                                        </span>
+                                    </NavLink>
+                                </li>
+                                <li>
+                                    <NavLink
+                                        to="/mi-cuenta"
+                                        className={claseElementoSidebar}
+                                    >
+                                        <span className="shrink-0">
+                                            <IconoCuenta />
+                                        </span>
+                                        <span className="max-md:hidden">
+                                            Cuenta
                                         </span>
                                     </NavLink>
                                 </li>
