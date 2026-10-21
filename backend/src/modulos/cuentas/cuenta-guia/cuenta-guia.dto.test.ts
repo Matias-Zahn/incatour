@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FiltrosCuentaGuiaDto } from "./cuenta-guia.dto";
+import { CrearCuentaGuiaDto, FiltrosCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 
 describe("CU-44: FiltrosCuentaGuiaDto", () => {
   it("acepta query vacía sin filtros", () => {
@@ -35,5 +35,59 @@ describe("CU-44: FiltrosCuentaGuiaDto", () => {
 
     const [errHab] = FiltrosCuentaGuiaDto.create({ habilitacion: "CADUCADA" });
     expect(errHab).toMatch("habilitacion debe ser uno de: VIGENTE, VENCIDA");
+  });
+});
+
+describe("CU-45: CrearCuentaGuiaDto", () => {
+  it("crea DTO válido con datos correctos", () => {
+    const [error, dto] = CrearCuentaGuiaDto.create({
+      idpersonal: 1,
+      email: "  guia.nuevo@incatour.com ",
+      contrasenia: "contraseniaValida123",
+      nroHabilitacion: "HAB-01",
+      fechaHabilitacion: "2028-10-10",
+    });
+
+    expect(error).toBeUndefined();
+    expect(dto).toBeDefined();
+    expect(dto?.idpersonal).toBe(1);
+    expect(dto?.email).toBe("guia.nuevo@incatour.com");
+    expect(dto?.contrasenia).toBe("contraseniaValida123");
+  });
+
+  it("rechaza idpersonal inválido", () => {
+    const [err] = CrearCuentaGuiaDto.create({
+      idpersonal: 0,
+      email: "test@incatour.com",
+      contrasenia: "12345678",
+    });
+    expect(err).toMatch("idpersonal debe ser un número entero positivo");
+  });
+
+  it("rechaza contraseñas cortas", () => {
+    const [err] = CrearCuentaGuiaDto.create({
+      idpersonal: 1,
+      email: "test@incatour.com",
+      contrasenia: "1234",
+    });
+    expect(err).toMatch("como mínimo 8 caracteres");
+  });
+});
+
+describe("ModificarCuentaGuiaDto", () => {
+  it("acepta actualización parcial", () => {
+    const [error, dto] = ModificarCuentaGuiaDto.create({
+      nombre: "Carlos Alberto",
+      email: "carlos.nuevo@incatour.com",
+    });
+
+    expect(error).toBeUndefined();
+    expect(dto?.nombre).toBe("Carlos Alberto");
+    expect(dto?.email).toBe("carlos.nuevo@incatour.com");
+  });
+
+  it("rechaza si el body está vacío", () => {
+    const [err] = ModificarCuentaGuiaDto.create({});
+    expect(err).toMatch("No se envió ningún dato para modificar");
   });
 });
