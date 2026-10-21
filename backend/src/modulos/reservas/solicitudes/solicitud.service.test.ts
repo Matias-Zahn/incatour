@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SolicitudService } from "./solicitud.service";
 import { ResolverSolicitudDto } from "./solicitud.dto";
 
-const { repo } = vi.hoisted(() => ({
+const { repo, notificador } = vi.hoisted(() => ({
   repo: {
     findAllPendientes: vi.fn(),
     buscarPorId: vi.fn(),
@@ -10,9 +10,12 @@ const { repo } = vi.hoisted(() => ({
     resolverComoRechazada: vi.fn(),
     resolverComoAceptada: vi.fn(),
     contarPendientesPorSalida: vi.fn(),
+    buscarServicio: vi.fn(),
   },
+  notificador: { enviarEmailAlojamientoConfirmado: vi.fn() },
 }));
 vi.mock("./solicitud.repository", () => ({ SolicitudRepository: class { constructor() { return repo; } } }));
+vi.mock("../../../integraciones/notificador/notificador.mock", () => ({ NotificadorMock: class { constructor() { return notificador; } } }));
 
 const solicitud = (over: Record<string, unknown> = {}, paquete: Record<string, unknown> = {}) => ({
   idsolicitud: 5,
@@ -23,7 +26,7 @@ const solicitud = (over: Record<string, unknown> = {}, paquete: Record<string, u
     solicitudes: [] as { gestiones: { resultado: string; idservicio: number }[] }[],
     nroReserva: "RES-1",
     idsalida: 7,
-    cliente: { nroCliente: "CLI-9" },
+    cliente: { nroCliente: "CLI-9", usuario: { email: "ana@mail.com" } },
     salida: {
       paquete: { categoriaGarantizada: "3 estrellas", localidadGarantizada: "Cusco", tipoHabitacionGarantizada: "Doble", ...paquete },
     },
@@ -39,6 +42,8 @@ describe("SolicitudService", () => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
     repo.buscarPorId.mockResolvedValue(solicitud());
+    repo.buscarServicio.mockResolvedValue({ nombreServicio: "Hotel 40", localidad: "Cusco" });
+    notificador.enviarEmailAlojamientoConfirmado.mockResolvedValue(true);
   });
 
   describe("consultarPendientes (CU-33)", () => {
@@ -115,6 +120,27 @@ describe("SolicitudService", () => {
       expect(r).toEqual({ mensaje: "Solicitud Confirmada exitosamente.", solicitudesPendientesRestantesEnSalida: 3 });
     });
 
+    it("aceptada: avisa al titular el establecimiento asignado", async () => {
+      repo.contarPendientesPorSalida.mockResolvedValue(0);
+
+      await new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }));
+
+      await vi.waitFor(() =>
+        expect(notificador.enviarEmailAlojamientoConfirmado).toHaveBeenCalledWith("ana@mail.com", "RES-1", "Hotel 40", "Cusco")
+      );
+    });
+
+    it("aceptada: si el aviso falla, la aceptación sigue firme", async () => {
+      repo.contarPendientesPorSalida.mockResolvedValue(0);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      notificador.enviarEmailAlojamientoConfirmado.mockImplementation(() => Promise.reject(new Error("smtp caído")));
+
+      const r = await new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }));
+
+      expect(r.mensaje).toBe("Solicitud Confirmada exitosamente.");
+      await vi.waitFor(() => expect(console.error).toHaveBeenCalled());
+    });
+
     it("FA1 rechazada: registra el rechazo con su motivo y devuelve la nueva solicitud pendiente", async () => {
       repo.resolverComoRechazada.mockResolvedValue({ idsolicitud: 6 });
 
@@ -126,6 +152,7 @@ describe("SolicitudService", () => {
       expect(repo.resolverComoRechazada).toHaveBeenCalledWith(5, 20, 40, "Sin habitaciones dobles", 2);
       expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
       expect(r.nuevaSolicitudId).toBe(6);
+      expect(notificador.enviarEmailAlojamientoConfirmado).not.toHaveBeenCalled();
     });
 
     it("rechaza resolver una solicitud inexistente", async () => {

@@ -66,4 +66,14 @@ export class NotificadorMock implements INotificador {
 `);
     return true;
   }
+
+  async enviarEmailAlojamientoConfirmado(email: string, nroReserva: string, establecimiento: string, localidad: string): Promise<boolean> {
+    await esperar();
+    console.log(`
+📧 [NOTIFICADOR] Enviando ALOJAMIENTO CONFIRMADO a: ${email}`);
+    console.log(`   └─ Reserva: ${nroReserva}`);
+    console.log(`   └─ Establecimiento: ${establecimiento}${localidad ? ` (${localidad})` : ""}
+`);
+    return true;
+  }
 }

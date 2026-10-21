@@ -33,7 +33,7 @@ export class SolicitudRepository {
                 paquete: true
               }
             },
-            cliente: true,
+            cliente: { include: { usuario: { select: { email: true } } } },
             // Historial de toda la reserva: un reintento (-R) es otra solicitud y no trae los rechazos anteriores
             solicitudes: { select: { gestiones: true } }
           }
@@ -141,5 +141,10 @@ export class SolicitudRepository {
         }
       }
     });
+  }
+
+  // CU-34 paso 9: datos del establecimiento asignado para avisar al titular
+  async buscarServicio(idservicio: number) {
+    return db.servicioBase.findUnique({ where: { idservicio }, select: { nombreServicio: true, localidad: true } });
   }
 }

@@ -1,9 +1,12 @@
 import { CustomError } from "../../../error/CustomError";
+import { INotificador } from "../../../integraciones/notificador/notificador.interface";
+import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
 import { SolicitudRepository } from "./solicitud.repository";
 import { ResolverSolicitudDto } from "./solicitud.dto";
 
 export class SolicitudService {
   private repository = new SolicitudRepository();
+  private notificador: INotificador = new NotificadorMock();
 
   // CU-33
   async consultarPendientes() {
@@ -95,8 +98,18 @@ export class SolicitudService {
         dto.servicioId
       );
 
-      // Simular notificación al cliente
-      console.log(`[NOTIFICADOR] -> Titular de reserva ${reservaId}: Alojamiento confirmado en hotel ID ${dto.servicioId}`);
+      // CU-34 paso 9: informar al titular el establecimiento asignado. Si falla, la aceptación sigue firme
+      this.repository
+        .buscarServicio(dto.servicioId)
+        .then((s) =>
+          this.notificador.enviarEmailAlojamientoConfirmado(
+            solicitud.reserva.cliente.usuario.email,
+            solicitud.reserva.nroReserva,
+            s?.nombreServicio ?? `Servicio ${dto.servicioId}`,
+            s?.localidad ?? ""
+          )
+        )
+        .catch((e) => console.error("[CU-34] Fallo al avisar el alojamiento asignado:", e));
 
       // Contar pendientes de la misma salida para avisar al admin si la salida ya se puede consolidar
       const pendientes = await this.repository.contarPendientesPorSalida(solicitud.reserva.idsalida);

@@ -28,4 +28,7 @@ export interface INotificador {
 
   // Al finalizar la salida: invitación a publicar la reseña (CU-47)
   enviarEmailInvitacionResenia(email: string, nroSalida: string, nombrePaquete: string): Promise<boolean>;
+
+  // CU-34 paso 9 / RF-32: aviso al titular del establecimiento asignado a su reserva
+  enviarEmailAlojamientoConfirmado(email: string, nroReserva: string, establecimiento: string, localidad: string): Promise<boolean>;
 }
