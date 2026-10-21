@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AutoridadMock } from "../../../integraciones/autoridad/autoridad.mock";
 import { CrearSalidaDto } from "./salida.dto";
 
-import { SalidaService } from "./salida.service";
+import { SalidaService, resumirSalida } from "./salida.service";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
 const { repo, actual } = vi.hoisted(() => ({
@@ -101,5 +101,59 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
     const r = await new SalidaService().consultarOpcionesSalida(dto());
 
     expect(r.cupoAutoridad).toBeNull();
+  });
+});
+
+describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
+  const AHORA = new Date("2026-11-15T12:00:00Z");
+  // Circuito de 4 días y 4 etapas; 1 reserva confirmada con 3 pasajeros, sin personal ni permisos
+  const listada = (extra: Record<string, unknown> = {}, reserva: Record<string, unknown> = {}) =>
+    ({
+      idsalida: 1,
+      estado: "PUBLICADA",
+      fechaInicio: new Date("2026-11-20"),
+      ultimaEtapaAlcanzada: null,
+      paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, _count: { etapas: 4 } } },
+      personalAsignado: [],
+      servicios: [],
+      permisos: [],
+      reservas: [{ _count: { pasajeros: 3 }, permisos: [], solicitudes: [], ...reserva }],
+      ...extra,
+    }) as unknown as Parameters<typeof resumirSalida>[0];
+
+  it("cuenta pasajeros, personal, guías y permisos faltantes", () => {
+    const r = resumirSalida(
+      listada({
+        personalAsignado: [{ personal: { nombreCompleto: "Rosa", rol: "Guía" } }, { personal: { nombreCompleto: "Juan", rol: "Porteador" } }],
+        permisos: [{ idpermisopersonal: 1 }],
+      }, { permisos: [{ idpermisopasajero: 1 }, { idpermisopasajero: 2 }] }),
+      AHORA
+    );
+    expect(r).toMatchObject({ pasajerosConfirmados: 3, cantidadPersonal: 2, guias: ["Rosa"], permisosFaltantes: 2 });
+    expect(r).not.toHaveProperty("reservas");
+  });
+
+  it("RF-61: a 7 días o menos alerta solicitudes pendientes y permisos sin emitir", () => {
+    const r = resumirSalida(listada({}, { solicitudes: [{ idsolicitud: 1 }] }), AHORA);
+    expect(r.alertas).toEqual(["SOLICITUD_PENDIENTE", "PERMISOS_SIN_CONFIRMAR"]);
+  });
+
+  it("RF-61: a más de 7 días no alerta", () => {
+    expect(resumirSalida(listada({ fechaInicio: new Date("2026-12-20") }, { solicitudes: [{ idsolicitud: 1 }] }), AHORA).alertas).toEqual([]);
+  });
+
+  it("en curso: etapa esperada proporcional y desfasada si el guía informó menos", () => {
+    // Día 3 de 4 con 4 etapas → etapa 3; el guía informó la 1
+    const r = resumirSalida(listada({ estado: "EN_CURSO", fechaInicio: new Date("2026-11-13"), ultimaEtapaAlcanzada: 1 }), AHORA);
+    expect(r).toMatchObject({ etapaEsperada: 3, etapaInformada: 1, etapaDesfasada: true, alertas: [] });
+  });
+
+  it("en curso al día: no está desfasada; después del último día queda en la última etapa", () => {
+    expect(resumirSalida(listada({ estado: "EN_CURSO", fechaInicio: new Date("2026-11-13"), ultimaEtapaAlcanzada: 3 }), AHORA).etapaDesfasada).toBe(false);
+    expect(resumirSalida(listada({ estado: "EN_CURSO", fechaInicio: new Date("2026-11-01"), ultimaEtapaAlcanzada: 4 }), AHORA).etapaEsperada).toBe(4);
+  });
+
+  it("si no está en curso no calcula etapa esperada", () => {
+    expect(resumirSalida(listada(), AHORA)).toMatchObject({ etapaEsperada: null, etapaDesfasada: false });
   });
 });

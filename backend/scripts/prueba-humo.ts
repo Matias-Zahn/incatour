@@ -192,6 +192,10 @@ async function faseC() {
   const reserva2 = await paso("Comprar otra reserva (CU-30)", "POST", "/reservas", compra(2), tokCliente);
   const idreserva = idDe(reserva, "idreserva") ?? reserva?.idDe(reserva, "idreserva");
   const idreserva2 = idDe(reserva2, "idreserva") ?? reserva2?.idDe(reserva, "idreserva");
+  // CU-35: filtro por circuito y conteo de pasajeros (dos compras de 1 pasajero)
+  const listado = await paso("Consultar salidas por circuito (CU-35)", "GET", `/salidas?idcircuito=${idcircuito}`);
+  const fila = listado?.find((s: any) => s.idsalida === idDe(salida, "idsalida"));
+  if (listado && fila?.pasajerosConfirmados !== 2) fallas.push(`C CU-35: se esperaban 2 pasajeros confirmados y llegó ${fila?.pasajerosConfirmados}`);
   await paso("Mis reservas (CU-31)", "GET", "/reservas/mis-reservas", undefined, tokCliente);
   await paso("Detalle de reserva (CU-31)", "GET", `/reservas/${idreserva}`, undefined, tokCliente);
   await paso("Comprobante (CU-31)", "GET", `/reservas/${idreserva}/comprobante`, undefined, tokCliente);

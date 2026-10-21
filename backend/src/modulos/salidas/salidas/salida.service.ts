@@ -1,9 +1,10 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
 import { ConsultarSalidasDto, CrearSalidaDto } from "./salida.dto";
-import { SalidaRepository } from "./salida.repository";
+import { SalidaListada, SalidaRepository } from "./salida.repository";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -12,7 +13,8 @@ export class SalidaService {
 
   // CU-35: Consultar salidas
   async consultarSalidas(dto: ConsultarSalidasDto) {
-    return this.repository.buscar(dto);
+    const ahora = new Date();
+    return (await this.repository.buscar(dto)).map((s) => resumirSalida(s, ahora));
   }
 
   // CU-36 pasos 4 a 7: dotación, total de lugares y alojamientos que se pueden bloquear
@@ -124,4 +126,51 @@ export class SalidaService {
     const alojamientos = await this.repository.buscarAlojamientosConBloqueo(paquete);
     return { paquete, dotacion, totalLugares, alojamientos };
   }
+}
+
+// RF-61: una salida está "próxima" si empieza dentro de estos días (supuesto del grupo, ver ERS)
+export const DIAS_ALERTA = 7;
+
+/**
+ * CU-35 (RF-50 y RF-61): agrega a cada salida los datos del listado del administrador.
+ * - permisosFaltantes: pasajeros confirmados + personal asignado − permisos emitidos.
+ * - etapaEsperada (solo EN_CURSO): reparto proporcional de las etapas en los días del circuito,
+ *   porque el itinerario no guarda en qué día cae cada etapa (supuesto del grupo).
+ * - alertas: con la salida a DIAS_ALERTA días o menos de empezar, solicitudes pendientes o permisos sin emitir.
+ */
+export function resumirSalida(s: SalidaListada, ahora: Date) {
+  const { reservas, permisos, ...salida } = s;
+  const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
+  const cantidadPersonal = salida.personalAsignado.length;
+  const emitidos = permisos.length + reservas.reduce((t, r) => t + r.permisos.length, 0);
+  const permisosFaltantes = Math.max(0, pasajerosConfirmados + cantidadPersonal - emitidos);
+  const guias = salida.personalAsignado.filter((a) => a.personal.rol === ROL_GUIA).map((a) => a.personal.nombreCompleto);
+
+  let etapaEsperada: number | null = null;
+  const { duracionDias, _count } = salida.paquete.circuito;
+  if (salida.estado === ESTADO_SALIDA.EN_CURSO && _count.etapas > 0 && duracionDias > 0) {
+    const dia = Math.floor((ahora.getTime() - salida.fechaInicio.getTime()) / DIA_MS) + 1;
+    etapaEsperada = Math.min(_count.etapas, Math.max(1, Math.ceil((dia / duracionDias) * _count.etapas)));
+  }
+  const etapaInformada = salida.ultimaEtapaAlcanzada ?? null;
+
+  const alertas: string[] = [];
+  const diasParaEmpezar = (salida.fechaInicio.getTime() - ahora.getTime()) / DIA_MS;
+  const porEmpezar = salida.estado !== ESTADO_SALIDA.EN_CURSO && SALIDAS_ACTIVAS.includes(salida.estado);
+  if (porEmpezar && diasParaEmpezar >= 0 && diasParaEmpezar <= DIAS_ALERTA) {
+    if (reservas.some((r) => r.solicitudes.length > 0)) alertas.push("SOLICITUD_PENDIENTE");
+    if (permisosFaltantes > 0) alertas.push("PERMISOS_SIN_CONFIRMAR");
+  }
+
+  return {
+    ...salida,
+    pasajerosConfirmados,
+    cantidadPersonal,
+    guias,
+    permisosFaltantes,
+    etapaEsperada,
+    etapaInformada,
+    etapaDesfasada: etapaEsperada !== null && etapaEsperada !== (etapaInformada ?? 0),
+    alertas,
+  };
 }

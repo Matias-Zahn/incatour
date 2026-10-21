@@ -1,9 +1,10 @@
 import { db } from "../../../config/postgresDatabase";
 import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, ESTADO_SALIDA, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { ConsultarSalidasDto } from "./salida.dto";
 
+export type SalidaListada = Awaited<ReturnType<SalidaRepository["buscar"]>>[number];
 export type PaqueteParaSalida = NonNullable<Awaited<ReturnType<SalidaRepository["buscarPaquete"]>>>;
 
 export interface DatosNuevaSalida {
@@ -28,11 +29,28 @@ export class SalidaRepository {
           },
         }),
         ...(dto.idguia && { personalAsignado: { some: { idpersonal: dto.idguia, personal: { rol: "Guía" } } } }),
+        ...(dto.idcircuito && { paquete: { idcircuito: dto.idcircuito } }),
       },
       include: {
-        paquete: { select: { nroPaquete: true, nombrePaquete: true } },
+        paquete: {
+          select: {
+            nroPaquete: true,
+            nombrePaquete: true,
+            circuito: { select: { idcircuito: true, nombreCircuito: true, duracionDias: true, _count: { select: { etapas: true } } } },
+          },
+        },
         personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
         servicios: { include: { servicio: { select: { nombreServicio: true } } } },
+        // RF-50 y RF-61: lo necesario para contar pasajeros, permisos y solicitudes pendientes
+        reservas: {
+          where: { estado: ESTADO_RESERVA.CONFIRMADA },
+          select: {
+            _count: { select: { pasajeros: true } },
+            permisos: { where: { estadoTramite: ESTADO_PERMISO.EMITIDO }, select: { idpermisopasajero: true } },
+            solicitudes: { where: { estado: ESTADO_SOLICITUD.PENDIENTE }, select: { idsolicitud: true } },
+          },
+        },
+        permisos: { where: { estadoTramite: ESTADO_PERMISO.EMITIDO }, select: { idpermisopersonal: true } },
       },
       orderBy: { fechaInicio: "asc" },
     });
