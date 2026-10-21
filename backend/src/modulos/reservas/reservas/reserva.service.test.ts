@@ -225,10 +225,10 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       expect(repo.confirmarReserva).not.toHaveBeenCalled();
     });
 
-    it("pasarela caída: libera los cupos y responde 500", async () => {
+    it("pasarela caída: libera los cupos y responde 503", async () => {
       pasarela.procesarPago.mockRejectedValue(new Error("timeout"));
 
-      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("pasarela") });
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 503, message: expect.stringContaining("pasarela") });
       expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, true);
       expect(repo.confirmarReserva).not.toHaveBeenCalled();
     });

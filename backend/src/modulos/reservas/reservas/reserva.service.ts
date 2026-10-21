@@ -75,7 +75,7 @@ export class ReservaService {
       });
     } catch (error) {
       await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
-      throw CustomError.internalServerError("No se pudo contactar a la pasarela de pagos.");
+      throw CustomError.serviceUnavailable("No se pudo contactar a la pasarela de pagos. Reintentá más tarde.");
     }
 
     if (!pago.aprobado) {
