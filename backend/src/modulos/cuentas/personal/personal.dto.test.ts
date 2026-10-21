@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ConsultarPersonalDto, ModificarPersonalDto } from "./personal.dto";
+import { ConsultarPersonalDto, CrearPersonalDto, ModificarPersonalDto } from "./personal.dto";
 
 describe("ConsultarPersonalDto", () => {
   it("sin filtros es válido", () => {
@@ -43,5 +43,23 @@ describe("ModificarPersonalDto", () => {
   it("rechaza datos inválidos", () => {
     expect(ModificarPersonalDto.create({ nombreCompleto: "Juan 123" })[0]).toMatch("letras");
     expect(ModificarPersonalDto.create({ fechaVencimientoPasaporte: "mañana" })[0]).toMatch("fecha");
+  });
+});
+
+describe("CrearPersonalDto", () => {
+  const guia = (email: string) => ({
+    nombre: "Ana", apellido: "Quispe", nroPasaporte: "P123", nacionalidad: "Peruana",
+    fechaVencimientoPasaporte: "2030-01-01", rolOperativo: "Guía", email,
+    contrasenia: "clave1234", nroHabilitacion: "H-1", fechaHabilitacion: "2030-01-01",
+  });
+
+  it("rechaza un email de guía sin formato de correo (CTA-05)", () => {
+    expect(CrearPersonalDto.create(guia("abc"))[0]).toBeDefined();
+  });
+
+  it("normaliza el email del guía", () => {
+    const [error, dto] = CrearPersonalDto.create(guia(" Ana@Mail.com "));
+    expect(error).toBeUndefined();
+    expect(dto?.email).toBe("ana@mail.com");
   });
 });

@@ -35,7 +35,15 @@ export class PersonalService {
       if (existe) throw CustomError.badRequest("Este número de pasaporte ya está registrado");
     }
 
-    return this.repository.modificar(idpersonal, dto);
+    // El nombre del guía vive también en su cuenta (Usuario): se actualiza junto con el legajo
+    let usuario: { idusuario: number; nombre: string; apellido: string } | undefined;
+    if (dto.nombreCompleto && personal.guia?.idusuario) {
+      const [nombre, ...resto] = dto.nombreCompleto.trim().split(/\s+/);
+      if (!resto.length) throw CustomError.badRequest("El nombre completo de un guía debe incluir nombre y apellido");
+      usuario = { idusuario: personal.guia.idusuario, nombre: nombre!, apellido: resto.join(" ") };
+    }
+
+    return this.repository.modificar(idpersonal, dto, usuario);
   }
 
   // CU-25: Baja lógica de personal operativo

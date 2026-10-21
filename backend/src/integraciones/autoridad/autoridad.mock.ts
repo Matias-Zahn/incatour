@@ -1,9 +1,14 @@
 import crypto from "crypto";
 import {
+  CUPO_DIARIO,
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
+  ResultadoEmision,
   TitularPermiso,
+  diaDelCupo,
+  separarNomina,
+  validarCantidad,
 } from "./autoridad.interface";
 
 /**
@@ -15,8 +20,6 @@ import {
  * Guarda el estado en memoria: es la versión para los tests unitarios. El servidor usa
  * AutoridadSimulada (autoridad.simulada.ts), que cumple el mismo contrato con tablas propias.
  */
-const CUPO_DIARIO = 500;
-
 interface Bloqueo {
   fecha: string; // "2026-11-15", para usarla como clave del Map
   lugares: number;
@@ -39,7 +42,8 @@ export class AutoridadMock implements IApiAutoridad {
     totalLugares: number,
   ): Promise<ResultadoBloqueo> {
     this.verificarConexion();
-    const fecha = fechaInicio.toISOString().slice(0, 10);
+    validarCantidad(totalLugares);
+    const fecha = diaDelCupo(fechaInicio);
     const ocupados = this.ocupadosPorDia.get(fecha) ?? 0;
     const disponibles = CUPO_DIARIO - ocupados;
 
@@ -53,15 +57,22 @@ export class AutoridadMock implements IApiAutoridad {
     return { aprobado: true, idBloqueo };
   }
 
+  async consultarDisponibilidad(fechaInicio: Date): Promise<number> {
+    this.verificarConexion();
+    return CUPO_DIARIO - (this.ocupadosPorDia.get(diaDelCupo(fechaInicio)) ?? 0);
+  }
+
   async liberarLugaresSobrantes(
     idBloqueo: string,
     sobrantes: number,
   ): Promise<void> {
     this.verificarConexion();
     const bloqueo = this.buscarBloqueo(idBloqueo);
-    if (sobrantes <= 0 || sobrantes > bloqueo.lugares) {
+    validarCantidad(sobrantes);
+    const libres = bloqueo.lugares - this.vigentes(idBloqueo);
+    if (sobrantes > libres) {
       throw new Error(
-        `Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares`,
+        `Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares y ${bloqueo.lugares - libres} permisos vigentes`,
       );
     }
     bloqueo.lugares -= sobrantes;
@@ -70,7 +81,8 @@ export class AutoridadMock implements IApiAutoridad {
 
   async liberarTotalidadCupos(idBloqueo: string): Promise<void> {
     this.verificarConexion();
-    const bloqueo = this.buscarBloqueo(idBloqueo);
+    const bloqueo = this.bloqueos.get(idBloqueo);
+    if (!bloqueo) return; // idempotente: si ya se liberó, no hay nada que hacer
     this.liberarDelDia(bloqueo.fecha, bloqueo.lugares);
     this.bloqueos.delete(idBloqueo);
     for (const [nroPermiso, permiso] of this.permisos) {
@@ -81,15 +93,12 @@ export class AutoridadMock implements IApiAutoridad {
   async solicitarEmisionNominal(
     idBloqueo: string,
     nomina: TitularPermiso[],
-  ): Promise<PermisoEmitido[]> {
+  ): Promise<ResultadoEmision> {
     this.verificarConexion();
     const bloqueo = this.buscarBloqueo(idBloqueo);
-    if (nomina.length > bloqueo.lugares) {
-      throw new Error(
-        `La nómina tiene ${nomina.length} personas y el bloqueo ${bloqueo.lugares} lugares`,
-      );
-    }
-    return nomina.map((titular) => this.emitir(idBloqueo, titular));
+    const { aceptados, rechazados } = separarNomina(nomina, bloqueo.fecha);
+    this.verificarLugar(idBloqueo, bloqueo, aceptados.length);
+    return { emitidos: aceptados.map((titular) => this.emitir(idBloqueo, titular)), rechazados };
   }
 
   async darDeBajaPermiso(idBloqueo: string, nroPermiso: string): Promise<void> {
@@ -109,8 +118,23 @@ export class AutoridadMock implements IApiAutoridad {
         `El permiso ${nroPermisoAnterior} sigue vigente: primero hay que darlo de baja`,
       );
     }
+    this.verificarLugar(idBloqueo, this.buscarBloqueo(idBloqueo), 1);
     this.permisos.delete(nroPermisoAnterior); // su lugar pasa al permiso nuevo
     return this.emitir(idBloqueo, reemplazante);
+  }
+
+  private vigentes(idBloqueo: string) {
+    return [...this.permisos.values()].filter((p) => p.idBloqueo === idBloqueo && p.vigente).length;
+  }
+
+  // Los permisos vigentes no pueden pasar los lugares del bloqueo
+  private verificarLugar(idBloqueo: string, bloqueo: Bloqueo, aEmitir: number) {
+    const vigentes = this.vigentes(idBloqueo);
+    if (vigentes + aEmitir > bloqueo.lugares) {
+      throw new Error(
+        `El bloqueo tiene ${bloqueo.lugares} lugares y ya hay ${vigentes} permisos vigentes: no entran ${aEmitir} más`,
+      );
+    }
   }
 
   private emitir(idBloqueo: string, titular: TitularPermiso): PermisoEmitido {

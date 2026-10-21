@@ -109,4 +109,5 @@ El servidor quedará escuchando en `http://localhost:3000` y la base de datos es
 
 ## 🔗 Enlaces Relacionados
 * ⬅️ **[Volver al README Principal](../README.md)**
+* 🤖 **[Trabajar con IA y corregir errores (`docs/TRABAJO_CON_IA.md`)](./docs/TRABAJO_CON_IA.md)**
 * 🎨 **[Frontend README](../frontend/README.md)**

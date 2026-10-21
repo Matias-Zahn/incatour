@@ -477,7 +477,7 @@
     "/api/salidas/opciones": {
       "get": {
         "summary": "Opciones para crear una salida (CU-36, pasos 4 a 7)",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación de personal que exige el circuito, el total de lugares a bloquear ante la autoridad y los alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas. No modifica nada.\n",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación de personal que exige el circuito, el total de lugares a bloquear ante la autoridad y los alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas. También informa cuántos lugares libres tiene la autoridad ese día (`cupoAutoridad`, `null` si la autoridad no responde). No modifica nada.\n",
         "tags": [
           "Salidas"
         ],
@@ -533,6 +533,10 @@
                       "porteadores": 4
                     },
                     "totalLugares": 14,
+                    "cupoAutoridad": {
+                      "lugaresDisponibles": 500,
+                      "alcanza": true
+                    },
                     "alojamientos": [
                       {
                         "idservicio": 1,

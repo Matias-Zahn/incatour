@@ -18,11 +18,14 @@ export class SalidaService {
   // CU-36 pasos 4 a 7: dotación, total de lugares y alojamientos que se pueden bloquear
   async consultarOpcionesSalida(dto: CrearSalidaDto) {
     const { paquete, dotacion, totalLugares, alojamientos } = await this.prepararSalida(dto);
+    // Informativo: si la autoridad no responde, la consulta sigue y el cupo queda sin informar
+    const libres = await obtenerAutoridad().consultarDisponibilidad(dto.fechaInicio).catch(() => null);
     return {
       paquete: { idpaquete: paquete.idpaquete, nombrePaquete: paquete.nombrePaquete },
       tamanoMaximo: dto.tamanoMaximo,
       dotacion,
       totalLugares,
+      cupoAutoridad: libres === null ? null : { lugaresDisponibles: libres, alcanza: libres >= totalLugares },
       alojamientos: alojamientos.map((a) => ({
         idservicio: a.idservicio,
         nombreServicio: a.nombreServicio,

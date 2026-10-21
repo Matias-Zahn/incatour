@@ -1,10 +1,16 @@
 import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { db } from "../../config/postgresDatabase";
 import {
+  CUPO_DIARIO,
   IApiAutoridad,
   PermisoEmitido,
   ResultadoBloqueo,
+  ResultadoEmision,
   TitularPermiso,
+  diaDelCupo,
+  separarNomina,
+  validarCantidad,
 } from "./autoridad.interface";
 
 /**
@@ -17,8 +23,6 @@ import {
  *
  * Los tests unitarios usan AutoridadMock (en memoria), que cumple el mismo contrato.
  */
-const CUPO_DIARIO = 500;
-
 const nuevoId = (prefijo: string) => `${prefijo}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 
 export class AutoridadSimulada implements IApiAutoridad {
@@ -26,7 +30,8 @@ export class AutoridadSimulada implements IApiAutoridad {
 
   async solicitarBloqueoCupo(fechaInicio: Date, totalLugares: number): Promise<ResultadoBloqueo> {
     this.verificarConexion();
-    const fecha = fechaInicio.toISOString().slice(0, 10);
+    validarCantidad(totalLugares);
+    const fecha = diaDelCupo(fechaInicio);
 
     return db.$transaction(async (tx) => {
       await tx.autoridadCupoDiario.createMany({ data: [{ fecha }], skipDuplicates: true });
@@ -47,39 +52,49 @@ export class AutoridadSimulada implements IApiAutoridad {
     });
   }
 
+  async consultarDisponibilidad(fechaInicio: Date): Promise<number> {
+    this.verificarConexion();
+    const dia = await db.autoridadCupoDiario.findUnique({ where: { fecha: diaDelCupo(fechaInicio) } });
+    return CUPO_DIARIO - (dia?.ocupados ?? 0);
+  }
+
   async liberarLugaresSobrantes(idBloqueo: string, sobrantes: number): Promise<void> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    if (sobrantes <= 0 || sobrantes > bloqueo.lugares) {
-      throw new Error(`Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares`);
-    }
-    await db.$transaction([
-      db.autoridadBloqueo.update({ where: { idBloqueo }, data: { lugares: { decrement: sobrantes } } }),
-      db.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: sobrantes } } }),
-    ]);
+    validarCantidad(sobrantes);
+    await db.$transaction(async (tx) => {
+      const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+      const libres = bloqueo.lugares - (await this.vigentes(tx, idBloqueo));
+      if (sobrantes > libres) {
+        throw new Error(`Sobrantes inválidos: el bloqueo ${idBloqueo} tiene ${bloqueo.lugares} lugares y ${bloqueo.lugares - libres} permisos vigentes`);
+      }
+      await tx.autoridadBloqueo.update({ where: { idBloqueo }, data: { lugares: { decrement: sobrantes } } });
+      await tx.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: sobrantes } } });
+    });
   }
 
   async liberarTotalidadCupos(idBloqueo: string): Promise<void> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    // Los permisos del bloqueo se borran en cascada
-    await db.$transaction([
-      db.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: bloqueo.lugares } } }),
-      db.autoridadBloqueo.delete({ where: { idBloqueo } }),
-    ]);
+    // Idempotente: si el bloqueo ya no existe, no hay nada que liberar. Los permisos se borran en cascada
+    await db.$transaction(async (tx) => {
+      const bloqueo = await this.bloquearFila(tx, idBloqueo);
+      if (!bloqueo) return;
+      await tx.autoridadCupoDiario.update({ where: { fecha: bloqueo.fecha }, data: { ocupados: { decrement: bloqueo.lugares } } });
+      await tx.autoridadBloqueo.delete({ where: { idBloqueo } });
+    });
   }
 
-  async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<PermisoEmitido[]> {
+  async solicitarEmisionNominal(idBloqueo: string, nomina: TitularPermiso[]): Promise<ResultadoEmision> {
     this.verificarConexion();
-    const bloqueo = await this.buscarBloqueo(idBloqueo);
-    if (nomina.length > bloqueo.lugares) {
-      throw new Error(`La nómina tiene ${nomina.length} personas y el bloqueo ${bloqueo.lugares} lugares`);
-    }
-    const permisos = nomina.map((titular) => this.armarPermiso(titular));
-    await db.autoridadPermiso.createMany({
-      data: permisos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
+    return db.$transaction(async (tx) => {
+      const bloqueo = await this.exigirBloqueo(tx, idBloqueo);
+      const { aceptados, rechazados } = separarNomina(nomina, bloqueo.fecha);
+      await this.verificarLugar(tx, idBloqueo, bloqueo, aceptados.length);
+      const emitidos = aceptados.map((titular) => this.armarPermiso(titular));
+      await tx.autoridadPermiso.createMany({
+        data: emitidos.map((p) => ({ nroPermiso: p.nroPermiso, idBloqueo })),
+      });
+      return { emitidos, rechazados };
     });
-    return permisos;
   }
 
   async darDeBajaPermiso(idBloqueo: string, nroPermiso: string): Promise<void> {
@@ -100,10 +115,11 @@ export class AutoridadSimulada implements IApiAutoridad {
     }
     const nuevo = this.armarPermiso(reemplazante);
     // El permiso nuevo ocupa el mismo lugar que el anterior
-    await db.$transaction([
-      db.autoridadPermiso.delete({ where: { nroPermiso: nroPermisoAnterior } }),
-      db.autoridadPermiso.create({ data: { nroPermiso: nuevo.nroPermiso, idBloqueo } }),
-    ]);
+    await db.$transaction(async (tx) => {
+      await this.verificarLugar(tx, idBloqueo, await this.exigirBloqueo(tx, idBloqueo), 1);
+      await tx.autoridadPermiso.delete({ where: { nroPermiso: nroPermisoAnterior } });
+      await tx.autoridadPermiso.create({ data: { nroPermiso: nuevo.nroPermiso, idBloqueo } });
+    });
     return nuevo;
   }
 
@@ -111,10 +127,29 @@ export class AutoridadSimulada implements IApiAutoridad {
     return { titular: { tipo: titular.tipo, id: titular.id }, nroPermiso: nuevoId("PER"), fechaEmision: new Date() };
   }
 
-  private async buscarBloqueo(idBloqueo: string) {
-    const bloqueo = await db.autoridadBloqueo.findUnique({ where: { idBloqueo } });
+  // Toma el lock de la fila del bloqueo hasta que termine la transacción. Orden de locks: siempre bloqueo → cupo
+  private async bloquearFila(tx: Prisma.TransactionClient, idBloqueo: string) {
+    const [bloqueo] = await tx.$queryRaw<{ fecha: string; lugares: number }[]>`
+      SELECT fecha, lugares FROM autoridad.bloqueo WHERE "idBloqueo" = ${idBloqueo} FOR UPDATE`;
+    return bloqueo ?? null;
+  }
+
+  private async exigirBloqueo(tx: Prisma.TransactionClient, idBloqueo: string) {
+    const bloqueo = await this.bloquearFila(tx, idBloqueo);
     if (!bloqueo) throw new Error(`El bloqueo ${idBloqueo} no existe`);
     return bloqueo;
+  }
+
+  private vigentes(tx: Prisma.TransactionClient, idBloqueo: string) {
+    return tx.autoridadPermiso.count({ where: { idBloqueo, vigente: true } });
+  }
+
+  // Con el bloqueo lockeado, los permisos vigentes no pueden pasar sus lugares (dos pedidos en paralelo se serializan)
+  private async verificarLugar(tx: Prisma.TransactionClient, idBloqueo: string, bloqueo: { lugares: number }, aEmitir: number) {
+    const vigentes = await this.vigentes(tx, idBloqueo);
+    if (vigentes + aEmitir > bloqueo.lugares) {
+      throw new Error(`El bloqueo tiene ${bloqueo.lugares} lugares y ya hay ${vigentes} permisos vigentes: no entran ${aEmitir} más`);
+    }
   }
 
   private async buscarPermiso(idBloqueo: string, nroPermiso: string) {

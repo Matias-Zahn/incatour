@@ -98,24 +98,37 @@ export class PersonalRepository {
   }
 
   // CU-24: Personal y, si corresponde, Guia en una sola operación
-  async modificar(idpersonal: number, dto: ModificarPersonalDto) {
-    return db.personal.update({
-      where: { idpersonal },
-      data: {
-        ...(dto.nombreCompleto && { nombreCompleto: dto.nombreCompleto }),
-        ...(dto.nroPasaporte && { nroPasaporte: dto.nroPasaporte }),
-        ...(dto.nacionalidad && { nacionalidad: dto.nacionalidad }),
-        ...(dto.fechaVencimientoPasaporte && { fechaVencimientoPasaporte: dto.fechaVencimientoPasaporte }),
-        ...(dto.modificaHabilitacion && {
-          guia: {
-            update: {
-              ...(dto.nroHabilitacion && { nroHabilitacion: dto.nroHabilitacion }),
-              ...(dto.fechaHabilitacion && { fechaHabilitacion: dto.fechaHabilitacion }),
+  async modificar(
+    idpersonal: number,
+    dto: ModificarPersonalDto,
+    usuario?: { idusuario: number; nombre: string; apellido: string }
+  ) {
+    return db.$transaction(async (tx) => {
+      const personal = await tx.personal.update({
+        where: { idpersonal },
+        data: {
+          ...(dto.nombreCompleto && { nombreCompleto: dto.nombreCompleto }),
+          ...(dto.nroPasaporte && { nroPasaporte: dto.nroPasaporte }),
+          ...(dto.nacionalidad && { nacionalidad: dto.nacionalidad }),
+          ...(dto.fechaVencimientoPasaporte && { fechaVencimientoPasaporte: dto.fechaVencimientoPasaporte }),
+          ...(dto.modificaHabilitacion && {
+            guia: {
+              update: {
+                ...(dto.nroHabilitacion && { nroHabilitacion: dto.nroHabilitacion }),
+                ...(dto.fechaHabilitacion && { fechaHabilitacion: dto.fechaHabilitacion }),
+              },
             },
-          },
-        }),
-      },
-      include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
+          }),
+        },
+        include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
+      });
+      if (usuario) {
+        await tx.usuario.update({
+          where: { idusuario: usuario.idusuario },
+          data: { nombre: usuario.nombre, apellido: usuario.apellido },
+        });
+      }
+      return personal;
     });
   }
 

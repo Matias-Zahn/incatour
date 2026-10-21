@@ -6,6 +6,8 @@ const { repo } = vi.hoisted(() => ({
   repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn(), registrarIncidente: vi.fn() },
 }));
 vi.mock("./guia.repository", () => ({ GuiaRepository: class { constructor() { return repo; } } }));
+const { notificador } = vi.hoisted(() => ({ notificador: { enviarEmailInvitacionResenia: vi.fn() } }));
+vi.mock("../../../integraciones/notificador/notificador.mock", () => ({ NotificadorMock: class { constructor() { return notificador; } } }));
 
 const salida = {
   idsalida: 2, nroSalida: "SAL-2026-002", estado: "CERRADA", fechaInicio: new Date(), fechaFin: new Date(),
@@ -68,12 +70,59 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
     expect(r).toMatchObject({ idcircuito: 5, numeroOrden: 1, estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
   });
 
+  it("pasa al repositorio la etapa leída y rechaza con 409 si otro avance se coló (CTA-06)", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido());
+    repo.registrarAvance.mockResolvedValue(null);
+
+    await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.registrarAvance).toHaveBeenCalledWith(expect.objectContaining({ ultimaEtapaLeida: null }));
+  });
+
   it("completar la última etapa finaliza la salida", async () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 2 }));
 
     const r = await new GuiaService().registrarAvance(1, 2, avance(3));
 
     expect(r).toMatchObject({ estadoSalida: "FINALIZADA", ultimaEtapaAlcanzada: 3 });
+  });
+
+  describe("invitación a reseñar", () => {
+    const reserva = (email: string) => ({ cliente: { usuario: { email } } });
+    const conClientes = (extra = {}) =>
+      enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 2, reservas: [reserva("a@x.com"), reserva("a@x.com"), reserva("b@x.com")], ...extra });
+
+    beforeEach(() => notificador.enviarEmailInvitacionResenia.mockResolvedValue(true));
+
+    it("al finalizar invita una vez a cada cliente, aunque tenga dos reservas", async () => {
+      repo.detalleSalida.mockResolvedValue(conClientes());
+
+      await new GuiaService().registrarAvance(1, 2, avance(3));
+
+      expect(notificador.enviarEmailInvitacionResenia).toHaveBeenCalledTimes(2);
+      expect(notificador.enviarEmailInvitacionResenia).toHaveBeenCalledWith("a@x.com", "SAL-2026-002", "Inca");
+    });
+
+    it("si el notificador falla, el avance se registra igual", async () => {
+      repo.detalleSalida.mockResolvedValue(conClientes());
+      // Función común y no vi.fn: vitest marca como no manejada la promesa rechazada que registra el espía
+      const espia = notificador.enviarEmailInvitacionResenia;
+      notificador.enviarEmailInvitacionResenia = (async () => { throw new Error("smtp caído"); }) as any;
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        await expect(new GuiaService().registrarAvance(1, 2, avance(3))).resolves.toMatchObject({ estadoSalida: "FINALIZADA" });
+      } finally {
+        notificador.enviarEmailInvitacionResenia = espia;
+      }
+    });
+
+    it("en una etapa intermedia no invita a nadie", async () => {
+      repo.detalleSalida.mockResolvedValue(conClientes({ ultimaEtapaAlcanzada: 1 }));
+
+      await new GuiaService().registrarAvance(1, 2, avance(2));
+
+      expect(notificador.enviarEmailInvitacionResenia).not.toHaveBeenCalled();
+    });
   });
 
   it("un tramo DEMORADO no avanza la última etapa", async () => {

@@ -78,6 +78,19 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(baja).toHaveBeenCalledTimes(7);
   });
 
+  it("si la autoridad rechaza a alguien, da de baja lo emitido y no guarda nada", async () => {
+    const real = autoridad.solicitarEmisionNominal.bind(autoridad);
+    vi.spyOn(autoridad, "solicitarEmisionNominal").mockImplementation(async (id, nomina) => {
+      const r = await real(id, nomina.slice(1));
+      return { ...r, rechazados: [{ titular: { tipo: nomina[0]!.tipo, id: nomina[0]!.id }, motivo: "Pasaporte vencido" }] };
+    });
+    const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
+
+    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toMatchObject({ statusCode: 400 });
+    expect(baja).toHaveBeenCalledTimes(6);
+    expect(repo.confirmar).not.toHaveBeenCalled();
+  });
+
   it("FA1: rechaza un guía sin habilitación vigente para las fechas", async () => {
     const vencido = { ...persona(1, "Guía"), guia: { fechaHabilitacion: new Date("2026-11-21") } };
     repo.buscarPersonal.mockResolvedValue([vencido, ...equipo.slice(1)]);

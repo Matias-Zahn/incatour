@@ -25,4 +25,7 @@ export interface INotificador {
     montoAReintegrar: number,
     alternativas: AlternativaSalida[]
   ): Promise<boolean>;
+
+  // Al finalizar la salida: invitación a publicar la reseña (CU-47)
+  enviarEmailInvitacionResenia(email: string, nroSalida: string, nombrePaquete: string): Promise<boolean>;
 }

@@ -1,3 +1,5 @@
+import { INotificador } from "../../../integraciones/notificador/notificador.interface";
+import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { ESTADO_TRAMO, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
@@ -5,6 +7,7 @@ import { GuiaRepository } from "./guia.repository";
 
 export class GuiaService {
   private repository = new GuiaRepository();
+  private notificador: INotificador = new NotificadorMock();
 
   // CU-48: consultarSalidasAsignadas (también es el punto de entrada de los CU-49 y CU-50)
   async consultarSalidasAsignadas(idusuario: number) {
@@ -107,17 +110,29 @@ export class GuiaService {
     // Paso 11: el primer avance pone la salida en curso; completar la última etapa la finaliza
     const completa = dto.estadoTramo === ESTADO_TRAMO.COMPLETADO;
     const ultimaDelCircuito = Math.max(...etapas.map((e) => e.numeroOrden));
+    const finaliza = completa && dto.numeroOrden === ultimaDelCircuito;
 
-    return this.repository.registrarAvance({
+    const r = await this.repository.registrarAvance({
       idsalida,
       idcircuito: etapa.idcircuito,
       numeroOrden: dto.numeroOrden,
       estadoTramo: dto.estadoTramo,
       fechaHoraLlegada: dto.fechaHoraLlegada,
       ultimaEtapaAlcanzada: completa ? dto.numeroOrden : s.ultimaEtapaAlcanzada,
-      estadoSalida:
-        completa && dto.numeroOrden === ultimaDelCircuito ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
+      ultimaEtapaLeida: s.ultimaEtapaAlcanzada,
+      estadoSalida: finaliza ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
     });
+    if (!r) throw CustomError.conflict("Otro avance de esta salida se registró al mismo tiempo; volvé a consultar la salida");
+
+    // Salida finalizada: se invita a reseñar a cada cliente una sola vez. Si el mail falla, el avance ya quedó registrado
+    if (finaliza) {
+      for (const email of new Set(s.reservas.map((x) => x.cliente.usuario.email))) {
+        this.notificador
+          .enviarEmailInvitacionResenia(email, s.nroSalida, s.paquete.nombrePaquete)
+          .catch((e) => console.error("Fallo al invitar a reseñar:", e));
+      }
+    }
+    return r;
   }
 
   // CU-50 FA1: pasajeros de la salida, para elegir a los afectados
