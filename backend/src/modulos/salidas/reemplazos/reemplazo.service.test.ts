@@ -101,6 +101,21 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     expect(baja).toHaveBeenCalledTimes(2); // la del original y la compensación del nuevo
   });
 
+  it("SAL-04: si la base falla tras emitir, la fila apunta al permiso nuevo dado de baja y el reintento funciona", async () => {
+    const fila = { idpermisopersonal: 50, idpersonal: 1, nroPermiso, estadoTramite: "Emitido" };
+    repo.marcarPermisoDadoDeBaja.mockImplementation(async (_id: number, nro?: string) => {
+      fila.estadoTramite = "Dado de baja";
+      if (nro) fila.nroPermiso = nro;
+    });
+    repo.buscarSalida.mockImplementation(async () => ({ ...salida(), permisos: [fila] }));
+    repo.reemplazar.mockRejectedValueOnce(new Error("fallo de la base"));
+
+    await expect(new ReemplazoService().confirmarReemplazo(2, dto, "a")).rejects.toThrow("fallo de la base");
+    const r = await new ReemplazoService().confirmarReemplazo(2, dto, "a");
+
+    expect(r.permisoNuevo).toMatch(/^PER-/);
+  });
+
   it("FA2: no permite reemplazar en una salida que ya inició", async () => {
     repo.buscarSalida.mockResolvedValue({ ...salida(), estado: "EN_CURSO" });
 

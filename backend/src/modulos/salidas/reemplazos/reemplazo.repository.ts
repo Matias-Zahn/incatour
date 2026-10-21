@@ -21,10 +21,11 @@ export class ReemplazoRepository {
   }
 
   // Si la autoridad dio de baja el permiso pero falló la emisión del nuevo, queda registrado para el reintento
-  async marcarPermisoDadoDeBaja(idpermisopersonal: number) {
+  // nroPermiso: si el lugar lo ocupa ahora otro permiso (el nuevo, dado de baja), la fila pasa a apuntar a ese
+  async marcarPermisoDadoDeBaja(idpermisopersonal: number, nroPermiso?: string) {
     return db.permisoPersonal.update({
       where: { idpermisopersonal },
-      data: { estadoTramite: ESTADO_PERMISO.DADO_DE_BAJA },
+      data: { estadoTramite: ESTADO_PERMISO.DADO_DE_BAJA, ...(nroPermiso && { nroPermiso }) },
     });
   }
 
