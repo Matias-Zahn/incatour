@@ -1,12 +1,20 @@
 import { delay, http, HttpResponse } from "msw";
 import { construirUrl } from "../../services/clienteApi";
-import { exigirRol } from "../autorizacion";
+import { cuentasMock, exigirRol } from "../autorizacion";
 import type {
     CrearReservaPayload,
     PaqueteCatalogoPublico,
     ResultadoReservaConfirmada,
     SalidaDisponibleCatalogo,
 } from "../../services/catalogoCompraService";
+import type {
+    ComprobanteReserva,
+    RegistrarClientePayload,
+    ReservaClienteDetalle,
+    ReservaClienteResumen,
+    ResultadoCancelacionReserva,
+    ResumenCancelacionReserva,
+} from "../../services/clientePortalService";
 
 const salidasPorPaqueteMock: Record<number, SalidaDisponibleCatalogo[]> = {
     1: [
@@ -155,9 +163,272 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
     },
 ];
 
+// Reservas semilla en memoria alineadas con backend/prisma/seed.ts
+export const reservasClienteMock: ReservaClienteDetalle[] = [
+    {
+        idreserva: 1,
+        nroReserva: "RES-0001",
+        estado: "CONFIRMADA",
+        estadoAlojamiento: "PENDIENTE",
+        fechaRealizacion: "2026-10-02T12:00:00.000Z",
+        cantidadPasajeros: 1,
+        precioCongelado: 1500,
+        condicionesComerciales:
+            "Incluye traslados desde Cusco y pensión completa en ruta.",
+        pagado: 1500,
+        titular: {
+            nombre: "Juan",
+            apellido: "Pérez",
+            email: "juan@test.com",
+        },
+        salida: {
+            idsalida: 1,
+            nroSalida: "SAL-2026-001",
+            estado: "PUBLICADA",
+            fechaInicio: "2026-11-15T00:00:00.000Z",
+            fechaFin: "2026-11-18T00:00:00.000Z",
+        },
+        paquete: {
+            idpaquete: 1,
+            nombrePaquete: "Inca Clásico Standard",
+        },
+        itinerario: {
+            nombreCircuito: "Camino del Inca Clásico",
+            duracionDias: 4,
+            etapas: [
+                {
+                    numeroOrden: 1,
+                    puntoInicio: "Km 82",
+                    puntoFin: "Wayllabamba",
+                    campamentoPrevisto: "Wayllabamba Camp",
+                },
+                {
+                    numeroOrden: 2,
+                    puntoInicio: "Wayllabamba",
+                    puntoFin: "Pacaymayo",
+                    campamentoPrevisto: "Pacaymayo Camp",
+                },
+            ],
+        },
+        pasajeros: [
+            {
+                idpasajero: 1,
+                nombreCompleto: "Lucía Fernández",
+                nroPasaporte: "PAS-ARG-987654",
+                nacionalidad: "Argentina",
+            },
+        ],
+        pagos: [
+            {
+                idpago: 1,
+                nrotransaccion: "TXN-SEED-0001",
+                monto: 1500,
+                medioPago: "Tarjeta de Crédito",
+                fechahora: "2026-10-02T12:00:00.000Z",
+            },
+        ],
+        reembolsos: [],
+        solicitudesAlojamiento: [
+            {
+                nroSolicitud: "SOL-0001",
+                estado: "PENDIENTE",
+                cantidadPlazas: 1,
+            },
+        ],
+        permisos: [
+            {
+                idpasajero: 1,
+                nroPermiso: "PERM-PAS-001",
+                estadoTramite: "Emitido",
+                fechaEmision: "2026-10-02T12:00:00.000Z",
+            },
+        ],
+    },
+    {
+        idreserva: 2,
+        nroReserva: "RES-0002-CANC",
+        estado: "CANCELADA",
+        estadoAlojamiento: "PENDIENTE",
+        fechaRealizacion: "2026-10-01T15:30:00.000Z",
+        cantidadPasajeros: 1,
+        precioCongelado: 1500,
+        condicionesComerciales:
+            "Incluye traslados desde Cusco y pensión completa en ruta.",
+        pagado: 1500,
+        titular: {
+            nombre: "Juan",
+            apellido: "Pérez",
+            email: "juan@test.com",
+        },
+        salida: {
+            idsalida: 1,
+            nroSalida: "SAL-2026-001",
+            estado: "PUBLICADA",
+            fechaInicio: "2026-11-15T00:00:00.000Z",
+            fechaFin: "2026-11-18T00:00:00.000Z",
+        },
+        paquete: {
+            idpaquete: 1,
+            nombrePaquete: "Inca Clásico Standard",
+        },
+        itinerario: {
+            nombreCircuito: "Camino del Inca Clásico",
+            duracionDias: 4,
+            etapas: [
+                {
+                    numeroOrden: 1,
+                    puntoInicio: "Km 82",
+                    puntoFin: "Wayllabamba",
+                    campamentoPrevisto: "Wayllabamba Camp",
+                },
+                {
+                    numeroOrden: 2,
+                    puntoInicio: "Wayllabamba",
+                    puntoFin: "Pacaymayo",
+                    campamentoPrevisto: "Pacaymayo Camp",
+                },
+            ],
+        },
+        pasajeros: [
+            {
+                idpasajero: 1,
+                nombreCompleto: "Lucía Fernández",
+                nroPasaporte: "PAS-ARG-987654",
+                nacionalidad: "Argentina",
+            },
+        ],
+        pagos: [
+            {
+                idpago: 2,
+                nrotransaccion: "TXN-SEED-0002",
+                monto: 1500,
+                medioPago: "Tarjeta de Crédito",
+                fechahora: "2026-10-01T15:30:00.000Z",
+            },
+        ],
+        reembolsos: [
+            {
+                idreembolso: 1,
+                montoReembolsado: 1500,
+                motivo: "Cancelación temprana sin permisos emitidos",
+                fechaReembolso: "2026-10-03T09:00:00.000Z",
+            },
+        ],
+        solicitudesAlojamiento: [],
+        permisos: [],
+    },
+];
+
 let proximoIdReserva = 100;
+let proximoIdReembolso = 10;
+let proximoIdUsuario = 50;
+let proximoIdCliente = 50;
+
+function resumirReservaMock(r: ReservaClienteDetalle): ReservaClienteResumen {
+    const reintegro =
+        r.reembolsos.length > 0
+            ? r.reembolsos.reduce((acc, x) => acc + x.montoReembolsado, 0)
+            : null;
+    return {
+        idreserva: r.idreserva,
+        nroReserva: r.nroReserva,
+        estado: r.estado,
+        estadoAlojamiento: r.estadoAlojamiento,
+        fechaRealizacion: r.fechaRealizacion,
+        cantidadPasajeros: r.cantidadPasajeros,
+        precioCongelado: r.precioCongelado,
+        pagado: r.pagado,
+        reintegro,
+        salida: r.salida,
+        paquete: r.paquete,
+    };
+}
 
 export const manejadoresCatalogoReservas = [
+    // CU-27: POST /api/clientes (registro público de cliente)
+    http.post(construirUrl("/clientes"), async ({ request }) => {
+        await delay(200);
+        const body = (await request.json()) as Partial<RegistrarClientePayload>;
+        const nombre = body.nombre?.trim() ?? "";
+        const apellido = body.apellido?.trim() ?? "";
+        const email = body.email?.trim().toLowerCase() ?? "";
+        const contrasenia = body.contrasenia ?? "";
+
+        const letrasRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!email || !emailRegex.test(email)) {
+            return HttpResponse.json(
+                { error: "El formato del correo electrónico no es válido" },
+                { status: 400 },
+            );
+        }
+        if (!contrasenia || contrasenia.length < 8) {
+            return HttpResponse.json(
+                { error: "La contraseña debe tener como mínimo 8 caracteres" },
+                { status: 400 },
+            );
+        }
+        if (!nombre || nombre.length > 64 || !letrasRegex.test(nombre)) {
+            return HttpResponse.json(
+                { error: "El nombre solo puede contener letras y espacios" },
+                { status: 400 },
+            );
+        }
+        if (!apellido || apellido.length > 64 || !letrasRegex.test(apellido)) {
+            return HttpResponse.json(
+                { error: "El apellido solo puede contener letras y espacios" },
+                { status: 400 },
+            );
+        }
+
+        const existe = cuentasMock.some(
+            (c) => c.usuario.email.toLowerCase() === email,
+        );
+        if (existe) {
+            return HttpResponse.json(
+                {
+                    error: "Ya existe un usuario registrado con ese correo electrónico.",
+                },
+                { status: 400 },
+            );
+        }
+
+        const idusuario = proximoIdUsuario++;
+        const idcliente = proximoIdCliente++;
+        const nroCliente = `CLI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        cuentasMock.push({
+            contrasenia,
+            usuario: {
+                idusuario,
+                email,
+                nombre,
+                apellido,
+                rol: "CLIENTE",
+            },
+        });
+
+        return HttpResponse.json(
+            {
+                mensaje: "Cliente creado con éxito",
+                data: {
+                    cliente: {
+                        idcliente,
+                        idusuario,
+                        nroCliente,
+                        estado: "ACTIVO",
+                    },
+                    idusuario,
+                    nombre,
+                    apellido,
+                    email,
+                },
+            },
+            { status: 201 },
+        );
+    }),
+
     // CU-26: GET /api/catalogo
     http.get(construirUrl("/catalogo"), async () => {
         await delay(150);
@@ -171,6 +442,271 @@ export const manejadoresCatalogoReservas = [
             data,
         });
     }),
+
+    // CU-31: GET /api/reservas/mis-reservas
+    http.get(construirUrl("/reservas/mis-reservas"), async ({ request }) => {
+        const denegado = exigirRol(request, "CLIENTE");
+        if (denegado) return denegado;
+        await delay(150);
+
+        const url = new URL(request.url);
+        const estadoFiltro = url.searchParams.get("estado");
+
+        const filtradas = reservasClienteMock
+            .filter((r) => !estadoFiltro || r.estado === estadoFiltro)
+            .map(resumirReservaMock);
+
+        return HttpResponse.json({ data: filtradas });
+    }),
+
+    // CU-31: GET /api/reservas/:idreserva/comprobante
+    http.get(
+        construirUrl("/reservas/:idreserva/comprobante"),
+        async ({ request, params }) => {
+            const denegado = exigirRol(request, "CLIENTE");
+            if (denegado) return denegado;
+            await delay(150);
+
+            const idreserva = Number(params.idreserva);
+            const reserva = reservasClienteMock.find(
+                (r) => r.idreserva === idreserva,
+            );
+            if (!reserva) {
+                return HttpResponse.json(
+                    { error: `No se encontró la reserva con ID ${idreserva}.` },
+                    { status: 404 },
+                );
+            }
+
+            const reintegro =
+                reserva.reembolsos.length > 0
+                    ? reserva.reembolsos.reduce(
+                          (acc, x) => acc + x.montoReembolsado,
+                          0,
+                      )
+                    : null;
+
+            const comprobante: ComprobanteReserva = {
+                nroReserva: reserva.nroReserva,
+                fechaRealizacion: reserva.fechaRealizacion,
+                estado: reserva.estado,
+                titular: reserva.titular,
+                paquete: reserva.paquete.nombrePaquete,
+                salida: {
+                    nroSalida: reserva.salida.nroSalida,
+                    fechaInicio: reserva.salida.fechaInicio,
+                    fechaFin: reserva.salida.fechaFin,
+                },
+                pasajeros: reserva.pasajeros.map((p) => p.nombreCompleto),
+                precioCongelado: reserva.precioCongelado,
+                condicionesComerciales: reserva.condicionesComerciales,
+                pagos: reserva.pagos.map((p) => ({
+                    nroTransaccion: p.nrotransaccion,
+                    monto: p.monto,
+                    medioPago: p.medioPago,
+                    fechahora: p.fechahora,
+                })),
+                totalPagado: reserva.pagado,
+                reintegro,
+            };
+
+            return HttpResponse.json({ data: comprobante });
+        },
+    ),
+
+    // CU-32 (paso 1): GET /api/reservas/:idreserva/cancelacion
+    http.get(
+        construirUrl("/reservas/:idreserva/cancelacion"),
+        async ({ request, params }) => {
+            const denegado = exigirRol(request, "CLIENTE");
+            if (denegado) return denegado;
+            await delay(150);
+
+            const idreserva = Number(params.idreserva);
+            const reserva = reservasClienteMock.find(
+                (r) => r.idreserva === idreserva,
+            );
+            if (!reserva) {
+                return HttpResponse.json(
+                    { error: `No se encontró la reserva con ID ${idreserva}.` },
+                    { status: 404 },
+                );
+            }
+
+            if (reserva.estado !== "CONFIRMADA") {
+                return HttpResponse.json(
+                    {
+                        error: "Solo se pueden cancelar reservas en estado Confirmada.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const salidaIniciada =
+                new Date(reserva.salida.fechaInicio) <= new Date() ||
+                ["EN_CURSO", "FINALIZADA", "CANCELADA"].includes(
+                    reserva.salida.estado,
+                );
+            if (salidaIniciada) {
+                return HttpResponse.json(
+                    {
+                        error: "Las salidas en curso o finalizadas no admiten cancelaciones.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const permisosEmitidos = reserva.permisos.some(
+                (p) => p.estadoTramite === "Emitido",
+            );
+            const importeAbonado = reserva.pagado;
+            const montoAReintegrar = permisosEmitidos ? 0 : importeAbonado;
+
+            const resumen: ResumenCancelacionReserva = {
+                idreserva,
+                nroReserva: reserva.nroReserva,
+                importeAbonado,
+                montoAReintegrar,
+                permisosEmitidos,
+                lugaresVuelvenALaVenta: !permisosEmitidos,
+                advertencia: permisosEmitidos
+                    ? "Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $0 y los lugares no vuelven a la venta."
+                    : null,
+            };
+
+            return HttpResponse.json({ data: resumen });
+        },
+    ),
+
+    // CU-32 (paso 2): POST /api/reservas/:idreserva/cancelar
+    http.post(
+        construirUrl("/reservas/:idreserva/cancelar"),
+        async ({ request, params }) => {
+            const denegado = exigirRol(request, "CLIENTE");
+            if (denegado) return denegado;
+            await delay(200);
+
+            const idreserva = Number(params.idreserva);
+            const reserva = reservasClienteMock.find(
+                (r) => r.idreserva === idreserva,
+            );
+            if (!reserva) {
+                return HttpResponse.json(
+                    { error: `No se encontró la reserva con ID ${idreserva}.` },
+                    { status: 404 },
+                );
+            }
+
+            if (reserva.estado !== "CONFIRMADA") {
+                return HttpResponse.json(
+                    {
+                        error: "Solo se pueden cancelar reservas en estado Confirmada.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const salidaIniciada =
+                new Date(reserva.salida.fechaInicio) <= new Date() ||
+                ["EN_CURSO", "FINALIZADA", "CANCELADA"].includes(
+                    reserva.salida.estado,
+                );
+            if (salidaIniciada) {
+                return HttpResponse.json(
+                    {
+                        error: "Las salidas en curso o finalizadas no admiten cancelaciones.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const body = (await request.json().catch(() => ({}))) as {
+                motivo?: string;
+            };
+            const motivo = body.motivo?.trim() || "Sin motivo informado";
+            if (motivo.length > 300) {
+                return HttpResponse.json(
+                    { error: "motivo debe ser un texto de hasta 300 caracteres." },
+                    { status: 400 },
+                );
+            }
+
+            const permisosEmitidos = reserva.permisos.some(
+                (p) => p.estadoTramite === "Emitido",
+            );
+            const montoReembolsado = permisosEmitidos ? 0 : reserva.pagado;
+
+            reserva.estado = "CANCELADA";
+            if (permisosEmitidos) {
+                reserva.permisos.forEach((p) => {
+                    if (p.estadoTramite === "Emitido") {
+                        p.estadoTramite = "Perdido";
+                    }
+                });
+            } else {
+                const todasSalidas = Object.values(salidasPorPaqueteMock).flat();
+                const salidaCatalogo = todasSalidas.find(
+                    (s) => s.idsalida === reserva.salida.idsalida,
+                );
+                if (salidaCatalogo) {
+                    salidaCatalogo.stockLocal += reserva.cantidadPasajeros;
+                }
+            }
+
+            reserva.solicitudesAlojamiento.forEach((s) => {
+                if (s.estado === "PENDIENTE" || s.estado === "CONFIRMADA") {
+                    s.estado = "CANCELADA";
+                }
+            });
+
+            const nuevoReembolso = {
+                idreembolso: proximoIdReembolso++,
+                montoReembolsado,
+                motivo,
+                fechaReembolso: new Date().toISOString(),
+            };
+            reserva.reembolsos.push(nuevoReembolso);
+
+            const resultado: ResultadoCancelacionReserva = {
+                idreserva,
+                nroReserva: reserva.nroReserva,
+                estado: "CANCELADA",
+                lugaresVuelvenALaVenta: !permisosEmitidos,
+                reembolso: {
+                    ...nuevoReembolso,
+                    nota: "La acreditación del dinero se ejecuta por fuera del sistema.",
+                },
+            };
+
+            return HttpResponse.json({
+                mensaje: "Reserva cancelada exitosamente",
+                data: resultado,
+            });
+        },
+    ),
+
+    // CU-31: GET /api/reservas/:idreserva (detalle)
+    http.get(
+        construirUrl("/reservas/:idreserva"),
+        async ({ request, params }) => {
+            const denegado = exigirRol(request, "CLIENTE");
+            if (denegado) return denegado;
+            await delay(150);
+
+            const idreserva = Number(params.idreserva);
+            const reserva = reservasClienteMock.find(
+                (r) => r.idreserva === idreserva,
+            );
+            if (!reserva) {
+                return HttpResponse.json(
+                    { error: `No se encontró la reserva con ID ${idreserva}.` },
+                    { status: 404 },
+                );
+            }
+
+            return HttpResponse.json({ data: reserva });
+        },
+    ),
 
     // CU-30: POST /api/reservas
     http.post(construirUrl("/reservas"), async ({ request }) => {
@@ -298,15 +834,88 @@ export const manejadoresCatalogoReservas = [
             .toUpperCase()
             .includes("ESTABLECIMIENTO");
 
+        const estadoAlojamiento = esEstablecimiento
+            ? "CONFIRMADO"
+            : "PENDIENTE";
+        const nroTransaccion = `TXN-${sufijo}`;
+        const ahoraIso = new Date().toISOString();
+
+        // Guardar también en reservasClienteMock para que aparezca en CU-31 y CU-32
+        reservasClienteMock.unshift({
+            idreserva,
+            nroReserva,
+            estado: "CONFIRMADA",
+            estadoAlojamiento,
+            fechaRealizacion: ahoraIso,
+            cantidadPasajeros: body.pasajeros.length,
+            precioCongelado,
+            condicionesComerciales: paquete?.condiciones ?? null,
+            pagado: precioCongelado,
+            titular: {
+                nombre: "Juan",
+                apellido: "Pérez",
+                email: "juan@test.com",
+            },
+            salida: {
+                idsalida: salida.idsalida,
+                nroSalida: salida.nroSalida,
+                estado: "PUBLICADA",
+                fechaInicio: salida.fechaInicio,
+                fechaFin: salida.fechaFin,
+            },
+            paquete: {
+                idpaquete: paquete?.id ?? idPaquete,
+                nombrePaquete: paquete?.nombre ?? "Paquete IncaTour",
+            },
+            itinerario: {
+                nombreCircuito:
+                    paquete?.circuito.nombre ?? "Camino del Inca Clásico",
+                duracionDias: paquete?.circuito.dias ?? 4,
+                etapas: (paquete?.circuito.etapas ?? []).map((e) => ({
+                    numeroOrden: e.numeroOrden,
+                    puntoInicio: e.puntoInicio,
+                    puntoFin: e.puntoFin,
+                    campamentoPrevisto: e.campamentoPrevisto ?? null,
+                })),
+            },
+            pasajeros: body.pasajeros.map((p, idx) => ({
+                idpasajero: idreserva * 10 + idx + 1,
+                nombreCompleto: p.nombreCompleto,
+                nroPasaporte: p.nroPasaporte,
+                nacionalidad: p.nacionalidad,
+            })),
+            pagos: [
+                {
+                    idpago: idreserva,
+                    nrotransaccion: nroTransaccion,
+                    monto: precioCongelado,
+                    medioPago: body.medioPago,
+                    fechahora: ahoraIso,
+                },
+            ],
+            reembolsos: [],
+            solicitudesAlojamiento:
+                estadoAlojamiento === "PENDIENTE"
+                    ? [
+                          {
+                              nroSolicitud: `SOL-${nroReserva}`,
+                              estado: "PENDIENTE",
+                              cantidadPlazas: body.pasajeros.length,
+                          },
+                      ]
+                    : [],
+            permisos: [],
+        });
+
         const data: ResultadoReservaConfirmada = {
             idreserva,
             nroReserva,
             estado: "CONFIRMADA",
-            estadoAlojamiento: esEstablecimiento ? "CONFIRMADO" : "PENDIENTE",
+            estadoAlojamiento,
             cantidadPasajeros: body.pasajeros.length,
             precioCongelado,
             moneda: salida.moneda,
-            transaccionPasarela: `TXN-${sufijo}`,
+            transaccionPasarela: nroTransaccion,
         };
 
         return HttpResponse.json(

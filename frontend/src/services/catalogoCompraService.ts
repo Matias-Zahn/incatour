@@ -155,6 +155,12 @@ export function useCrearReservaPaquete() {
             queryClient.invalidateQueries({
                 queryKey: ["solicitudes"],
             });
+            queryClient.invalidateQueries({
+                queryKey: ["cliente-mis-reservas"],
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["cliente-historial-resenias"],
+            });
         },
     });
 }

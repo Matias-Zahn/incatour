@@ -1,6 +1,9 @@
 import LayoutCliente from "./components/LayoutCliente";
 import LayoutGestion from "./components/LayoutGestion";
 import CatalogoCompraPage from "./pages/cliente/CatalogoCompraPage";
+import MisReseniasPage from "./pages/cliente/MisReseniasPage";
+import MisReservasPage from "./pages/cliente/MisReservasPage";
+import RegistroClientePage from "./pages/cliente/RegistroClientePage";
 import CircuitosPage from "./pages/gestion/CircuitosPage";
 import CuentasGuiaPage from "./pages/gestion/CuentasGuiaPage";
 import EtapasPage from "./pages/gestion/EtapasPage";
@@ -23,6 +26,22 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
+          path="/registro"
+          element={
+            <LayoutCliente>
+              <RegistroClientePage />
+            </LayoutCliente>
+          }
+        />
+        <Route
+          path="/cliente/registro"
+          element={
+            <LayoutCliente>
+              <RegistroClientePage />
+            </LayoutCliente>
+          }
+        />
+        <Route
           path="/catalogo"
           element={
             <LayoutCliente>
@@ -30,6 +49,43 @@ function App() {
             </LayoutCliente>
           }
         />
+
+        {/* Rutas exclusivas del perfil CLIENTE (CU-31, CU-32, CU-47) */}
+        <Route element={<RutaProtegida roles={["CLIENTE"]} />}>
+          <Route
+            path="/mis-reservas"
+            element={
+              <LayoutCliente>
+                <MisReservasPage />
+              </LayoutCliente>
+            }
+          />
+          <Route
+            path="/cliente/reservas"
+            element={
+              <LayoutCliente>
+                <MisReservasPage />
+              </LayoutCliente>
+            }
+          />
+          <Route
+            path="/mis-resenias"
+            element={
+              <LayoutCliente>
+                <MisReseniasPage />
+              </LayoutCliente>
+            }
+          />
+          <Route
+            path="/cliente/resenias"
+            element={
+              <LayoutCliente>
+                <MisReseniasPage />
+              </LayoutCliente>
+            }
+          />
+        </Route>
+
         {/* Rutas exclusivas del perfil GUÍA (CU-48, CU-49, CU-50) */}
         <Route element={<RutaProtegida roles={["GUIA"]} />}>
           <Route path="/guia" element={<PortalGuiaPage />} />
