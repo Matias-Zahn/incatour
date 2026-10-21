@@ -278,7 +278,9 @@ async function faseC() {
   const libre = await paso("Crear temporada sin tarifas (CU-07)", "POST", "/temporadas", { nombre: `Humo ${t} libre`, fechaInicio: "2027-08-01", fechaFin: "2027-08-31" });
   await paso("Baja temporada (CU-09)", "PATCH", `/temporadas/${idDe(libre, "idtemporada")}/baja`);
   await paso("Baja circuito (CU-04)", "PATCH", `/circuitos/${idcircuito}/baja`);
-  await paso("Baja cliente (CU-29)", "PATCH", `/clientes/${idDe(cliente, "idcliente")}/baja`);
+  // El cliente del flujo tiene reservas activas (no se puede dar de baja): se usa uno nuevo
+  const sinReservas = await paso("Registrar cliente sin reservas (CU-27)", "POST", "/clientes", { email: `baja.${t.toLowerCase()}@humo.com`, contrasenia: "clienteHumo123", nombre: "Bruno", apellido: "Humo" }, "");
+  await paso("Baja cliente (CU-29)", "PATCH", `/clientes/${idDe(sinReservas, "idcliente")}/baja`);
 }
 
 // Fase D: usa AutoridadSimulada directo contra la base de la prueba (nunca incatour_db)
