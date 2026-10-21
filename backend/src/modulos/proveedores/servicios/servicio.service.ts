@@ -1,122 +1,90 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
-import { CAMPOS_MODIFICAR, CrearServicioDto, FiltrosServicioDto, ModificarServicioDto } from "./servicio.dto";
+import { ESTADO } from "../../../shared/constantes";
+import { CrearServicioDto, FiltrosServicioDto, ModificarServicioDto } from "./servicio.dto";
 import { ServicioRepository } from "./servicio.repository";
+import { TIPO_SERVICIO, TipoServicio, MODALIDAD_BLOQUEO_PLAZAS } from "../../../shared/constantes";
 
 type ServicioCompleto = NonNullable<Awaited<ReturnType<ServicioRepository["findById"]>>>;
 
-const CAMPOS_BASE_EDITABLES = ["nombreServicio", "descripcion", "costoBase", "localidad"];
-
 export class ServicioService {
-  private repository: ServicioRepository;
+  private repository = new ServicioRepository();
 
-  constructor() {
-    this.repository = new ServicioRepository();
+  // CU-18: Consultar servicios
+  async consultarServicios(filtros: FiltrosServicioDto) {
+    const servicios = await this.repository.findServicios(filtros);
+    const equipamientos = servicios.filter((s) => s.equipamiento !== null).map((s) => s.idservicio);
+    const mapaComprometidas = await this.repository.comprometidasPorServicio(equipamientos);
+
+    return servicios.map((s) => this.formatear(s, mapaComprometidas.get(s.idservicio) ?? 0));
   }
 
-  // CU-18: Consultar servicios de un proveedor
-  async consultarServiciosProveedor(idproveedor: number, filtros: FiltrosServicioDto) {
+  // CU-19: Alta de servicio
+  async crearServicio(idproveedor: number, dto: CrearServicioDto) {
     const proveedor = await this.repository.findProveedor(idproveedor);
     if (!proveedor) throw CustomError.notFound(`No se encontró el proveedor con ID ${idproveedor}.`);
-
-    const servicios = await this.repository.findByProveedor(idproveedor, filtros.estado);
-    const idsEquipamiento = servicios.filter((s) => s.equipamiento).map((s) => s.idservicio);
-    const comprometidas = await this.repository.comprometidasPorServicio(idsEquipamiento);
-
-    return servicios.map((s) => this.formatear(s, comprometidas.get(s.idservicio) ?? 0));
-  }
-
-  // DCD: solicitarEdicionServicio. Devuelve los datos actuales + qué se puede editar y qué restricciones hay.
-  async obtenerServicio(id: number) {
-    const servicio = await this.buscarOFallar(id);
-    const tipo = tipoDeServicio(servicio) as TipoServicio;
-
-    const comprometida = tipo === TIPO_SERVICIO.EQUIPAMIENTO ? await this.repository.cantidadComprometida(id) : 0;
-    const enUso = (await this.repository.contarSalidasActivas(id)) > 0;
-    const garantiza = (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0;
-
-    return {
-      ...this.formatear(servicio, comprometida),
-      edicion: {
-        camposEditables: [...CAMPOS_BASE_EDITABLES, ...Object.keys(CAMPOS_MODIFICAR[tipo])],
-        enUsoEnSalidasActivas: enUso,
-        garantizaPaquetesActivos: garantiza,
-        // Si está en uso, un cambio estructural genera una versión nueva (rige solo para salidas futuras)
-        aplicaSoloAFuturasSalidas:
-          enUso && (tipo === TIPO_SERVICIO.ALOJAMIENTO || tipo === TIPO_SERVICIO.TRANSPORTE),
-      },
-    };
-  }
-
-  // CU-19: Registrar servicio de un proveedor
-  async registrarServicio(idproveedor: number, dto: CrearServicioDto) {
-    const proveedor = await this.repository.findProveedor(idproveedor);
-    if (!proveedor) throw CustomError.notFound(`No se encontró el proveedor con ID ${idproveedor}.`);
-
-    // CU-17: un proveedor dado de baja queda inhabilitado para nuevos servicios
     if (proveedor.estado !== ESTADO.ACTIVO) {
-      throw CustomError.badRequest("No se pueden registrar servicios para un proveedor inactivo.");
+      throw CustomError.badRequest("No se pueden dar de alta servicios para un proveedor dado de baja.");
     }
-    // El rubro del servicio debe coincidir con el del proveedor
-    if (proveedor.tipoProveedor !== dto.tipo) {
+
+    // Regla de negocio: el servicio debe corresponder al rubro del proveedor
+    if (dto.tipo !== proveedor.tipoProveedor) {
       throw CustomError.badRequest(
-        `El proveedor es de tipo ${proveedor.tipoProveedor}: solo puede registrar servicios de ese tipo.`
+        `El tipo de servicio (${dto.tipo}) no coincide con el rubro del proveedor (${proveedor.tipoProveedor}).`
       );
     }
-    if (await this.repository.existeNombre(idproveedor, dto.base.nombreServicio)) {
-      throw CustomError.badRequest(`El proveedor ya tiene un servicio activo llamado "${dto.base.nombreServicio}".`);
+
+    // Unicidad de nombre de servicio por proveedor (activos)
+    if (await this.repository.existeNombreEnProveedor(dto.base.nombreServicio, idproveedor)) {
+      throw CustomError.badRequest(
+        `El proveedor ya tiene un servicio activo con el nombre "${dto.base.nombreServicio}".`
+      );
     }
 
     const creado = await this.repository.create(idproveedor, dto);
     return this.formatear(creado, 0);
   }
 
-  // CU-20: Modificar servicio de un proveedor
+  // CU-20: Modificar servicio
   async modificarServicio(id: number, dto: ModificarServicioDto) {
     const servicio = await this.buscarOFallar(id);
     if (servicio.estado !== ESTADO.ACTIVO) {
-      throw CustomError.badRequest("No se puede modificar un servicio que está dado de baja.");
-    }
-    const tipo = tipoDeServicio(servicio) as TipoServicio;
-
-    // 1. Solo se aceptan campos que correspondan al rubro del servicio
-    const permitidos = Object.keys(CAMPOS_MODIFICAR[tipo]);
-    const ajenos = Object.keys(dto.especifico).filter((c) => !permitidos.includes(c));
-    if (ajenos.length > 0) {
-      throw CustomError.badRequest(`Los campos ${ajenos.join(", ")} no corresponden a un servicio de tipo ${tipo}.`);
+      throw CustomError.badRequest("No se puede modificar un servicio dado de baja.");
     }
 
+    const tipo = dto.tipo;
+    const especifico = dto.especifico;
     const actual = this.datosEspecificos(servicio, tipo);
-    let especifico: { [k: string]: any } = { ...dto.especifico };
 
-    // 2. Equipamiento: el stock es el inventario físico real (CU-20). No puede quedar debajo de lo comprometido.
-    if (tipo === TIPO_SERVICIO.EQUIPAMIENTO && especifico.inventarioTotal !== undefined) {
-      const comprometida = await this.repository.cantidadComprometida(id);
-      const total = especifico.inventarioTotal as number;
-      if (total < comprometida) {
-        throw CustomError.badRequest(
-          `La nueva cantidad (${total}) es inferior a la comprometida en salidas activas (${comprometida}).`
-        );
-      }
-      const { inventarioTotal, ...resto } = especifico;
-      // cantidadDisponible guarda lo que queda libre: inventario total menos lo ya comprometido
-      especifico = { ...resto, cantidadDisponible: total - comprometida };
+    // 1. Unicidad de nombre si cambió
+    if (
+      dto.base.nombreServicio !== undefined &&
+      dto.base.nombreServicio !== servicio.nombreServicio &&
+      (await this.repository.existeNombreEnProveedor(dto.base.nombreServicio, servicio.idproveedor, id))
+    ) {
+      throw CustomError.badRequest(
+        `El proveedor ya tiene un servicio activo con el nombre "${dto.base.nombreServicio}".`
+      );
     }
 
-    // 3. Un alojamiento garantizado por un paquete activo no puede quedar fuera de la garantía
-    if (tipo === TIPO_SERVICIO.ALOJAMIENTO && (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0) {
-      const cambiaCriterio =
-        (dto.base.localidad !== undefined && dto.base.localidad !== servicio.localidad) ||
-        (especifico.categoria !== undefined && especifico.categoria !== actual.categoria) ||
-        (especifico.tipoHabitacion !== undefined && especifico.tipoHabitacion !== actual.tipoHabitacion);
-      if (cambiaCriterio) {
+    // 2. Equipamiento: no se puede reducir stock por debajo de lo comprometido en salidas activas
+    if (tipo === TIPO_SERVICIO.EQUIPAMIENTO && especifico.cantidadDisponible !== undefined) {
+      const comprometida = await this.repository.cantidadComprometida(id);
+      if (especifico.cantidadDisponible < comprometida) {
         throw CustomError.badRequest(
-          "El servicio es el establecimiento garantizado por un paquete activo: no se pueden cambiar su localidad, categoría ni tipo de habitación. Modificá primero el paquete."
+          `No se puede reducir el stock a ${especifico.cantidadDisponible}: hay ${comprometida} unidad(es) comprometida(s) en salidas activas o en curso.`
         );
       }
+    }
+
+    // 3. Alojamiento: no se puede pasar a A_SOLICITUD si es garantía de un paquete activo (CU-20, regla de negocio)
+    if (
+      tipo === TIPO_SERVICIO.ALOJAMIENTO &&
+      especifico.modalidadConfirmacion !== undefined &&
+      especifico.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS
+    ) {
       if (
-        especifico.modalidadConfirmacion !== undefined &&
-        especifico.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS
+        (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0 &&
+        actual.modalidadConfirmacion === MODALIDAD_BLOQUEO_PLAZAS
       ) {
         throw CustomError.badRequest(
           "Un establecimiento garantizado por un paquete debe mantener la modalidad de bloqueo de plazas."
@@ -163,6 +131,14 @@ export class ServicioService {
       throw CustomError.badRequest("Error. El servicio es el establecimiento garantizado por un paquete activo");
     }
 
+    // CAT-09: No permitir la baja de un servicio si está incluido en paquetes activos
+    const paquetesActivosConServicio = await this.repository.contarPaquetesActivosQueLoIncluyen(id);
+    if (paquetesActivosConServicio > 0) {
+      throw CustomError.badRequest(
+        `Error. El servicio está incluido en ${paquetesActivosConServicio} paquete(s) activo(s).`
+      );
+    }
+
     const baja = await this.repository.updateEstado(id, ESTADO.INACTIVO);
     return this.formatear(baja, 0);
   }
@@ -180,44 +156,37 @@ export class ServicioService {
       : tipo === TIPO_SERVICIO.TRANSPORTE ? s.transporte
       : tipo === TIPO_SERVICIO.TREN ? s.tren
       : s.equipamiento;
-    const { idservicio, ...datos } = sub ?? {};
-    return datos;
+    const { idservicio, ...resto } = sub ?? {};
+    return resto;
   }
 
   private formatear(s: ServicioCompleto, comprometida: number) {
-    const tipo = tipoDeServicio(s) as TipoServicio;
-    const datos = this.datosEspecificos(s, tipo);
+    const { idproveedor, proveedor, alojamiento, transporte, tren, equipamiento, ...base } = s;
+    const tipo =
+      alojamiento ? TIPO_SERVICIO.ALOJAMIENTO
+      : transporte ? TIPO_SERVICIO.TRANSPORTE
+      : tren ? TIPO_SERVICIO.TREN
+      : TIPO_SERVICIO.EQUIPAMIENTO;
 
-    let disponibilidad: { [k: string]: number | string };
-    switch (tipo) {
-      case TIPO_SERVICIO.EQUIPAMIENTO:
-        disponibilidad = {
-          cantidadDisponible: datos.cantidadDisponible,
-          cantidadComprometida: comprometida,
-          inventarioTotal: datos.cantidadDisponible + comprometida,
-        };
-        break;
-      case TIPO_SERVICIO.ALOJAMIENTO:
-        disponibilidad = { capacidadDisponible: datos.capacidadDisponible, modalidadConfirmacion: datos.modalidadConfirmacion };
-        break;
-      case TIPO_SERVICIO.TRANSPORTE:
-        disponibilidad = { capacidadVehiculo: datos.capacidadVehiculo };
-        break;
-      default:
-        disponibilidad = { diasOperacion: datos.diasOperacion };
-    }
+    const especifico = this.datosEspecificos(s, tipo);
+    const stock = equipamiento ? equipamiento.cantidadDisponible : null;
 
     return {
-      idservicio: s.idservicio,
+      ...base,
       tipo,
-      nombreServicio: s.nombreServicio,
-      descripcion: s.descripcion,
-      costoBase: s.costoBase,
-      localidad: s.localidad,
-      estado: s.estado,
-      proveedor: s.proveedor,
-      datos,
-      disponibilidad,
+      proveedor: {
+        idproveedor: proveedor.idproveedor,
+        razonSocial: proveedor.razonSocial,
+        localidad: proveedor.localidad,
+        tipoProveedor: proveedor.tipoProveedor,
+        estado: proveedor.estado,
+      },
+      ...especifico,
+      ...(stock !== null && {
+        cantidadDisponible: stock,
+        cantidadComprometida: comprometida,
+        cantidadLibre: Math.max(0, stock - comprometida),
+      }),
     };
   }
 }
