@@ -42,4 +42,26 @@ describe("PasarelaMock", () => {
     const r = await pagar(solicitud());
     expect(r.aprobado).toBe(true);
   });
+
+  describe("reembolsar", () => {
+    const reembolsar = async (id: any, monto = 100) => {
+      vi.useFakeTimers();
+      const promesa = new PasarelaMock().reembolsar(id, monto);
+      await vi.runAllTimersAsync();
+      return promesa;
+    };
+
+    it("es idempotente: repetir el mismo reembolso aprueba las dos veces", async () => {
+      expect((await reembolsar("TXN-0123456789AB")).aprobado).toBe(true);
+      expect((await reembolsar("TXN-0123456789AB")).aprobado).toBe(true);
+    });
+
+    it.each([["TXN-1"], [12345], [undefined]])("transacción inválida %o: rechaza sin tirar", async (id) => {
+      expect((await reembolsar(id)).aprobado).toBe(false);
+    });
+
+    it("monto inválido: rechaza", async () => {
+      expect((await reembolsar("TXN-0123456789AB", 0)).aprobado).toBe(false);
+    });
+  });
 });

@@ -109,16 +109,19 @@ export class ReservaService {
             },
       });
     } catch (error) {
-      // Cobramos pero no pudimos registrar: se devuelven los cupos y se deja rastro para
-      // gestionar el reintegro (IPasarelaPagos todavía no tiene una operación de reembolso).
+      // Cobramos pero no pudimos registrar: se devuelven los cupos y se anula el cobro
       await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
       console.error(
         `[CU-30] Pago aprobado (${pago.transaccionId}) sin reserva registrada para ${nroReserva}:`,
         error
       );
+      const reembolsado = await this.reembolsarSinFallar(
+        pago.transaccionId!, precio.total, dto.idsalida, nroReserva, cliente.usuario.email, error
+      );
       throw CustomError.internalServerError(
-        "El pago fue aprobado pero no pudimos registrar la reserva. Contactanos con el código " +
-          `${pago.transaccionId}.`
+        reembolsado
+          ? `No pudimos registrar la reserva. El cobro ${pago.transaccionId} fue anulado; podés reintentar la compra.`
+          : `El pago fue aprobado pero no pudimos registrar la reserva. Contactanos con el código ${pago.transaccionId}.`
       );
     }
 
@@ -176,6 +179,23 @@ export class ReservaService {
       await this.repository.liberarCupos(idsalida, cantidad, alojamientoReservado);
     } catch (e) {
       console.error(`[CU-30] No se pudieron liberar los cupos de la salida ${idsalida}:`, e);
+    }
+  }
+
+  // Compensación del cobro: si el reembolso no sale, queda registrado para reintentarlo a mano
+  private async reembolsarSinFallar(
+    transaccionId: string, monto: number, idsalida: number, nroReserva: string, email: string, causa: unknown
+  ) {
+    try {
+      const r = await this.pasarela.reembolsar(transaccionId, monto);
+      if (r.aprobado) return true;
+      throw new Error(r.mensaje);
+    } catch (e) {
+      console.error(`[CU-30] Reembolso pendiente de ${transaccionId} (${nroReserva}):`, e);
+      await this.repository
+        .registrarReembolsoPendiente({ idsalida, email, transaccionId, monto, nroReserva, causa: String(causa), error: String(e) })
+        .catch((e2) => console.error(`[CU-30] No se pudo registrar el reembolso pendiente de ${transaccionId}:`, e2));
+      return false;
     }
   }
 }

@@ -20,4 +20,5 @@ export interface RespuestaPago {
 
 export interface IPasarelaPagos {
   procesarPago(solicitud: SolicitudPago): Promise<RespuestaPago>;
+  reembolsar(transaccionId: string, monto: number): Promise<RespuestaPago>; // idempotente por transaccionId
 }

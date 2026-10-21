@@ -10,8 +10,9 @@ const { repo, pasarela, notificador } = vi.hoisted(() => ({
     reservarCupos: vi.fn(),
     liberarCupos: vi.fn(),
     confirmarReserva: vi.fn(),
+    registrarReembolsoPendiente: vi.fn(),
   },
-  pasarela: { procesarPago: vi.fn() },
+  pasarela: { procesarPago: vi.fn(), reembolsar: vi.fn() },
   notificador: { enviarEmailConfirmacion: vi.fn(), enviarEmailRechazo: vi.fn() },
 }));
 vi.mock("./reserva.repository", () => ({ ReservaRepository: class { constructor() { return repo; } } }));
@@ -80,6 +81,8 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       estadoAlojamiento: d.estadoAlojamiento, cantidadPasajeros: d.pasajeros.length, precioCongelado: d.precioCongelado,
     }));
     pasarela.procesarPago.mockResolvedValue({ aprobado: true, transaccionId: "TXN-1", mensaje: "ok" });
+    pasarela.reembolsar.mockResolvedValue({ aprobado: true, transaccionId: "TXN-1", mensaje: "ok" });
+    repo.registrarReembolsoPendiente.mockResolvedValue({});
     notificador.enviarEmailConfirmacion.mockResolvedValue(true);
     notificador.enviarEmailRechazo.mockResolvedValue(true);
   });
@@ -233,13 +236,42 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       expect(repo.confirmarReserva).not.toHaveBeenCalled();
     });
 
-    it("pago aprobado pero falla la base: libera los cupos e informa la transacción para el reintegro", async () => {
-      repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
-      repo.confirmarReserva.mockRejectedValue(new Error("fallo de la base"));
+    describe("pago aprobado pero falla la base", () => {
+      beforeEach(() => {
+        repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
+        repo.confirmarReserva.mockRejectedValue(new Error("fallo de la base"));
+      });
 
-      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("TXN-1") });
-      expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, false);
-      expect(notificador.enviarEmailConfirmacion).not.toHaveBeenCalled();
+      it("libera los cupos y reembolsa el cobro", async () => {
+        await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("anulado") });
+        expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, false);
+        expect(pasarela.reembolsar).toHaveBeenCalledWith("TXN-1", 1600);
+        expect(repo.registrarReembolsoPendiente).not.toHaveBeenCalled();
+        expect(notificador.enviarEmailConfirmacion).not.toHaveBeenCalled();
+      });
+
+      it("si el reembolso falla, queda registrado como pendiente e informa la transacción", async () => {
+        pasarela.reembolsar.mockRejectedValue(new Error("timeout"));
+
+        await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("TXN-1") });
+        expect(repo.registrarReembolsoPendiente).toHaveBeenCalledWith(
+          expect.objectContaining({ idsalida: 7, transaccionId: "TXN-1", monto: 1600, email: "ana@mail.com" })
+        );
+      });
+
+      it("si el reembolso es rechazado, también queda registrado", async () => {
+        pasarela.reembolsar.mockResolvedValue({ aprobado: false, mensaje: "no" });
+
+        await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500 });
+        expect(repo.registrarReembolsoPendiente).toHaveBeenCalledTimes(1);
+      });
+
+      it("si fallan el reembolso y el registro, igual informa la transacción", async () => {
+        pasarela.reembolsar.mockRejectedValue(new Error("timeout"));
+        repo.registrarReembolsoPendiente.mockRejectedValue(new Error("base caída"));
+
+        await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("TXN-1") });
+      });
     });
 
     it("si también falla la liberación de cupos, se conserva el error original", async () => {

@@ -135,4 +135,16 @@ export class ReservaRepository {
       });
     });
   }
+
+  // RES-02: pago aprobado sin reserva y sin reembolso; se consulta en RegistroAuditoria con accion REEMBOLSO_PENDIENTE
+  async registrarReembolsoPendiente(d: { idsalida: number; email: string; transaccionId: string; monto: number; nroReserva: string; causa: string; error: string }) {
+    return db.registroAuditoria.create({
+      data: {
+        idsalida: d.idsalida,
+        usuario: d.email,
+        motivo: "Reembolso pendiente: pago aprobado sin reserva registrada",
+        cambios: { accion: "REEMBOLSO_PENDIENTE", transaccionId: d.transaccionId, monto: d.monto, nroReserva: d.nroReserva, causa: d.causa, error: d.error },
+      },
+    });
+  }
 }
