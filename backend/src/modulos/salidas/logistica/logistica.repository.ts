@@ -232,12 +232,14 @@ export class LogisticaRepository {
   }
 
   /** Devuelve el motivo por el que el transporte no puede asignarse, o null si está disponible. */
-  private async motivoTransporteNoDisponible(
+  async motivoTransporteNoDisponible(
     tx: Cliente,
     idservicio: number,
     salida: SalidaFechas,
     pasajeros: number
   ): Promise<string | null> {
+    // Lock del servicio: dos asignaciones del mismo transporte se serializan (orden: Salida, Personal, ServicioBase)
+    await tx.$queryRaw`SELECT 1 FROM public."ServicioBase" WHERE idservicio = ${idservicio} FOR UPDATE`;
     const servicio = await tx.servicioBase.findUnique({
       where: { idservicio },
       include: { transporte: true, proveedor: { select: { estado: true } } },

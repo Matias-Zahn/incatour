@@ -9,7 +9,7 @@ const { repo, logistica, actual } = vi.hoisted(() => ({
   logistica: { disponiblesTransporte: vi.fn(), disponiblesEquipamiento: vi.fn() },
   actual: { autoridad: null as unknown },
 }));
-vi.mock("./asignacion.repository", () => ({ AsignacionRepository: class { constructor() { return repo; } } }));
+vi.mock("./asignacion.repository", () => ({ ESTADOS_ASIGNABLES: ["PUBLICADA", "CERRADA"], AsignacionRepository: class { constructor() { return repo; } } }));
 vi.mock("../logistica/logistica.repository", () => ({ LogisticaRepository: class { constructor() { return logistica; } } }));
 vi.mock("../autoridad.wiring", () => ({ obtenerAutoridad: () => actual.autoridad }));
 

@@ -6,9 +6,7 @@ import { LogisticaRepository } from "../logistica/logistica.repository";
 import { calcularDotacion } from "../salidas/salida.dotacion";
 import { ROL_GUIA, ROL_PORTEADOR } from "../../cuentas/personal/personal.dto";
 import { ConfirmarAsignacionDto } from "./asignacion.dto";
-import { AsignacionRepository, SalidaParaAsignar } from "./asignacion.repository";
-
-const ESTADOS_ASIGNABLES = ["PUBLICADA", "CERRADA"];
+import { AsignacionRepository, ESTADOS_ASIGNABLES, SalidaParaAsignar } from "./asignacion.repository";
 
 export class AsignacionService {
   private repository = new AsignacionRepository();

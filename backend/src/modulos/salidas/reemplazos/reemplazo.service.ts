@@ -109,6 +109,8 @@ export class ReemplazoService {
         idsalida,
         idoriginal: original.idpersonal,
         idreemplazante: reemplazante.idpersonal,
+        fechaInicio: salida.fechaInicio,
+        fechaFin: salida.fechaFin,
         motivo: dto.motivo,
         usuario,
         idpermisoAnterior: anterior?.idpermisopersonal,

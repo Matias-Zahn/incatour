@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { CustomError } from "../../../error/CustomError";
 import {
@@ -8,7 +9,10 @@ import {
   TIPO_SERVICIO,
 } from "../../../shared/constantes";
 import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
+import { LogisticaRepository } from "../logistica/logistica.repository";
 import { ItemCamping } from "./asignacion.dto";
+
+export const ESTADOS_ASIGNABLES = ["PUBLICADA", "CERRADA"];
 
 export type SalidaParaAsignar = NonNullable<Awaited<ReturnType<AsignacionRepository["buscarSalida"]>>>;
 
@@ -29,8 +33,8 @@ export class AsignacionRepository {
   }
 
   // Personal ACTIVO sin otra salida activa que se superponga con estas fechas (FA1)
-  async personalLibre(salida: { idsalida: number; fechaInicio: Date; fechaFin: Date }, ids?: number[]) {
-    return db.personal.findMany({
+  async personalLibre(salida: { idsalida: number; fechaInicio: Date; fechaFin: Date }, ids?: number[], cliente: Prisma.TransactionClient = db) {
+    return cliente.personal.findMany({
       where: {
         ...(ids && { idpersonal: { in: ids } }),
         estado: ESTADO.ACTIVO,
@@ -52,6 +56,14 @@ export class AsignacionRepository {
     });
   }
 
+  // Lock de las filas de Personal: dos asignaciones/reemplazos con la misma persona se serializan (RF-54)
+  async personalOcupado(tx: Prisma.TransactionClient, salida: { idsalida: number; fechaInicio: Date; fechaFin: Date }, ids: number[]) {
+    if (!ids.length) return [];
+    await tx.$queryRaw`SELECT idpersonal FROM public."Personal" WHERE idpersonal IN (${Prisma.join(ids)}) ORDER BY idpersonal FOR UPDATE`;
+    const libres = new Set((await this.personalLibre(salida, ids, tx)).map((p) => p.idpersonal));
+    return ids.filter((id) => !libres.has(id));
+  }
+
   async buscarPersonal(ids: number[]) {
     return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: true } });
   }
@@ -71,6 +83,22 @@ export class AsignacionRepository {
   }) {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
+      // Lock de la salida: una compra que confirma en paralelo espera (o ya cerró la salida) y se detecta acá
+      // ponytail: la compra en curso al cerrar se cobra y cae en el camino "pago aprobado sin reserva" (la rama fix/martin-externos lo convierte en reembolso)
+      const [fila] = await tx.$queryRaw<{ estado: string; stockLocalAlojamiento: number | null }[]>`
+        SELECT estado, "stockLocalAlojamiento" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
+      const vendidos = p.salida.reservas.reduce((t, r) => t + r.pasajeros.length, 0);
+      const confirmados = await tx.reservaPasajero.count({ where: { reserva: { idsalida, estado: ESTADO_RESERVA.CONFIRMADA } } });
+      if (!fila || !ESTADOS_ASIGNABLES.includes(fila.estado) || confirmados !== vendidos) {
+        throw CustomError.conflict("La salida cambió mientras se asignaba (se confirmó una compra o ya se asignó). Volvé a cargar el panel");
+      }
+
+      if ((await this.personalOcupado(tx, p.salida, p.personalIds)).length) {
+        throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar el panel");
+      }
+      const motivo = await new LogisticaRepository().motivoTransporteNoDisponible(tx, p.idtransporte, p.salida, vendidos);
+      if (motivo) throw CustomError.conflict(motivo);
+
       await tx.asignacionPersonal.createMany({
         data: p.personalIds.map((idpersonal) => ({ idsalida, idpersonal })),
       });
@@ -106,7 +134,7 @@ export class AsignacionRepository {
 
       // Las plazas de hotel bloqueadas que no se vendieron vuelven al proveedor (regla 7 del CU-36)
       const hotel = p.salida.servicios.find((s) => s.tipo === TIPO_SERVICIO.ALOJAMIENTO);
-      const plazasSobrantes = p.salida.stockLocalAlojamiento ?? 0;
+      const plazasSobrantes = fila.stockLocalAlojamiento ?? 0;
       if (hotel && plazasSobrantes > 0) {
         await tx.servicioAlojamiento.update({
           where: { idservicio: hotel.idservicio },
