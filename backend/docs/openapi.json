@@ -1681,7 +1681,7 @@
         },
         "responses": {
           "200": {
-            "description": "Asignación confirmada. Informa los permisos emitidos y los lugares liberados."
+            "description": "Asignación confirmada. Informa los permisos emitidos y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes."
           },
           "400": {
             "description": "Personal ocupado",
@@ -1694,10 +1694,68 @@
             "description": "La salida no existe."
           },
           "409": {
-            "description": "Hay reservas con el alojamiento pendiente (FA5)."
+            "description": "Hay reservas con el alojamiento pendiente (FA5)",
+            "o la salida": null,
+            "el personal o el transporte cambiaron mientras se asignaba.": null
           },
           "503": {
             "description": "La autoridad no pudo emitir los permisos. No se modificó nada."
+          }
+        }
+      }
+    },
+    "/api/salidas/{idsalida}/asignacion/liberar-sobrantes": {
+      "post": {
+        "summary": "Reintentar la liberación de lugares sobrantes (CU-40 paso 12)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Si al confirmar la asignación la autoridad no liberó los lugares sobrantes, la cantidad queda guardada en la salida y se libera con esta petición. Es idempotente: si no queda nada pendiente responde lugaresLiberados 0.\n",
+        "tags": [
+          "Salidas"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idsalida",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sobrantes liberados (o nada pendiente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "lugaresLiberados": {
+                          "type": "integer",
+                          "example": 7
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La salida no está cerrada o no tiene bloqueo ante la autoridad."
+          },
+          "404": {
+            "description": "La salida no existe."
+          },
+          "503": {
+            "description": "La autoridad no respondió; la cantidad sigue pendiente. Reintentar más tarde."
           }
         }
       }
@@ -3605,7 +3663,7 @@
     "/api/cuentas-guia": {
       "get": {
         "summary": "Consultar usuarios guía (CU-44)",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista las cuentas de acceso de los guías (solo ellos tienen cuenta; los porteadores no) con el guía asociado, la situación de su habilitación y las salidas que tiene pendientes. Filtra por rol y estado de la cuenta, situación de la habilitación y búsqueda por nombre, apellido o email.\n",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Lista las cuentas de acceso de los guías con el guía asociado, la situación de su habilitación y las salidas que tiene pendientes.\n",
         "tags": [
           "Cuentas de guía"
         ],
@@ -3614,77 +3672,9 @@
             "BearerAuth": []
           }
         ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "rol",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "GUIA"
-              ]
-            },
-            "description": "Hoy el único rol con cuenta entre el personal operativo."
-          },
-          {
-            "in": "query",
-            "name": "estado",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ACTIVO",
-                "INACTIVO"
-              ]
-            }
-          },
-          {
-            "in": "query",
-            "name": "habilitacion",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "VIGENTE",
-                "VENCIDA"
-              ]
-            }
-          },
-          {
-            "in": "query",
-            "name": "busqueda",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Coincidencia parcial en nombre, apellido o email."
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Cuentas de guía.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CuentaGuia"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Filtro inválido.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            }
+            "description": "Cuentas de guía obtenidas exitosamente."
           },
           "401": {
             "description": "Token no proporcionado o inválido."
@@ -3693,12 +3683,73 @@
             "description": "Se requiere el perfil ADMIN."
           }
         }
+      },
+      "post": {
+        "summary": "Alta de cuenta de acceso para un guía ya registrado (CU-45)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Crea las credenciales de acceso para un personal guía existente.\n",
+        "tags": [
+          "Cuentas de guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idpersonal",
+                  "email",
+                  "contrasenia"
+                ],
+                "properties": {
+                  "idpersonal": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "email": {
+                    "type": "string",
+                    "example": "nuevo.guia@incatour.com"
+                  },
+                  "contrasenia": {
+                    "type": "string",
+                    "example": "password123"
+                  },
+                  "nroHabilitacion": {
+                    "type": "string",
+                    "example": "HAB-2026-99"
+                  },
+                  "fechaHabilitacion": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-12-31"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta de guía creada exitosamente."
+          },
+          "400": {
+            "description": "Error de validación o el guía ya tiene cuenta."
+          },
+          "404": {
+            "description": "Personal guía no encontrado."
+          }
+        }
       }
     },
-    "/api/cuentas-guia/{idusuario}/baja": {
-      "patch": {
-        "summary": "Baja cuenta guía (CU-46)",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** Baja lógica de la cuenta de acceso: pasa a INACTIVO, el guía ya no puede iniciar sesión y se conserva todo su historial de salidas. El legajo del personal no se modifica (eso es la baja de personal, CU-25). No se puede dar de baja la cuenta de un guía asignado a una salida cuyo recorrido no finalizó. La verificación y la baja ocurren en una misma transacción.\n",
+    "/api/cuentas-guia/{idusuario}": {
+      "put": {
+        "summary": "Modificar cuenta de guía (por administrador)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Permite corregir datos de la cuenta del guía (nombre, apellido, email, contraseña, habilitación o estado).\n",
         "tags": [
           "Cuentas de guía"
         ],
@@ -3714,41 +3765,53 @@
             "required": true,
             "schema": {
               "type": "integer"
-            },
-            "description": "ID del usuario (cuenta) del guía, no el del personal."
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Cuenta dada de baja.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "mensaje": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CuentaGuia"
-                    }
-                  }
-                }
-              }
-            }
+            "description": "Cuenta de guía modificada exitosamente."
           },
           "400": {
-            "description": "La cuenta ya estaba dada de baja o el guía tiene salidas pendientes.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            }
+            "description": "Error de validación o email ya en uso."
           },
           "404": {
-            "description": "No existe una cuenta de guía con ese ID."
+            "description": "Cuenta de guía no encontrada."
+          }
+        }
+      }
+    },
+    "/api/cuentas-guia/{idusuario}/baja": {
+      "patch": {
+        "summary": "Baja cuenta guía (CU-46)",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Baja lógica de la cuenta de acceso: pasa a INACTIVO.\n",
+        "tags": [
+          "Cuentas de guía"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idusuario",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuenta dada de baja exitosamente."
+          },
+          "400": {
+            "description": "La cuenta ya estaba inactiva o tiene salidas pendientes."
+          },
+          "404": {
+            "description": "No existe cuenta de guía con ese ID."
           }
         }
       }
@@ -3873,7 +3936,7 @@
       },
       "put": {
         "summary": "Modificar datos de perfil de un cliente",
-        "description": "**RESTRINGIDO AL PROPIO CLIENTE.** Permite actualizar nombre, apellido y email. La contraseña NO es modificable por este endpoint (requerimiento futuro del ERS). No se puede modificar una cuenta con estado INACTIVO.\n",
+        "description": "**RESTRINGIDO AL PROPIO CLIENTE O ADMINISTRADOR.** Permite actualizar nombre, apellido y email. La contraseña NO es modificable por este endpoint (requerimiento futuro del ERS). No se puede modificar una cuenta con estado INACTIVO.\n",
         "tags": [
           "Clientes"
         ],
@@ -3941,8 +4004,8 @@
     },
     "/api/clientes/{id}/baja": {
       "patch": {
-        "summary": "Dar de baja lógica a un cliente",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** Realiza una baja lógica (estado INACTIVO). No elimina el registro de la base de datos. No se puede dar de baja a un cliente que tenga reservas en estado \"Confirmada\".\n",
+        "summary": "Dar de baja lógica a un cliente (CU-29)",
+        "description": "**ACCESIBLE POR EL PROPIO CLIENTE O POR ADMINISTRADOR.** Realiza una baja lógica (estado INACTIVO). No elimina el registro de la base de datos. No se puede dar de baja a un cliente que tenga reservas en estado \"CONFIRMADA\".\n",
         "tags": [
           "Clientes"
         ],
@@ -3967,13 +4030,13 @@
             "description": "Cliente inhabilitado exitosamente."
           },
           "400": {
-            "description": "El cliente tiene reservas en estado Confirmada."
+            "description": "El cliente tiene reservas activas."
           },
           "401": {
             "description": "Token no proporcionado o inválido/expirado."
           },
           "403": {
-            "description": "Acceso denegado. Se requiere el perfil ADMIN."
+            "description": "Acceso denegado. Se requiere el perfil CLIENTE o ADMIN."
           },
           "404": {
             "description": "Cliente no encontrado."

@@ -1,5 +1,7 @@
 import { db } from "../../../config/postgresDatabase";
+import { CustomError } from "../../../error/CustomError";
 import { ESTADO_PERMISO } from "../../../shared/constantes";
+import { AsignacionRepository } from "../asignacion/asignacion.repository";
 import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
 
 export class ReemplazoRepository {
@@ -21,10 +23,11 @@ export class ReemplazoRepository {
   }
 
   // Si la autoridad dio de baja el permiso pero falló la emisión del nuevo, queda registrado para el reintento
-  async marcarPermisoDadoDeBaja(idpermisopersonal: number) {
+  // nroPermiso: si el lugar lo ocupa ahora otro permiso (el nuevo, dado de baja), la fila pasa a apuntar a ese
+  async marcarPermisoDadoDeBaja(idpermisopersonal: number, nroPermiso?: string) {
     return db.permisoPersonal.update({
       where: { idpermisopersonal },
-      data: { estadoTramite: ESTADO_PERMISO.DADO_DE_BAJA },
+      data: { estadoTramite: ESTADO_PERMISO.DADO_DE_BAJA, ...(nroPermiso && { nroPermiso }) },
     });
   }
 
@@ -36,12 +39,20 @@ export class ReemplazoRepository {
     idsalida: number;
     idoriginal: number;
     idreemplazante: number;
+    fechaInicio: Date;
+    fechaFin: Date;
     motivo: string;
     usuario: string;
     idpermisoAnterior: number | undefined;
     permisoNuevo: PermisoEmitido | undefined;
   }) {
     return db.$transaction(async (tx) => {
+      // Lock del reemplazante: si otra asignación lo tomó en esas fechas, no se superpone (RF-54)
+      const { idsalida, fechaInicio, fechaFin } = p;
+      if ((await new AsignacionRepository().personalOcupado(tx, { idsalida, fechaInicio, fechaFin }, [p.idreemplazante])).length) {
+        throw CustomError.conflict("El reemplazante se asignó a otra salida en esas fechas. Elegí otra persona");
+      }
+
       await tx.asignacionPersonal.delete({
         where: { idsalida_idpersonal: { idsalida: p.idsalida, idpersonal: p.idoriginal } },
       });
