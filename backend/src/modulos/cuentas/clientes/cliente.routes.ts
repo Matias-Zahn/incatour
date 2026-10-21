@@ -113,7 +113,7 @@ export class ClienteRoutes {
      *   put:
      *     summary: Modificar datos de perfil de un cliente
      *     description: >
-     *       **RESTRINGIDO AL PROPIO CLIENTE.**
+     *       **RESTRINGIDO AL PROPIO CLIENTE O ADMINISTRADOR.**
      *       Permite actualizar nombre, apellido y email. La contraseña
      *       NO es modificable por este endpoint (requerimiento futuro del ERS).
      *       No se puede modificar una cuenta con estado INACTIVO.
@@ -158,17 +158,17 @@ export class ClienteRoutes {
      *       404:
      *         description: Cliente no encontrado.
      */
-    router.put("/:id", autenticar, requierePerfil("CLIENTE"), controller.modificarCliente);
+    router.put("/:id", autenticar, requierePerfil("CLIENTE", "ADMIN"), controller.modificarCliente);
 
     /**
      * @swagger
      * /api/clientes/{id}/baja:
      *   patch:
-     *     summary: Dar de baja lógica a un cliente
+     *     summary: Dar de baja lógica a un cliente (CU-29)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.**
+     *       **ACCESIBLE POR EL PROPIO CLIENTE O POR ADMINISTRADOR.**
      *       Realiza una baja lógica (estado INACTIVO). No elimina el registro de la base de datos.
-     *       No se puede dar de baja a un cliente que tenga reservas en estado "Confirmada".
+     *       No se puede dar de baja a un cliente que tenga reservas en estado "CONFIRMADA".
      *     tags: [Clientes]
      *     security:
      *       - BearerAuth: []
@@ -183,15 +183,15 @@ export class ClienteRoutes {
      *       200:
      *         description: Cliente inhabilitado exitosamente.
      *       400:
-     *         description: El cliente tiene reservas en estado Confirmada.
+     *         description: El cliente tiene reservas activas.
      *       401:
      *         description: Token no proporcionado o inválido/expirado.
      *       403:
-     *         description: Acceso denegado. Se requiere el perfil ADMIN.
+     *         description: Acceso denegado. Se requiere el perfil CLIENTE o ADMIN.
      *       404:
      *         description: Cliente no encontrado.
      */
-    router.patch("/:id/baja", autenticar, requierePerfil("ADMIN"), controller.darDeBajaCliente);
+    router.patch("/:id/baja", autenticar, requierePerfil("CLIENTE", "ADMIN"), controller.darDeBajaCliente);
 
     return router;
   }

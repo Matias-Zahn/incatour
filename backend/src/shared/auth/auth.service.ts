@@ -15,15 +15,15 @@ export class AuthService {
       throw CustomError.unauthorized("Credenciales inválidas");
     }
 
-    // 2. Verificar estado activo
-    if (usuario.estado === "INACTIVO") {
-      throw CustomError.unauthorized("Su cuenta ha sido desactivada");
-    }
-
-    // 3. Comparar contraseñas
+    // 2. SEG-05: Comparar contraseñas ANTES de evaluar estado para evitar enumeración y filtración de cuentas
     const coincide = await bcrypt.compare(dto.contrasenia, usuario.contrasenia);
     if (!coincide) {
       throw CustomError.unauthorized("Credenciales inválidas");
+    }
+
+    // 3. SEG-02 & SEG-05: Si las credenciales coinciden pero la cuenta de usuario o cliente está dada de baja
+    if (usuario.estado === "INACTIVO" || usuario.cliente?.estado === "INACTIVO") {
+      throw CustomError.unauthorized("Su cuenta ha sido desactivada");
     }
 
     // 4. Generar Payload del JWT (datos no sensibles para el frontend)
@@ -32,7 +32,7 @@ export class AuthService {
       email: usuario.email,
       nombre: usuario.nombre,
       apellido: usuario.apellido,
-      rol: usuario.rol
+      rol: usuario.rol,
     };
 
     // 5. Firmar el Token
@@ -40,7 +40,7 @@ export class AuthService {
 
     return {
       usuario: payload,
-      token
+      token,
     };
   }
 }

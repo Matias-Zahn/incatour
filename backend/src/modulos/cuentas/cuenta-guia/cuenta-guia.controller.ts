@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
-import { FiltrosCuentaGuiaDto } from "./cuenta-guia.dto";
+import { CrearCuentaGuiaDto, FiltrosCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 import { CuentaGuiaService } from "./cuenta-guia.service";
 
 const cuentaGuiaService = new CuentaGuiaService();
@@ -14,6 +14,35 @@ export class CuentaGuiaController {
 
       const cuentas = await cuentaGuiaService.consultarUsuariosGuia(filtros!);
       return res.json({ data: cuentas });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // CU-45: POST /api/cuentas-guia — Alta de cuenta de guía
+  crearCuentaGuia = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const [error, dto] = CrearCuentaGuiaDto.create(req.body);
+      if (error) throw CustomError.badRequest(error);
+
+      const cuenta = await cuentaGuiaService.crearCuentaGuia(dto!);
+      return res.status(201).json({ mensaje: "Cuenta de guía creada exitosamente", data: cuenta });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // PUT /api/cuentas-guia/:idusuario — Modificar cuenta de guía (por administrador)
+  modificarCuenta = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const idusuario = parseInt(req.params.idusuario as string);
+      if (isNaN(idusuario)) throw CustomError.badRequest("El ID de usuario proporcionado no es válido.");
+
+      const [error, dto] = ModificarCuentaGuiaDto.create(req.body);
+      if (error) throw CustomError.badRequest(error);
+
+      const cuenta = await cuentaGuiaService.modificarCuenta(idusuario, dto!);
+      return res.json({ mensaje: "Cuenta de guía modificada exitosamente", data: cuenta });
     } catch (error) {
       next(error);
     }

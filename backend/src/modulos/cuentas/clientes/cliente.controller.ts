@@ -21,6 +21,13 @@ export class ClienteController {
       if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
 
       const resultado = await service.consultarClientePorId(id);
+
+      // SEG-01: Si el usuario autenticado es CLIENTE, solo puede ver sus propios datos
+      const usuarioAutenticado = req.usuarioAutenticado;
+      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && resultado.idusuario !== usuarioAutenticado.idusuario) {
+        throw CustomError.forbidden("No tiene permisos para acceder a los datos de otro cliente.");
+      }
+
       return res.status(200).json({ data: resultado });
     } catch (error) {
       next(error);
@@ -44,6 +51,14 @@ export class ClienteController {
       const id = parseInt(req.params.id as string);
       if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
 
+      const cliente = await service.consultarClientePorId(id);
+
+      // SEG-01: Si el usuario autenticado es CLIENTE, solo puede modificar sus propios datos
+      const usuarioAutenticado = req.usuarioAutenticado;
+      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && cliente.idusuario !== usuarioAutenticado.idusuario) {
+        throw CustomError.forbidden("No tiene permisos para modificar los datos de otro cliente.");
+      }
+
       const [error, dto] = ModificarClienteDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
 
@@ -58,6 +73,14 @@ export class ClienteController {
     try {
       const id = parseInt(req.params.id as string);
       if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
+
+      const cliente = await service.consultarClientePorId(id);
+
+      // CTA-02 & SEG-01: Si el usuario autenticado es CLIENTE, solo puede dar de baja su propia cuenta
+      const usuarioAutenticado = req.usuarioAutenticado;
+      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && cliente.idusuario !== usuarioAutenticado.idusuario) {
+        throw CustomError.forbidden("No tiene permisos para dar de baja la cuenta de otro cliente.");
+      }
 
       const resultado = await service.darDeBajaCliente(id);
       return res.status(200).json({ mensaje: "Cliente dado de baja", data: resultado });
