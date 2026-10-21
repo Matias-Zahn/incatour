@@ -1,13 +1,13 @@
 import { CustomError } from "../../../error/CustomError";
 import { db } from "../../../config/postgresDatabase";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
-import { PaqueteRepository } from "./paquete.repository";
+import { FiltrosPaquete, PaqueteRepository } from "./paquete.repository";
 
 export class PaqueteService {
   private repository = new PaqueteRepository();
 
-  async consultarPaquetes() {
-    return this.repository.findAll();
+  async consultarPaquetes(filtros?: FiltrosPaquete) {
+    return this.repository.findAll(filtros);
   }
 
   async consultarPaquetePorId(id: number) {
@@ -66,12 +66,12 @@ export class PaqueteService {
         localidadGarantizada: dto.localidadGarantizada,
         categoriaGarantizada: dto.categoriaGarantizada,
         tipoHabitacionGarantizada: dto.tipoHabitacionGarantizada,
-        nochesPrevias: dto.nochesPrevias,
-        nochesPosteriores: dto.nochesPosteriores,
+        nochesPrevias: dto.nochesPrevias ?? 0,
+        nochesPosteriores: dto.nochesPosteriores ?? 0,
         diasDisponibles: dto.diasDisponibles,
       },
       dto.matrizPrecios,
-      dto.serviciosIncluidos
+      dto.serviciosIncluidos ?? []
     );
   }
 
@@ -86,9 +86,20 @@ export class PaqueteService {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
 
+    // Validar circuito si se cambia
+    if (dto.idcircuito && dto.idcircuito !== paquete.idcircuito) {
+      const circuito = await db.circuito.findUnique({
+        where: { idcircuito: dto.idcircuito },
+      });
+      if (!circuito || circuito.estado !== "ACTIVO") {
+        throw CustomError.badRequest("El circuito no existe o no está activo.");
+      }
+    }
+
     // Si mandan idservicioGarantizado o cambian a POR_ESTABLECIMIENTO, validar
     const tipoGarantiaFinal = dto.tipoGarantia ?? paquete.tipoGarantia;
-    const idGarantizadoFinal = dto.idservicioGarantizado ?? paquete.idservicioGarantizado;
+    const idGarantizadoActual = paquete.garantiasEstablecimiento?.[0]?.idservicio;
+    const idGarantizadoFinal = dto.idservicioGarantizado !== undefined ? dto.idservicioGarantizado : idGarantizadoActual;
 
     if (tipoGarantiaFinal === "POR_ESTABLECIMIENTO") {
       if (!idGarantizadoFinal) {
@@ -104,10 +115,10 @@ export class PaqueteService {
 
     // 1. Actualizar datos básicos
     const dataUpdate: any = {};
+    if (dto.idcircuito) dataUpdate.idcircuito = dto.idcircuito;
     if (dto.nombrePaquete) dataUpdate.nombrePaquete = dto.nombrePaquete;
     if (dto.condiciones !== undefined) dataUpdate.condiciones = dto.condiciones;
     if (dto.tipoGarantia) dataUpdate.tipoGarantia = dto.tipoGarantia;
-    if (dto.idservicioGarantizado !== undefined) dataUpdate.idservicioGarantizado = dto.idservicioGarantizado;
     if (dto.localidadGarantizada !== undefined) dataUpdate.localidadGarantizada = dto.localidadGarantizada;
     if (dto.categoriaGarantizada !== undefined) dataUpdate.categoriaGarantizada = dto.categoriaGarantizada;
     if (dto.tipoHabitacionGarantizada !== undefined) dataUpdate.tipoHabitacionGarantizada = dto.tipoHabitacionGarantizada;
@@ -115,12 +126,21 @@ export class PaqueteService {
     if (dto.nochesPosteriores !== undefined) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
 
-    let resultado = paquete;
-    if (Object.keys(dataUpdate).length > 0) {
-      resultado = await this.repository.update(id, dataUpdate);
+    const hasData = Object.keys(dataUpdate).length > 0;
+    const hasServicios = dto.serviciosIncluidos !== undefined;
+    const hasGarantia = dto.idservicioGarantizado !== undefined || dto.tipoGarantia !== undefined;
+
+    if (hasData || hasServicios || hasGarantia) {
+      await this.repository.update(
+        id,
+        dataUpdate,
+        dto.serviciosIncluidos,
+        dto.idservicioGarantizado,
+        dto.tipoGarantia
+      );
     }
 
-    // 2. Si viene matrizPrecios, validar temporadas y reemplazar tarifas
+    // 2. Si viene matrizPrecios, validar temporadas y reemplazar tarifas (CAT-06)
     if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
       await this.validarViabilidadComercial(dto.matrizPrecios);
       await this.repository.reemplazarTarifas(id, dto.matrizPrecios);
@@ -139,7 +159,7 @@ export class PaqueteService {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
 
-    // RN: Control de salidas activas asociadas
+    // RN: Control de salidas activas asociadas (CAT-02)
     const tieneSalidas = await this.repository.tieneSalidasActivas(id);
     if (tieneSalidas) {
       throw CustomError.badRequest(
@@ -165,7 +185,7 @@ export class PaqueteService {
       include: { alojamiento: true, proveedor: true },
     });
 
-    if (!servicio || servicio.estado !== "ACTIVO" || servicio.proveedor?.estado !== "ACTIVO") {
+    if (!servicio || servicio.estado !== "ACTIVO" || (servicio.proveedor && servicio.proveedor.estado !== "ACTIVO")) {
       throw CustomError.notFound("El servicio de alojamiento garantizado no existe o no está activo.");
     }
 
@@ -211,7 +231,7 @@ export class PaqueteService {
         where: { idservicio },
         include: { proveedor: true },
       });
-      if (!servicio || servicio.estado !== "ACTIVO" || servicio.proveedor?.estado !== "ACTIVO") {
+      if (!servicio || servicio.estado !== "ACTIVO" || (servicio.proveedor && servicio.proveedor.estado !== "ACTIVO")) {
         throw CustomError.badRequest(
           `El servicio con ID ${idservicio} no existe o no está activo.`
         );

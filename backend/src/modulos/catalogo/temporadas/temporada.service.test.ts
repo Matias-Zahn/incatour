@@ -4,15 +4,25 @@ import { CrearTemporadaDto, ModificarTemporadaDto } from "./temporada.dto";
 
 const { repo } = vi.hoisted(() => ({
   repo: {
-    findAll: vi.fn(), findById: vi.fn(), existeNombre: vi.fn(), create: vi.fn(),
-    update: vi.fn(), updateEstado: vi.fn(), tieneTarifasAsociadas: vi.fn(),
+    findAll: vi.fn(),
+    findById: vi.fn(),
+    existeNombre: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateEstado: vi.fn(),
+    tieneTarifasAsociadas: vi.fn(),
+    existeSolapamiento: vi.fn(),
+    tieneSalidasConReservas: vi.fn(),
   },
 }));
 vi.mock("./temporada.repository", () => ({ TemporadaRepository: class { constructor() { return repo; } } }));
 
 const temporada = (estado = "ACTIVO") => ({
-  idtemporada: 1, nombre: "Alta 2030", estado,
-  fechaInicio: new Date("2030-05-01"), fechaFin: new Date("2030-09-30"),
+  idtemporada: 1,
+  nombre: "Alta 2030",
+  estado,
+  fechaInicio: new Date("2030-05-01"),
+  fechaFin: new Date("2030-09-30"),
 });
 const modificar = (obj: Record<string, unknown>) => ModificarTemporadaDto.create(obj)[1]!;
 
@@ -22,6 +32,8 @@ describe("TemporadaService", () => {
     repo.existeNombre.mockResolvedValue(false);
     repo.findById.mockResolvedValue(temporada());
     repo.tieneTarifasAsociadas.mockResolvedValue(false);
+    repo.existeSolapamiento.mockResolvedValue(false);
+    repo.tieneSalidasConReservas.mockResolvedValue(false);
   });
 
   it("CU-06: devuelve las temporadas del repositorio", async () => {
@@ -39,10 +51,23 @@ describe("TemporadaService", () => {
       expect(repo.create).toHaveBeenCalledWith(dto);
     });
 
-    it("rechaza un nombre que ya usa otra temporada activa", async () => {
+    it("rechaza un nombre que ya usa otra temporada activa con 409 (CAT-15)", async () => {
       repo.existeNombre.mockResolvedValue(true);
 
-      await expect(new TemporadaService().crearTemporada(dto)).rejects.toThrow("Ya existe una temporada activa");
+      await expect(new TemporadaService().crearTemporada(dto)).rejects.toMatchObject({
+        statusCode: 409,
+        message: expect.stringContaining("Ya existe una temporada activa"),
+      });
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si las fechas se superponen con otra temporada activa (CAT-01, RF-11)", async () => {
+      repo.existeSolapamiento.mockResolvedValue(true);
+
+      await expect(new TemporadaService().crearTemporada(dto)).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("superponen"),
+      });
       expect(repo.create).not.toHaveBeenCalled();
     });
   });
@@ -61,10 +86,13 @@ describe("TemporadaService", () => {
       expect(repo.existeNombre).not.toHaveBeenCalled();
     });
 
-    it("rechaza un nombre duplicado", async () => {
+    it("rechaza un nombre duplicado con 409 (CAT-15)", async () => {
       repo.existeNombre.mockResolvedValue(true);
 
-      await expect(new TemporadaService().modificarTemporada(1, modificar({ nombre: "Baja" }))).rejects.toThrow("Ya existe otra temporada");
+      await expect(new TemporadaService().modificarTemporada(1, modificar({ nombre: "Baja" }))).rejects.toMatchObject({
+        statusCode: 409,
+        message: expect.stringContaining("Ya existe otra temporada"),
+      });
       expect(repo.update).not.toHaveBeenCalled();
     });
 
@@ -80,6 +108,42 @@ describe("TemporadaService", () => {
       await new TemporadaService().modificarTemporada(1, modificar({ fechaInicio: "2030-06-01" }));
 
       expect(repo.update).toHaveBeenCalled();
+    });
+
+    it("rechaza modificar fechas si tiene tarifas de paquetes asociadas (CAT-03, RF-12)", async () => {
+      repo.tieneTarifasAsociadas.mockResolvedValue(true);
+
+      await expect(
+        new TemporadaService().modificarTemporada(1, modificar({ fechaFin: "2030-10-15" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("tarifas asociadas"),
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("rechaza modificar fechas si tiene salidas con reservas (CAT-03, RF-12)", async () => {
+      repo.tieneSalidasConReservas.mockResolvedValue(true);
+
+      await expect(
+        new TemporadaService().modificarTemporada(1, modificar({ fechaFin: "2030-10-15" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("salidas que tienen reservas"),
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("rechaza modificar fechas si se superponen con otra temporada activa (CAT-01, RF-11)", async () => {
+      repo.existeSolapamiento.mockResolvedValue(true);
+
+      await expect(
+        new TemporadaService().modificarTemporada(1, modificar({ fechaFin: "2030-10-15" }))
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("superponen"),
+      });
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it("404 si la temporada no existe o está inactiva", async () => {

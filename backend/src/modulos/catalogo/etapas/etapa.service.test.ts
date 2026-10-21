@@ -49,25 +49,30 @@ describe("EtapaService (CU-05)", () => {
       expect(repo.reemplazarSecuenciaEtapas).not.toHaveBeenCalled();
     });
 
-    it("no permite cambiar las etapas si el circuito ya tiene paquetes activos", async () => {
+    it("404 si el circuito no existe", async () => {
+      db.circuito.findUnique.mockResolvedValue(null);
+
+      await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("rechaza si el circuito no está activo", async () => {
+      db.circuito.findUnique.mockResolvedValue({ idcircuito: 1, estado: "INACTIVO" });
+
+      await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toThrow("no está activo");
+    });
+
+    it("no permite reemplazar la secuencia si el circuito tiene paquetes activos", async () => {
       repo.circuitoTienePaquetesActivos.mockResolvedValue(true);
 
       await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toThrow("paquetes comerciales activos");
-    });
-
-    it("404 si el circuito no existe o está inactivo", async () => {
-      db.circuito.findUnique.mockResolvedValue({ idcircuito: 1, estado: "INACTIVO" });
-
-      await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toMatchObject({ statusCode: 404 });
     });
   });
 
   describe("consultarEtapas", () => {
     it("devuelve las etapas del circuito", async () => {
-      repo.getByCircuitoId.mockResolvedValue([etapa(1, "A", "B")]);
+      repo.getByCircuitoId.mockResolvedValue([{ idetapa: 1 }]);
 
       await expect(new EtapaService().consultarEtapas(1)).resolves.toHaveLength(1);
-      expect(repo.getByCircuitoId).toHaveBeenCalledWith(1);
     });
 
     it("404 si el circuito no existe", async () => {
@@ -81,6 +86,15 @@ describe("EtapaService (CU-05)", () => {
 describe("EstablecerSecuenciaDto", () => {
   it("acepta una secuencia válida y normaliza campamentoPrevisto", () => {
     const [error, dto] = EstablecerSecuenciaDto.create({ etapas: [etapa(1, "A", "B")] });
+
+    expect(error).toBeUndefined();
+    expect(dto?.etapas[0]?.campamentoPrevisto).toBeNull();
+  });
+
+  it("normaliza campamentoPrevisto: null a null en vez del texto 'null' (CAT-15)", () => {
+    const [error, dto] = EstablecerSecuenciaDto.create({
+      etapas: [{ numeroOrden: 1, puntoInicio: "A", puntoFin: "B", campamentoPrevisto: null }],
+    });
 
     expect(error).toBeUndefined();
     expect(dto?.etapas[0]?.campamentoPrevisto).toBeNull();

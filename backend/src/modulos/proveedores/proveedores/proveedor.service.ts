@@ -25,7 +25,7 @@ export class ProveedorService {
   // CU-15: Alta proveedor
   async crearProveedor(dto: CrearProveedorDto) {
     if (await this.repository.existeRazonSocial(dto.razonSocial, dto.localidad)) {
-      throw CustomError.badRequest(
+      throw CustomError.conflict(
         `Ya existe un proveedor activo "${dto.razonSocial}" en ${dto.localidad}.`
       );
     }
@@ -52,7 +52,7 @@ export class ProveedorService {
       (dto.razonSocial !== undefined || dto.localidad !== undefined) &&
       (await this.repository.existeRazonSocial(razonSocial, localidad, id))
     ) {
-      throw CustomError.badRequest(`Ya existe un proveedor activo "${razonSocial}" en ${localidad}.`);
+      throw CustomError.conflict(`Ya existe un proveedor activo "${razonSocial}" en ${localidad}.`);
     }
 
     // Pasar a Inactivo por esta vía es una baja: rigen las mismas reglas del CU-17

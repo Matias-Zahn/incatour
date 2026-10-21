@@ -62,4 +62,29 @@ export class TemporadaRepository {
     });
     return count > 0;
   }
+
+  async existeSolapamiento(fechaInicio: Date, fechaFin: Date, excluirId?: number): Promise<boolean> {
+    const where: any = {
+      estado: "ACTIVO",
+      fechaInicio: { lte: fechaFin },
+      fechaFin: { gte: fechaInicio },
+    };
+    if (excluirId) {
+      where.idtemporada = { not: excluirId };
+    }
+    const count = await db.temporada.count({ where });
+    return count > 0;
+  }
+
+  async tieneSalidasConReservas(fechaInicio: Date, fechaFin: Date): Promise<boolean> {
+    const count = await db.reserva.count({
+      where: {
+        salida: {
+          fechaInicio: { gte: fechaInicio, lte: fechaFin },
+        },
+        estado: { notIn: ["CANCELADA"] },
+      },
+    });
+    return count > 0;
+  }
 }

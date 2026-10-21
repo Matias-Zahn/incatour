@@ -1,6 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
 import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
-import { CircuitoRepository } from "./circuito.repository";
+import { CircuitoRepository, FiltrosCircuito } from "./circuito.repository";
 
 export class CircuitoService {
   private repository: CircuitoRepository;
@@ -10,8 +10,8 @@ export class CircuitoService {
   }
 
   // CU-01: Consultar circuitos
-  async consultarCircuitos() {
-    return this.repository.findAll();
+  async consultarCircuitos(filtros?: FiltrosCircuito) {
+    return this.repository.findAll(filtros);
   }
 
   // CU-02: Crear circuito
@@ -19,7 +19,7 @@ export class CircuitoService {
     // Validar que no exista otro circuito activo con el mismo nombre
     const existe = await this.repository.existeNombre(dto.nombreCircuito);
     if (existe) {
-      throw CustomError.badRequest(
+      throw CustomError.conflict(
         `Ya existe un circuito activo con el nombre "${dto.nombreCircuito}".`
       );
     }
@@ -39,11 +39,27 @@ export class CircuitoService {
       throw CustomError.badRequest("No se puede modificar un circuito que no está activo.");
     }
 
+    // RF-03: Bloquear atributos estructurales (duración y dotación) si hay paquetes activos o salidas
+    const cambiaEstructura =
+      (dto.duracionDias !== undefined && dto.duracionDias !== circuito.duracionDias) ||
+      (dto.minimoGuias !== undefined && dto.minimoGuias !== circuito.minimoGuias) ||
+      (dto.parametrosPorteadores !== undefined && dto.parametrosPorteadores !== circuito.parametrosPorteadores);
+
+    if (cambiaEstructura) {
+      const tienePaquetes = await this.repository.tienePaquetesActivos(id);
+      const tieneSalidas = await this.repository.tieneSalidas(id);
+      if (tienePaquetes || tieneSalidas) {
+        throw CustomError.badRequest(
+          "No se pueden modificar los atributos estructurales del circuito (duración o dotación) porque está en uso por paquetes activos o salidas."
+        );
+      }
+    }
+
     // Si cambia el nombre, verificar que no colisione con otro
     if (dto.nombreCircuito) {
       const existe = await this.repository.existeNombre(dto.nombreCircuito, id);
       if (existe) {
-        throw CustomError.badRequest(
+        throw CustomError.conflict(
           `Ya existe un circuito activo con el nombre "${dto.nombreCircuito}".`
         );
       }

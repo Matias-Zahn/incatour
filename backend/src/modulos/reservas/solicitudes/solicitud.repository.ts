@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { CustomError } from "../../../error/CustomError";
 
 export class SolicitudRepository {
   
@@ -68,9 +69,25 @@ export class SolicitudRepository {
     });
   }
 
-  // CU-34: Registrar Aceptación
+  // CU-34: Registrar Aceptación (RES-01, RES-05)
   async resolverComoAceptada(solicitudId: number, reservaId: number, servicioId: number) {
     return db.$transaction(async (tx) => {
+      // RES-05: Validar atómicamente dentro de la transacción que la solicitud sigue PENDIENTE y la reserva no está CANCELADA
+      const solActual = await tx.solicitud.findUnique({
+        where: { idsolicitud: solicitudId },
+        include: { reserva: true },
+      });
+
+      if (!solActual) {
+        throw CustomError.notFound("Solicitud no encontrada.");
+      }
+      if (solActual.estado !== "PENDIENTE") {
+        throw CustomError.badRequest("La solicitud ya no está pendiente.");
+      }
+      if (solActual.reserva.estado === "CANCELADA") {
+        throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
+      }
+
       // 1. Actualizar la Solicitud
       const sol = await tx.solicitud.update({
         where: { idsolicitud: solicitudId },
@@ -85,13 +102,11 @@ export class SolicitudRepository {
         }
       });
 
-      // 2. Actualizar la Reserva (Simulado: Cambiar un estadoAlojamiento si existiera el campo)
-      // Como el esquema de Prisma no tiene un campo 'estadoAlojamiento' explícito en la Reserva, 
-      // lo deducimos de la solicitud, pero registramos auditoria o actualizamos el estado si aplica.
+      // 2. Actualizar la Reserva: RES-01 actualiza estadoAlojamiento, NO estado
       await tx.reserva.update({
         where: { idreserva: reservaId },
         data: {
-          estado: "CONFIRMADA" // Asumiendo que se reafirma su estado.
+          estadoAlojamiento: "CONFIRMADO"
         }
       });
 
@@ -99,9 +114,24 @@ export class SolicitudRepository {
     });
   }
 
-  // CU-34: Registrar Rechazo
+  // CU-34: Registrar Rechazo (RES-05, RES-09)
   async resolverComoRechazada(solicitudId: number, reservaId: number, servicioId: number, motivo: string, cantPlazas: number) {
     return db.$transaction(async (tx) => {
+      const solActual = await tx.solicitud.findUnique({
+        where: { idsolicitud: solicitudId },
+        include: { reserva: { include: { salida: { include: { paquete: true } } } } },
+      });
+
+      if (!solActual) {
+        throw CustomError.notFound("Solicitud no encontrada.");
+      }
+      if (solActual.estado !== "PENDIENTE") {
+        throw CustomError.badRequest("La solicitud ya no está pendiente.");
+      }
+      if (solActual.reserva.estado === "CANCELADA") {
+        throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
+      }
+
       // 1. Marcar la solicitud actual como Rechazada
       const solAnterior = await tx.solicitud.update({
         where: { idsolicitud: solicitudId },
@@ -117,13 +147,23 @@ export class SolicitudRepository {
         }
       });
 
+      // RES-09: La solicitud -R copia los criterios de alojamiento
+      const criterios = solActual.criterios ?? (
+        solActual.reserva?.salida?.paquete
+          ? `Localidad: ${solActual.reserva.salida.paquete.localidadGarantizada ?? "-"} | ` +
+            `Categoría: ${solActual.reserva.salida.paquete.categoriaGarantizada ?? "-"} | ` +
+            `Habitación: ${solActual.reserva.salida.paquete.tipoHabitacionGarantizada ?? "-"}`
+          : null
+      );
+
       // 2. Crear una NUEVA solicitud Pendiente (Patrón Creator)
       const nuevaSol = await tx.solicitud.create({
         data: {
           idreserva: reservaId,
           nroSolicitud: `${solAnterior.nroSolicitud}-R`, // Sufijo para indicar que es reintento
           estado: "PENDIENTE",
-          cantidadPlazas: cantPlazas
+          cantidadPlazas: cantPlazas,
+          criterios,
         }
       });
 
@@ -145,6 +185,9 @@ export class SolicitudRepository {
 
   // CU-34 paso 9: datos del establecimiento asignado para avisar al titular
   async buscarServicio(idservicio: number) {
-    return db.servicioBase.findUnique({ where: { idservicio }, select: { nombreServicio: true, localidad: true } });
+    return db.servicioBase.findUnique({
+      where: { idservicio },
+      include: { alojamiento: true, proveedor: true },
+    });
   }
 }

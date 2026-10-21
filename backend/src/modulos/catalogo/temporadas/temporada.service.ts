@@ -12,8 +12,14 @@ export class TemporadaService {
   async crearTemporada(dto: CrearTemporadaDto) {
     const existe = await this.repository.existeNombre(dto.nombre);
     if (existe) {
-      throw CustomError.badRequest("Ya existe una temporada activa con ese nombre.");
+      throw CustomError.conflict("Ya existe una temporada activa con ese nombre.");
     }
+
+    const solapa = await this.repository.existeSolapamiento(dto.fechaInicio, dto.fechaFin);
+    if (solapa) {
+      throw CustomError.badRequest("Las fechas de la temporada se superponen con otra temporada activa.");
+    }
+
     return this.repository.create(dto);
   }
 
@@ -26,7 +32,7 @@ export class TemporadaService {
     if (dto.nombre && dto.nombre !== temporadaActual.nombre) {
       const existeNombre = await this.repository.existeNombre(dto.nombre, id);
       if (existeNombre) {
-        throw CustomError.badRequest("Ya existe otra temporada activa con ese nombre.");
+        throw CustomError.conflict("Ya existe otra temporada activa con ese nombre.");
       }
     }
 
@@ -36,6 +42,30 @@ export class TemporadaService {
 
     if (nuevaFechaInicio >= nuevaFechaFin) {
       throw CustomError.badRequest("La fecha de inicio debe ser anterior a la fecha de fin.");
+    }
+
+    const cambiaFechas =
+      (dto.fechaInicio !== undefined && dto.fechaInicio.getTime() !== temporadaActual.fechaInicio.getTime()) ||
+      (dto.fechaFin !== undefined && dto.fechaFin.getTime() !== temporadaActual.fechaFin.getTime());
+
+    if (cambiaFechas) {
+      const tieneTarifas = await this.repository.tieneTarifasAsociadas(id);
+      if (tieneTarifas) {
+        throw CustomError.badRequest("No se pueden modificar las fechas de una temporada que tiene tarifas asociadas.");
+      }
+
+      const tieneReservas = await this.repository.tieneSalidasConReservas(
+        temporadaActual.fechaInicio,
+        temporadaActual.fechaFin
+      );
+      if (tieneReservas) {
+        throw CustomError.badRequest("No se pueden modificar las fechas de una temporada con salidas que tienen reservas.");
+      }
+
+      const solapa = await this.repository.existeSolapamiento(nuevaFechaInicio, nuevaFechaFin, id);
+      if (solapa) {
+        throw CustomError.badRequest("Las fechas de la temporada se superponen con otra temporada activa.");
+      }
     }
 
     return this.repository.update(id, dto);

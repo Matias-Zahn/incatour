@@ -10,7 +10,12 @@ export class CircuitoController {
   // CU-01: GET /api/circuitos
   consultarCircuitos = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const circuitos = await circuitoService.consultarCircuitos();
+      const { duracionDias, dificultad, estado } = req.query;
+      const circuitos = await circuitoService.consultarCircuitos({
+        duracionDias: duracionDias as string | undefined,
+        dificultad: dificultad as string | undefined,
+        estado: estado as string | undefined,
+      });
       return res.json({ data: circuitos });
     } catch (error) {
       next(error);

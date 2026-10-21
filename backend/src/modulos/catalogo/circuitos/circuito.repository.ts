@@ -1,11 +1,35 @@
 import { db } from "../../../config/postgresDatabase";
+import { SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 
-export class CircuitoRepository {
+export interface FiltrosCircuito {
+  duracionDias?: string | number | undefined;
+  dificultad?: string | undefined;
+  estado?: string | undefined;
+}
 
-  async findAll() {
+export class CircuitoRepository {
+  async findAll(filtros?: FiltrosCircuito) {
+    const where: any = {};
+
+    if (filtros?.estado) {
+      if (filtros.estado !== "TODOS") {
+        where.estado = String(filtros.estado).toUpperCase();
+      }
+    } else {
+      where.estado = "ACTIVO";
+    }
+
+    if (filtros?.dificultad) {
+      where.dificultad = { equals: String(filtros.dificultad), mode: "insensitive" };
+    }
+
+    if (filtros?.duracionDias != null && filtros.duracionDias !== "") {
+      where.duracionDias = Number(filtros.duracionDias);
+    }
+
     return db.circuito.findMany({
-      where: { estado: "ACTIVO" },
+      where,
       include: { etapas: { orderBy: { numeroOrden: "asc" } } },
     });
   }
@@ -71,6 +95,16 @@ export class CircuitoRepository {
       where: {
         idcircuito: id,
         estado: "ACTIVO",
+      },
+    });
+    return count > 0;
+  }
+
+  async tieneSalidas(id: number): Promise<boolean> {
+    const count = await db.salida.count({
+      where: {
+        paquete: { idcircuito: id },
+        estado: { in: SALIDAS_ACTIVAS },
       },
     });
     return count > 0;

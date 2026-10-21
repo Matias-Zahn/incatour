@@ -31,7 +31,7 @@ export class PaqueteController {
   // GET /api/paquetes — CU-10: Consultar paquetes turísticos
   consultarPaquetes = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const paquetes = await paqueteService.consultarPaquetes();
+      const { estado, idcircuito, nombrePaquete } = req.query; const paquetes = await paqueteService.consultarPaquetes({ estado: estado as string | undefined, idcircuito: idcircuito as string | number | undefined, nombrePaquete: nombrePaquete as string | undefined });
       return res.json({ data: paquetes.map(enriquecerPaqueteConImagenes) });
     } catch (error) {
       next(error);
@@ -304,3 +304,4 @@ export class PaqueteController {
     }
   };
 }
+

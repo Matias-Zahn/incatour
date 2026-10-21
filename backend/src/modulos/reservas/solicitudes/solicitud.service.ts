@@ -70,8 +70,39 @@ export class SolicitudService {
   // CU-34 Fase 2: Resolver Solicitud (Aceptar o Rechazar)
   async procesarResolucion(solicitudId: number, dto: ResolverSolicitudDto) {
     const solicitud = await this.repository.buscarPorId(solicitudId);
-    if (!solicitud || solicitud.estado !== "PENDIENTE") {
-      throw CustomError.badRequest("Solicitud inválida o ya resuelta");
+    // RES-10: 404 si no existe
+    if (!solicitud) {
+      throw CustomError.notFound("Solicitud no encontrada");
+    }
+    if (solicitud.estado !== "PENDIENTE") {
+      throw CustomError.badRequest("La solicitud no está PENDIENTE");
+    }
+
+    // RES-04: Validar servicio a resolver (existencia, activo, alojamiento, criterios de paquete, no rechazado previamente)
+    const servicio = await this.repository.buscarServicio(dto.servicioId);
+    if (!servicio || servicio.estado !== "ACTIVO" || !servicio.alojamiento) {
+      throw CustomError.badRequest("El servicio no existe, no está activo o no es un servicio de alojamiento.");
+    }
+
+    const paquete = solicitud.reserva.salida.paquete;
+    if (
+      servicio.localidad !== paquete.localidadGarantizada ||
+      servicio.alojamiento.categoria !== paquete.categoriaGarantizada ||
+      servicio.alojamiento.tipoHabitacion !== paquete.tipoHabitacionGarantizada
+    ) {
+      throw CustomError.badRequest(
+        "El servicio no cumple con los criterios de localidad, categoría o tipo de habitación garantizados."
+      );
+    }
+
+    if (dto.resolucion === "ACEPTADA") {
+      const rechazadosIds = solicitud.reserva.solicitudes
+        .flatMap((s) => s.gestiones)
+        .filter((g) => g.resultado === "Rechazada")
+        .map((g) => g.idservicio);
+      if (rechazadosIds.includes(dto.servicioId)) {
+        throw CustomError.badRequest("El servicio ya fue rechazado anteriormente para esta reserva.");
+      }
     }
 
     const reservaId = solicitud.idreserva;

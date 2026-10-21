@@ -13,6 +13,23 @@ import { PaqueteController } from "./paquete.controller";
  *     tags: [Paquetes]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVO, INACTIVO]
+ *         description: Filtrar por estado
+ *       - in: query
+ *         name: idcircuito
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por ID de circuito
+ *       - in: query
+ *         name: nombrePaquete
+ *         schema:
+ *           type: string
+ *         description: Filtrar por nombre del paquete
  *     responses:
  *       200:
  *         description: Lista de paquetes obtenida exitosamente
@@ -102,6 +119,12 @@ import { PaqueteController } from "./paquete.controller";
  *           type: integer
  *     responses:
  *       200:
+ *         description: Paquete dado de baja exitosamente
+ *       400:
+ *         description: No se puede dar de baja porque tiene salidas activas
+ *       404:
+ *         description: Paquete no encontrado o inactivo
+ *
  * /api/paquetes/{id}/imagen:
  *   post:
  *     summary: Subir imagen de un paquete turístico
