@@ -5,17 +5,21 @@ export class ConsultarSalidasDto {
     public desde: Date | undefined,
     public hasta: Date | undefined,
     public idguia: number | undefined,
+    public idcircuito: number | undefined,
   ) {}
 
   // Los filtros llegan por query string: siempre texto y todos opcionales
   public static create(query: { [key: string]: any }): [string | undefined, ConsultarSalidasDto?] {
-    const { idpaquete, estado, desde, hasta, idguia } = query;
+    const { idpaquete, estado, desde, hasta, idguia, idcircuito } = query;
 
     const [errPaquete, paquete] = aEntero(idpaquete, "idpaquete");
     if (errPaquete) return [errPaquete];
 
     const [errGuia, guia] = aEntero(idguia, "idguia");
     if (errGuia) return [errGuia];
+
+    const [errCircuito, circuito] = aEntero(idcircuito, "idcircuito");
+    if (errCircuito) return [errCircuito];
 
     if (estado !== undefined && typeof estado !== "string") return ["estado debe ser un texto"];
 
@@ -27,7 +31,7 @@ export class ConsultarSalidasDto {
 
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return ["desde no puede ser posterior a hasta"];
 
-    return [undefined, new ConsultarSalidasDto(paquete, estado, fechaDesde, fechaHasta, guia)];
+    return [undefined, new ConsultarSalidasDto(paquete, estado, fechaDesde, fechaHasta, guia, circuito)];
   }
 }
 

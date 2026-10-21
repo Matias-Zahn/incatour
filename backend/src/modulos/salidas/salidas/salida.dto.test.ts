@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { ConsultarSalidasDto, CrearSalidaDto } from "./salida.dto";
 
 describe("ConsultarSalidasDto", () => {
+  it("acepta idcircuito (RF-50) y rechaza uno inválido", () => {
+    expect(ConsultarSalidasDto.create({ idcircuito: "3" })[1]?.idcircuito).toBe(3);
+    expect(ConsultarSalidasDto.create({ idcircuito: "x" })[0]).toBeDefined();
+  });
+
   it("sin filtros es válido y deja todo sin definir", () => {
     const [error, dto] = ConsultarSalidasDto.create({});
 

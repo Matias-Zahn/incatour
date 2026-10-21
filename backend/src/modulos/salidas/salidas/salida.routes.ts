@@ -14,7 +14,11 @@ export class SalidaRoutes {
      *     summary: Consultar salidas (CU-35)
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** Lista las salidas con su paquete, personal asignado y servicios,
-     *       ordenadas por fecha de inicio. Todos los filtros son opcionales.
+     *       ordenadas por fecha de inicio. Todos los filtros son opcionales. Cada salida trae además (RF-50 y RF-61):
+     *       pasajerosConfirmados, cantidadPersonal, guias, permisosFaltantes (pasajeros + personal − permisos emitidos),
+     *       etapaEsperada / etapaInformada / etapaDesfasada (solo EN_CURSO; la esperada reparte las etapas en
+     *       proporción a los días del circuito) y alertas: SOLICITUD_PENDIENTE y PERMISOS_SIN_CONFIRMAR cuando la
+     *       salida empieza dentro de 7 días.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -24,6 +28,7 @@ export class SalidaRoutes {
      *       - { in: query, name: desde, schema: { type: string, format: date }, description: Fecha de inicio desde. }
      *       - { in: query, name: hasta, schema: { type: string, format: date }, description: Fecha de inicio hasta. }
      *       - { in: query, name: idguia, schema: { type: integer }, description: idpersonal de un guía asignado. }
+     *       - { in: query, name: idcircuito, schema: { type: integer }, description: Circuito del paquete. }
      *     responses:
      *       200:
      *         description: Lista de salidas.
