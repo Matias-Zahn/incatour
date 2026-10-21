@@ -175,8 +175,8 @@ export class AsignacionService {
   private async prepararAsignacion(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!ESTADOS_ASIGNABLES.includes(salida.estado)) {
-      throw CustomError.badRequest(`No se pueden asignar recursos a una salida en estado ${salida.estado}`);
+    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+      throw CustomError.badRequest("No se pueden asignar recursos a una salida que ya inició o no está activa");
     }
     if (!salida.idbloqueo) throw CustomError.badRequest("La salida no tiene un bloqueo de cupo ante la autoridad");
     if (salida.personalAsignado.length > 0) {

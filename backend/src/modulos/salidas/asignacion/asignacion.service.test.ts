@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AutoridadMock } from "../../../integraciones/autoridad/autoridad.mock";
 import { AsignacionService } from "./asignacion.service";
 import { ConfirmarAsignacionDto } from "./asignacion.dto";
@@ -38,6 +38,9 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Hoy fijo antes de INICIO (2026-11-20): solo se simula el reloj de Date
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01"));
     autoridad = new AutoridadMock();
     actual.autoridad = autoridad;
     const b = await autoridad.solicitarBloqueoCupo(INICIO, 14);
@@ -48,6 +51,16 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.personalLibre.mockResolvedValue(equipo);
     logistica.disponiblesTransporte.mockResolvedValue([{ idservicio: 7 }]);
     logistica.disponiblesEquipamiento.mockResolvedValue([]);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("SAL-10: rechaza asignar una salida que ya empezó, sin emitir permisos", async () => {
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), fechaInicio: new Date("2026-10-31") });
+    const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
+
+    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("ya inició");
+    expect(emitir).not.toHaveBeenCalled();
   });
 
   it("emite un permiso por persona de la nómina y libera los 7 lugares sobrantes", async () => {
