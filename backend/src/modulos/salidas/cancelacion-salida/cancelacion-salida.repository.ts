@@ -51,6 +51,7 @@ export class CancelacionSalidaRepository {
     emailUsuario: string;
     motivo: string;
     estadoAnterior: string;
+    idbloqueo: string | null;
   }) {
     return db.$transaction(
       async (tx) => {
@@ -130,6 +131,7 @@ export class CancelacionSalidaRepository {
               accion: "CANCELAR_SALIDA",
               antes: { estado: p.estadoAnterior },
               despues: { estado: ESTADO_SALIDA.CANCELADA },
+              idbloqueo: p.idbloqueo,
               reservasCanceladas: afectadas.map((r) => r.idreserva),
               reembolsoTotal,
             },
@@ -140,6 +142,11 @@ export class CancelacionSalidaRepository {
       },
       { timeout: 20000 }
     );
+  }
+
+  // Marca que los cupos ya se liberaron ante la autoridad
+  async limpiarBloqueo(idsalida: number, idbloqueo: string) {
+    return db.salida.updateMany({ where: { idsalida, idbloqueo }, data: { idbloqueo: null } });
   }
 
   // DCD buscarSalidasAlternativas: otras salidas publicadas del mismo paquete con lugares

@@ -69,11 +69,11 @@ export class CancelacionSalidaRoutes {
      *   post:
      *     summary: Cancelar una salida (CU-37)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Primero libera ante la autoridad la totalidad de los cupos
-     *       bloqueados; si la autoridad no responde, **la salida no se cancela**. Luego, en una única transacción:
+     *       **RESTRINGIDO A ADMINISTRADOR.** En una única transacción:
      *       los permisos emitidos pasan a Perdido, se reintegra el stock de equipamiento, se dan de baja las
      *       solicitudes de alojamiento pendientes, todas las reservas pasan a Cancelada con su reembolso del
-     *       100% de lo abonado y la salida queda Cancelada, con el motivo en el registro de auditoría.
+     *       100% de lo abonado y la salida queda Cancelada, con el motivo en el registro de auditoría. Después del commit se liberan ante la
+     *       autoridad los cupos bloqueados; si no responde, la salida queda cancelada y repetir la petición solo los libera.
      *       Por último se avisa por correo a los titulares con el motivo, el importe y salidas alternativas.
      *       Solo procede si el recorrido no comenzó. El dinero se acredita por fuera del sistema.
      *     tags: [Salidas]
@@ -123,8 +123,8 @@ export class CancelacionSalidaRoutes {
      *             schema: { $ref: '#/components/schemas/ErrorRespuesta' }
      *       404:
      *         description: La salida no existe.
-     *       500:
-     *         description: La autoridad no respondió; la salida no se canceló. Reintentar más tarde.
+     *       503:
+     *         description: La salida quedó cancelada pero la autoridad no liberó los cupos; reintentar la misma petición los libera.
      */
     router.post("/:idsalida/cancelar", autenticar, requierePerfil("ADMIN"), controller.confirmarCancelacionSalida);
 

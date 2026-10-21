@@ -22,6 +22,19 @@ export class PasarelaMock implements IPasarelaPagos {
     return this.evaluar(solicitud);
   }
 
+  // Idempotente: repetir el reembolso de una transacción válida siempre aprueba (no guarda estado)
+  async reembolsar(transaccionId: string, monto: number): Promise<RespuestaPago> {
+    const latencia = Math.floor(Math.random() * 1000) + 500;
+    await new Promise((resolve) => setTimeout(resolve, latencia));
+    if (typeof transaccionId !== "string" || !/^TXN-[0-9A-F]{12}$/.test(transaccionId)) {
+      return { aprobado: false, mensaje: "Transacción inexistente" };
+    }
+    if (!Number.isFinite(monto) || monto <= 0) {
+      return { aprobado: false, mensaje: "Monto inválido" };
+    }
+    return { aprobado: true, transaccionId, mensaje: "Reembolso procesado" };
+  }
+
   // Pura: se evalúa después de la espera, así un dato raro no puede tirar dentro del setTimeout
   private evaluar({ tarjeta, monto }: SolicitudPago): RespuestaPago {
     // Validaciones de formato
