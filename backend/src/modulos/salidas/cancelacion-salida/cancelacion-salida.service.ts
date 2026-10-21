@@ -45,20 +45,14 @@ export class CancelacionSalidaService {
 
   // DCD confirmarCancelacionSalida (CU-37, pasos 3 a 12)
   async confirmarCancelacion(idsalida: number, dto: CancelarSalidaDto, usuario: UsuarioAutenticado) {
-    const salida = await this.buscarCancelableOFallar(idsalida);
-
-    // Paso 3: liberar la totalidad de los cupos ante la autoridad ANTES de tocar nada.
-    // Flujo alternativo 1: si no responde, la salida NO se cancela.
-    if (salida.idbloqueo) {
-      try {
-        await obtenerAutoridad().liberarTotalidadCupos(salida.idbloqueo);
-      } catch (error) {
-        console.error(`[CU-37] La autoridad no liberó el bloqueo ${salida.idbloqueo}:`, error);
-        throw CustomError.internalServerError(
-          "No fue posible liberar los cupos ante la autoridad competente. Reintentá más tarde."
-        );
-      }
+    // Reintento: la salida ya quedó cancelada pero la autoridad no liberó los cupos; solo falta eso
+    const previa = await this.repository.findParaCancelar(idsalida);
+    if (previa?.estado === ESTADO_SALIDA.CANCELADA && previa.idbloqueo) {
+      await this.liberarCupos(idsalida, previa.idbloqueo);
+      return { idsalida, nroSalida: previa.nroSalida, estado: ESTADO_SALIDA.CANCELADA, nota: "Cupos liberados ante la autoridad." };
     }
+
+    const salida = await this.buscarCancelableOFallar(idsalida);
 
     // Pasos 4 a 11 en una sola transacción
     const resultado = await this.repository.ejecutarCancelacion({
@@ -67,6 +61,7 @@ export class CancelacionSalidaService {
       emailUsuario: usuario.email,
       motivo: dto.motivo,
       estadoAnterior: salida.estado,
+      idbloqueo: salida.idbloqueo,
     });
     if (!resultado) {
       throw CustomError.badRequest("La salida ya fue cancelada o su recorrido comenzó mientras se procesaba la operación.");
@@ -101,6 +96,9 @@ export class CancelacionSalidaService {
       fallidas = envios.length - enviadas;
     }
 
+    // Paso 3, después del commit: si la autoridad no responde, los avisos igual salieron
+    if (salida.idbloqueo) await this.liberarCupos(idsalida, salida.idbloqueo);
+
     return {
       idsalida,
       nroSalida: salida.nroSalida,
@@ -113,6 +111,19 @@ export class CancelacionSalidaService {
   }
 
   // ---- helpers ----
+  // CU-37 paso 3, después del commit: idempotente, así que reintentar POST /cancelar es seguro
+  private async liberarCupos(idsalida: number, idbloqueo: string) {
+    try {
+      await obtenerAutoridad().liberarTotalidadCupos(idbloqueo);
+    } catch (error) {
+      console.error(`[CU-37] La autoridad no liberó el bloqueo ${idbloqueo}:`, error);
+      throw CustomError.serviceUnavailable(
+        "La salida quedó cancelada, pero la autoridad no liberó los cupos. Reintentá la cancelación más tarde para liberarlos."
+      );
+    }
+    await this.repository.limpiarBloqueo(idsalida, idbloqueo);
+  }
+
   private async buscarCancelableOFallar(idsalida: number): Promise<SalidaParaCancelar> {
     const salida = await this.repository.findParaCancelar(idsalida);
     if (!salida) throw CustomError.notFound(`No se encontró la salida con ID ${idsalida}.`);

@@ -269,6 +269,15 @@ async function faseC() {
   await paso("Compra sobre la salida a cancelar", "POST", "/reservas", compra(3, idDe(salida2, "idsalida") ?? null), tokCliente);
   await paso("Liquidación de la cancelación (CU-37)", "GET", `/salidas/${idDe(salida2, "idsalida")}/cancelacion`);
   await paso("Cancelar salida (CU-37)", "POST", `/salidas/${idDe(salida2, "idsalida")}/cancelar`, { motivo: "Prueba de humo" });
+  // Repetir la cancelación ya liberada tiene que dar 4xx (solo reintenta si faltó liberar los cupos)
+  const rep = idDe(salida2, "idsalida") !== undefined
+    ? await llamar("POST", `/salidas/${idDe(salida2, "idsalida")}/cancelar`, { motivo: "Prueba de humo" })
+    : undefined;
+  if (rep) {
+    const ok4xx = rep.status >= 400 && rep.status < 500;
+    console.log(`${ok4xx ? "✓" : "✗"} ${rep.status} Repetir cancelación (CU-37)`);
+    if (!ok4xx) fallas.push(`C Repetir cancelación (CU-37) → ${rep.status} ${resumen(rep.body)}${rep.error}`);
+  }
 
   // Bajas
   await paso("Baja porteador (CU-25)", "PATCH", `/personal/${idDe(porteador, "idpersonal")}/baja`);
