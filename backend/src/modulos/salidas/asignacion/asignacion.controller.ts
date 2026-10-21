@@ -35,4 +35,14 @@ export class AsignacionController {
       next(error);
     }
   };
+
+  // CU-40 paso 12 (reintento): POST /api/salidas/:idsalida/asignacion/liberar-sobrantes
+  liberarSobrantes = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const resultado = await service.liberarSobrantes(leerId(req.params.idsalida));
+      return res.json({ data: resultado });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

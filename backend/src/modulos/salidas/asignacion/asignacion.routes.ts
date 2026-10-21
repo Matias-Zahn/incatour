@@ -68,14 +68,40 @@ export class AsignacionRoutes {
      *                     idservicio: { type: integer, example: 5 }
      *                     cantidad: { type: integer, example: 4 }
      *     responses:
-     *       200: { description: Asignación confirmada. Informa los permisos emitidos y los lugares liberados. }
+     *       200: { description: "Asignación confirmada. Informa los permisos emitidos y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
      *       400: { description: Personal ocupado, dado de baja o sin habilitación (FA1), stock insuficiente (FA2), transporte sin cupo (FA3), pasaportes vencidos (FA4) o dotación incompleta. }
      *       404: { description: La salida no existe. }
-     *       409: { description: Hay reservas con el alojamiento pendiente (FA5). }
+     *       409: { description: Hay reservas con el alojamiento pendiente (FA5), o la salida, el personal o el transporte cambiaron mientras se asignaba. }
      *       503: { description: La autoridad no pudo emitir los permisos. No se modificó nada. }
+     *
+     * /api/salidas/{idsalida}/asignacion/liberar-sobrantes:
+     *   post:
+     *     summary: Reintentar la liberación de lugares sobrantes (CU-40 paso 12)
+     *     description: >
+     *       **RESTRINGIDO A ADMINISTRADOR.** Si al confirmar la asignación la autoridad no liberó los lugares
+     *       sobrantes, la cantidad queda guardada en la salida y se libera con esta petición. Es idempotente:
+     *       si no queda nada pendiente responde lugaresLiberados 0.
+     *     tags: [Salidas]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     responses:
+     *       200:
+     *         description: Sobrantes liberados (o nada pendiente).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 data: { type: object, properties: { lugaresLiberados: { type: integer, example: 7 } } }
+     *       400: { description: La salida no está cerrada o no tiene bloqueo ante la autoridad. }
+     *       404: { description: La salida no existe. }
+     *       503: { description: La autoridad no respondió; la cantidad sigue pendiente. Reintentar más tarde. }
      */
     router.get("/:idsalida/asignacion", autenticar, requierePerfil("ADMIN"), controller.obtenerPanelAsignacion);
     router.post("/:idsalida/asignacion", autenticar, requierePerfil("ADMIN"), controller.confirmarAsignacion);
+    router.post("/:idsalida/asignacion/liberar-sobrantes", autenticar, requierePerfil("ADMIN"), controller.liberarSobrantes);
 
     return router;
   }

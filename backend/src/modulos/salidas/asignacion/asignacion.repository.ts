@@ -80,6 +80,7 @@ export class AsignacionRepository {
     itemsCamping: ItemCamping[];
     permisos: PermisoEmitido[];
     reservaDePasajero: Map<number, number>;
+    lugaresPorLiberar: number;
   }) {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
@@ -145,7 +146,7 @@ export class AsignacionRepository {
       // Con el personal asignado y los permisos emitidos, la venta queda cerrada
       return tx.salida.update({
         where: { idsalida },
-        data: { estado: "CERRADA", stockLocal: 0, stockLocalAlojamiento: 0 },
+        data: { estado: "CERRADA", stockLocal: 0, stockLocalAlojamiento: 0, lugaresPorLiberar: p.lugaresPorLiberar },
         include: {
           personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
           servicios: { include: { servicio: { select: { nombreServicio: true } } } },
@@ -153,5 +154,16 @@ export class AsignacionRepository {
         },
       });
     });
+  }
+
+  // SAL-09: se "toma" la cantidad pendiente antes de llamar a la autoridad; dos reintentos en paralelo nunca liberan dos veces
+  async tomarSobrantes(idsalida: number, n: number) {
+    const { count } = await db.salida.updateMany({ where: { idsalida, lugaresPorLiberar: n }, data: { lugaresPorLiberar: 0 } });
+    return count === 1;
+  }
+
+  // Si la autoridad falló, la cantidad vuelve a quedar pendiente para el próximo reintento
+  async devolverSobrantes(idsalida: number, n: number) {
+    await db.salida.updateMany({ where: { idsalida, lugaresPorLiberar: 0 }, data: { lugaresPorLiberar: n } });
   }
 }

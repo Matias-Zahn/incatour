@@ -343,7 +343,7 @@ async function faseD() {
       const repoAsig = new AsignacionRepository();
       const confirmarAsignacion = async (idsalida: number) => repoAsig.confirmar({
         salida: (await repoAsig.buscarSalida(idsalida))!, personalIds: [personal.idpersonal],
-        idtransporte: transporte.idservicio, itemsCamping: [], permisos: [], reservaDePasajero: new Map(),
+        idtransporte: transporte.idservicio, itemsCamping: [], permisos: [], reservaDePasajero: new Map(), lugaresPorLiberar: 0,
       });
 
       // a) dos salidas superpuestas con el mismo personal y transporte: solo una se asigna

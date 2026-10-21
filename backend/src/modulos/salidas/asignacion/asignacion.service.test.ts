@@ -5,7 +5,7 @@ import { ConfirmarAsignacionDto } from "./asignacion.dto";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
 const { repo, logistica, actual } = vi.hoisted(() => ({
-  repo: { buscarSalida: vi.fn(), personalLibre: vi.fn(), buscarPersonal: vi.fn(), confirmar: vi.fn() },
+  repo: { buscarSalida: vi.fn(), personalLibre: vi.fn(), buscarPersonal: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn() },
   logistica: { disponiblesTransporte: vi.fn(), disponiblesEquipamiento: vi.fn() },
   actual: { autoridad: null as unknown },
 }));
@@ -51,6 +51,8 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.personalLibre.mockResolvedValue(equipo);
     logistica.disponiblesTransporte.mockResolvedValue([{ idservicio: 7 }]);
     logistica.disponiblesEquipamiento.mockResolvedValue([]);
+    repo.tomarSobrantes.mockResolvedValue(true);
+    repo.devolverSobrantes.mockResolvedValue(undefined);
   });
 
   afterEach(() => vi.useRealTimers());
@@ -72,6 +74,46 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(r.lugaresLiberados).toBe(7);
     // El bloqueo bajó de 14 a 7 lugares: ese día quedan 493 libres
     expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
+  });
+
+  it("SAL-09: si la autoridad no libera los sobrantes, quedan pendientes y se reintentan", async () => {
+    repo.confirmar.mockResolvedValue({ idsalida: 2 });
+    vi.spyOn(autoridad, "liberarLugaresSobrantes").mockRejectedValueOnce(new Error("caída"));
+
+    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 7 }));
+    expect(r.lugaresLiberados).toBe(0);
+    expect(r.advertencia).toContain("liberar-sobrantes");
+    expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 7);
+
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 7 });
+    expect(await new AsignacionService().liberarSobrantes(2)).toEqual({ lugaresLiberados: 7 });
+    expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
+  });
+
+  it("SAL-09: el reintento sin nada pendiente no llama a la autoridad", async () => {
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 0 });
+    const liberar = vi.spyOn(autoridad, "liberarLugaresSobrantes");
+
+    expect(await new AsignacionService().liberarSobrantes(2)).toEqual({ lugaresLiberados: 0 });
+    expect(liberar).not.toHaveBeenCalled();
+  });
+
+  it("SAL-09: si otro pedido ya tomó los sobrantes, no los libera dos veces", async () => {
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 7 });
+    repo.tomarSobrantes.mockResolvedValue(false);
+    const liberar = vi.spyOn(autoridad, "liberarLugaresSobrantes");
+
+    await new AsignacionService().liberarSobrantes(2);
+    expect(liberar).not.toHaveBeenCalled();
+  });
+
+  it("SAL-09: con la autoridad caída en el reintento responde 503", async () => {
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 7 });
+    vi.spyOn(autoridad, "liberarLugaresSobrantes").mockRejectedValueOnce(new Error("caída"));
+
+    await expect(new AsignacionService().liberarSobrantes(2)).rejects.toMatchObject({ statusCode: 503 });
+    expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 7);
   });
 
   it("FA4: con un pasaporte vencido no emite permisos ni guarda nada", async () => {
