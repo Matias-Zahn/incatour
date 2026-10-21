@@ -8,6 +8,7 @@ import { manejadoresGuia } from "./manejadores/guia";
 import { manejadoresPaquetes } from "./manejadores/paquetes";
 import { manejadoresPersonal } from "./manejadores/personal";
 import { manejadoresProveedores } from "./manejadores/proveedores";
+import { manejadoresSalidas } from "./manejadores/salidas";
 import { manejadoresServicios } from "./manejadores/servicios";
 import { manejadoresSolicitudes } from "./manejadores/solicitudes";
 import { manejadoresTemporadas } from "./manejadores/temporadas";
@@ -22,6 +23,7 @@ export const manejadores = [
     ...manejadoresEtapas,
     ...manejadoresTemporadas,
     ...manejadoresPaquetes,
+    ...manejadoresSalidas,
     ...manejadoresSolicitudes,
     ...manejadoresEvaluaciones,
     ...manejadoresCatalogoReservas,

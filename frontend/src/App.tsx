@@ -9,6 +9,7 @@ import InicioGestionPage from "./pages/gestion/InicioGestionPage";
 import PaquetesPage from "./pages/gestion/PaquetesPage";
 import PersonalPage from "./pages/gestion/PersonalPage";
 import ProveedoresPage from "./pages/gestion/ProveedoresPage";
+import SalidasPage from "./pages/gestion/SalidasPage";
 import ServiciosPage from "./pages/gestion/ServiciosPage";
 import SolicitudesPage from "./pages/gestion/SolicitudesPage";
 import TemporadasPage from "./pages/gestion/TemporadasPage";
@@ -91,6 +92,14 @@ function App() {
             element={
               <LayoutGestion seccion="Proveedores">
                 <ServiciosPage />
+              </LayoutGestion>
+            }
+          />
+          <Route
+            path="/gestion/salidas"
+            element={
+              <LayoutGestion seccion="Salidas">
+                <SalidasPage />
               </LayoutGestion>
             }
           />
