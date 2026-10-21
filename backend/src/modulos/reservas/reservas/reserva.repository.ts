@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { ESTADO_SALIDA } from "../../../shared/constantes";
 import { PasajeroInput } from "./reserva.dto";
 
 export interface DatosConfirmacionReserva {
@@ -83,6 +84,10 @@ export class ReservaRepository {
   // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
   async confirmarReserva(d: DatosConfirmacionReserva) {
     return db.$transaction(async (tx) => {
+      // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan (y ven) el cierre de la asignación (CU-40)
+      const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
+      if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
+
       // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza y se actualizan sus datos
       const idsPasajeros: number[] = [];
       for (const p of d.pasajeros) {

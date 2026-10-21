@@ -60,8 +60,8 @@ model Reserva {
   estado                 String
   estadoAlojamiento      String?
 
-  cliente     Cliente             @relation(fields: [idcliente], references: [idcliente])
-  salida      Salida              @relation(fields: [idsalida], references: [idsalida])
+  cliente     Cliente           @relation(fields: [idcliente], references: [idcliente])
+  salida      Salida            @relation(fields: [idsalida], references: [idsalida])
   pasajeros   ReservaPasajero[]
   pagos       Pago[]
   reembolsos  Reembolso[] // Relación con el nuevo modelo Reembolso
@@ -325,6 +325,7 @@ model Salida {
   idpaquete             Int
   nroSalida             String   @unique
   idbloqueo             String?
+  lugaresPorLiberar     Int      @default(0) // CU-40: sobrantes que la autoridad todavía no liberó (SAL-09)
   stockLocal            Int // Restricción CHECK pendiente en BD
   stockLocalAlojamiento Int?
   tamanoMaximo          Int
@@ -351,7 +352,7 @@ model Salida {
 }
 
 model SalidaServicio {
-  idsalida   Int
+  idsalida           Int
   idservicio         Int
   tipo               String
   comprobanteReserva String? // Solo TRANSPORTE: comprobante de la reserva externa (CU-39)

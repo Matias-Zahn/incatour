@@ -6,9 +6,7 @@ import { LogisticaRepository } from "../logistica/logistica.repository";
 import { calcularDotacion } from "../salidas/salida.dotacion";
 import { ROL_GUIA, ROL_PORTEADOR } from "../../cuentas/personal/personal.dto";
 import { ConfirmarAsignacionDto } from "./asignacion.dto";
-import { AsignacionRepository, SalidaParaAsignar } from "./asignacion.repository";
-
-const ESTADOS_ASIGNABLES = ["PUBLICADA", "CERRADA"];
+import { AsignacionRepository, ESTADOS_ASIGNABLES, SalidaParaAsignar } from "./asignacion.repository";
 
 export class AsignacionService {
   private repository = new AsignacionRepository();
@@ -138,6 +136,7 @@ export class AsignacionService {
         idtransporte: dto.idtransporte,
         itemsCamping: dto.itemsCamping,
         permisos,
+        lugaresPorLiberar: sobrantes - extra,
         reservaDePasajero: new Map(
           salida.reservas.flatMap((r) => r.pasajeros.map((rp) => [rp.idpasajero, r.idreserva] as [number, number]))
         ),
@@ -148,35 +147,54 @@ export class AsignacionService {
     }
 
     // Paso 12: liberar los lugares sobrantes. La salida ya quedó bien, así que si la autoridad
-    // falla acá no se deshace nada: se informa para reintentar la liberación.
+    // falla acá no se deshace nada: la cantidad queda guardada y se reintenta con liberarSobrantes
     const lugaresALiberar = sobrantes - extra;
-    let sobrantesLiberados = lugaresALiberar === 0;
-    if (lugaresALiberar > 0) {
-      sobrantesLiberados = await autoridad
-        .liberarLugaresSobrantes(salida.idbloqueo!, lugaresALiberar)
-        .then(() => true)
-        .catch((e) => {
-          console.error(`No se pudieron liberar ${lugaresALiberar} lugares del bloqueo ${salida.idbloqueo}`, e);
-          return false;
-        });
-    }
+    const sobrantesLiberados = lugaresALiberar === 0 || (await this.liberar(salida.idbloqueo!, idsalida, lugaresALiberar));
 
     return {
       salida: salidaActualizada,
       permisosEmitidos: permisos.length,
       lugaresLiberados: sobrantesLiberados ? lugaresALiberar : 0,
       ...(!sobrantesLiberados && {
-        advertencia: `La asignación se guardó, pero no se pudieron liberar ${lugaresALiberar} lugares sobrantes ante la autoridad`,
+        advertencia: `La asignación se guardó, pero no se pudieron liberar ${lugaresALiberar} lugares sobrantes ante la autoridad. Reintentá con POST /api/salidas/${idsalida}/asignacion/liberar-sobrantes`,
       }),
     };
+  }
+
+  // CU-40 paso 12, reintento (SAL-09): libera los sobrantes que quedaron pendientes. Idempotente
+  async liberarSobrantes(idsalida: number) {
+    const salida = await this.repository.buscarSalida(idsalida);
+    if (!salida) throw CustomError.notFound("La salida no existe");
+    if (salida.estado !== "CERRADA" || !salida.idbloqueo) {
+      throw CustomError.badRequest("La salida no tiene lugares sobrantes por liberar");
+    }
+    const n = salida.lugaresPorLiberar;
+    if (n > 0 && !(await this.liberar(salida.idbloqueo, idsalida, n))) {
+      throw CustomError.serviceUnavailable("No fue posible liberar los lugares ante la autoridad. Reintentá más tarde");
+    }
+    return { lugaresLiberados: n };
+  }
+
+  // true si quedaron liberados (o si otro pedido ya los tomó); false si la autoridad falló
+  private async liberar(idbloqueo: string, idsalida: number, n: number) {
+    if (!(await this.repository.tomarSobrantes(idsalida, n))) return true;
+    try {
+      await obtenerAutoridad().liberarLugaresSobrantes(idbloqueo, n);
+      return true;
+    } catch (e) {
+      console.error(`No se pudieron liberar ${n} lugares del bloqueo ${idbloqueo}`, e);
+      // ponytail: si la base también falla acá, la cantidad se pierde y solo queda el log
+      await this.repository.devolverSobrantes(idsalida, n).catch((e2) => console.error("No se pudo volver a marcar los sobrantes pendientes", e2));
+      return false;
+    }
   }
 
   // Precondiciones, FA5 y cálculos compartidos por el panel y la confirmación
   private async prepararAsignacion(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!ESTADOS_ASIGNABLES.includes(salida.estado)) {
-      throw CustomError.badRequest(`No se pueden asignar recursos a una salida en estado ${salida.estado}`);
+    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+      throw CustomError.badRequest("No se pueden asignar recursos a una salida que ya inició o no está activa");
     }
     if (!salida.idbloqueo) throw CustomError.badRequest("La salida no tiene un bloqueo de cupo ante la autoridad");
     if (salida.personalAsignado.length > 0) {

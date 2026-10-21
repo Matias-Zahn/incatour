@@ -328,6 +328,61 @@ async function faseD() {
 
     const negativo = await Promise.allSettled([autoridad.solicitarBloqueoCupo(new Date("2030-06-15"), -10)]);
     controlar("Bloquear -10 lugares se rechaza", negativo[0]!.status === "rejected");
+
+    // SAL-05 / SAL-06: asignaciones y compras contra el mismo recurso, con los locks reales de Postgres
+    const { AsignacionRepository } = await import("../src/modulos/salidas/asignacion/asignacion.repository.js");
+    const { ReservaRepository } = await import("../src/modulos/reservas/reservas/reserva.repository.js");
+    const { ESTADO } = await import("../src/shared/constantes.js");
+    const paquete = await db.paquete.findUniqueOrThrow({ where: { nroPaquete: "PAQ-INC-01" } });
+    const cliente = await db.usuario.findUniqueOrThrow({ where: { email: "juan@test.com" } });
+    const transporte = await db.servicioTransporte.findFirstOrThrow();
+    const sufijo = Date.now().toString(36).toUpperCase();
+    const crearSalida = (n: string, inicio: string, fin: string) => db.salida.create({
+      data: {
+        idpaquete: paquete.idpaquete, nroSalida: `SAL-D-${sufijo}-${n}`, idbloqueo: `BLQ-D-${sufijo}-${n}`,
+        stockLocal: 5, stockLocalAlojamiento: 0, tamanoMaximo: 5,
+        fechaInicio: new Date(inicio), fechaFin: new Date(fin), estado: "PUBLICADA",
+      },
+    });
+    const personal = await db.personal.create({
+      data: { nombreCompleto: `Humo D ${sufijo}`, nroPasaporte: `DP-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: new Date("2035-01-01"), estado: ESTADO.ACTIVO, rol: "Porteador" },
+    });
+    const salidas: number[] = [];
+    try {
+      const repoAsig = new AsignacionRepository();
+      const confirmarAsignacion = async (idsalida: number) => repoAsig.confirmar({
+        salida: (await repoAsig.buscarSalida(idsalida))!, personalIds: [personal.idpersonal],
+        idtransporte: transporte.idservicio, itemsCamping: [], permisos: [], reservaDePasajero: new Map(), lugaresPorLiberar: 0,
+      });
+
+      // a) dos salidas superpuestas con el mismo personal y transporte: solo una se asigna
+      const s1 = await crearSalida("A1", "2031-03-10", "2031-03-13");
+      const s2 = await crearSalida("A2", "2031-03-12", "2031-03-15");
+      salidas.push(s1.idsalida, s2.idsalida);
+      const paralelas = await Promise.allSettled([confirmarAsignacion(s1.idsalida), confirmarAsignacion(s2.idsalida)]);
+      controlar("Dos asignaciones superpuestas con el mismo personal/transporte: solo una pasa", exactamenteUno(paralelas));
+
+      // b) compra sobre una salida que se cierra: reserva cupo, la asignación cierra, el pago ya no confirma
+      const s3 = await crearSalida("B", "2031-06-10", "2031-06-13");
+      salidas.push(s3.idsalida);
+      const repoReserva = new ReservaRepository();
+      await repoReserva.reservarCupos(s3.idsalida, 1);
+      await confirmarAsignacion(s3.idsalida).then(
+        () => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", true),
+        (e) => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", false, String(e)),
+      );
+      const compra = await Promise.allSettled([repoReserva.confirmarReserva({
+        idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100,
+        condicionesComerciales: "humo", medioPago: "TARJETA", estadoAlojamiento: "CONFIRMADO",
+        pasajeros: [{ nombreCompleto: "Humo D", nroPasaporte: `DPAS-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2035-01-01" }],
+      })]);
+      controlar("Confirmar una compra sobre una salida ya cerrada se rechaza", compra[0]!.status === "rejected");
+    } finally {
+      await db.asignacionPersonal.deleteMany({ where: { idsalida: { in: salidas } } });
+      await db.salidaServicio.deleteMany({ where: { idsalida: { in: salidas } } });
+      await db.salida.deleteMany({ where: { idsalida: { in: salidas } } });
+      await db.personal.delete({ where: { idpersonal: personal.idpersonal } });
+    }
   } finally {
     await db.$disconnect();
   }
