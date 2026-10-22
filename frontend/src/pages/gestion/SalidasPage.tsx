@@ -6,6 +6,7 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
+import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
@@ -34,6 +35,7 @@ const ESTADOS_SALIDA = [
 ] as const;
 
 function SalidasPage() {
+    const [filtroCircuito, setFiltroCircuito] = useState<number | "">("");
     const [filtroPaquete, setFiltroPaquete] = useState<number | "">("");
     const [filtroEstado, setFiltroEstado] = useState<string>("");
     const [filtroDesde, setFiltroDesde] = useState<string>("");
@@ -42,6 +44,7 @@ function SalidasPage() {
     const [paginaActual, setPaginaActual] = useState(1);
 
     // Opciones para los selectores de filtros
+    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos();
     const { data: paquetes = [], isPending: cargandoPaquetes } = usePaquetes();
     const { data: personalGuias = [], isPending: cargandoGuias } = usePersonal({
         rol: "Guía",
@@ -52,6 +55,7 @@ function SalidasPage() {
     );
 
     const filtrosConsulta: FiltrosSalidas = {
+        ...(filtroCircuito !== "" ? { idcircuito: Number(filtroCircuito) } : {}),
         ...(filtroPaquete !== "" ? { idpaquete: Number(filtroPaquete) } : {}),
         ...(filtroEstado ? { estado: filtroEstado } : {}),
         ...(!rangoFechasInvalido && filtroDesde ? { desde: filtroDesde } : {}),
@@ -66,7 +70,7 @@ function SalidasPage() {
         error,
     } = useSalidas(filtrosConsulta);
 
-    // Consulta de solicitudes de alojamiento para advertencias operativas (RF-61)
+    // Consulta de solicitudes de alojamiento para enriquecer con el conteo exacto de solicitudes pendientes
     const { data: solicitudesPendientes = [] } = useQuery({
         queryKey: ["solicitudes"],
         queryFn: listarSolicitudesPendientes,
@@ -77,16 +81,13 @@ function SalidasPage() {
         return contarSolicitudesPendientesPorSalida(solicitudesPendientes);
     }, [solicitudesPendientes]);
 
-    const salidasConSolicitudes = useMemo(() => {
-        return salidas
-            .map((s) => ({
-                salida: s,
-                cantidad: solicitudesPorSalida.get(s.idsalida) ?? 0,
-            }))
-            .filter((item) => item.cantidad > 0);
-    }, [salidas, solicitudesPorSalida]);
+    // Advertencias operativas basadas en salida.alertas provistas por el backend (RF-61)
+    const salidasConAlertasOperativas = useMemo(() => {
+        return salidas.filter((s) => Array.isArray(s.alertas) && s.alertas.length > 0);
+    }, [salidas]);
 
     const hayFiltrosActivos =
+        filtroCircuito !== "" ||
         filtroPaquete !== "" ||
         Boolean(filtroEstado) ||
         Boolean(filtroDesde) ||
@@ -94,6 +95,7 @@ function SalidasPage() {
         filtroGuia !== "";
 
     function limpiarFiltros() {
+        setFiltroCircuito("");
         setFiltroPaquete("");
         setFiltroEstado("");
         setFiltroDesde("");
@@ -164,11 +166,18 @@ function SalidasPage() {
         },
         {
             clave: "tamanoMaximo" as const,
-            titulo: "Cupo / Stock",
+            titulo: "Pasajeros / Cupo",
             renderizar: (fila: Salida) => (
-                <div className="min-w-[100px] whitespace-nowrap text-xs">
-                    <p className="font-medium text-texto">Máx: {fila.tamanoMaximo}</p>
-                    <p className="text-texto-suave mt-0.5">Disponible: {fila.stockLocal}</p>
+                <div className="min-w-[110px] whitespace-nowrap text-xs">
+                    <p className="font-medium text-texto">
+                        Confirmados:{" "}
+                        <span className="font-semibold text-navegacion">
+                            {fila.pasajerosConfirmados}
+                        </span>
+                    </p>
+                    <p className="text-texto-suave mt-0.5">
+                        Máx: {fila.tamanoMaximo} · Disp: {fila.stockLocal}
+                    </p>
                 </div>
             ),
         },
@@ -177,7 +186,8 @@ function SalidasPage() {
             titulo: "Personal",
             renderizar: (fila: Salida) => {
                 const dotacion = dotacionDeSalida(fila);
-                if (dotacion.total === 0) {
+                const totalPersonal = fila.cantidadPersonal ?? dotacion.total;
+                if (totalPersonal === 0) {
                     return (
                         <span className="text-xs text-texto-suave whitespace-nowrap">
                             Sin personal asignado
@@ -187,13 +197,15 @@ function SalidasPage() {
                 return (
                     <div className="min-w-[140px] text-xs">
                         <p className="font-medium text-texto whitespace-nowrap">
-                            {dotacion.total} asignados
+                            {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
                         </p>
-                        <p className="text-texto-suave mt-0.5 whitespace-nowrap">
-                            {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
-                            {dotacion.porteadores}{" "}
-                            {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
-                        </p>
+                        {dotacion.total > 0 && (
+                            <p className="text-texto-suave mt-0.5 whitespace-nowrap">
+                                {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
+                                {dotacion.porteadores}{" "}
+                                {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
+                            </p>
+                        )}
                     </div>
                 );
             },
@@ -202,7 +214,10 @@ function SalidasPage() {
             clave: "id" as const,
             titulo: "Guía/s",
             renderizar: (fila: Salida) => {
-                const guias = nombresGuiasDeSalida(fila);
+                const guias =
+                    fila.guias && fila.guias.length > 0
+                        ? fila.guias
+                        : nombresGuiasDeSalida(fila);
                 if (guias.length === 0) {
                     return (
                         <span className="text-xs text-texto-suave whitespace-nowrap">
@@ -222,26 +237,94 @@ function SalidasPage() {
             },
         },
         {
+            clave: "permisosFaltantes" as const,
+            titulo: "Permisos",
+            renderizar: (fila: Salida) => {
+                const faltantes = fila.permisosFaltantes ?? 0;
+                const alertaPermisos = fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
+
+                if (faltantes === 0) {
+                    return (
+                        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 whitespace-nowrap">
+                            Al día (0 faltantes)
+                        </span>
+                    );
+                }
+
+                if (alertaPermisos) {
+                    return (
+                        <div className="whitespace-nowrap">
+                            <span
+                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
+                                title="Alerta operativa: permisos sin emitir dentro de los 7 días previos al inicio"
+                            >
+                                <span aria-hidden="true">⚠️</span>
+                                <span>
+                                    {faltantes}{" "}
+                                    {faltantes === 1 ? "faltante" : "faltantes"}
+                                </span>
+                            </span>
+                        </div>
+                    );
+                }
+
+                return (
+                    <span className="inline-flex items-center rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 whitespace-nowrap">
+                        {faltantes} {faltantes === 1 ? "faltante" : "faltantes"}
+                    </span>
+                );
+            },
+        },
+        {
             clave: "ultimaEtapaAlcanzada" as const,
             titulo: "Avance",
             renderizar: (fila: Salida) => {
                 if (fila.estado === "EN_CURSO") {
-                    if (
-                        fila.ultimaEtapaAlcanzada !== null &&
-                        fila.ultimaEtapaAlcanzada !== undefined
-                    ) {
+                    const informada = fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
+                    const esperada = fila.etapaEsperada;
+                    const desfasada = fila.etapaDesfasada;
+
+                    const textoInformada =
+                        informada !== null ? `Etapa ${informada}` : "Sin informe";
+                    const textoEsperada =
+                        esperada !== null ? `Esperada: ${esperada}` : null;
+
+                    if (desfasada) {
                         return (
-                            <div className="whitespace-nowrap">
-                                <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                                    Etapa {fila.ultimaEtapaAlcanzada} informada
+                            <div className="whitespace-nowrap flex flex-col gap-0.5">
+                                <span
+                                    className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
+                                    title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
+                                >
+                                    <span aria-hidden="true">⏱️</span>
+                                    <span>{textoInformada}</span>
+                                    {textoEsperada && (
+                                        <span className="font-normal text-amber-700">
+                                            ({textoEsperada})
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="text-[10px] font-semibold text-amber-700">
+                                    Desfasada del cronograma
                                 </span>
                             </div>
                         );
                     }
+
                     return (
-                        <span className="text-xs text-texto-suave whitespace-nowrap">
-                            Sin avances informados
-                        </span>
+                        <div className="whitespace-nowrap flex flex-col gap-0.5">
+                            <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                                {textoInformada}
+                                {textoEsperada && (
+                                    <span className="ml-1 text-emerald-600">
+                                        ({textoEsperada})
+                                    </span>
+                                )}
+                            </span>
+                            <span className="text-[10px] text-emerald-700 font-medium">
+                                Al día
+                            </span>
+                        </div>
                     );
                 }
                 return <span className="text-xs text-texto-suave">—</span>;
@@ -251,41 +334,68 @@ function SalidasPage() {
             clave: "id" as const,
             titulo: "Avisos",
             renderizar: (fila: Salida) => {
-                const cantidad = solicitudesPorSalida.get(fila.idsalida) ?? 0;
-                if (cantidad > 0) {
+                const tieneAlertas =
+                    Array.isArray(fila.alertas) && fila.alertas.length > 0;
+                if (!tieneAlertas) {
                     return (
-                        <div className="whitespace-nowrap">
+                        <span className="text-xs text-texto-suave whitespace-nowrap">
+                            Sin avisos
+                        </span>
+                    );
+                }
+
+                const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
+
+                return (
+                    <div className="whitespace-nowrap flex flex-col gap-1 items-start">
+                        {fila.alertas.includes("SOLICITUD_PENDIENTE") && (
                             <Link
                                 to="/gestion/solicitudes"
-                                title="Ver solicitudes de alojamiento pendientes"
+                                title="Solicitudes de alojamiento pendientes en salida próxima (< 7 días)"
                                 className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-200 transition-colors"
                             >
                                 <span aria-hidden="true">⚠️</span>
                                 <span>
-                                    {cantidad}{" "}
-                                    {cantidad === 1 ? "solicitud pend." : "solicitudes pend."}
+                                    {cantSolicitudes !== undefined && cantSolicitudes > 0
+                                        ? `${cantSolicitudes} ${cantSolicitudes === 1 ? "solicitud pend." : "solicitudes pend."}`
+                                        : "Solicitud pend."}
                                 </span>
                             </Link>
-                        </div>
-                    );
-                }
-                return <span className="text-xs text-texto-suave whitespace-nowrap">Sin avisos</span>;
+                        )}
+                        {fila.alertas.includes("PERMISOS_SIN_CONFIRMAR") && (
+                            <span
+                                title="Permisos sin confirmar en salida próxima (< 7 días)"
+                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-xs font-semibold text-rose-900"
+                            >
+                                <span aria-hidden="true">📋</span>
+                                <span>
+                                    {fila.permisosFaltantes}{" "}
+                                    {fila.permisosFaltantes === 1
+                                        ? "perm. faltante"
+                                        : "perm. faltantes"}
+                                </span>
+                            </span>
+                        )}
+                    </div>
+                );
             },
         },
         {
             clave: "idsalida" as const,
             titulo: "Acciones",
             renderizar: (fila: Salida) => {
-                const tienePendientes = (solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0;
+                const tieneSolicitudes =
+                    (solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
+                    fila.alertas?.includes("SOLICITUD_PENDIENTE");
                 const esFinalizada = fila.estado === "FINALIZADA";
 
-                if (!tienePendientes && !esFinalizada) {
+                if (!tieneSolicitudes && !esFinalizada) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
 
                 return (
                     <div className="min-w-[110px] whitespace-nowrap flex flex-col gap-1 items-start text-xs font-semibold">
-                        {tienePendientes && (
+                        {tieneSolicitudes && (
                             <Link
                                 to="/gestion/solicitudes"
                                 className="text-marca hover:underline"
@@ -321,34 +431,57 @@ function SalidasPage() {
                 </div>
             </header>
 
-            {/* Advertencia operativa de solicitudes pendientes (RF-61) */}
-            {salidasConSolicitudes.length > 0 ? (
+            {/* Advertencia operativa en salidas próximas (< 7 días) (RF-61) */}
+            {salidasConAlertasOperativas.length > 0 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo="Advertencia operativa: Solicitudes de alojamiento pendientes (RF-61)"
+                    titulo="Advertencias operativas: Salidas próximas dentro de 7 días (RF-61)"
                 >
                     <div className="space-y-2">
                         <p className="text-sm">
-                            Se detectaron {salidasConSolicitudes.length}{" "}
-                            {salidasConSolicitudes.length === 1 ? "salida" : "salidas"} con solicitudes de alojamiento pendientes de confirmación ante proveedores:
+                            Se detectaron situaciones operativas pendientes en{" "}
+                            {salidasConAlertasOperativas.length}{" "}
+                            {salidasConAlertasOperativas.length === 1
+                                ? "salida próxima a iniciar"
+                                : "salidas próximas a iniciar"}
+                            :
                         </p>
                         <div className="flex flex-wrap gap-2 pt-1">
-                            {salidasConSolicitudes.map(({ salida, cantidad }) => (
-                                <span
-                                    key={salida.idsalida}
-                                    className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300"
-                                >
-                                    <span>
-                                        {salida.nroSalida} ({salida.paquete?.nombrePaquete}):
-                                    </span>
-                                    <span className="font-bold underline">
-                                        {cantidad}{" "}
-                                        {cantidad === 1
-                                            ? "solicitud pendiente"
-                                            : "solicitudes pendientes"}
-                                    </span>
-                                </span>
-                            ))}
+                            {salidasConAlertasOperativas.map((s) => {
+                                const tieneSol = s.alertas?.includes("SOLICITUD_PENDIENTE");
+                                const tienePerm = s.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
+                                const cantSol = solicitudesPorSalida.get(s.idsalida);
+
+                                return (
+                                    <div
+                                        key={s.idsalida}
+                                        className="inline-flex flex-wrap items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300"
+                                    >
+                                        <span>
+                                            {s.nroSalida} ({s.paquete?.nombrePaquete}):
+                                        </span>
+                                        {tieneSol && (
+                                            <Link
+                                                to="/gestion/solicitudes"
+                                                className="font-bold underline hover:text-amber-950"
+                                            >
+                                                {cantSol
+                                                    ? `${cantSol} ${cantSol === 1 ? "solicitud pendiente" : "solicitudes pendientes"}`
+                                                    : "solicitud pendiente"}
+                                            </Link>
+                                        )}
+                                        {tieneSol && tienePerm && <span>·</span>}
+                                        {tienePerm && (
+                                            <span className="text-rose-900 font-bold">
+                                                {s.permisosFaltantes}{" "}
+                                                {s.permisosFaltantes === 1
+                                                    ? "permiso faltante"
+                                                    : "permisos faltantes"}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         <div className="pt-1">
                             <Link
@@ -369,7 +502,33 @@ function SalidasPage() {
             ) : null}
 
             {/* Panel de Filtros */}
-            <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                <label
+                    htmlFor="filtro-circuito"
+                    className="grid gap-1 text-xs font-semibold text-texto-suave"
+                >
+                    Circuito
+                    <select
+                        id="filtro-circuito"
+                        value={filtroCircuito}
+                        disabled={cargandoCircuitos}
+                        onChange={(evento) => {
+                            setFiltroCircuito(
+                                evento.target.value ? Number(evento.target.value) : "",
+                            );
+                            setPaginaActual(1);
+                        }}
+                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
+                    >
+                        <option value="">Todos los circuitos</option>
+                        {circuitos.map((c) => (
+                            <option key={c.idcircuito} value={c.idcircuito}>
+                                {c.nombreCircuito}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
                 <label
                     htmlFor="filtro-paquete"
                     className="grid gap-1 text-xs font-semibold text-texto-suave"
@@ -480,7 +639,7 @@ function SalidasPage() {
                 </label>
 
                 {hayFiltrosActivos ? (
-                    <div className="flex justify-end sm:col-span-2 lg:col-span-5">
+                    <div className="flex justify-end sm:col-span-2 md:col-span-3 lg:col-span-6">
                         <Boton
                             variante="fantasma"
                             className="text-xs text-texto-suave"
@@ -510,8 +669,20 @@ function SalidasPage() {
             ) : (
                 <div className="space-y-4">
                     <div className="overflow-x-auto rounded-tarjeta">
-                        <div className="min-w-[1150px]">
-                            <Tabla filas={salidasPaginadas} columnas={columnas} />
+                        <div className="min-w-full w-max">
+                            <Tabla
+                                filas={salidasPaginadas}
+                                columnas={columnas}
+                                claseFila={(fila) => {
+                                    const tieneAlertas =
+                                        Array.isArray(fila.alertas) && fila.alertas.length > 0;
+                                    const tieneDesfase = fila.etapaDesfasada === true;
+                                    if (tieneAlertas || tieneDesfase) {
+                                        return "bg-amber-50/75 hover:bg-amber-100/60 transition-colors";
+                                    }
+                                    return undefined;
+                                }}
+                            />
                         </div>
                     </div>
 

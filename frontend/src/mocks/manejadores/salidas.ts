@@ -11,10 +11,23 @@ export const manejadoresSalidas = [
         const url = new URL(request.url);
 
         const idpaqueteParam = url.searchParams.get("idpaquete");
+        const idcircuitoParam = url.searchParams.get("idcircuito");
         const estadoParam = url.searchParams.get("estado");
         const desdeParam = url.searchParams.get("desde");
         const hastaParam = url.searchParams.get("hasta");
         const idguiaParam = url.searchParams.get("idguia");
+
+        let idcircuito: number | undefined;
+        if (idcircuitoParam) {
+            const parsed = Number(idcircuitoParam);
+            if (!Number.isInteger(parsed) || parsed <= 0) {
+                return HttpResponse.json(
+                    { error: "idcircuito debe ser un número entero positivo" },
+                    { status: 400 },
+                );
+            }
+            idcircuito = parsed;
+        }
 
         let fechaDesde: Date | undefined;
         let fechaHasta: Date | undefined;
@@ -51,6 +64,9 @@ export const manejadoresSalidas = [
 
         const resultado = salidas.filter((salida) => {
             if (idpaquete && salida.idpaquete !== idpaquete) {
+                return false;
+            }
+            if (idcircuito && salida.paquete?.circuito?.idcircuito !== idcircuito) {
                 return false;
             }
             if (estadoParam && salida.estado !== estadoParam) {
