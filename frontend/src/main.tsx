@@ -19,7 +19,19 @@ async function habilitarMocks() {
     return
   }
   const { trabajadorMocks } = await import('./mocks/navegador')
-  await trabajadorMocks.start()
+  await trabajadorMocks.start({
+    // Solo se rechazan las rutas /api/ sin manejador. Las navegaciones de React,
+    // los recursos estáticos y el HMR continúan normalmente (passthrough).
+    onUnhandledFrame({ frame, defaults }) {
+      if (frame.protocol !== 'http') return
+      const { request } = frame.data as { request: Request }
+      const { pathname } = new URL(request.url)
+      if (pathname.startsWith('/api/')) {
+        defaults.error()
+        throw new Error(`[MSW] Ruta /api sin manejador: ${request.method} ${pathname}`)
+      }
+    },
+  })
 }
 
 habilitarMocks().then(() => {
