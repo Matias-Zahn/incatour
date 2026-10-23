@@ -43,12 +43,27 @@ export class DevolucionEquipamientoService {
       throw CustomError.notFound(`La salida #${idsalida} no existe.`);
     }
 
+    // SAL-03: Salidas canceladas ya reintegraron su equipamiento al stock en CU-37
+    if (salida.estado === "CANCELADA") {
+      throw CustomError.badRequest(
+        "No se puede registrar la devolución de una salida cancelada (el equipamiento ya fue reintegrado al cancelar)."
+      );
+    }
+
     // Regla de Negocio: la salida debe haber finalizado
     const ahora = new Date();
     const yaConcluyo = salida.estado === "FINALIZADA" || salida.fechaFin <= ahora;
     if (!yaConcluyo) {
       throw CustomError.badRequest(
         "Solo se puede registrar la devolución del equipamiento de una salida concluida o en estado FINALIZADA."
+      );
+    }
+
+    // SAL-03: No permitir registrar la devolución más de una vez (evita inflar stock)
+    const yaDevuelto = await this.repository.existeDevolucion(idsalida);
+    if (yaDevuelto) {
+      throw CustomError.badRequest(
+        `La devolución de equipamiento para la salida #${idsalida} ya fue registrada previamente.`
       );
     }
 

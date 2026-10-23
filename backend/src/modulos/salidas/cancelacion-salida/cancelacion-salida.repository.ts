@@ -4,6 +4,7 @@ import {
   ESTADO_RESERVA,
   ESTADO_SALIDA,
   ESTADO_SOLICITUD,
+  TIPO_SERVICIO,
   SALIDAS_NO_INICIADAS,
   redondear2,
 } from "../../../shared/constantes";
@@ -70,6 +71,18 @@ export class CancelacionSalidaRepository {
           where: { estadoTramite: ESTADO_PERMISO.EMITIDO, reserva: { idsalida: p.idsalida } },
           data: { estadoTramite: ESTADO_PERMISO.PERDIDO },
         });
+
+        // SAL-02: Alojamiento: se reponen las plazas bloqueadas al hotel (RF-51)
+        const servicioHotel = await tx.salidaServicio.findFirst({
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          select: { idservicio: true, salida: { select: { tamanoMaximo: true } } },
+        });
+        if (servicioHotel) {
+          await tx.servicioAlojamiento.update({
+            where: { idservicio: servicioHotel.idservicio },
+            data: { capacidadDisponible: { increment: servicioHotel.salida.tamanoMaximo } },
+          });
+        }
 
         // Equipamiento: se reintegra al stock interno del proveedor
         const equipos = await tx.salidaEquipamiento.findMany({ where: { idsalida: p.idsalida } });
