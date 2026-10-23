@@ -173,6 +173,100 @@ export type ResultadoCrearSalida = {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-40 Asignar Recursos
+// ==========================================
+
+export type SalidaAsignacionInfo = {
+    idsalida: number;
+    nroSalida: string;
+    fechaInicio: string;
+    fechaFin: string;
+};
+
+export type DotacionRequerida = {
+    guias: number;
+    porteadores: number;
+};
+
+export type PersonalDisponibleItem = {
+    idpersonal: number;
+    nombreCompleto: string;
+    rol: string;
+};
+
+export type TransporteDisponibleItem = {
+    idservicio: number;
+    nombreServicio: string;
+    capacidadVehiculo?: number;
+};
+
+export type ItemStockCamping = {
+    idservicio: number;
+    nombreServicio: string;
+    tipoEquipamiento?: string;
+    cantidadDisponible?: number;
+};
+
+export type DatosPanelAsignacion = {
+    salida: SalidaAsignacionInfo;
+    pasajerosConfirmados: number;
+    dotacionRequerida: DotacionRequerida;
+    bloqueoInicial: number;
+    lugaresSobrantes: number;
+    personalDisponible: PersonalDisponibleItem[];
+    transportesDisponibles: TransporteDisponibleItem[];
+    stockCamping: ItemStockCamping[];
+};
+
+type RespuestaPanelAsignacionApi = {
+    data: DatosPanelAsignacion;
+};
+
+export type ItemCampingSeleccionado = {
+    idservicio: number;
+    cantidad: number;
+};
+
+export type PayloadConfirmarAsignacion = {
+    personalIds: number[];
+    idtransporte: number;
+    itemsCamping: ItemCampingSeleccionado[];
+};
+
+export type ParametrosConfirmarAsignacion = {
+    idsalida: number;
+    datos: PayloadConfirmarAsignacion;
+};
+
+export type DatosResultadoConfirmarAsignacion = {
+    salida: SalidaApi;
+    permisosEmitidos: number;
+    lugaresLiberados: number;
+    advertencia?: string;
+};
+
+type RespuestaConfirmarAsignacionApi = {
+    mensaje: string;
+    data: DatosResultadoConfirmarAsignacion;
+};
+
+export type ResultadoConfirmarAsignacion = {
+    salida: Salida;
+    permisosEmitidos: number;
+    lugaresLiberados: number;
+    mensaje: string;
+    advertencia?: string;
+};
+
+export type ResultadoLiberarSobrantes = {
+    lugaresLiberados: number;
+};
+
+type RespuestaLiberarSobrantesApi = {
+    data: ResultadoLiberarSobrantes;
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -296,6 +390,58 @@ export async function crearSalida(
     };
 }
 
+/**
+ * Consulta la dotación definitiva y recursos disponibles para una salida (CU-40, GET /api/salidas/:idsalida/asignacion).
+ */
+export async function obtenerPanelAsignacion(
+    idsalida: number,
+): Promise<DatosPanelAsignacion> {
+    const respuesta = await solicitarApi<RespuestaPanelAsignacionApi>(
+        `/salidas/${idsalida}/asignacion`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Confirma la asignación de recursos, emite permisos y cierra la venta (CU-40, POST /api/salidas/:idsalida/asignacion).
+ * Si la autoridad no pudo liberar los lugares sobrantes, devuelve `advertencia` sin fallar la asignación.
+ */
+export async function confirmarAsignacion(
+    idsalida: number,
+    payload: PayloadConfirmarAsignacion,
+): Promise<ResultadoConfirmarAsignacion> {
+    const respuesta = await solicitarApi<RespuestaConfirmarAsignacionApi>(
+        `/salidas/${idsalida}/asignacion`,
+        {
+            method: "POST",
+            body: JSON.stringify(payload),
+        },
+    );
+
+    return {
+        salida: normalizarSalida(respuesta.data.salida),
+        permisosEmitidos: respuesta.data.permisosEmitidos,
+        lugaresLiberados: respuesta.data.lugaresLiberados,
+        mensaje: respuesta.mensaje,
+        advertencia: respuesta.data.advertencia,
+    };
+}
+
+/**
+ * Reintenta la liberación de lugares sobrantes pendientes ante la autoridad (CU-40 paso 12, POST /api/salidas/:idsalida/asignacion/liberar-sobrantes).
+ */
+export async function liberarSobrantes(
+    idsalida: number,
+): Promise<ResultadoLiberarSobrantes> {
+    const respuesta = await solicitarApi<RespuestaLiberarSobrantesApi>(
+        `/salidas/${idsalida}/asignacion/liberar-sobrantes`,
+        {
+            method: "POST",
+        },
+    );
+    return respuesta.data;
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -306,6 +452,8 @@ export const clavesSalidas = {
     lista: (filtros?: FiltrosSalidas) => ["salidas", "lista", filtros ?? {}] as const,
     opciones: (params?: ParametrosConsultaOpciones | null) =>
         ["salidas", "opciones", params ?? {}] as const,
+    asignacion: (idsalida?: number | null) =>
+        ["salidas", "asignacion", idsalida ?? null] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
@@ -341,6 +489,60 @@ export function useCrearSalida() {
         mutationFn: (datos: DatosCrearSalida) => crearSalida(datos),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+        },
+    });
+}
+
+/**
+ * Hook para consultar el panel de asignación de una salida (CU-40).
+ * Evita ejecutar la consulta sin un idsalida válido (entero positivo).
+ */
+export function usePanelAsignacion(
+    idsalida: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" && Number.isInteger(idsalida) && idsalida > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.asignacion(idsalida),
+        queryFn: () => obtenerPanelAsignacion(idsalida!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para confirmar la asignación de recursos y emisión de nómina (CU-40).
+ * Invalida las consultas de salidas para reflejar el nuevo estado CERRADA y personal asignado.
+ */
+export function useConfirmarAsignacion() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ idsalida, datos }: ParametrosConfirmarAsignacion) =>
+            confirmarAsignacion(idsalida, datos),
+        onSuccess: (_resultado, variables) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.asignacion(variables.idsalida),
+            });
+        },
+    });
+}
+
+/**
+ * Hook para reintentar la liberación de lugares sobrantes ante la autoridad (CU-40 paso 12).
+ * Invalida las consultas de salidas tras el éxito.
+ */
+export function useLiberarSobrantes() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (idsalida: number) => liberarSobrantes(idsalida),
+        onSuccess: (_resultado, idsalida) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.asignacion(idsalida),
+            });
         },
     });
 }

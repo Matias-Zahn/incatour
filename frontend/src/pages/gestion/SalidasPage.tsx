@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
+import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
+import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
@@ -16,15 +18,20 @@ import {
 import { usePaquetes } from "../../services/paqueteService";
 import { usePersonal } from "../../services/personalService";
 import {
+    clavesSalidas,
     contarSolicitudesPendientesPorSalida,
     dotacionDeSalida,
     nombresGuiasDeSalida,
+    useConfirmarAsignacion,
     useCrearSalida,
+    useLiberarSobrantes,
     useOpcionesSalida,
+    usePanelAsignacion,
     useSalidas,
     type DatosCrearSalida,
     type FiltrosSalidas,
     type ParametrosConsultaOpciones,
+    type PayloadConfirmarAsignacion,
     type Salida,
 } from "../../services/salidaService";
 import { obtenerUsuario } from "../../services/sesionService";
@@ -43,6 +50,7 @@ const ESTADOS_SALIDA = [
 function SalidasPage() {
     const usuario = obtenerUsuario();
     const esAdmin = !usuario || usuario.rol === "ADMIN";
+    const queryClient = useQueryClient();
 
     // Estados para la creación de salidas (CU-36)
     const [formularioAbierto, setFormularioAbierto] = useState(false);
@@ -63,11 +71,46 @@ function SalidasPage() {
 
     const crearSalidaMutation = useCrearSalida();
 
+    // Estados para la asignación de recursos (CU-40)
+    const [salidaParaAsignar, setSalidaParaAsignar] = useState<Salida | null>(null);
+    const [payloadConfirmarAsignacion, setPayloadConfirmarAsignacion] =
+        useState<PayloadConfirmarAsignacion | null>(null);
+    const [errorConfirmacion, setErrorConfirmacion] = useState("");
+    const [errorLiberacionSobrantes, setErrorLiberacionSobrantes] = useState("");
+    const [mensajeSalidaYaAsignada, setMensajeSalidaYaAsignada] = useState<string | null>(null);
+    const [resultadoAsignacion, setResultadoAsignacion] = useState<{
+        idsalida: number;
+        nroSalida: string;
+        permisosEmitidos: number;
+        lugaresLiberados: number;
+        estado: string;
+        advertencia?: string;
+    } | null>(null);
+
+    const {
+        data: datosAsignacion,
+        isPending: cargandoAsignacion,
+        isFetching: recargandoAsignacion,
+        error: errorAsignacion,
+        refetch: recargarAsignacion,
+    } = usePanelAsignacion(salidaParaAsignar?.idsalida ?? null);
+
+    const confirmarAsignacionMutation = useConfirmarAsignacion();
+    const liberarSobrantesMutation = useLiberarSobrantes();
+
     function abrirFormulario() {
         setFormularioAbierto(true);
+        setSalidaParaAsignar(null);
         setParametrosConsulta(null);
         setErrorCreacion("");
         setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeSalidaYaAsignada(null);
+        if (!resultadoAsignacion?.advertencia) {
+            setResultadoAsignacion(null);
+        }
+        setPayloadConfirmarAsignacion(null);
     }
 
     function cerrarFormulario() {
@@ -75,6 +118,144 @@ function SalidasPage() {
         setParametrosConsulta(null);
         setErrorCreacion("");
     }
+
+    function abrirAsignacion(salida: Salida) {
+        setSalidaParaAsignar(salida);
+        setFormularioAbierto(false);
+        setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeSalidaYaAsignada(null);
+        if (!resultadoAsignacion?.advertencia) {
+            setResultadoAsignacion(null);
+        }
+        setPayloadConfirmarAsignacion(null);
+    }
+
+    function cerrarAsignacion() {
+        setSalidaParaAsignar(null);
+        setPayloadConfirmarAsignacion(null);
+        setErrorConfirmacion("");
+    }
+
+    function manejarSolicitarConfirmacionAsignacion(payload: PayloadConfirmarAsignacion) {
+        setErrorConfirmacion("");
+        setPayloadConfirmarAsignacion(payload);
+    }
+
+    function manejarConfirmarAsignacionDefinitiva() {
+        if (
+            !salidaParaAsignar ||
+            !payloadConfirmarAsignacion ||
+            confirmarAsignacionMutation.isPending
+        ) {
+            return;
+        }
+
+        const idsalida = salidaParaAsignar.idsalida;
+        const nroSalida = salidaParaAsignar.nroSalida;
+        setErrorConfirmacion("");
+
+        confirmarAsignacionMutation.mutate(
+            {
+                idsalida,
+                datos: payloadConfirmarAsignacion,
+            },
+            {
+                onSuccess: (resultado) => {
+                    setPayloadConfirmarAsignacion(null);
+                    setSalidaParaAsignar(null);
+                    setResultadoAsignacion({
+                        idsalida,
+                        nroSalida: resultado.salida?.nroSalida ?? nroSalida,
+                        permisosEmitidos: resultado.permisosEmitidos,
+                        lugaresLiberados: resultado.lugaresLiberados,
+                        estado: resultado.salida?.estado ?? "CERRADA",
+                        advertencia: resultado.advertencia,
+                    });
+                },
+                onError: (err: Error) => {
+                    setPayloadConfirmarAsignacion(null);
+                    const mensaje = err.message || "";
+                    const esYaAsignada =
+                        mensaje.toLowerCase().includes("ya tiene personal") ||
+                        mensaje.toLowerCase().includes("no está activa");
+
+                    if (esYaAsignada) {
+                        setSalidaParaAsignar(null);
+                        setErrorConfirmacion("");
+                        setMensajeSalidaYaAsignada(
+                            `La salida ${nroSalida} ya cuenta con personal asignado o se encuentra cerrada. Se actualizó el listado de salidas.`,
+                        );
+                        queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+                        return;
+                    }
+
+                    const esErrorRed =
+                        mensaje.toLowerCase().includes("network") ||
+                        mensaje.toLowerCase().includes("fetch") ||
+                        mensaje.toLowerCase().includes("failed to fetch") ||
+                        mensaje.toLowerCase().includes("conexión");
+
+                    if (esErrorRed) {
+                        setErrorConfirmacion(
+                            "Ocurrió un error de conexión al comunicarse con el servidor. Es posible que la solicitud se haya procesado. Por favor, actualizá los datos o verificá el listado antes de volver a confirmar.",
+                        );
+                        queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+                        queryClient.invalidateQueries({
+                            queryKey: clavesSalidas.asignacion(idsalida),
+                        });
+                        return;
+                    }
+
+                    setErrorConfirmacion(
+                        mensaje ||
+                            "Ocurrió un error al confirmar la asignación de recursos.",
+                    );
+                    queryClient.invalidateQueries({
+                        queryKey: clavesSalidas.asignacion(idsalida),
+                    });
+                },
+            },
+        );
+    }
+
+    function manejarReintentarLiberacion(idsalida: number) {
+        setErrorLiberacionSobrantes("");
+        liberarSobrantesMutation.mutate(idsalida, {
+            onSuccess: (resultado) => {
+                setResultadoAsignacion((prev) =>
+                    prev
+                        ? {
+                              ...prev,
+                              lugaresLiberados: resultado.lugaresLiberados,
+                              advertencia: undefined,
+                          }
+                        : null,
+                );
+                setErrorLiberacionSobrantes("");
+            },
+            onError: (err: Error) => {
+                setErrorLiberacionSobrantes(
+                    err.message ||
+                        "No fue posible liberar los lugares sobrantes ante la autoridad. Reintentá más tarde.",
+                );
+            },
+        });
+    }
+
+    const descripcionDialogoConfirmacion = useMemo(() => {
+        if (!salidaParaAsignar || !payloadConfirmarAsignacion) {
+            return "";
+        }
+        const cantPersonal = payloadConfirmarAsignacion.personalIds.length;
+        const pasajeros =
+            datosAsignacion?.pasajerosConfirmados ??
+            salidaParaAsignar.pasajerosConfirmados ??
+            0;
+        const totalNomina = pasajeros + cantPersonal;
+        return `¿Estás seguro de que deseás confirmar la dotación y recursos para la salida ${salidaParaAsignar.nroSalida}? Se solicitará la emisión de ${totalNomina} permisos nominales ante la autoridad externa (${pasajeros} pasajeros y ${cantPersonal} de personal asignado), se liberarán los lugares sobrantes del bloqueo y la salida pasará al estado Cerrada. Esta acción no se puede deshacer desde este formulario.`;
+    }, [salidaParaAsignar, payloadConfirmarAsignacion, datosAsignacion]);
 
     function manejarConfirmarCreacion(datos: DatosCrearSalida) {
         setErrorCreacion("");
@@ -274,7 +455,7 @@ function SalidasPage() {
             titulo: "Guía/s",
             renderizar: (fila: Salida) => {
                 const guias =
-                    fila.guias && fila.guias.length > 0
+                    Array.isArray(fila.guias) && fila.guias.length > 0
                         ? fila.guias
                         : nombresGuiasDeSalida(fila);
                 if (guias.length === 0) {
@@ -448,12 +629,48 @@ function SalidasPage() {
                     fila.alertas?.includes("SOLICITUD_PENDIENTE");
                 const esFinalizada = fila.estado === "FINALIZADA";
 
-                if (!tieneSolicitudes && !esFinalizada) {
+                // CU-40: Una salida admite asignación si está activa (PUBLICADA o CERRADA),
+                // tiene fecha futura y no tiene personal asignado aún.
+                // Si la salida no tiene pasajeros o tiene restricciones de negocio (FA5, bloqueo),
+                // el backend responderá el error correspondiente y el formulario lo informará.
+                const estadoAsignable = fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
+                const fechaFutura = new Date(fila.fechaInicio) > new Date();
+                const cantPersonal =
+                    typeof fila.cantidadPersonal === "number"
+                        ? fila.cantidadPersonal
+                        : Array.isArray(fila.personalAsignado)
+                        ? fila.personalAsignado.length
+                        : 0;
+                const sinPersonal = cantPersonal === 0;
+                const tieneAdvertenciaPendiente =
+                    resultadoAsignacion?.advertencia !== undefined &&
+                    resultadoAsignacion?.idsalida === fila.idsalida;
+                const puedeAsignar =
+                    esAdmin &&
+                    estadoAsignable &&
+                    fechaFutura &&
+                    sinPersonal &&
+                    !tieneAdvertenciaPendiente;
+
+                if (!tieneSolicitudes && !esFinalizada && !puedeAsignar) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
 
                 return (
                     <div className="min-w-[110px] whitespace-nowrap flex flex-col gap-1 items-start text-xs font-semibold">
+                        {puedeAsignar && (
+                            <button
+                                type="button"
+                                disabled={
+                                    confirmarAsignacionMutation.isPending ||
+                                    liberarSobrantesMutation.isPending
+                                }
+                                onClick={() => abrirAsignacion(fila)}
+                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Asignar recursos
+                            </button>
+                        )}
                         {tieneSolicitudes && (
                             <Link
                                 to="/gestion/solicitudes"
@@ -490,7 +707,15 @@ function SalidasPage() {
                 </div>
                 {esAdmin ? (
                     <div className="flex flex-wrap items-center gap-3">
-                        <Boton onClick={abrirFormulario}>+ Nueva salida</Boton>
+                        <Boton
+                            onClick={abrirFormulario}
+                            disabled={
+                                confirmarAsignacionMutation.isPending ||
+                                liberarSobrantesMutation.isPending
+                            }
+                        >
+                            + Nueva salida
+                        </Boton>
                     </div>
                 ) : null}
             </header>
@@ -539,6 +764,189 @@ function SalidasPage() {
                     }}
                     alConfirmarCreacion={manejarConfirmarCreacion}
                     alCancelar={cerrarFormulario}
+                />
+            ) : null}
+
+            {mensajeSalidaYaAsignada ? (
+                <Alerta tipo="informacion" titulo="Salida ya asignada">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>{mensajeSalidaYaAsignada}</p>
+                        <Boton
+                            variante="secundario"
+                            className="px-2.5 py-1 text-xs"
+                            onClick={() => setMensajeSalidaYaAsignada(null)}
+                        >
+                            Cerrar aviso
+                        </Boton>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {resultadoAsignacion && !resultadoAsignacion.advertencia ? (
+                <Alerta
+                    tipo="exito"
+                    titulo="Asignación confirmada y nómina emitida exitosamente"
+                >
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">
+                                Se confirmaron los recursos y la dotación definitiva para la salida{" "}
+                                <span className="font-bold text-navegacion">
+                                    {resultadoAsignacion.nroSalida}
+                                </span>
+                                .
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setResultadoAsignacion(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3 pt-1 border-t border-emerald-200/70 text-xs">
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Permisos emitidos
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950">
+                                    {resultadoAsignacion.permisosEmitidos}{" "}
+                                    {resultadoAsignacion.permisosEmitidos === 1
+                                        ? "permiso nominal"
+                                        : "permisos nominales"}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Emitidos ante la autoridad gubernamental
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Lugares liberados
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950">
+                                    {resultadoAsignacion.lugaresLiberados}{" "}
+                                    {resultadoAsignacion.lugaresLiberados === 1
+                                        ? "lugar liberado"
+                                        : "lugares liberados"}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Cupos sobrantes devueltos del bloqueo
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Estado de la salida
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950 flex items-center gap-1.5">
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${estilosEstadoSalida(
+                                            resultadoAsignacion.estado,
+                                        )}`}
+                                    >
+                                        {formatearEstadoSalida(resultadoAsignacion.estado)}
+                                    </span>
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Venta cerrada y cupo local en 0
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {resultadoAsignacion && resultadoAsignacion.advertencia ? (
+                <Alerta
+                    tipo="advertencia"
+                    titulo="Asignación guardada con advertencia: liberación de cupos pendiente"
+                >
+                    <div className="space-y-3">
+                        <p className="text-sm">
+                            La dotación de personal y recursos para la salida{" "}
+                            <span className="font-bold text-navegacion">
+                                {resultadoAsignacion.nroSalida}
+                            </span>{" "}
+                            <strong>sí quedó guardada</strong> en el sistema y se emitieron{" "}
+                            <strong>
+                                {resultadoAsignacion.permisosEmitidos}{" "}
+                                {resultadoAsignacion.permisosEmitidos === 1
+                                    ? "permiso nominal"
+                                    : "permisos nominales"}
+                            </strong>
+                            . El estado de la salida es{" "}
+                            <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${estilosEstadoSalida(
+                                    resultadoAsignacion.estado,
+                                )}`}
+                            >
+                                {formatearEstadoSalida(resultadoAsignacion.estado)}
+                            </span>
+                            .
+                        </p>
+
+                        <div className="rounded-control border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
+                            <p className="font-bold">Detalle de la advertencia externa:</p>
+                            <p>{resultadoAsignacion.advertencia}</p>
+                        </div>
+
+                        {errorLiberacionSobrantes ? (
+                            <div className="rounded-control border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-900">
+                                <p className="font-bold">Error al reintentar la liberación:</p>
+                                <p>{errorLiberacionSobrantes}</p>
+                            </div>
+                        ) : null}
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-amber-300/60">
+                            <p className="text-xs text-amber-900 font-medium">
+                                Podés reintentar la liberación de los lugares sobrantes ante la autoridad ahora:
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Boton
+                                    variante="secundario"
+                                    className="px-2.5 py-1 text-xs"
+                                    onClick={() => {
+                                        setResultadoAsignacion(null);
+                                        setErrorLiberacionSobrantes("");
+                                    }}
+                                    disabled={liberarSobrantesMutation.isPending}
+                                >
+                                    Cerrar aviso
+                                </Boton>
+                                {resultadoAsignacion.idsalida ? (
+                                    <Boton
+                                        variante="principal"
+                                        className="px-3 py-1 text-xs"
+                                        cargando={liberarSobrantesMutation.isPending}
+                                        disabled={liberarSobrantesMutation.isPending}
+                                        onClick={() =>
+                                            manejarReintentarLiberacion(resultadoAsignacion.idsalida)
+                                        }
+                                    >
+                                        Reintentar liberación de sobrantes
+                                    </Boton>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {salidaParaAsignar ? (
+                <FormularioAsignarRecursos
+                    key={salidaParaAsignar.idsalida}
+                    datos={datosAsignacion}
+                    cargando={cargandoAsignacion}
+                    recargando={recargandoAsignacion}
+                    guardando={confirmarAsignacionMutation.isPending}
+                    errorServidor={
+                        errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
+                    }
+                    onRecargarDatos={() => recargarAsignacion()}
+                    onConfirmar={manejarSolicitarConfirmacionAsignacion}
+                    onCancelar={cerrarAsignacion}
                 />
             ) : null}
 
@@ -804,6 +1212,25 @@ function SalidasPage() {
                     />
                 </div>
             )}
+
+            <DialogoConfirmacion
+                abierto={payloadConfirmarAsignacion !== null}
+                titulo="Confirmar asignación de recursos y emisión de nómina"
+                descripcion={descripcionDialogoConfirmacion}
+                textoConfirmar={
+                    confirmarAsignacionMutation.isPending
+                        ? "Emitiendo permisos..."
+                        : "Confirmar asignación"
+                }
+                textoCancelar="Volver a revisar"
+                cargando={confirmarAsignacionMutation.isPending}
+                onConfirmar={manejarConfirmarAsignacionDefinitiva}
+                onCancelar={() => {
+                    if (!confirmarAsignacionMutation.isPending) {
+                        setPayloadConfirmarAsignacion(null);
+                    }
+                }}
+            />
         </section>
     );
 }
