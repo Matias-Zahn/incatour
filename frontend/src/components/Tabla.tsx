@@ -9,11 +9,13 @@ type Columna<T> = {
 type TablaProps<T extends { id: string | number }> = {
     columnas: Columna<T>[];
     filas: T[];
+    claseFila?: (fila: T) => string | undefined;
 };
 
 function Tabla<T extends { id: string | number }>({
     columnas,
     filas,
+    claseFila,
 }: TablaProps<T>) {
     return (
         <div className="overflow-hidden rounded-tarjeta border border-borde bg-white">
@@ -30,7 +32,10 @@ function Tabla<T extends { id: string | number }>({
 
                 <tbody>
                     {filas.map((fila) => (
-                        <tr key={fila.id} className="border-t border-borde">
+                        <tr
+                            key={fila.id}
+                            className={`border-t border-borde ${claseFila ? claseFila(fila) ?? "" : ""}`.trimEnd()}
+                        >
                             {columnas.map((columna) => (
                                 <td key={String(columna.clave)} className="px-4 py-3 text-texto">
                                     {columna.renderizar

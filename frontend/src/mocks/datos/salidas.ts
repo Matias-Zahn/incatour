@@ -1,5 +1,13 @@
 import type { SalidaApi } from "../../services/salidaService";
 
+const ahora = new Date();
+const fechaRelativa = (dias: number, horaUtc = 8): string => {
+    const f = new Date(ahora);
+    f.setUTCDate(f.getUTCDate() + dias);
+    f.setUTCHours(horaUtc, 0, 0, 0);
+    return f.toISOString();
+};
+
 export const salidasMockIniciales: SalidaApi[] = [
     {
         idsalida: 1,
@@ -9,13 +17,19 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 4,
         stockLocalAlojamiento: 4,
         tamanoMaximo: 8,
-        fechaInicio: "2026-11-15T08:00:00.000Z",
-        fechaFin: "2026-11-18T18:00:00.000Z",
+        fechaInicio: fechaRelativa(3),
+        fechaFin: fechaRelativa(6, 18),
         estado: "PUBLICADA",
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [
             {
@@ -46,6 +60,14 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
+        pasajerosConfirmados: 4,
+        cantidadPersonal: 2,
+        guias: ["Carlos Mamani"],
+        permisosFaltantes: 2,
+        etapaEsperada: null,
+        etapaInformada: null,
+        etapaDesfasada: false,
+        alertas: ["SOLICITUD_PENDIENTE", "PERMISOS_SIN_CONFIRMAR"],
     },
     {
         idsalida: 2,
@@ -55,13 +77,19 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 0,
         stockLocalAlojamiento: 0,
         tamanoMaximo: 10,
-        fechaInicio: "2026-10-01T08:00:00.000Z",
-        fechaFin: "2026-10-04T18:00:00.000Z",
+        fechaInicio: fechaRelativa(-15),
+        fechaFin: fechaRelativa(-12, 18),
         estado: "FINALIZADA",
         ultimaEtapaAlcanzada: 4,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [
             {
@@ -92,6 +120,14 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
+        pasajerosConfirmados: 10,
+        cantidadPersonal: 2,
+        guias: ["Carlos Mamani"],
+        permisosFaltantes: 0,
+        etapaEsperada: null,
+        etapaInformada: 4,
+        etapaDesfasada: false,
+        alertas: [],
     },
     {
         idsalida: 3,
@@ -101,13 +137,19 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 0,
         stockLocalAlojamiento: 0,
         tamanoMaximo: 6,
-        fechaInicio: "2026-10-18T08:00:00.000Z",
-        fechaFin: "2026-10-22T18:00:00.000Z",
+        fechaInicio: fechaRelativa(-2),
+        fechaFin: fechaRelativa(2, 18),
         estado: "EN_CURSO",
-        ultimaEtapaAlcanzada: 2,
+        ultimaEtapaAlcanzada: 1,
         paquete: {
             nroPaquete: "PAQ-INC-02",
             nombrePaquete: "Inca VIP Hotel Montaña",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [
             {
@@ -138,6 +180,14 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
+        pasajerosConfirmados: 6,
+        cantidadPersonal: 2,
+        guias: ["Rosa Huamán"],
+        permisosFaltantes: 0,
+        etapaEsperada: 3,
+        etapaInformada: 1,
+        etapaDesfasada: true,
+        alertas: [],
     },
     {
         idsalida: 4,
@@ -147,13 +197,19 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 0,
         stockLocalAlojamiento: 0,
         tamanoMaximo: 8,
-        fechaInicio: "2026-11-01T08:00:00.000Z",
-        fechaFin: "2026-11-04T18:00:00.000Z",
+        fechaInicio: fechaRelativa(5),
+        fechaFin: fechaRelativa(8, 18),
         estado: "CERRADA",
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [
             {
@@ -166,6 +222,14 @@ export const salidasMockIniciales: SalidaApi[] = [
             },
         ],
         servicios: [],
+        pasajerosConfirmados: 8,
+        cantidadPersonal: 1,
+        guias: ["Carlos Mamani"],
+        permisosFaltantes: 1,
+        etapaEsperada: null,
+        etapaInformada: null,
+        etapaDesfasada: false,
+        alertas: ["PERMISOS_SIN_CONFIRMAR"],
     },
     {
         idsalida: 5,
@@ -175,16 +239,30 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 8,
         stockLocalAlojamiento: null,
         tamanoMaximo: 8,
-        fechaInicio: "2026-12-01T08:00:00.000Z",
-        fechaFin: "2026-12-04T18:00:00.000Z",
+        fechaInicio: fechaRelativa(40),
+        fechaFin: fechaRelativa(43, 18),
         estado: "CANCELADA",
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [],
         servicios: [],
+        pasajerosConfirmados: 0,
+        cantidadPersonal: 0,
+        guias: [],
+        permisosFaltantes: 0,
+        etapaEsperada: null,
+        etapaInformada: null,
+        etapaDesfasada: false,
+        alertas: [],
     },
     {
         idsalida: 6,
@@ -194,13 +272,19 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 2,
         stockLocalAlojamiento: 2,
         tamanoMaximo: 6,
-        fechaInicio: "2026-12-10T08:00:00.000Z",
-        fechaFin: "2026-12-14T18:00:00.000Z",
+        fechaInicio: fechaRelativa(25),
+        fechaFin: fechaRelativa(29, 18),
         estado: "PUBLICADA",
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-02",
             nombrePaquete: "Inca VIP Hotel Montaña",
+            circuito: {
+                idcircuito: 1,
+                nombreCircuito: "Camino del Inca Clásico",
+                duracionDias: 4,
+                _count: { etapas: 4 },
+            },
         },
         personalAsignado: [
             {
@@ -223,5 +307,55 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
+        pasajerosConfirmados: 4,
+        cantidadPersonal: 1,
+        guias: ["Rosa Huamán"],
+        permisosFaltantes: 0,
+        etapaEsperada: null,
+        etapaInformada: null,
+        etapaDesfasada: false,
+        alertas: [],
+    },
+    {
+        idsalida: 7,
+        idpaquete: 3,
+        nroSalida: "SAL-2026-006",
+        idbloqueo: "BLQ-006",
+        stockLocal: 6,
+        stockLocalAlojamiento: 6,
+        tamanoMaximo: 12,
+        fechaInicio: fechaRelativa(14),
+        fechaFin: fechaRelativa(19, 18),
+        estado: "PUBLICADA",
+        ultimaEtapaAlcanzada: null,
+        paquete: {
+            nroPaquete: "PAQ-SAL-01",
+            nombrePaquete: "Salkantay Aventura",
+            circuito: {
+                idcircuito: 2,
+                nombreCircuito: "Trekking Salkantay",
+                duracionDias: 5,
+                _count: { etapas: 5 },
+            },
+        },
+        personalAsignado: [
+            {
+                idsalida: 7,
+                idpersonal: 3,
+                personal: {
+                    nombreCompleto: "Rosa Huamán",
+                    rol: "Guía",
+                },
+            },
+        ],
+        servicios: [],
+        pasajerosConfirmados: 6,
+        cantidadPersonal: 1,
+        guias: ["Rosa Huamán"],
+        permisosFaltantes: 2,
+        etapaEsperada: null,
+        etapaInformada: null,
+        etapaDesfasada: false,
+        alertas: [],
     },
 ];

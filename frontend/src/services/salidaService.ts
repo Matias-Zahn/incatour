@@ -5,9 +5,19 @@ import { solicitarApi } from "./clienteApi";
 // Tipos TypeScript: Backend real (SalidaApi)
 // ==========================================
 
+export type CircuitoSalidaApi = {
+    idcircuito: number;
+    nombreCircuito: string;
+    duracionDias: number;
+    _count: {
+        etapas: number;
+    };
+};
+
 export type PaqueteSalidaApi = {
     nroPaquete: string;
     nombrePaquete: string;
+    circuito: CircuitoSalidaApi;
 };
 
 export type PersonalAsignadoSalidaApi = {
@@ -29,9 +39,12 @@ export type ServicioSalidaApi = {
     };
 };
 
+export type AlertaSalida = "SOLICITUD_PENDIENTE" | "PERMISOS_SIN_CONFIRMAR" | string;
+
 /**
  * Estructura real de una salida devuelta por GET /api/salidas en el backend.
- * Refleja los campos escalares de Salida más los includes de paquete, personal y servicios.
+ * Refleja los campos escalares de Salida más los includes de paquete (con circuito),
+ * personal asignado, servicios y los nuevos cálculos de RF-50 y RF-61.
  */
 export type SalidaApi = {
     idsalida: number;
@@ -48,6 +61,15 @@ export type SalidaApi = {
     paquete: PaqueteSalidaApi;
     personalAsignado: PersonalAsignadoSalidaApi[];
     servicios: ServicioSalidaApi[];
+    // Campos incorporados por RF-50 y RF-61:
+    pasajerosConfirmados: number;
+    cantidadPersonal: number;
+    guias: string[];
+    permisosFaltantes: number;
+    etapaEsperada: number | null;
+    etapaInformada: number | null;
+    etapaDesfasada: boolean;
+    alertas: AlertaSalida[];
 };
 
 // ==========================================
@@ -67,7 +89,6 @@ export type Salida = SalidaApi & {
 
 /**
  * Filtros admitidos por GET /api/salidas (ConsultarSalidasDto en backend).
- * Nota: idcircuito no es soportado por el backend y se excluye intencionalmente.
  */
 export type FiltrosSalidas = {
     idpaquete?: number;
@@ -75,6 +96,7 @@ export type FiltrosSalidas = {
     desde?: string;
     hasta?: string;
     idguia?: number;
+    idcircuito?: number;
 };
 
 type RespuestaSalidasApi = {
@@ -99,6 +121,13 @@ export function construirQuerySalidas(filtros: FiltrosSalidas = {}): string {
         const idpaquete = Number(filtros.idpaquete);
         if (Number.isInteger(idpaquete) && idpaquete > 0) {
             parametros.set("idpaquete", String(idpaquete));
+        }
+    }
+
+    if (filtros.idcircuito !== undefined && filtros.idcircuito !== null) {
+        const idcircuito = Number(filtros.idcircuito);
+        if (Number.isInteger(idcircuito) && idcircuito > 0) {
+            parametros.set("idcircuito", String(idcircuito));
         }
     }
 
@@ -182,10 +211,15 @@ export function guiasDeSalida(
 
 /**
  * Devuelve la lista de nombres completos de los guías asignados a la salida.
+ * Si el objeto cuenta con el campo oficial `guias` del backend, lo utiliza directamente;
+ * de lo contrario, filtra y extrae los nombres desde `personalAsignado`.
  */
 export function nombresGuiasDeSalida(
-    salida: Pick<SalidaApi, "personalAsignado">,
+    salida: Pick<SalidaApi, "personalAsignado"> & Partial<Pick<SalidaApi, "guias">>,
 ): string[] {
+    if (Array.isArray(salida.guias)) {
+        return salida.guias;
+    }
     return guiasDeSalida(salida).map((asignacion) => asignacion.personal.nombreCompleto);
 }
 
