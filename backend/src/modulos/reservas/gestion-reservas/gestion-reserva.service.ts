@@ -68,6 +68,7 @@ export class GestionReservaService {
       salida: { nroSalida: reserva.salida.nroSalida, fechaInicio: reserva.salida.fechaInicio, fechaFin: reserva.salida.fechaFin },
       pasajeros: reserva.pasajeros.map((p) => p.pasajero.nombreCompleto),
       precioCongelado: reserva.precioCongelado,
+      ...this.calcularDesglose(reserva),
       condicionesComerciales: reserva.condicionesComerciales,
       pagos: reserva.pagos.map((p) => ({
         nroTransaccion: p.nrotransaccion,
@@ -198,8 +199,35 @@ export class GestionReservaService {
     };
   }
 
+  private calcularDesglose(r: ReservaDetalle) {
+    const tarifas = (r.salida.paquete as any)?.tarifas ?? [];
+    const fechaSalida = new Date(r.salida.fechaInicio);
+    const tarifaAplicada = tarifas.find((t: any) => {
+      const inicio = new Date(t.temporada.fechaInicio);
+      const fin = new Date(t.temporada.fechaFin);
+      return fechaSalida >= inicio && fechaSalida <= fin;
+    });
+
+    const temporadaNombre = tarifaAplicada?.temporada?.nombre ?? null;
+    const precioUnitario = tarifaAplicada?.monto != null
+      ? Number(tarifaAplicada.monto)
+      : (r.cantidadPasajeros > 0 ? redondear2(r.precioCongelado / r.cantidadPasajeros) : 0);
+    const precioPaquete = redondear2(precioUnitario * r.cantidadPasajeros);
+    const adicionalesEquipaje = redondear2(Math.max(0, r.precioCongelado - precioPaquete));
+
+    return {
+      temporadaAplicada: temporadaNombre,
+      temporada: tarifaAplicada?.temporada ?? (temporadaNombre ? { nombre: temporadaNombre } : null),
+      precioUnitario,
+      precioPaquete,
+      adicionales: adicionalesEquipaje,
+      adicionalesEquipaje,
+    };
+  }
+
   private detallar(r: ReservaDetalle) {
-    const { circuito, ...paquete } = r.salida.paquete;
+    const desglose = this.calcularDesglose(r);
+    const { circuito, tarifas: _tarifas, ...paquete } = r.salida.paquete as any;
     const { paquete: _omitido, ...salida } = r.salida;
     return {
       idreserva: r.idreserva,
@@ -209,6 +237,12 @@ export class GestionReservaService {
       fechaRealizacion: r.fechaRealizacion,
       cantidadPasajeros: r.cantidadPasajeros,
       precioCongelado: r.precioCongelado,
+      temporadaAplicada: desglose.temporadaAplicada,
+      temporada: desglose.temporada,
+      precioUnitario: desglose.precioUnitario,
+      precioPaquete: desglose.precioPaquete,
+      adicionales: desglose.adicionales,
+      adicionalesEquipaje: desglose.adicionalesEquipaje,
       condicionesComerciales: r.condicionesComerciales,
       pagado: sumar(r.pagos.map((p) => p.monto)),
       titular: r.cliente.usuario,

@@ -95,7 +95,7 @@ export class ReseniaRepository {
         valoracion: { ...(f.valoracionMin && { gte: f.valoracionMin }), ...(f.valoracionMax && { lte: f.valoracionMax }) },
       }),
       ...((f.fechaDesde || f.fechaHasta) && {
-        fechaEnvio: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: f.fechaHasta }) },
+        fechaEnvio: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: (() => { const h = new Date(f.fechaHasta); if (h.getUTCHours() === 0 && h.getUTCMinutes() === 0 && h.getUTCSeconds() === 0 && h.getUTCMilliseconds() === 0) { h.setUTCHours(23, 59, 59, 999); } return h; })() }) },
       }),
     };
   }
