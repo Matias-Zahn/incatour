@@ -41,6 +41,10 @@ export class ReservaRepository {
             garantiasEstablecimiento: true,
           },
         },
+        reservas: {
+          where: { estado: { not: "CANCELADA" } },
+          select: { pasajeros: { select: { pasajero: { select: { nroPasaporte: true } } } } },
+        },
         // Servicios ya asignados a la salida (SalidaServicio)
         servicios: { include: { servicio: { include: { transporte: true } } } },
       },
@@ -87,6 +91,24 @@ export class ReservaRepository {
       // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan (y ven) el cierre de la asignación (CU-40)
       const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
+
+      // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida
+      const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte);
+      const ocupado = await tx.reservaPasajero.findFirst({
+        where: {
+          reserva: {
+            idsalida: d.idsalida,
+            estado: { not: "CANCELADA" },
+          },
+          pasajero: {
+            nroPasaporte: { in: pasaportesInput },
+          },
+        },
+        select: { pasajero: { select: { nroPasaporte: true } } },
+      });
+      if (ocupado) {
+        throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
+      }
 
       // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza y se actualizan sus datos
       const idsPasajeros: number[] = [];

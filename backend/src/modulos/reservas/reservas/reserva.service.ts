@@ -45,7 +45,23 @@ export class ReservaService {
     if (pasaportes.size !== cantidad) {
       throw CustomError.badRequest("Hay pasajeros con el mismo número de pasaporte.");
     }
+    // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida
+    const reservasPrevias = (salida as any).reservas ?? [];
+    const pasaportesExistentes = new Set<string>();
+    for (const r of reservasPrevias) {
+      for (const pj of r.pasajeros ?? []) {
+        if (pj.pasajero?.nroPasaporte) {
+          pasaportesExistentes.add(pj.pasajero.nroPasaporte);
+        }
+      }
+    }
+
     for (const p of dto.pasajeros) {
+      if (pasaportesExistentes.has(p.nroPasaporte)) {
+        throw CustomError.badRequest(
+          `El pasaporte ${p.nroPasaporte} ya se encuentra registrado en esta salida.`
+        );
+      }
       if (new Date(p.fechaVencimientoPasaporte) <= salida.fechaFin) {
         throw CustomError.badRequest(
           `El pasaporte de ${p.nombreCompleto} vence antes de finalizar el recorrido.`

@@ -89,6 +89,7 @@ export class GestionReservaRepository {
               select: {
                 idpaquete: true,
                 nombrePaquete: true,
+                tarifas: { include: { temporada: true } },
                 circuito: {
                   select: {
                     nombreCircuito: true,
