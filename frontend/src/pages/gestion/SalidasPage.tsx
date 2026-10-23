@@ -6,6 +6,7 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
+import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
@@ -18,10 +19,15 @@ import {
     contarSolicitudesPendientesPorSalida,
     dotacionDeSalida,
     nombresGuiasDeSalida,
+    useCrearSalida,
+    useOpcionesSalida,
     useSalidas,
+    type DatosCrearSalida,
     type FiltrosSalidas,
+    type ParametrosConsultaOpciones,
     type Salida,
 } from "../../services/salidaService";
+import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
 const ELEMENTOS_POR_PAGINA = 5;
@@ -35,6 +41,59 @@ const ESTADOS_SALIDA = [
 ] as const;
 
 function SalidasPage() {
+    const usuario = obtenerUsuario();
+    const esAdmin = !usuario || usuario.rol === "ADMIN";
+
+    // Estados para la creación de salidas (CU-36)
+    const [formularioAbierto, setFormularioAbierto] = useState(false);
+    const [parametrosConsulta, setParametrosConsulta] =
+        useState<ParametrosConsultaOpciones | null>(null);
+    const [errorCreacion, setErrorCreacion] = useState("");
+    const [mensajeExito, setMensajeExito] = useState<{
+        titulo: string;
+        numeroSalida?: string;
+        fechaInicio?: string;
+    } | null>(null);
+
+    const {
+        data: opcionesSalida,
+        isFetching: cargandoOpciones,
+        error: errorOpciones,
+    } = useOpcionesSalida(parametrosConsulta);
+
+    const crearSalidaMutation = useCrearSalida();
+
+    function abrirFormulario() {
+        setFormularioAbierto(true);
+        setParametrosConsulta(null);
+        setErrorCreacion("");
+        setMensajeExito(null);
+    }
+
+    function cerrarFormulario() {
+        setFormularioAbierto(false);
+        setParametrosConsulta(null);
+        setErrorCreacion("");
+    }
+
+    function manejarConfirmarCreacion(datos: DatosCrearSalida) {
+        setErrorCreacion("");
+        crearSalidaMutation.mutate(datos, {
+            onSuccess: (resultado) => {
+                const numero = resultado.numeroSalida ?? resultado.salida?.nroSalida;
+                setMensajeExito({
+                    titulo: resultado.mensaje || "Salida creada exitosamente",
+                    numeroSalida: numero,
+                    fechaInicio: resultado.salida?.fechaInicio,
+                });
+                cerrarFormulario();
+            },
+            onError: (err: Error) => {
+                setErrorCreacion(err.message || "Ocurrió un error al crear la salida.");
+            },
+        });
+    }
+
     const [filtroCircuito, setFiltroCircuito] = useState<number | "">("");
     const [filtroPaquete, setFiltroPaquete] = useState<number | "">("");
     const [filtroEstado, setFiltroEstado] = useState<string>("");
@@ -429,7 +488,59 @@ function SalidasPage() {
                         Visualizá y consultá las salidas programadas, su dotación de personal asignado y estado de avance.
                     </p>
                 </div>
+                {esAdmin ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Boton onClick={abrirFormulario}>+ Nueva salida</Boton>
+                    </div>
+                ) : null}
             </header>
+
+            {mensajeExito ? (
+                <Alerta tipo="exito" titulo={mensajeExito.titulo}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>
+                            Se creó la salida planificada{" "}
+                            <span className="font-bold text-navegacion">
+                                {mensajeExito.numeroSalida ?? "nueva"}
+                            </span>
+                            {mensajeExito.fechaInicio ? (
+                                <>
+                                    {" "}para el día{" "}
+                                    <span className="font-semibold">
+                                        {formatearFechaSalida(mensajeExito.fechaInicio)}
+                                    </span>
+                                </>
+                            ) : null}
+                            . Ya se encuentra disponible en el listado a continuación.
+                        </p>
+                        <Boton
+                            variante="secundario"
+                            className="px-2.5 py-1 text-xs"
+                            onClick={() => setMensajeExito(null)}
+                        >
+                            Cerrar aviso
+                        </Boton>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {formularioAbierto ? (
+                <FormularioCrearSalida
+                    paquetes={paquetes}
+                    opciones={opcionesSalida}
+                    cargandoOpciones={cargandoOpciones}
+                    creando={crearSalidaMutation.isPending}
+                    errorServidor={
+                        errorCreacion || (errorOpciones ? errorOpciones.message : undefined)
+                    }
+                    alConsultarOpciones={(parametros) => {
+                        setErrorCreacion("");
+                        setParametrosConsulta(parametros);
+                    }}
+                    alConfirmarCreacion={manejarConfirmarCreacion}
+                    alCancelar={cerrarFormulario}
+                />
+            ) : null}
 
             {/* Advertencia operativa en salidas próximas (< 7 días) (RF-61) */}
             {salidasConAlertasOperativas.length > 0 ? (

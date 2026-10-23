@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { solicitarApi } from "./clienteApi";
 
 // ==========================================
@@ -104,6 +104,75 @@ type RespuestaSalidasApi = {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-36 Crear Salida
+// ==========================================
+
+export type DotacionOpciones = {
+    guias: number;
+    porteadores: number;
+};
+
+export type CupoAutoridadOpciones = {
+    lugaresDisponibles: number;
+    alcanza: boolean;
+};
+
+export type AlojamientoOpcion = {
+    idservicio: number;
+    nombreServicio: string;
+    localidad: string;
+    categoria?: string | null;
+    capacidadDisponible?: number | null;
+    alcanza: boolean;
+};
+
+export type OpcionesSalidaDto = {
+    paquete: {
+        idpaquete: number;
+        nombrePaquete: string;
+    };
+    tamanoMaximo: number;
+    dotacion: DotacionOpciones;
+    totalLugares: number;
+    cupoAutoridad: CupoAutoridadOpciones | null;
+    alojamientos: AlojamientoOpcion[];
+};
+
+export type ParametrosConsultaOpciones = {
+    idpaquete: number;
+    fechaInicio: string; // "YYYY-MM-DD"
+    tamanoMaximo: number;
+};
+
+export type DatosCrearSalida = {
+    idpaquete: number;
+    fechaInicio: string; // "YYYY-MM-DD"
+    tamanoMaximo: number;
+    idalojamiento?: number;
+};
+
+type RespuestaOpcionesSalidaApi = {
+    data: OpcionesSalidaDto;
+};
+
+type RespuestaCrearSalidaApi = {
+    mensaje: string;
+    data: {
+        salida: SalidaApi;
+        dotacion: DotacionOpciones;
+        totalLugares: number;
+    };
+};
+
+export type ResultadoCrearSalida = {
+    salida: Salida;
+    dotacion: DotacionOpciones;
+    totalLugares: number;
+    mensaje: string;
+    numeroSalida?: string;
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -154,6 +223,23 @@ export function construirQuerySalidas(filtros: FiltrosSalidas = {}): string {
     return query ? `?${query}` : "";
 }
 
+export function construirQueryOpcionesSalida(
+    parametros: ParametrosConsultaOpciones,
+): string {
+    const searchParams = new URLSearchParams();
+    if (parametros.idpaquete !== undefined && parametros.idpaquete !== null) {
+        searchParams.set("idpaquete", String(parametros.idpaquete));
+    }
+    if (parametros.fechaInicio && parametros.fechaInicio.trim() !== "") {
+        searchParams.set("fechaInicio", parametros.fechaInicio.trim());
+    }
+    if (parametros.tamanoMaximo !== undefined && parametros.tamanoMaximo !== null) {
+        searchParams.set("tamanoMaximo", String(parametros.tamanoMaximo));
+    }
+    const query = searchParams.toString();
+    return query ? `?${query}` : "";
+}
+
 // ==========================================
 // Consultas HTTP
 // ==========================================
@@ -169,6 +255,47 @@ export async function consultarSalidas(filtros: FiltrosSalidas = {}): Promise<Sa
 
 export const listarSalidas = consultarSalidas;
 
+/**
+ * Consulta las opciones de dotación, cupo y alojamientos para crear una salida (CU-36, GET /api/salidas/opciones).
+ */
+export async function consultarOpcionesSalida(
+    parametros: ParametrosConsultaOpciones,
+): Promise<OpcionesSalidaDto> {
+    const query = construirQueryOpcionesSalida(parametros);
+    const respuesta = await solicitarApi<RespuestaOpcionesSalidaApi>(
+        `/salidas/opciones${query}`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Confirma y registra una nueva salida planificada (CU-36, POST /api/salidas).
+ */
+export async function crearSalida(
+    datos: DatosCrearSalida,
+): Promise<ResultadoCrearSalida> {
+    const cuerpo: Record<string, unknown> = {
+        idpaquete: datos.idpaquete,
+        fechaInicio: datos.fechaInicio,
+        tamanoMaximo: datos.tamanoMaximo,
+    };
+    if (datos.idalojamiento !== undefined && datos.idalojamiento !== null) {
+        cuerpo.idalojamiento = datos.idalojamiento;
+    }
+
+    const respuesta = await solicitarApi<RespuestaCrearSalidaApi>("/salidas", {
+        method: "POST",
+        body: JSON.stringify(cuerpo),
+    });
+
+    return {
+        ...respuesta.data,
+        salida: normalizarSalida(respuesta.data.salida),
+        mensaje: respuesta.mensaje,
+        numeroSalida: respuesta.data.salida.nroSalida,
+    };
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -177,12 +304,44 @@ export const clavesSalidas = {
     todas: ["salidas"] as const,
     todos: ["salidas"] as const,
     lista: (filtros?: FiltrosSalidas) => ["salidas", "lista", filtros ?? {}] as const,
+    opciones: (params?: ParametrosConsultaOpciones | null) =>
+        ["salidas", "opciones", params ?? {}] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
     return useQuery({
         queryKey: clavesSalidas.lista(filtros),
         queryFn: () => consultarSalidas(filtros),
+    });
+}
+
+export function useOpcionesSalida(
+    parametros: ParametrosConsultaOpciones | null,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const habilitado =
+        (opcionesQuery?.enabled ?? true) &&
+        Boolean(
+            parametros &&
+                parametros.idpaquete > 0 &&
+                parametros.fechaInicio &&
+                parametros.tamanoMaximo > 0,
+        );
+
+    return useQuery({
+        queryKey: clavesSalidas.opciones(parametros),
+        queryFn: () => consultarOpcionesSalida(parametros!),
+        enabled: habilitado,
+    });
+}
+
+export function useCrearSalida() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (datos: DatosCrearSalida) => crearSalida(datos),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+        },
     });
 }
 

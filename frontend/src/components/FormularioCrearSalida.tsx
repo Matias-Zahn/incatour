@@ -15,57 +15,22 @@ export type PaqueteOpcion = {
     estado?: string;
 };
 
-export type DotacionOpciones = {
-    guias: number;
-    porteadores: number;
-};
+import type {
+    DotacionOpciones,
+    CupoAutoridadOpciones,
+    AlojamientoOpcion,
+    OpcionesSalidaDto,
+    ParametrosConsultaOpciones,
+    DatosCrearSalida as DatosConfirmarSalida,
+} from "../services/salidaService";
 
-export type CupoAutoridadOpciones = {
-    lugaresDisponibles: number;
-    alcanza: boolean;
-};
-
-export type AlojamientoOpcion = {
-    idservicio: number;
-    nombreServicio: string;
-    localidad: string;
-    categoria?: string | null;
-    capacidadDisponible?: number | null;
-    alcanza: boolean;
-};
-
-/**
- * Estructura entregada por GET /api/salidas/opciones en el backend.
- */
-export type OpcionesSalidaDto = {
-    paquete: {
-        idpaquete: number;
-        nombrePaquete: string;
-    };
-    tamanoMaximo: number;
-    dotacion: DotacionOpciones;
-    totalLugares: number;
-    cupoAutoridad: CupoAutoridadOpciones | null;
-    alojamientos: AlojamientoOpcion[];
-};
-
-/**
- * Parámetros requeridos para consultar opciones de dimensionamiento y cupo.
- */
-export type ParametrosConsultaOpciones = {
-    idpaquete: number;
-    fechaInicio: string; // "YYYY-MM-DD"
-    tamanoMaximo: number;
-};
-
-/**
- * Carga útil para confirmar la creación de una salida planificada (POST /api/salidas).
- */
-export type DatosConfirmarSalida = {
-    idpaquete: number;
-    fechaInicio: string; // "YYYY-MM-DD"
-    tamanoMaximo: number;
-    idalojamiento?: number;
+export type {
+    DotacionOpciones,
+    CupoAutoridadOpciones,
+    AlojamientoOpcion,
+    OpcionesSalidaDto,
+    ParametrosConsultaOpciones,
+    DatosConfirmarSalida,
 };
 
 export type FormularioCrearSalidaProps = {
@@ -184,10 +149,10 @@ function FormularioCrearSalida({
     // Comprobar si los parámetros actuales del formulario coinciden con los consultados
     const opcionesEstanSincronizadas = Boolean(
         parametrosConsultados &&
-            opciones &&
-            Number(valorIdPaquete) === parametrosConsultados.idpaquete &&
-            valorFechaInicio === parametrosConsultados.fechaInicio &&
-            Number(valorTamanoMaximo) === parametrosConsultados.tamanoMaximo,
+        opciones &&
+        Number(valorIdPaquete) === parametrosConsultados.idpaquete &&
+        valorFechaInicio === parametrosConsultados.fechaInicio &&
+        Number(valorTamanoMaximo) === parametrosConsultados.tamanoMaximo,
     );
 
     // Detectar si el usuario modificó los campos luego de haber consultado
@@ -207,6 +172,13 @@ function FormularioCrearSalida({
     // Estado del cupo de la autoridad
     const tieneCupoInsuficienteAutoridad = Boolean(
         opciones?.cupoAutoridad && opciones.cupoAutoridad.alcanza === false,
+    );
+
+    // Error contextual de autoridad en FA2 al intentar confirmar
+    const esErrorAutoridadFA2 = Boolean(
+        errorServidor &&
+        opcionesEstanSincronizadas &&
+        opciones?.cupoAutoridad === null,
     );
 
     function manejarConsulta(valores: ValoresFormularioSalida) {
@@ -273,7 +245,8 @@ function FormularioCrearSalida({
                 </p>
             </header>
 
-            {errorServidor ? (
+            {/* Error general del servidor (solo si no es el error contextual de FA2 que se prioriza en el bloque de autoridad) */}
+            {errorServidor && !esErrorAutoridadFA2 ? (
                 <div className="mb-5">
                     <Alerta tipo="error" titulo="Error al procesar la solicitud">
                         {errorServidor}
@@ -283,14 +256,18 @@ function FormularioCrearSalida({
 
             {/* PASO 1: Formulario de Parámetros de Entrada */}
             <form onSubmit={handleSubmit(manejarConsulta)} noValidate>
-                <div className="mb-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                        Paso 1: Parámetros del contingente
-                    </h3>
-                    <p className="text-xs text-texto-suave">
-                        Definí el paquete, la fecha de inicio prevista y la cantidad máxima de
-                        pasajeros.
-                    </p>
+                <div className="mb-4 flex items-center gap-2.5">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-navegacion text-xs font-bold text-white shadow-xs">
+                        1
+                    </span>
+                    <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
+                            Paso 1: Parámetros del contingente
+                        </h3>
+                        <p className="text-xs text-texto-suave">
+                            Definí el paquete turístico, la fecha de inicio prevista y la cantidad máxima de pasajeros.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -310,11 +287,10 @@ function FormularioCrearSalida({
                             aria-describedby={
                                 errors.idpaquete ? `${idPaqueteId}-error` : undefined
                             }
-                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${
-                                errors.idpaquete
+                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${errors.idpaquete
                                     ? "border-peligro focus:border-peligro focus:ring-peligro/20"
                                     : "border-borde focus:border-marca focus:ring-marca/20"
-                            }`}
+                                }`}
                         >
                             <option value="">Seleccionar paquete...</option>
                             {paquetesActivos.map((p) => (
@@ -352,11 +328,10 @@ function FormularioCrearSalida({
                             aria-describedby={
                                 errors.fechaInicio ? `${idFechaInicioId}-error` : undefined
                             }
-                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${
-                                errors.fechaInicio
+                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${errors.fechaInicio
                                     ? "border-peligro focus:border-peligro focus:ring-peligro/20"
                                     : "border-borde focus:border-marca focus:ring-marca/20"
-                            }`}
+                                }`}
                         />
                         {errors.fechaInicio ? (
                             <span
@@ -394,11 +369,10 @@ function FormularioCrearSalida({
                                     ? `${idTamanoMaximoId}-error`
                                     : undefined
                             }
-                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${
-                                errors.tamanoMaximo
+                            className={`rounded-control border bg-white px-3 py-2 text-sm text-texto outline-none transition-colors focus:ring-2 disabled:bg-slate-50 ${errors.tamanoMaximo
                                     ? "border-peligro focus:border-peligro focus:ring-peligro/20"
                                     : "border-borde focus:border-marca focus:ring-marca/20"
-                            }`}
+                                }`}
                         />
                         {errors.tamanoMaximo ? (
                             <span
@@ -416,33 +390,44 @@ function FormularioCrearSalida({
                     </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-borde/60 pt-3">
                     <p className="text-xs text-texto-suave">
-                        La dotación de guías, porteadores y total de lugares se calcularán
-                        automáticamente según el circuito.
+                        La dotación de personal y los cupos ante la autoridad se calcularán automáticamente.
                     </p>
-                    <Boton
-                        type="submit"
-                        variante="secundario"
-                        cargando={cargandoOpciones}
-                        disabled={creando}
-                    >
-                        Consultar opciones y disponibilidad
-                    </Boton>
+                    <div className="flex items-center gap-2">
+                        <Boton
+                            type="button"
+                            variante="secundario"
+                            onClick={alCancelar}
+                            disabled={cargandoOpciones || creando}
+                        >
+                            Cancelar
+                        </Boton>
+                        <Boton
+                            type="submit"
+                            variante={opcionesEstanSincronizadas ? "secundario" : "principal"}
+                            cargando={cargandoOpciones}
+                            disabled={creando}
+                        >
+                            {opcionesEstanSincronizadas
+                                ? "Actualizar disponibilidad"
+                                : "Consultar opciones y disponibilidad"}
+                        </Boton>
+                    </div>
                 </div>
             </form>
 
             {/* Aviso de Parámetros Modificados tras Consulta */}
             {opcionesQuedaronObsoletas ? (
-                <div className="mt-6">
+                <div className="mt-5">
                     <Alerta
                         tipo="advertencia"
-                        titulo="Los parámetros de la salida fueron modificados"
+                        titulo="Los parámetros del contingente fueron modificados"
                     >
                         <p className="text-xs sm:text-sm">
-                            Modificaste el paquete, la fecha o el tamaño del grupo. Hacé clic
-                            en <strong>&quot;Consultar opciones y disponibilidad&quot;</strong> para
-                            recalcular la dotación de personal y consultar el cupo actualizado.
+                            Modificaste el paquete, la fecha o el tamaño del grupo. Hacé clic en{" "}
+                            <strong>&quot;Actualizar disponibilidad&quot;</strong> para recalcular la dotación de
+                            personal y consultar el cupo actualizado.
                         </p>
                     </Alerta>
                 </div>
@@ -450,24 +435,28 @@ function FormularioCrearSalida({
 
             {/* PASO 2: Presentación de Opciones, Dotación, Autoridad y Alojamiento */}
             {opcionesEstanSincronizadas && opciones ? (
-                <div className="mt-6 space-y-6 border-t border-borde pt-6">
-                    <div>
-                        <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                            Paso 2: Dimensionamiento, cupos y alojamiento
-                        </h3>
-                        <p className="text-xs text-texto-suave">
-                            Revisá la dotación calculada para el circuito y seleccioná el
-                            alojamiento asignado a la salida.
-                        </p>
+                <div className="mt-8 space-y-6 border-t-2 border-borde/80 pt-6">
+                    <div className="flex items-center gap-2.5">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-marca-oscura text-xs font-bold text-white shadow-xs">
+                            2
+                        </span>
+                        <div>
+                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
+                                Paso 2: Dimensionamiento, cupos y alojamiento
+                            </h3>
+                            <p className="text-xs text-texto-suave">
+                                Revisá la dotación calculada para el circuito y confirmá la asignación de plazas.
+                            </p>
+                        </div>
                     </div>
 
                     {/* Resumen de Dimensionamiento */}
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="rounded-control border border-borde bg-fondo p-3.5">
-                            <span className="text-xs font-semibold uppercase text-texto-suave">
+                        <div className="rounded-control border border-borde bg-fondo/50 p-3.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-texto-suave">
                                 Cupo de pasajeros
                             </span>
-                            <p className="mt-1 text-xl font-bold text-navegacion">
+                            <p className="mt-1 text-2xl font-bold text-navegacion">
                                 {opciones.tamanoMaximo}
                                 <span className="ml-1 text-xs font-normal text-texto">
                                     turistas
@@ -478,11 +467,11 @@ function FormularioCrearSalida({
                             </span>
                         </div>
 
-                        <div className="rounded-control border border-borde bg-fondo p-3.5">
-                            <span className="text-xs font-semibold uppercase text-texto-suave">
+                        <div className="rounded-control border border-borde bg-fondo/50 p-3.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-texto-suave">
                                 Dotación requerida
                             </span>
-                            <p className="mt-1 text-xl font-bold text-navegacion">
+                            <p className="mt-1 text-2xl font-bold text-navegacion">
                                 {opciones.dotacion.guias + opciones.dotacion.porteadores}
                                 <span className="ml-1 text-xs font-normal text-texto">
                                     trabajadores
@@ -498,11 +487,11 @@ function FormularioCrearSalida({
                             </span>
                         </div>
 
-                        <div className="rounded-control border border-marca/30 bg-marca-suave/40 p-3.5">
-                            <span className="text-xs font-semibold uppercase text-texto-suave">
+                        <div className="rounded-control border border-marca/40 bg-marca-suave/60 p-3.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-marca-oscura">
                                 Total de lugares a bloquear
                             </span>
-                            <p className="mt-1 text-xl font-bold text-marca-oscura">
+                            <p className="mt-1 text-2xl font-bold text-marca-oscura">
                                 {opciones.totalLugares}
                                 <span className="ml-1 text-xs font-normal text-texto">
                                     personas
@@ -517,17 +506,31 @@ function FormularioCrearSalida({
                     {/* Estado del Cupo ante la Autoridad del Camino del Inca */}
                     <div>
                         {opciones.cupoAutoridad === null ? (
-                            <Alerta
-                                tipo="advertencia"
-                                titulo="Disponibilidad previa no disponible (Autoridad)"
-                            >
-                                <p className="text-xs sm:text-sm">
-                                    No fue posible consultar la disponibilidad en tiempo real con
-                                    el servicio de la autoridad. La verificación y el bloqueo de los{" "}
-                                    <strong>{opciones.totalLugares} lugares</strong> se intentarán
-                                    directamente al confirmar la creación.
-                                </p>
-                            </Alerta>
+                            esErrorAutoridadFA2 ? (
+                                <Alerta
+                                    tipo="error"
+                                    titulo="Fallo de comunicación con la autoridad (FA2)"
+                                >
+                                    <div className="space-y-1.5 text-xs sm:text-sm">
+                                        <p className="font-semibold text-peligro">
+                                            {errorServidor}
+                                        </p>
+                                        <p className="text-texto-suave">
+                                            Los datos y opciones seleccionadas se conservan en pantalla. Podés reintentar la confirmación y publicación cuando el servicio de la autoridad se encuentre disponible.
+                                        </p>
+                                    </div>
+                                </Alerta>
+                            ) : (
+                                <Alerta
+                                    tipo="advertencia"
+                                    titulo="Disponibilidad previa no disponible (Autoridad del Parque)"
+                                >
+                                    <p className="text-xs sm:text-sm">
+                                        No fue posible verificar la disponibilidad en tiempo real con el servicio de la autoridad. La validación y el bloqueo de los{" "}
+                                        <strong>{opciones.totalLugares} lugares</strong> se intentarán directamente al confirmar la creación.
+                                    </p>
+                                </Alerta>
+                            )
                         ) : opciones.cupoAutoridad.alcanza ? (
                             <Alerta
                                 tipo="exito"
@@ -536,12 +539,10 @@ function FormularioCrearSalida({
                                 <p className="text-xs sm:text-sm">
                                     La autoridad informa{" "}
                                     <strong>
-                                        {opciones.cupoAutoridad.lugaresDisponibles} lugares
-                                        disponibles
+                                        {opciones.cupoAutoridad.lugaresDisponibles} lugares disponibles
                                     </strong>{" "}
                                     para esa fecha. La cantidad es suficiente para cubrir los{" "}
-                                    <strong>{opciones.totalLugares} lugares</strong> que demanda
-                                    esta salida.
+                                    <strong>{opciones.totalLugares} lugares</strong> requeridos para esta salida.
                                 </p>
                             </Alerta>
                         ) : (
@@ -549,16 +550,20 @@ function FormularioCrearSalida({
                                 tipo="error"
                                 titulo="Cupo insuficiente ante la autoridad (FA1)"
                             >
-                                <p className="text-xs sm:text-sm">
-                                    La autoridad solo dispone de{" "}
-                                    <strong>
-                                        {opciones.cupoAutoridad.lugaresDisponibles} lugares libres
-                                    </strong>
-                                    , pero la salida necesita{" "}
-                                    <strong>{opciones.totalLugares} lugares</strong> (turistas +
-                                    dotación de personal). No es posible crear la salida en esta
-                                    fecha; por favor, elegí otra fecha o reducí el tamaño del grupo.
-                                </p>
+                                <div className="space-y-1.5 text-xs sm:text-sm">
+                                    <p>
+                                        La autoridad solo dispone de{" "}
+                                        <strong>
+                                            {opciones.cupoAutoridad.lugaresDisponibles} lugares libres
+                                        </strong>
+                                        , pero la salida necesita{" "}
+                                        <strong>{opciones.totalLugares} lugares</strong> ({opciones.tamanoMaximo} turistas +{" "}
+                                        {opciones.dotacion.guias + opciones.dotacion.porteadores} dotación de personal).
+                                    </p>
+                                    <p className="text-texto-suave">
+                                        No es posible crear la salida en esta fecha. Por favor, elegí otra fecha en el Paso 1 o reducí el tamaño máximo de pasajeros para reintentar.
+                                    </p>
+                                </div>
                             </Alerta>
                         )}
                     </div>
@@ -566,20 +571,29 @@ function FormularioCrearSalida({
                     {/* Sección de Selección de Alojamiento */}
                     <div className="space-y-3">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <label className="text-sm font-semibold text-navegacion">
-                                Alojamiento por bloqueo de plazas
-                                {requiereSeleccionAlojamiento ? (
-                                    <span className="ml-1 text-xs font-semibold text-peligro">
-                                        (Selección obligatoria)
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-semibold text-navegacion">
+                                    Alojamiento por bloqueo de plazas
+                                </label>
+                                {!tieneCupoInsuficienteAutoridad && requiereSeleccionAlojamiento ? (
+                                    <span className="inline-flex items-center rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                        Selección obligatoria
                                     </span>
                                 ) : null}
-                            </label>
+                            </div>
                             <span className="text-xs text-texto-suave">
                                 Garantía del paquete turístico
                             </span>
                         </div>
 
-                        {requiereSeleccionAlojamiento ? (
+                        {tieneCupoInsuficienteAutoridad ? (
+                            /* En FA1 evitamos destacar información que no resulta útil para completar la operación */
+                            <div className="rounded-control border border-borde/70 bg-fondo/50 p-4">
+                                <p className="text-xs text-texto-suave">
+                                    La asignación y reserva de alojamiento queda suspendida debido a que no hay cupo suficiente ante la autoridad del parque para esta salida.
+                                </p>
+                            </div>
+                        ) : requiereSeleccionAlojamiento ? (
                             <div className="space-y-2">
                                 <p className="text-xs text-texto-suave">
                                     El paquete cuenta con establecimientos que confirman por
@@ -596,13 +610,12 @@ function FormularioCrearSalida({
                                         return (
                                             <label
                                                 key={aloj.idservicio}
-                                                className={`flex items-start gap-3 rounded-control border p-3.5 transition-all ${
-                                                    deshabilitado
+                                                className={`flex items-start gap-3 rounded-control border p-3.5 transition-all ${deshabilitado
                                                         ? "cursor-not-allowed border-borde bg-slate-50/70 opacity-60"
                                                         : seleccionado
-                                                          ? "cursor-pointer border-marca bg-marca-suave/40 shadow-sm"
-                                                          : "cursor-pointer border-borde bg-white hover:border-marca/50"
-                                                }`}
+                                                            ? "cursor-pointer border-marca bg-marca-suave/40 shadow-xs"
+                                                            : "cursor-pointer border-borde bg-white hover:border-marca/50"
+                                                    }`}
                                             >
                                                 <input
                                                     type="radio"
@@ -629,11 +642,10 @@ function FormularioCrearSalida({
                                                             ) : null}
                                                         </p>
                                                         <span
-                                                            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${
-                                                                aloj.alcanza
+                                                            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${aloj.alcanza
                                                                     ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                                                                     : "border border-rose-200 bg-rose-50 text-rose-800"
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {aloj.capacidadDisponible ?? 0} plazas
                                                             disponibles
@@ -664,48 +676,68 @@ function FormularioCrearSalida({
                                 ) : null}
                             </div>
                         ) : (
+                            /* FA3: Sin alojamiento disponible */
                             <Alerta
                                 tipo="informacion"
-                                titulo="Sin alojamiento con bloqueo de plazas (FA3)"
+                                titulo="Salida sin alojamiento con bloqueo de plazas (FA3)"
                             >
-                                <p className="text-xs sm:text-sm">
-                                    El paquete no cuenta con alojamientos que confirmen por bloqueo
-                                    de plazas con capacidad suficiente para este tamaño de grupo.
-                                    La salida se creará <strong>sin alojamiento asignado</strong>;
-                                    cada reserva que compren los pasajeros generará su respectiva
-                                    solicitud individual de alojamiento a confirmar ante el
-                                    proveedor (CU-34).
-                                </p>
+                                <div className="space-y-1.5 text-xs sm:text-sm">
+                                    <p>
+                                        El paquete no cuenta con alojamientos que confirmen por bloqueo
+                                        de plazas con capacidad suficiente para este tamaño de grupo ({opciones.tamanoMaximo} plazas).
+                                    </p>
+                                    <p className="text-texto-suave">
+                                        La salida puede crearse y publicarse <strong>sin alojamiento asignado</strong>.
+                                        Cada reserva que compren los pasajeros generará su respectiva solicitud individual
+                                        de alojamiento a tramitar ante los prestadores correspondientes (CU-34).
+                                    </p>
+                                </div>
                             </Alerta>
                         )}
                     </div>
 
                     {/* Acciones de Confirmación Final */}
-                    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-borde pt-5">
-                        <Boton
-                            type="button"
-                            variante="secundario"
-                            onClick={alCancelar}
-                            disabled={creando}
-                        >
-                            Cancelar
-                        </Boton>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-borde pt-5">
+                        <div>
+                            {tieneCupoInsuficienteAutoridad ? (
+                                <p className="text-xs font-medium text-peligro">
+                                    Confirmación no disponible por falta de cupo
+                                </p>
+                            ) : esErrorAutoridadFA2 ? (
+                                <p className="text-xs font-medium text-advertencia">
+                                    Los datos se conservan. Podés volver a intentar la confirmación.
+                                </p>
+                            ) : null}
+                        </div>
 
-                        <Boton
-                            type="button"
-                            variante="principal"
-                            cargando={creando}
-                            disabled={
-                                cargandoOpciones ||
-                                creando ||
-                                tieneCupoInsuficienteAutoridad ||
-                                (requiereSeleccionAlojamiento &&
-                                    idalojamientoSeleccionado === null)
-                            }
-                            onClick={manejarConfirmacion}
-                        >
-                            Confirmar y publicar salida
-                        </Boton>
+                        <div className="flex items-center gap-2">
+                            <Boton
+                                type="button"
+                                variante="secundario"
+                                onClick={alCancelar}
+                                disabled={creando}
+                            >
+                                Cancelar
+                            </Boton>
+
+                            <Boton
+                                type="button"
+                                variante="principal"
+                                cargando={creando}
+                                disabled={
+                                    cargandoOpciones ||
+                                    creando ||
+                                    tieneCupoInsuficienteAutoridad ||
+                                    (requiereSeleccionAlojamiento &&
+                                        idalojamientoSeleccionado === null)
+                                }
+                                onClick={manejarConfirmacion}
+                            >
+                                {esErrorAutoridadFA2
+                                    ? "Reintentar confirmación y publicación"
+                                    : "Confirmar y publicar salida"}
+                            </Boton>
+                        </div>
                     </div>
                 </div>
             ) : null}
