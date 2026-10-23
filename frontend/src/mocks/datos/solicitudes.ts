@@ -1,4 +1,7 @@
 import type { SolicitudPendiente } from "../../services/solicitudService";
+import { salidasMockIniciales } from "./salidas";
+
+const salidaSal001 = salidasMockIniciales.find((s) => s.nroSalida === "SAL-2026-001");
 
 export const hotelesCompatiblesMock = [
   {
@@ -41,8 +44,8 @@ export const solicitudesIniciales: SolicitudPendiente[] = [
       salida: {
         idsalida: 1,
         nroSalida: "SAL-2026-001",
-        fechaInicio: "2026-11-15T00:00:00.000Z",
-        fechaFin: "2026-11-18T00:00:00.000Z",
+        fechaInicio: salidaSal001?.fechaInicio ?? "2026-11-15T00:00:00.000Z",
+        fechaFin: salidaSal001?.fechaFin ?? "2026-11-18T00:00:00.000Z",
         estado: "PUBLICADA",
         paquete: {
           idpaquete: 1,
