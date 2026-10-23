@@ -359,3 +359,20 @@ export const salidasMockIniciales: SalidaApi[] = [
         alertas: [],
     },
 ];
+
+export const alojamientosSalidaMock = [
+    {
+        idservicio: 1,
+        nombreServicio: "Hotel Montaña",
+        localidad: "Cusco",
+        categoria: "3 Estrellas",
+        capacidadDisponible: 15,
+    },
+    {
+        idservicio: 4,
+        nombreServicio: "Hospedaje Andino",
+        localidad: "Cusco",
+        categoria: "3 Estrellas",
+        capacidadDisponible: 4,
+    },
+];
