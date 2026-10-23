@@ -1,24 +1,71 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import type { Request } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { CustomError } from "../../error/CustomError";
+import { db } from "../../config/postgresDatabase";
 
 const BASE_IMG_PATH = path.resolve(process.cwd(), "public/imagenes/paquetes");
 const FORMATOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
+const NOMBRES_FOTOS_VALIDOS = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
 
-// Contador por petición para nombrar fotos del carrusel secuencialmente (foto_1, foto_2, ...)
-let contadorFoto = 1;
+export async function validarPaqueteParaSubida(
+  req: Request,
+  validarNombreFoto = false
+): Promise<number> {
+  const rawId = req.params.id;
+
+  // 1. Validar formato estrictamente numérico (evita traversal como %2e%2e, .., /, \)
+  if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
+    throw CustomError.badRequest("El ID proporcionado no es válido.");
+  }
+
+  const id = parseInt(rawId, 10);
+  if (isNaN(id) || id <= 0) {
+    throw CustomError.badRequest("El ID proporcionado no es válido.");
+  }
+
+  // 2. Si aplica validarNombreFoto, verificar que sea un nombre permitido
+  if (validarNombreFoto) {
+    const rawNombreFoto = req.params.nombreFoto;
+    const nombreFoto = typeof rawNombreFoto === "string" ? rawNombreFoto.toLowerCase() : "";
+    if (!NOMBRES_FOTOS_VALIDOS.includes(nombreFoto)) {
+      throw CustomError.badRequest(
+        `nombreFoto debe ser uno de: ${NOMBRES_FOTOS_VALIDOS.join(", ")}.`
+      );
+    }
+  }
+
+  // 3. Validar que el paquete exista y se encuentre ACTIVO antes de escribir o borrar archivos
+  const paquete = await db.paquete.findUnique({
+    where: { idpaquete: id },
+    select: { idpaquete: true, estado: true },
+  });
+
+  if (!paquete || paquete.estado !== "ACTIVO") {
+    throw CustomError.notFound("Paquete no encontrado o inactivo.");
+  }
+
+  return id;
+}
 
 const storageCarrusel = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const id = req.params.id;
-    const dir = path.join(BASE_IMG_PATH, id as string);
+    const rawId = req.params.id;
+    if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
+      return cb(CustomError.badRequest("El ID proporcionado no es válido."), "");
+    }
+    const resolvedBase = path.resolve(BASE_IMG_PATH);
+    const dir = path.resolve(BASE_IMG_PATH, rawId);
+    if (!dir.startsWith(resolvedBase + path.sep)) {
+      return cb(CustomError.badRequest("Ruta de destino inválida."), "");
+    }
+
     fs.mkdirSync(dir, { recursive: true });
 
     if ((req as any)._primerArchivo !== false) {
       (req as any)._primerArchivo = false;
-      contadorFoto = 1;
+      (req as any)._contadorFoto = 1;
 
       try {
         const archivos = fs.readdirSync(dir);
@@ -36,13 +83,14 @@ const storageCarrusel = multer.diskStorage({
 
     cb(null, dir);
   },
-  filename: (_req, file, cb) => {
+  filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (contadorFoto === 1) {
-      contadorFoto++;
+    const contador = (req as any)._contadorFoto ?? 1;
+    (req as any)._contadorFoto = contador + 1;
+    if (contador === 1) {
       cb(null, `principal${ext}`);
     } else {
-      cb(null, `foto_${contadorFoto++}${ext}`);
+      cb(null, `foto_${contador}${ext}`);
     }
   },
 });
@@ -55,8 +103,100 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   }
 };
 
-// Middleware para subir galería/carrusel completo: de 1 a 5 fotos
-export const subirCarruselPaquete = multer({
+const storageImagen = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const rawId = req.params.id;
+    if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
+      return cb(CustomError.badRequest("El ID proporcionado no es válido."), "");
+    }
+    const resolvedBase = path.resolve(BASE_IMG_PATH);
+    const dir = path.resolve(BASE_IMG_PATH, rawId);
+    if (!dir.startsWith(resolvedBase + path.sep)) {
+      return cb(CustomError.badRequest("Ruta de destino inválida."), "");
+    }
+
+    fs.mkdirSync(dir, { recursive: true });
+
+    try {
+      const archivosPrevios = fs.readdirSync(dir);
+      for (const archivo of archivosPrevios) {
+        if (archivo.startsWith("principal.")) {
+          fs.unlinkSync(path.join(dir, archivo));
+        }
+      }
+    } catch {}
+
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `principal${ext}`);
+  },
+});
+
+const storageModificarFoto = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const rawId = req.params.id;
+    const rawNombreFoto = req.params.nombreFoto;
+    if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
+      return cb(CustomError.badRequest("El ID proporcionado no es válido."), "");
+    }
+    const nombreFoto = typeof rawNombreFoto === "string" ? rawNombreFoto.toLowerCase() : "";
+    if (!NOMBRES_FOTOS_VALIDOS.includes(nombreFoto)) {
+      return cb(
+        CustomError.badRequest(`nombreFoto debe ser uno de: ${NOMBRES_FOTOS_VALIDOS.join(", ")}.`),
+        ""
+      );
+    }
+
+    const resolvedBase = path.resolve(BASE_IMG_PATH);
+    const dir = path.resolve(BASE_IMG_PATH, rawId);
+    if (!dir.startsWith(resolvedBase + path.sep)) {
+      return cb(CustomError.badRequest("Ruta de destino inválida."), "");
+    }
+
+    fs.mkdirSync(dir, { recursive: true });
+
+    try {
+      const archivos = fs.readdirSync(dir);
+      for (const arch of archivos) {
+        if (arch.startsWith(`${nombreFoto}.`)) {
+          fs.unlinkSync(path.join(dir, arch));
+        }
+      }
+    } catch {}
+
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const nombreFoto = (req.params.nombreFoto as string)?.toLowerCase();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${nombreFoto}${ext}`);
+  },
+});
+
+function envolverMulter(multerInstance: multer.Multer, validarNombreFoto = false): multer.Multer {
+  const envolver = (handler: RequestHandler): RequestHandler => {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await validarPaqueteParaSubida(req, validarNombreFoto);
+        handler(req, res, next);
+      } catch (error) {
+        next(error);
+      }
+    };
+  };
+
+  return {
+    single: (fieldName: string) => envolver(multerInstance.single(fieldName)),
+    array: (fieldName: string, maxCount?: number) => envolver(multerInstance.array(fieldName, maxCount)),
+    fields: (fields: readonly multer.Field[]) => envolver(multerInstance.fields(fields)),
+    any: () => envolver(multerInstance.any()),
+    none: () => envolver(multerInstance.none()),
+  };
+}
+
+const multerCarruselInterno = multer({
   storage: storageCarrusel,
   fileFilter,
   limits: {
@@ -65,68 +205,30 @@ export const subirCarruselPaquete = multer({
   },
 });
 
-// Middleware para foto individual de portada (principal)
-export const subirImagenPaquete = multer({
-  storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      const id = req.params.id;
-      const dir = path.join(BASE_IMG_PATH, id as string);
-      fs.mkdirSync(dir, { recursive: true });
-
-      try {
-        const archivosPrevios = fs.readdirSync(dir);
-        for (const archivo of archivosPrevios) {
-          if (archivo.startsWith("principal.")) {
-            fs.unlinkSync(path.join(dir, archivo));
-          }
-        }
-      } catch {}
-
-      cb(null, dir);
-    },
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `principal${ext}`);
-    },
-  }),
+const multerImagenInterno = multer({
+  storage: storageImagen,
   fileFilter,
   limits: {
     fileSize: 3 * 1024 * 1024,
   },
 });
+
+const multerModificarFotoInterno = multer({
+  storage: storageModificarFoto,
+  fileFilter,
+  limits: {
+    fileSize: 3 * 1024 * 1024,
+  },
+});
+
+// Middleware para subir galería/carrusel completo: de 1 a 5 fotos
+export const subirCarruselPaquete = envolverMulter(multerCarruselInterno, false);
+
+// Middleware para foto individual de portada (principal)
+export const subirImagenPaquete = envolverMulter(multerImagenInterno, false);
 
 // Middleware para modificar una foto específica del carrusel por su nombre (ej: foto_2, principal, etc.)
-export const modificarFotoEspecifica = multer({
-  storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      const id = req.params.id;
-      const nombreFoto = req.params.nombreFoto; // ej: 'foto_2' o 'principal'
-      const dir = path.join(BASE_IMG_PATH, id as string);
-      fs.mkdirSync(dir, { recursive: true });
-
-      // Borramos la versión anterior de esa foto en particular sin tocar las demás
-      try {
-        const archivos = fs.readdirSync(dir);
-        for (const arch of archivos) {
-          if (arch.startsWith(`${nombreFoto}.`)) {
-            fs.unlinkSync(path.join(dir, arch));
-          }
-        }
-      } catch {}
-
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const nombreFoto = req.params.nombreFoto;
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${nombreFoto}${ext}`);
-    },
-  }),
-  fileFilter,
-  limits: {
-    fileSize: 3 * 1024 * 1024,
-  },
-});
+export const modificarFotoEspecifica = envolverMulter(multerModificarFotoInterno, true);
 
 const IMAGENES_CATALOGO_POR_DEFECTO = [
   "/imagenes/catalogo/camino_inca_tradicional.jpg",
