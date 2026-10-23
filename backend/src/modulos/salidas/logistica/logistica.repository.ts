@@ -126,18 +126,21 @@ export class LogisticaRepository {
         async (tx) => {
           const antes = await this.instantanea(tx, idsalida);
 
-          // 1. Desasignar
+          // 1. Desasignar (SAL-08: atómico - deleteMany primero, solo reintegra si eliminó exactamente la fila)
           for (const item of p.itemsDesasignar) {
             if (item.tipo === TIPO_SERVICIO.EQUIPAMIENTO) {
               const fila = await tx.salidaEquipamiento.findFirst({ where: { idsalida, idservicio: item.idservicio } });
               if (!fila) {
                 throw new ReglaLogisticaViolada(`El equipamiento ${item.idservicio} no está asignado a la salida.`);
               }
+              const borrado = await tx.salidaEquipamiento.deleteMany({ where: { idsalida, idservicio: item.idservicio } });
+              if (borrado.count === 0) {
+                throw new ReglaLogisticaViolada(`El equipamiento ${item.idservicio} ya fue desasignado por otra operación.`);
+              }
               await tx.servicioEquipamiento.update({
                 where: { idservicio: item.idservicio },
                 data: { cantidadDisponible: { increment: fila.cantidad } },
               });
-              await tx.salidaEquipamiento.deleteMany({ where: { idsalida, idservicio: item.idservicio } });
             } else {
               const baja = await tx.salidaServicio.deleteMany({
                 where: { idsalida, idservicio: item.idservicio, tipo: TIPO_SERVICIO.TRANSPORTE },

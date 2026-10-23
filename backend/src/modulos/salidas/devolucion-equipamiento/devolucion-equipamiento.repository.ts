@@ -12,6 +12,16 @@ export class DevolucionEquipamientoRepository {
   /**
    * Obtiene la salida junto con el equipamiento asignado y su detalle de stock.
    */
+  async existeDevolucion(idsalida: number) {
+    const auditoria = await db.registroAuditoria.findFirst({
+      where: {
+        idsalida,
+        cambios: { path: ["tipoOperacion"], equals: "DEVOLUCION_EQUIPAMIENTO" },
+      },
+    });
+    return !!auditoria;
+  }
+
   async obtenerSalidaConEquipamiento(idsalida: number) {
     return db.salida.findUnique({
       where: { idsalida },
@@ -38,6 +48,17 @@ export class DevolucionEquipamientoRepository {
    */
   async registrarDevolucion(datos: DatosRegistroDevolucion) {
     return db.$transaction(async (tx) => {
+      // SAL-03: Verificación atómica contra doble devolución dentro de la transacción
+      const yaExiste = await tx.registroAuditoria.findFirst({
+        where: {
+          idsalida: datos.idsalida,
+          cambios: { path: ["tipoOperacion"], equals: "DEVOLUCION_EQUIPAMIENTO" },
+        },
+      });
+      if (yaExiste) {
+        throw new Error("La devolución de equipamiento para esta salida ya fue registrada.");
+      }
+
       const resultadosStock = [];
 
       for (const item of datos.items) {

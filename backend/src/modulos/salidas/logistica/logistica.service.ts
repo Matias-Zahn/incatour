@@ -78,11 +78,16 @@ export class LogisticaService {
   }
 
   // ---- helpers ----
-  // Precondición: la salida no empezó (ni está cancelada o finalizada)
+  // Precondición: la salida tiene recursos ya asignados (CERRADA) y no empezó (CU-39 / SAL-07)
   private async buscarModificableOFallar(idsalida: number) {
     const salida = await this.repository.findSalida(idsalida);
     if (!salida) throw CustomError.notFound(`No se encontró la salida con ID ${idsalida}.`);
-    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+    if (salida.estado === "PUBLICADA") {
+      throw CustomError.badRequest(
+        "La salida todavía no tiene recursos asignados (CU-40). La logística solo se modifica sobre salidas con asignación previa."
+      );
+    }
+    if (salida.estado !== "CERRADA" || salida.fechaInicio <= new Date()) {
       throw CustomError.badRequest(
         "La logística solo puede modificarse en salidas que no hayan comenzado y no estén canceladas ni finalizadas."
       );
