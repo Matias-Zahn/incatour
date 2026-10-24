@@ -460,7 +460,7 @@ export function guardarAvanceOffline(
         idLocal: `off_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         sincronizado: false,
     };
-    const actualizados = [nuevo, ...existentes];
+    const actualizados = [...existentes, nuevo]; // FIFO: el back exige las etapas en orden de llegada
     try {
         localStorage.setItem(
             `${CLAVE_AVANCES_OFFLINE}_${idsalida}`,
