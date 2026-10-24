@@ -120,11 +120,22 @@ function PaquetesPage() {
         datos: DatosCrearPaquete,
         imagenesArchivos?: File[],
     ) {
+        let creado: Paquete;
         try {
             setErrorFormulario("");
             setMensajeExito("");
-            const creado = await registrar.mutateAsync(datos);
-            if (imagenesArchivos && imagenesArchivos.length > 0) {
+            creado = await registrar.mutateAsync(datos);
+        } catch (e) {
+            setErrorFormulario(
+                e instanceof Error
+                    ? e.message
+                    : "Ocurrió un error al registrar el paquete.",
+            );
+            return;
+        }
+
+        if (imagenesArchivos && imagenesArchivos.length > 0) {
+            try {
                 const resImg = await subirImagen.mutateAsync({
                     id: creado.idpaquete,
                     archivos: imagenesArchivos,
@@ -134,15 +145,19 @@ function PaquetesPage() {
                 setMensajeExito(
                     `Paquete "${creado.nombrePaquete}" publicado con ${cantidad} ${cantidad === 1 ? "imagen guardada" : "imágenes guardadas"}.`,
                 );
+            } catch (e) {
+                setPaqueteEnEdicion(creado);
+                setErrorFormulario(
+                    `El paquete "${creado.nombrePaquete}" (${creado.nroPaquete}) ya fue creado, pero falló la subida de imágenes: ${
+                        e instanceof Error
+                            ? e.message
+                            : "Error al subir el carrusel."
+                    } Podés corregir las imágenes y guardar los cambios sin duplicar el paquete.`,
+                );
+                return;
             }
-            cerrarFormulario();
-        } catch (e) {
-            setErrorFormulario(
-                e instanceof Error
-                    ? e.message
-                    : "Ocurrió un error al registrar el paquete.",
-            );
         }
+        cerrarFormulario();
     }
 
     async function guardarEdicionPaquete(
