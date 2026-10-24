@@ -51,8 +51,23 @@ function obtenerGaleriaPaquete(paquete: Paquete): string[] {
 
 function PaquetesPage() {
     const navegar = useNavigate();
-    const { data: paquetes = [], isPending, isError, error } = usePaquetes();
-    const { data: circuitos = [] } = useCircuitos();
+    const [filtroEstado, setFiltroEstado] = useState<
+        "ACTIVO" | "INACTIVO" | "TODOS"
+    >("TODOS");
+    const [filtroCircuito, setFiltroCircuito] = useState<number>(0);
+    const [filtroTemporada, setFiltroTemporada] = useState<number>(0);
+
+    const {
+        data: paquetes = [],
+        isPending,
+        isError,
+        error,
+    } = usePaquetes({
+        estado: filtroEstado,
+        idcircuito: filtroCircuito > 0 ? filtroCircuito : undefined,
+    });
+    const { data: circuitos = [] } = useCircuitos({ estado: "TODOS" });
+    const circuitosActivos = circuitos.filter((c) => c.estado === "ACTIVO");
     const { data: temporadas = [] } = useTemporadas();
     const { data: serviciosDisponibles = [] } =
         useServiciosDisponiblesCatalogo();
@@ -277,7 +292,27 @@ function PaquetesPage() {
     }
 
     const terminoLimpio = busqueda.trim().toLowerCase();
+    const hayFiltrosActivos =
+        Boolean(terminoLimpio) ||
+        filtroEstado !== "TODOS" ||
+        filtroCircuito > 0 ||
+        filtroTemporada > 0;
+
+    function limpiarTodosLosFiltros() {
+        setBusqueda("");
+        setFiltroEstado("TODOS");
+        setFiltroCircuito(0);
+        setFiltroTemporada(0);
+        setPaginaActual(1);
+    }
+
     const paquetesFiltrados = paquetes.filter((paquete) => {
+        if (
+            filtroTemporada > 0 &&
+            !paquete.tarifas?.some((t) => t.idtemporada === filtroTemporada)
+        ) {
+            return false;
+        }
         if (!terminoLimpio) return true;
         return (
             paquete.nombrePaquete.toLowerCase().includes(terminoLimpio) ||
@@ -301,10 +336,10 @@ function PaquetesPage() {
 
     const estado = isPending ? "cargando" : isError ? "error" : "exito";
     const sinPaquetesRegistrados =
-        estado === "exito" && paquetes.length === 0;
+        estado === "exito" && paquetes.length === 0 && !hayFiltrosActivos;
     const sinResultadosBusqueda =
         estado === "exito" &&
-        paquetes.length > 0 &&
+        !sinPaquetesRegistrados &&
         paquetesFiltrados.length === 0;
 
     return (
@@ -339,7 +374,7 @@ function PaquetesPage() {
                 <FormularioPaquete
                     key={paqueteEnEdicion?.idpaquete ?? "nuevo"}
                     paqueteEnEdicion={paqueteEnEdicion}
-                    circuitos={circuitos}
+                    circuitos={circuitosActivos}
                     temporadas={temporadas}
                     serviciosDisponibles={serviciosDisponibles}
                     alGuardarNuevo={guardarNuevoPaquete}
@@ -378,12 +413,10 @@ function PaquetesPage() {
                 </Alerta>
             ) : null}
 
-            {estado === "exito" && paquetes.length > 0 ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative w-full max-w-md">
-                        <label htmlFor="buscar-paquete" className="sr-only">
-                            Buscar paquete turístico
-                        </label>
+            {estado === "exito" && (paquetes.length > 0 || hayFiltrosActivos) ? (
+                <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta md:grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] md:items-end">
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Buscar paquete
                         <input
                             id="buscar-paquete"
                             type="search"
@@ -391,18 +424,83 @@ function PaquetesPage() {
                             onChange={(evento) =>
                                 manejarCambioBusqueda(evento.target.value)
                             }
-                            placeholder="Buscar por código, nombre, circuito o garantía..."
-                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            placeholder="Código, nombre, circuito o garantía..."
+                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
-                    </div>
+                    </label>
 
-                    {busqueda ? (
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Estado
+                        <select
+                            aria-label="Filtrar paquetes por estado"
+                            value={filtroEstado}
+                            onChange={(e) => {
+                                setFiltroEstado(
+                                    e.target.value as
+                                        | "ACTIVO"
+                                        | "INACTIVO"
+                                        | "TODOS",
+                                );
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value="TODOS">Todos los estados</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="INACTIVO">Dados de baja (Inactivos)</option>
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Circuito
+                        <select
+                            aria-label="Filtrar paquetes por circuito"
+                            value={filtroCircuito}
+                            onChange={(e) => {
+                                setFiltroCircuito(Number(e.target.value));
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value={0}>Todos los circuitos</option>
+                            {circuitos.map((c) => (
+                                <option key={c.idcircuito} value={c.idcircuito}>
+                                    {c.nombreCircuito}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Temporada
+                        <select
+                            aria-label="Filtrar paquetes por temporada"
+                            value={filtroTemporada}
+                            onChange={(e) => {
+                                setFiltroTemporada(Number(e.target.value));
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value={0}>Todas las temporadas</option>
+                            {temporadas.map((t) => (
+                                <option
+                                    key={t.idtemporada}
+                                    value={t.idtemporada}
+                                >
+                                    {t.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    {hayFiltrosActivos ? (
                         <Boton
                             variante="fantasma"
-                            className="self-start text-xs text-texto-suave sm:self-auto"
-                            onClick={() => manejarCambioBusqueda("")}
+                            className="px-3 py-2 text-xs text-texto-suave"
+                            onClick={limpiarTodosLosFiltros}
                         >
-                            Limpiar búsqueda
+                            Limpiar filtros
                         </Boton>
                     ) : null}
                 </div>
@@ -421,7 +519,7 @@ function PaquetesPage() {
             ) : sinResultadosBusqueda ? (
                 <EstadoListado
                     estado="vacio"
-                    mensaje={`No se encontraron paquetes que coincidan con "${busqueda.trim()}".`}
+                    mensaje="No se encontraron paquetes que coincidan con los filtros seleccionados."
                 />
             ) : (
                 <div className="overflow-x-auto">

@@ -228,8 +228,32 @@ export type RespuestaSubirImagenPaquete = {
     urls?: string[];
 };
 
-export async function listarPaquetes(): Promise<Paquete[]> {
-    return solicitarApi<RespuestaDatos<PaqueteApi[]>>("/paquetes")
+export type FiltrosPaquete = {
+    estado?: "ACTIVO" | "INACTIVO" | "TODOS";
+    idcircuito?: number;
+    nombrePaquete?: string;
+};
+
+export async function listarPaquetes(
+    filtros?: FiltrosPaquete | Record<string, unknown>,
+): Promise<Paquete[]> {
+    const params = new URLSearchParams();
+    if (typeof filtros?.estado === "string" && filtros.estado) {
+        params.set("estado", filtros.estado);
+    }
+    if (typeof filtros?.idcircuito === "number" && filtros.idcircuito > 0) {
+        params.set("idcircuito", String(filtros.idcircuito));
+    }
+    if (
+        typeof filtros?.nombrePaquete === "string" &&
+        filtros.nombrePaquete.trim()
+    ) {
+        params.set("nombrePaquete", filtros.nombrePaquete.trim());
+    }
+    const query = params.toString();
+    return solicitarApi<RespuestaDatos<PaqueteApi[]>>(
+        query ? `/paquetes?${query}` : "/paquetes",
+    )
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarPaquete));
 }
@@ -390,14 +414,18 @@ export async function listarServiciosDisponiblesCatalogo(): Promise<
 
 export const clavesPaquetes = {
     todos: ["paquetes"] as const,
+    lista: (filtros?: FiltrosPaquete) =>
+        filtros
+            ? (["paquetes", filtros] as const)
+            : (["paquetes"] as const),
     uno: (id: number) => ["paquetes", id] as const,
     serviciosCatalogo: ["servicios-catalogo-paquetes"] as const,
 };
 
-export function usePaquetes() {
+export function usePaquetes(filtros?: FiltrosPaquete) {
     return useQuery({
-        queryKey: clavesPaquetes.todos,
-        queryFn: listarPaquetes,
+        queryKey: clavesPaquetes.lista(filtros),
+        queryFn: () => listarPaquetes(filtros),
     });
 }
 

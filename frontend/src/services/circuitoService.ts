@@ -85,8 +85,35 @@ function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCir
     return copia;
 }
 
-export function listarCircuitos(): Promise<Circuito[]> {
-    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos")
+export type FiltrosCircuito = {
+    estado?: "ACTIVO" | "INACTIVO" | "TODOS";
+    dificultad?: string;
+    duracionDias?: number;
+};
+
+export function listarCircuitos(
+    filtros?: FiltrosCircuito | Record<string, unknown>,
+): Promise<Circuito[]> {
+    const params = new URLSearchParams();
+    if (typeof filtros?.estado === "string" && filtros.estado) {
+        params.set("estado", filtros.estado);
+    }
+    if (
+        typeof filtros?.dificultad === "string" &&
+        filtros.dificultad.trim()
+    ) {
+        params.set("dificultad", filtros.dificultad.trim());
+    }
+    if (
+        typeof filtros?.duracionDias === "number" &&
+        filtros.duracionDias > 0
+    ) {
+        params.set("duracionDias", String(filtros.duracionDias));
+    }
+    const query = params.toString();
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>(
+        query ? `/circuitos?${query}` : "/circuitos",
+    )
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarCircuito));
 }
@@ -150,14 +177,18 @@ export function guardarSecuenciaEtapas(
 
 export const clavesCircuitos = {
     todos: ["circuitos"] as const,
+    lista: (filtros?: FiltrosCircuito) =>
+        filtros
+            ? (["circuitos", filtros] as const)
+            : (["circuitos"] as const),
     uno: (id: number) => ["circuitos", id] as const,
     etapas: (idCircuito: number) => ["circuitos", idCircuito, "etapas"] as const,
 };
 
-export function useCircuitos() {
+export function useCircuitos(filtros?: FiltrosCircuito) {
     return useQuery({
-        queryKey: clavesCircuitos.todos,
-        queryFn: listarCircuitos,
+        queryKey: clavesCircuitos.lista(filtros),
+        queryFn: () => listarCircuitos(filtros),
     });
 }
 
