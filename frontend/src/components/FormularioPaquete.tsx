@@ -580,7 +580,10 @@ function FormularioPaquete({
         if (esEdicion && paqueteEnEdicion) {
             alGuardarEdicion(
                 paqueteEnEdicion.idpaquete,
-                payloadComun,
+                {
+                    ...payloadComun,
+                    condiciones: condiciones.trim(),
+                },
                 imagenesArchivos,
             );
             return;

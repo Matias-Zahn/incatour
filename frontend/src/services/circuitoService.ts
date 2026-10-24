@@ -76,11 +76,15 @@ function normalizarCircuito(circuito: CircuitoApi): Circuito {
     };
 }
 
-function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCircuito> {
+function limpiarPayloadCircuito(
+    datos: Partial<DatosCircuito>,
+    esEdicion = false,
+): Partial<DatosCircuito> {
     const copia: Partial<DatosCircuito> = { ...datos };
     if (copia.parametrosPorteadores !== undefined) {
         const texto = copia.parametrosPorteadores.trim();
-        copia.parametrosPorteadores = texto.length > 0 ? texto : undefined;
+        copia.parametrosPorteadores =
+            texto.length > 0 ? texto : esEdicion ? "" : undefined;
     }
     return copia;
 }
@@ -121,7 +125,7 @@ export function listarCircuitos(
 export function registrarCircuito(datos: DatosCircuito): Promise<Circuito> {
     return solicitarApi<RespuestaDatos<CircuitoApi>>("/circuitos", {
         method: "POST",
-        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+        body: JSON.stringify(limpiarPayloadCircuito(datos, false)),
     })
         .then(respuestaDatos)
         .then(normalizarCircuito);
@@ -133,7 +137,7 @@ export function modificarCircuito(
 ): Promise<Circuito> {
     return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
         method: "PUT",
-        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+        body: JSON.stringify(limpiarPayloadCircuito(datos, true)),
     })
         .then(respuestaDatos)
         .then(normalizarCircuito);
