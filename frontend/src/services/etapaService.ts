@@ -149,9 +149,9 @@ export function detectarDiscontinuidadesEspaciales(etapas: Etapa[]): Discontinui
 }
 
 export function consultarCircuitos(): Promise<Circuito[]> {
-    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos").then((respuesta) =>
-        respuesta.data.map(normalizarCircuito),
-    );
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>(
+        "/circuitos?estado=TODOS",
+    ).then((respuesta) => respuesta.data.map(normalizarCircuito));
 }
 
 export function consultarEtapas(idcircuito: number): Promise<Etapa[]> {
@@ -190,7 +190,7 @@ export function confirmarSecuenciaCompleta(
 export const reemplazarEtapas = confirmarSecuenciaCompleta;
 
 export const clavesEtapas = {
-    circuitos: ["circuitos"] as const,
+    circuitos: ["circuitos", { estado: "TODOS" }] as const,
     porCircuito: (idcircuito: number) => ["etapas", idcircuito] as const,
 };
 

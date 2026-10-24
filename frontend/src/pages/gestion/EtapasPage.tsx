@@ -44,7 +44,13 @@ function EtapasPage() {
     const circuitoSeleccionado = circuitos.find(
         (circuito) => circuito.idcircuito === idCircuitoActivo,
     );
-    const circuitoInactivo = circuitoSeleccionado?.estado === "INACTIVO";
+    const circuitoNoEncontrado =
+        !cargandoCircuitos &&
+        !errorCircuitos &&
+        circuitos.length > 0 &&
+        !circuitoSeleccionado;
+    const circuitoInactivo =
+        circuitoSeleccionado?.estado === "INACTIVO" || circuitoNoEncontrado;
 
     const {
         data: etapasServidor = [],
@@ -303,6 +309,11 @@ function EtapasPage() {
                         onChange={(evento) => cambiarCircuito(Number(evento.target.value))}
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-semibold text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                     >
+                        {circuitoNoEncontrado ? (
+                            <option value={idCircuitoActivo} disabled>
+                                Circuito #{idCircuitoActivo} (no disponible)
+                            </option>
+                        ) : null}
                         {circuitos.map((circuito) => (
                             <option key={circuito.idcircuito} value={circuito.idcircuito}>
                                 {circuito.nombreCircuito} ({circuito.duracionDias} días ·{" "}
