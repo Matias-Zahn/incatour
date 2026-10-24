@@ -62,7 +62,7 @@ export class SolicitudService {
         servicioId: s.idservicio,
         hotel: s.nombreServicio,
         proveedor: s.proveedor.razonSocial,
-        canalContacto: "Por fuera del sistema" // Hardcodeado según DSD
+        canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema"
       }))
     };
   }

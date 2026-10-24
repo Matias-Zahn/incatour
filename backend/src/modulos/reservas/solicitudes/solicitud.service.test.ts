@@ -34,13 +34,13 @@ const solicitud = (over: Record<string, unknown> = {}, paquete: Record<string, u
   ...over,
 });
 
-const hotel = (id: number) => ({
+const hotel = (id: number, canalComunicacion = "WhatsApp") => ({
   idservicio: id,
   nombreServicio: `Hotel ${id}`,
   localidad: "Cusco",
   estado: "ACTIVO",
   alojamiento: { categoria: "3 estrellas", tipoHabitacion: "Doble" },
-  proveedor: { razonSocial: `Proveedor ${id}` },
+  proveedor: { razonSocial: `Proveedor ${id}`, canalComunicacion, datosContacto: `contacto${id}@hotel.com` },
 });
 const dto = (obj: Record<string, unknown>) => ResolverSolicitudDto.create(obj)[1]!;
 
@@ -63,15 +63,46 @@ describe("SolicitudService", () => {
 
   describe("buscarServiciosCompatibles (CU-34, fase 1)", () => {
     it("busca hoteles con los criterios garantizados del paquete y arma las opciones de contacto", async () => {
-      repo.buscarServiciosCompatiblesExcluyendoRechazados.mockResolvedValue([hotel(40), hotel(41)]);
+      repo.buscarServiciosCompatiblesExcluyendoRechazados.mockResolvedValue([
+        hotel(40, "WhatsApp"),
+        hotel(41, "Correo electrónico"),
+      ]);
 
       const r = await new SolicitudService().buscarServiciosCompatibles(5);
 
       expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).toHaveBeenCalledWith("Doble", "3 estrellas", "Cusco", []);
       expect(r).toMatchObject({ solicitudId: 5, reserva: "RES-1", cliente: "CLI-9" });
       expect(r.opcionesContacto).toEqual([
-        { servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "Por fuera del sistema" },
-        { servicioId: 41, hotel: "Hotel 41", proveedor: "Proveedor 41", canalContacto: "Por fuera del sistema" },
+        { servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp" },
+        { servicioId: 41, hotel: "Hotel 41", proveedor: "Proveedor 41", canalContacto: "Correo electrónico" },
+      ]);
+    });
+
+    it("BE-04: usa datosContacto o 'Por fuera del sistema' si canalComunicacion está ausente", async () => {
+      repo.buscarServiciosCompatiblesExcluyendoRechazados.mockResolvedValue([
+        {
+          idservicio: 50,
+          nombreServicio: "Hotel 50",
+          localidad: "Cusco",
+          estado: "ACTIVO",
+          alojamiento: { categoria: "3 estrellas", tipoHabitacion: "Doble" },
+          proveedor: { razonSocial: "Proveedor 50", canalComunicacion: null, datosContacto: "+51 84 123456" },
+        },
+        {
+          idservicio: 51,
+          nombreServicio: "Hotel 51",
+          localidad: "Cusco",
+          estado: "ACTIVO",
+          alojamiento: { categoria: "3 estrellas", tipoHabitacion: "Doble" },
+          proveedor: { razonSocial: "Proveedor 51", canalComunicacion: "", datosContacto: "" },
+        },
+      ]);
+
+      const r = await new SolicitudService().buscarServiciosCompatibles(5);
+
+      expect(r.opcionesContacto).toEqual([
+        { servicioId: 50, hotel: "Hotel 50", proveedor: "Proveedor 50", canalContacto: "+51 84 123456" },
+        { servicioId: 51, hotel: "Hotel 51", proveedor: "Proveedor 51", canalContacto: "Por fuera del sistema" },
       ]);
     });
 
