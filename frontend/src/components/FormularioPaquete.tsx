@@ -29,6 +29,7 @@ type FormularioPaqueteProps = {
     circuitos: Circuito[];
     temporadas: Temporada[];
     serviciosDisponibles: ServicioDisponiblePaquete[];
+    errorCargaServicios?: string;
     alGuardarNuevo: (
         datos: DatosCrearPaquete,
         imagenesArchivos?: File[],
@@ -98,6 +99,7 @@ function FormularioPaquete({
     circuitos,
     temporadas,
     serviciosDisponibles,
+    errorCargaServicios,
     alGuardarNuevo,
     alGuardarEdicion,
     alCancelar,
@@ -945,7 +947,14 @@ function FormularioPaquete({
                             <p className="text-xs font-semibold text-texto">
                                 Seleccioná el establecimiento de alojamiento garantizado:
                             </p>
-                            {alojamientosDisponibles.length === 0 ? (
+                            {errorCargaServicios ? (
+                                <p
+                                    className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
+                                    role="alert"
+                                >
+                                    No se pudieron cargar los servicios de alojamiento: {errorCargaServicios}
+                                </p>
+                            ) : alojamientosDisponibles.length === 0 ? (
                                 <p className="text-xs text-texto-suave">
                                     No se encontraron servicios de alojamiento activos. Podés registrarlos desde la sección Proveedores.
                                 </p>
@@ -1167,7 +1176,24 @@ function FormularioPaquete({
             </div>
 
             {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS */}
-            {serviciosDisponibles.length > 0 ? (
+            {errorCargaServicios ? (
+                <div className="space-y-3 border-t border-borde pt-5">
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
+                            4
+                        </span>
+                        <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
+                            Servicios operativos incluidos en el paquete
+                        </h3>
+                    </div>
+                    <p
+                        className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
+                        role="alert"
+                    >
+                        No se pudieron cargar los servicios operativos de proveedores: {errorCargaServicios}
+                    </p>
+                </div>
+            ) : serviciosDisponibles.length > 0 ? (
                 <div className="space-y-3 border-t border-borde pt-5">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">

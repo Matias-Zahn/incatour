@@ -383,33 +383,27 @@ export async function eliminarFotoIndividualPaquete(
 export async function listarServiciosDisponiblesCatalogo(): Promise<
     ServicioDisponiblePaquete[]
 > {
-    try {
-        const resProveedores = await solicitarApi<
-            RespuestaDatos<
-                {
-                    idproveedor: number;
-                    razonSocial: string;
-                    tipoProveedor: string;
-                    estado: string;
-                }[]
-            >
-        >("/proveedores?estado=ACTIVO");
+    const resProveedores = await solicitarApi<
+        RespuestaDatos<
+            {
+                idproveedor: number;
+                razonSocial: string;
+                tipoProveedor: string;
+                estado: string;
+            }[]
+        >
+    >("/proveedores?estado=ACTIVO");
 
-        const proveedores = resProveedores.data ?? [];
-        const listasPorProveedor = await Promise.all(
-            proveedores.map((prov) =>
-                solicitarApi<RespuestaDatos<ServicioDisponiblePaquete[]>>(
-                    `/proveedores/${prov.idproveedor}/servicios?estado=ACTIVO`,
-                )
-                    .then((r) => r.data ?? [])
-                    .catch(() => [] as ServicioDisponiblePaquete[]),
-            ),
-        );
+    const proveedores = resProveedores.data ?? [];
+    const listasPorProveedor = await Promise.all(
+        proveedores.map((prov) =>
+            solicitarApi<RespuestaDatos<ServicioDisponiblePaquete[]>>(
+                `/proveedores/${prov.idproveedor}/servicios?estado=ACTIVO`,
+            ).then((r) => r.data ?? []),
+        ),
+    );
 
-        return listasPorProveedor.flat();
-    } catch {
-        return [];
-    }
+    return listasPorProveedor.flat();
 }
 
 export const clavesPaquetes = {

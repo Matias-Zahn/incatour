@@ -69,8 +69,11 @@ function PaquetesPage() {
     const { data: circuitos = [] } = useCircuitos({ estado: "TODOS" });
     const circuitosActivos = circuitos.filter((c) => c.estado === "ACTIVO");
     const { data: temporadas = [] } = useTemporadas();
-    const { data: serviciosDisponibles = [] } =
-        useServiciosDisponiblesCatalogo();
+    const {
+        data: serviciosDisponibles = [],
+        isError: errorServiciosCatalogo,
+        error: detalleErrorServiciosCatalogo,
+    } = useServiciosDisponiblesCatalogo();
 
     const registrar = useRegistrarPaquete();
     const modificar = useModificarPaquete();
@@ -377,6 +380,12 @@ function PaquetesPage() {
                     circuitos={circuitosActivos}
                     temporadas={temporadas}
                     serviciosDisponibles={serviciosDisponibles}
+                    errorCargaServicios={
+                        errorServiciosCatalogo
+                            ? (detalleErrorServiciosCatalogo?.message ??
+                              "Error al consultar proveedores y servicios.")
+                            : undefined
+                    }
                     alGuardarNuevo={guardarNuevoPaquete}
                     alGuardarEdicion={guardarEdicionPaquete}
                     alCancelar={cerrarFormulario}
