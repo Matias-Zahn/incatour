@@ -29,6 +29,25 @@ describe("CU-15: CrearProveedorDto", () => {
     });
     expect(err).toMatch("tipoProveedor debe ser uno de");
   });
+
+  it("BE-03: rechaza tipo 'Operador' y exige canalComunicacion en alta", () => {
+    const [errTipo] = CrearProveedorDto.create({
+      tipoProveedor: "Operador",
+      razonSocial: "Andes Travel",
+      localidad: "Cusco",
+      datosContacto: "reservas@andestravel.com · +51 84 123456",
+      canalComunicacion: "Correo electrónico",
+    });
+    expect(errTipo).toBe("tipoProveedor debe ser uno de: ALOJAMIENTO, TRANSPORTE, TREN, EQUIPAMIENTO.");
+
+    const [errCanal] = CrearProveedorDto.create({
+      tipoProveedor: "ALOJAMIENTO",
+      razonSocial: "Andes Travel",
+      localidad: "Cusco",
+      datosContacto: "reservas@andestravel.com · +51 84 123456",
+    });
+    expect(errCanal).toBe("canalComunicacion es requerido.");
+  });
 });
 
 describe("CU-16: ModificarProveedorDto", () => {
@@ -39,6 +58,13 @@ describe("CU-16: ModificarProveedorDto", () => {
     const [error, dto] = ModificarProveedorDto.create({ razonSocial: " Nueva Razón Social " });
     expect(error).toBeUndefined();
     expect(dto?.razonSocial).toBe("Nueva Razón Social");
+  });
+
+  it("BE-03: rechaza tipo 'Operador' en modificación", () => {
+    const [err] = ModificarProveedorDto.create({
+      tipoProveedor: "Operador",
+    });
+    expect(err).toBe("tipoProveedor debe ser uno de: ALOJAMIENTO, TRANSPORTE, TREN, EQUIPAMIENTO.");
   });
 });
 
