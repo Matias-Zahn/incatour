@@ -194,6 +194,7 @@ function MisReservasPage() {
         setAvisoExito(null);
         setErrorAccion(null);
         setResultadoCancelacion(null);
+        confirmarCancelacionMutacion.reset();
         resetFormularioCancelacion({ motivo: "" });
         setIdReservaACancelar(idreserva);
     }
@@ -202,10 +203,12 @@ function MisReservasPage() {
         if (confirmarCancelacionMutacion.isPending) return;
         setConfirmacionFinalAbierta(false);
         setIdReservaACancelar(null);
+        confirmarCancelacionMutacion.reset();
         resetFormularioCancelacion({ motivo: "" });
     }
 
     function pasarAConfirmacionFinal() {
+        confirmarCancelacionMutacion.reset();
         setConfirmacionFinalAbierta(true);
     }
 
@@ -223,6 +226,9 @@ function MisReservasPage() {
                     setIdReservaACancelar(null);
                     setResultadoCancelacion(respuesta.data);
                     setAvisoExito(respuesta.mensaje);
+                },
+                onError: () => {
+                    setConfirmacionFinalAbierta(false);
                 },
             },
         );

@@ -138,7 +138,7 @@ function RegistroClientePage() {
                                 N° de Cliente
                             </p>
                             <p className="mt-1 font-mono text-sm font-bold text-navegacion">
-                                {registroExitoso.datos.cliente.nroCliente}
+                                {registroExitoso.datos.nroCliente}
                             </p>
                         </div>
                         <div>

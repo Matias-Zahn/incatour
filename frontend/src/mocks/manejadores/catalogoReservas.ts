@@ -441,20 +441,36 @@ export const manejadoresCatalogoReservas = [
             {
                 mensaje: "Cliente creado con éxito",
                 data: {
-                    cliente: {
-                        idcliente,
-                        idusuario,
-                        nroCliente,
-                        estado: "ACTIVO",
-                    },
+                    idcliente,
                     idusuario,
+                    nroCliente,
                     nombre,
                     apellido,
                     email,
+                    estado: "ACTIVO",
                 },
             },
             { status: 201 },
         );
+    }),
+
+    // BE-02 / CU-28: GET /api/clientes/mi-perfil (consultar perfil del cliente autenticado)
+    http.get(construirUrl("/clientes/mi-perfil"), async ({ request }) => {
+        const denegado = exigirRol(request, "CLIENTE");
+        if (denegado) return denegado;
+        await delay(120);
+
+        const cliente =
+            clientesMock.find((c) => c.estado === "ACTIVO") ?? clientesMock[0];
+
+        if (!cliente) {
+            return HttpResponse.json(
+                { error: "Cliente no encontrado." },
+                { status: 404 },
+            );
+        }
+
+        return HttpResponse.json({ data: cliente });
     }),
 
     // CU-28: GET /api/clientes/:id (consultar perfil del cliente)

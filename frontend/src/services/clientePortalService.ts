@@ -62,16 +62,13 @@ export type RegistrarClientePayload = {
 };
 
 export type ClienteRegistrado = {
-    cliente: {
-        idcliente: number;
-        idusuario: number;
-        nroCliente: string;
-        estado: string;
-    };
+    idcliente: number;
     idusuario: number;
+    nroCliente: string;
     nombre: string;
     apellido: string;
     email: string;
+    estado: string;
 };
 
 type RespuestaRegistrarCliente = {
@@ -100,11 +97,6 @@ export function obtenerIdClienteLocal(): number | null {
     }
 }
 
-function cabecerasConToken(): HeadersInit {
-    const token = obtenerToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export async function registrarCliente(
     payload: RegistrarClientePayload,
 ): Promise<RespuestaRegistrarCliente> {
@@ -117,8 +109,8 @@ export async function registrarCliente(
             contrasenia: payload.contrasenia,
         }),
     });
-    if (respuesta.data?.cliente?.idcliente) {
-        guardarIdClienteLocal(respuesta.data.cliente.idcliente);
+    if (respuesta.data?.idcliente) {
+        guardarIdClienteLocal(respuesta.data.idcliente);
     }
     return respuesta;
 }
@@ -182,53 +174,13 @@ export type ModificarClientePayload = {
 };
 
 export async function consultarPerfilClienteActual(): Promise<PerfilClienteDetalle> {
-    const usuario = obtenerUsuario();
-    const candidatos = Array.from(
-        new Set(
-            [
-                obtenerIdClienteLocal(),
-                usuario?.idusuario === 2 ? 1 : null,
-                usuario?.idusuario ?? null,
-                1,
-            ].filter((id): id is number => typeof id === "number" && id > 0),
-        ),
+    const res = await solicitarApi<{ data: PerfilClienteDetalle }>(
+        "/clientes/mi-perfil",
     );
-
-    let ultimoError: unknown = null;
-    for (const idCandidato of candidatos) {
-        try {
-            const res = await solicitarApi<{ data: PerfilClienteDetalle }>(
-                `/clientes/${idCandidato}`,
-                {
-                    headers: cabecerasConToken(),
-                },
-            );
-            if (res.data) {
-                guardarIdClienteLocal(res.data.idcliente);
-                return res.data;
-            }
-        } catch (err) {
-            ultimoError = err;
-        }
+    if (res.data?.idcliente) {
+        guardarIdClienteLocal(res.data.idcliente);
     }
-
-    if (usuario) {
-        return {
-            idcliente: obtenerIdClienteLocal() ?? 1,
-            idusuario: usuario.idusuario,
-            nroCliente: "CLI-001",
-            estado: "ACTIVO",
-            usuario: {
-                nombre: usuario.nombre,
-                apellido: usuario.apellido,
-                email: usuario.email,
-            },
-        };
-    }
-
-    throw ultimoError instanceof Error
-        ? ultimoError
-        : new Error("No se pudo obtener la información de la cuenta.");
+    return res.data;
 }
 
 export async function modificarCuentaCliente(
@@ -239,7 +191,6 @@ export async function modificarCuentaCliente(
         data: PerfilClienteDetalle;
     }>(`/clientes/${payload.idcliente}`, {
         method: "PUT",
-        headers: cabecerasConToken(),
         body: JSON.stringify({
             nombre: payload.nombre.trim(),
             apellido: payload.apellido.trim(),
@@ -273,7 +224,6 @@ export async function darDeBajaCuentaCliente(
         data: { idcliente: number; estado: string };
     }>(`/clientes/${idcliente}/baja`, {
         method: "PATCH",
-        headers: cabecerasConToken(),
     });
     limpiarSesion();
     return respuesta;

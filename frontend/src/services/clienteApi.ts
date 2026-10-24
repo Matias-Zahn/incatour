@@ -18,7 +18,14 @@ export function construirUrl(ruta: string): string {
 }
 
 /** Rutas públicas: no llevan token y un 401 no implica sesión vencida. */
-const RUTAS_PUBLICAS = ["/auth/login", "/catalogo", "/clientes"];
+const RUTAS_PUBLICAS_PREFIJO = ["/auth/login", "/catalogo"];
+
+function esPedidoPublico(ruta: string, metodo: string): boolean {
+    if (RUTAS_PUBLICAS_PREFIJO.some((publica) => ruta.startsWith(publica))) {
+        return true;
+    }
+    return ruta === "/clientes" && metodo.toUpperCase() === "POST";
+}
 
 /**
  * Cliente HTTP único: es el único lugar del front que usa fetch.
@@ -38,7 +45,7 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
         ? {}
         : { "Content-Type": "application/json" };
 
-    const esRutaPublica = RUTAS_PUBLICAS.some((publica) => ruta.startsWith(publica));
+    const esRutaPublica = esPedidoPublico(ruta, opciones.method ?? "GET");
 
     const tieneAuthEnOpciones = (() => {
         if (!opciones.headers) return false;
