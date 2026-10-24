@@ -69,9 +69,7 @@ export function VistaAvances({
                     etapa: `Etapa ${e.numeroOrden}: ${e.puntoInicio} → ${e.puntoFin}`,
                     estadoTramo: (e.estadoTramo as EstadoTramo) ?? "COMPLETADO",
                     fechaHora: e.fechaHoraLlegada
-                        ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES", {
-                              timeZone: "UTC",
-                          })
+                        ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES")
                         : "Completado previamente",
                     offline: false,
                 }));

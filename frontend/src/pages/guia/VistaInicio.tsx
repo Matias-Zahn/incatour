@@ -39,9 +39,7 @@ export function VistaInicio({
             titulo: `Etapa ${e.numeroOrden}: ${formatearEstadoSalida(e.estadoTramo)}`,
             subtitulo: `${e.puntoInicio} → ${e.puntoFin}${
                 e.fechaHoraLlegada
-                    ? ` · Llegada: ${new Date(e.fechaHoraLlegada).toLocaleString("es-ES", {
-                          timeZone: "UTC",
-                      })}`
+                    ? ` · Llegada: ${new Date(e.fechaHoraLlegada).toLocaleString("es-ES")}`
                     : ""
             }`,
             demorado: e.estadoTramo === "DEMORADO",
