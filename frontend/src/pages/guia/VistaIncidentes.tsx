@@ -160,12 +160,13 @@ export function VistaIncidentes({
             agregarHistorialLocalIncidente(idsalida, nuevoItem);
             setHistorialIncidentes((prev) => [nuevoItem, ...prev]);
 
+            // Primero limpiar el formulario (resetea el feedback) y después mostrar el éxito
+            descartarFormulario();
+
             setMensajeFeedback({
                 tipo: "exito",
                 texto: "Notificación de incidente enviada exitosamente al equipo de administración.",
             });
-
-            descartarFormulario();
         } catch (error: unknown) {
             const mensaje =
                 error instanceof Error
