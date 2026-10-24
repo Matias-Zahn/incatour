@@ -13,6 +13,7 @@ import {
     serializarDiasDisponibles,
     useEliminarFotoIndividualPaquete,
     useModificarFotoIndividualPaquete,
+    usePaqueteDetalle,
     type CodigoDia,
     type DatosCrearPaquete,
     type DatosModificarPaquete,
@@ -140,11 +141,21 @@ function FormularioPaquete({
                 s.disponibilidad?.modalidadConfirmacion) === "BLOQUEO_PLAZAS",
     );
 
-    const [idservicioGarantizado, setIdservicioGarantizado] = useState<number>(
-        primerAlojamientoBloqueo?.idservicio ??
-            alojamientosDisponibles[0]?.idservicio ??
-            0,
+    const { data: detallePaquete } = usePaqueteDetalle(
+        paqueteEnEdicion?.idpaquete ?? null,
     );
+
+    const [idservicioGarantizadoEditado, setIdservicioGarantizado] = useState<
+        number | null
+    >(null);
+    const idservicioGarantizado =
+        idservicioGarantizadoEditado ??
+        paqueteEnEdicion?.garantiasEstablecimiento?.[0]?.idservicio ??
+        detallePaquete?.garantiasEstablecimiento?.[0]?.idservicio ??
+        primerAlojamientoBloqueo?.idservicio ??
+        alojamientosDisponibles[0]?.idservicio ??
+        0;
+
     const [localidadGarantizada, setLocalidadGarantizada] = useState(
         paqueteEnEdicion?.localidadGarantizada ?? "Cusco",
     );
@@ -158,10 +169,13 @@ function FormularioPaquete({
     const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
         () => tarifasIniciales(paqueteEnEdicion, temporadas),
     );
-    const [serviciosIncluidos, setServiciosIncluidos] = useState<number[]>(
-        () =>
-            paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ?? [],
-    );
+    const [serviciosIncluidosEditados, setServiciosIncluidosEditados] =
+        useState<number[] | null>(null);
+    const serviciosIncluidos =
+        serviciosIncluidosEditados ??
+        paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ??
+        detallePaquete?.servicios?.map((item) => item.idservicio) ??
+        [];
     const [imagenesArchivos, setImagenesArchivos] = useState<File[]>([]);
     const [vistasPrevias, setVistasPrevias] = useState<string[]>([]);
     const [errorValidacion, setErrorValidacion] = useState("");
@@ -390,11 +404,12 @@ function FormularioPaquete({
 
     function alternarServicioIncluido(idServicio: number) {
         setErrorValidacion("");
-        setServiciosIncluidos((previos) =>
-            previos.includes(idServicio)
-                ? previos.filter((id) => id !== idServicio)
-                : [...previos, idServicio],
-        );
+        setServiciosIncluidosEditados((previos) => {
+            const base = previos ?? serviciosIncluidos;
+            return base.includes(idServicio)
+                ? base.filter((id) => id !== idServicio)
+                : [...base, idServicio];
+        });
     }
 
     function actualizarFilaPrecio(
@@ -500,22 +515,6 @@ function FormularioPaquete({
 
         const diasSerializados = serializarDiasDisponibles(diasSeleccionados);
 
-        if (esEdicion && paqueteEnEdicion) {
-            alGuardarEdicion(
-                paqueteEnEdicion.idpaquete,
-                {
-                    nombrePaquete: nombrePaquete.trim(),
-                    condiciones: condiciones.trim() || undefined,
-                    nochesPrevias,
-                    nochesPosteriores,
-                    diasDisponibles: diasSerializados,
-                    matrizPrecios,
-                },
-                imagenesArchivos,
-            );
-            return;
-        }
-
         if (!idcircuito || idcircuito <= 0) {
             setErrorValidacion("Seleccioná un circuito turístico base.");
             return;
@@ -523,7 +522,7 @@ function FormularioPaquete({
 
         if (cantidadEtapasCircuito === 0) {
             setErrorValidacion(
-                "El circuito seleccionado todavía no tiene etapas cargadas. Configuralas antes de crear el paquete.",
+                "El circuito seleccionado todavía no tiene etapas cargadas. Configuralas antes de guardar el paquete.",
             );
             return;
         }
@@ -550,28 +549,36 @@ function FormularioPaquete({
             }
         }
 
-        alGuardarNuevo(
-            {
-                idcircuito,
-                nombrePaquete: nombrePaquete.trim(),
-                condiciones: condiciones.trim() || undefined,
-                tipoGarantia,
-                ...(tipoGarantia === "POR_ESTABLECIMIENTO"
-                    ? { idservicioGarantizado }
-                    : {
-                          localidadGarantizada: localidadGarantizada.trim(),
-                          categoriaGarantizada: categoriaGarantizada.trim(),
-                          tipoHabitacionGarantizada:
-                              tipoHabitacionGarantizada.trim() || undefined,
-                      }),
-                nochesPrevias,
-                nochesPosteriores,
-                diasDisponibles: diasSerializados,
-                matrizPrecios,
-                serviciosIncluidos,
-            },
-            imagenesArchivos,
-        );
+        const payloadComun: DatosCrearPaquete = {
+            idcircuito,
+            nombrePaquete: nombrePaquete.trim(),
+            condiciones: condiciones.trim() || undefined,
+            tipoGarantia,
+            ...(tipoGarantia === "POR_ESTABLECIMIENTO"
+                ? { idservicioGarantizado }
+                : {
+                      localidadGarantizada: localidadGarantizada.trim(),
+                      categoriaGarantizada: categoriaGarantizada.trim(),
+                      tipoHabitacionGarantizada:
+                          tipoHabitacionGarantizada.trim() || undefined,
+                  }),
+            nochesPrevias,
+            nochesPosteriores,
+            diasDisponibles: diasSerializados,
+            matrizPrecios,
+            serviciosIncluidos,
+        };
+
+        if (esEdicion && paqueteEnEdicion) {
+            alGuardarEdicion(
+                paqueteEnEdicion.idpaquete,
+                payloadComun,
+                imagenesArchivos,
+            );
+            return;
+        }
+
+        alGuardarNuevo(payloadComun, imagenesArchivos);
     }
 
     const mensajeError = errorValidacion || errorServidor;
@@ -589,8 +596,8 @@ function FormularioPaquete({
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
                     {esEdicion
-                        ? "Actualizá los datos comerciales, noches de estadía, días de salida y el cuadro tarifario por temporada."
-                        : "Completá los 4 pasos para publicar un paquete comercial con garantía de alojamiento y tarifas por temporada."}
+                        ? "Actualizá el circuito asociado, la modalidad de garantía, los servicios incluidos y el cuadro tarifario por temporada."
+                        : "Completá los pasos para publicar un paquete comercial con garantía de alojamiento y tarifas por temporada."}
                 </p>
             </div>
 
@@ -625,7 +632,6 @@ function FormularioPaquete({
                         <select
                             id="select-circuito"
                             value={idcircuito}
-                            disabled={esEdicion}
                             onChange={(e) =>
                                 setIdcircuito(Number(e.target.value))
                             }
@@ -651,7 +657,7 @@ function FormularioPaquete({
                                 );
                             })}
                         </select>
-                        {!esEdicion && circuitoSeleccionado ? (
+                        {circuitoSeleccionado ? (
                             cantidadEtapasCircuito > 0 ? (
                                 <p className="text-xs font-normal text-exito">
                                     ✓ Circuito válido con{" "}
@@ -787,9 +793,8 @@ function FormularioPaquete({
                 </label>
             </div>
 
-            {/* PASO 2: GARANTÍA DE ALOJAMIENTO (solo en creación) */}
-            {!esEdicion ? (
-                <div className="space-y-4 border-t border-borde pt-5">
+            {/* PASO 2: GARANTÍA DE ALOJAMIENTO */}
+            <div className="space-y-4 border-t border-borde pt-5">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
                             2
@@ -1005,15 +1010,14 @@ function FormularioPaquete({
                             )}
                         </div>
                     )}
-                </div>
-            ) : null}
+            </div>
 
             {/* PASO 3: MATRIZ DE PRECIOS POR TEMPORADA */}
             <div className="space-y-4 border-t border-borde pt-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            {esEdicion ? "2" : "3"}
+                            3
                         </span>
                         <div>
                             <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
@@ -1132,8 +1136,8 @@ function FormularioPaquete({
                 )}
             </div>
 
-            {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS (solo en creación) */}
-            {!esEdicion && serviciosDisponibles.length > 0 ? (
+            {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS */}
+            {serviciosDisponibles.length > 0 ? (
                 <div className="space-y-3 border-t border-borde pt-5">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
@@ -1195,7 +1199,7 @@ function FormularioPaquete({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            {esEdicion ? "4" : "5"}
+                            5
                         </span>
                         <div>
                             <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">

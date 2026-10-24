@@ -187,12 +187,19 @@ export type DatosCrearPaquete = {
 };
 
 export type DatosModificarPaquete = {
+    idcircuito?: number;
     nombrePaquete?: string;
     condiciones?: string;
+    tipoGarantia?: TipoGarantiaPaquete;
+    idservicioGarantizado?: number;
+    localidadGarantizada?: string;
+    categoriaGarantizada?: string;
+    tipoHabitacionGarantizada?: string;
     nochesPrevias?: number;
     nochesPosteriores?: number;
     diasDisponibles?: string;
     matrizPrecios?: PrecioTemporadaInput[];
+    serviciosIncluidos?: number[];
 };
 
 type PaqueteApi = Omit<Paquete, "id">;
