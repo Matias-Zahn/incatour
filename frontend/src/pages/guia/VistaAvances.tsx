@@ -3,6 +3,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
+import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalAvance,
     eliminarAvanceOffline,
@@ -125,6 +126,7 @@ export function VistaAvances({
 
         setSincronizando(true);
         let exitoCount = 0;
+        const rechazados: string[] = [];
 
         for (const item of pendientes) {
             try {
@@ -139,6 +141,18 @@ export function VistaAvances({
                 eliminarAvanceOffline(idsalida, item.idLocal);
                 exitoCount += 1;
             } catch (error) {
+                // 4xx = rechazo definitivo del back: se descarta para no trabar la cola.
+                // 401/408/429 y errores de red o 5xx se reintentan en el próximo intento.
+                if (
+                    error instanceof ErrorApi &&
+                    error.estado >= 400 &&
+                    error.estado < 500 &&
+                    ![401, 408, 429].includes(error.estado)
+                ) {
+                    eliminarAvanceOffline(idsalida, item.idLocal);
+                    rechazados.push(`${item.etapaNombre}: ${error.message}`);
+                    continue;
+                }
                 console.error("Error sincronizando avance", error);
                 break;
             }
@@ -148,7 +162,13 @@ export function VistaAvances({
         setAvancesPendientes(restantes);
         setSincronizando(false);
 
-        if (exitoCount > 0) {
+        if (rechazados.length > 0) {
+            setMensajeFeedback({
+                tipo: "error",
+                texto: `El servidor rechazó ${rechazados.length} avance(s) pendiente(s) y se descartaron: ${rechazados.join(" | ")}`,
+            });
+            setHistorialAvances(obtenerHistorialLocalAvances(idsalida));
+        } else if (exitoCount > 0) {
             setMensajeFeedback({
                 tipo: "exito",
                 texto: `Se sincronizaron exitosamente ${exitoCount} avance(s) pendiente(s) con el servidor.`,
