@@ -46,6 +46,7 @@ export default function PortalGuiaPage() {
     // Salida actual activa
     const salidaActual =
         salidas.find((s) => s.idsalida === idsalidaSeleccionada) ??
+        salidas.find((s) => s.estado !== "FINALIZADA") ??
         salidas[0] ??
         null;
 

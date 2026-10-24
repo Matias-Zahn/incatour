@@ -10,6 +10,7 @@ import {
     estilosEstadoSalida,
     etiquetasNivelGravedad,
     etiquetasTipoIncidente,
+    fechaLocalHoy,
     formatearEstadoSalida,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
@@ -58,7 +59,7 @@ export function VistaIncidentes({
         RegistroHistorialIncidente[]
     >(() => (idsalida > 0 ? obtenerHistorialLocalIncidentes(idsalida) : []));
 
-    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const fechaHoy = fechaLocalHoy();
     const horaActual = new Date().toTimeString().slice(0, 5);
 
     const {
@@ -160,12 +161,13 @@ export function VistaIncidentes({
             agregarHistorialLocalIncidente(idsalida, nuevoItem);
             setHistorialIncidentes((prev) => [nuevoItem, ...prev]);
 
+            // Primero limpiar el formulario (resetea el feedback) y después mostrar el éxito
+            descartarFormulario();
+
             setMensajeFeedback({
                 tipo: "exito",
                 texto: "Notificación de incidente enviada exitosamente al equipo de administración.",
             });
-
-            descartarFormulario();
         } catch (error: unknown) {
             const mensaje =
                 error instanceof Error

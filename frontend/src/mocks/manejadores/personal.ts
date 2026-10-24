@@ -231,8 +231,10 @@ export const manejadoresPersonal = [
         return HttpResponse.json(
             {
                 mensaje: "Personal registrado exitosamente",
-                perfilOperativo: serializarPersonal(nuevoPersonal),
-                credencialesAcceso,
+                data: {
+                    perfilOperativo: serializarPersonal(nuevoPersonal),
+                    credencialesAcceso,
+                },
             },
             { status: 201 },
         );

@@ -316,9 +316,7 @@ export function VistaSalidas({
                                         {etapa.fechaHoraLlegada ? (
                                             <p className="mt-1 text-[11px] text-texto-suave">
                                                 Llegada:{" "}
-                                                {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES", {
-                                                    timeZone: "UTC",
-                                                })}
+                                                {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES")}
                                             </p>
                                         ) : null}
                                     </div>
