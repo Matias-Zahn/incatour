@@ -1,5 +1,6 @@
 import { db } from "../../../config/postgresDatabase";
 import { CustomError } from "../../../error/CustomError";
+import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD } from "../../../shared/constantes";
 
 export class SolicitudRepository {
   
@@ -72,7 +73,7 @@ export class SolicitudRepository {
   // CU-34: Registrar Aceptación (RES-01, RES-05)
   async resolverComoAceptada(solicitudId: number, reservaId: number, servicioId: number) {
     return db.$transaction(async (tx) => {
-      // RES-05: Validar atómicamente dentro de la transacción que la solicitud sigue PENDIENTE y la reserva no está CANCELADA
+      // RES-05: Validar dentro de la transacción que la solicitud existe
       const solActual = await tx.solicitud.findUnique({
         where: { idsolicitud: solicitudId },
         include: { reserva: true },
@@ -88,29 +89,38 @@ export class SolicitudRepository {
         throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
       }
 
-      // 1. Actualizar la Solicitud
-      const sol = await tx.solicitud.update({
-        where: { idsolicitud: solicitudId },
-        data: { 
-          estado: "CONFIRMADA",
-          gestiones: {
-            create: {
-              idservicio: servicioId,
-              resultado: "Aceptada"
-            }
-          }
-        }
-      });
+      // RES-05: se bloquea primero la reserva y después la solicitud, en el mismo orden que la
+      // cancelación (CU-32). Con el orden inverso, una aceptación y una cancelación simultáneas
+      // se bloquean mutuamente (deadlock) y una de las dos termina en 500.
 
-      // 2. Actualizar la Reserva: RES-01 actualiza estadoAlojamiento, NO estado
-      await tx.reserva.update({
-        where: { idreserva: reservaId },
+      // 1. RES-01 y RES-05: actualizar la reserva solo si NO está CANCELADA (estadoAlojamiento, no estado)
+      const resActualizada = await tx.reserva.updateMany({
+        where: { idreserva: reservaId, estado: { not: ESTADO_RESERVA.CANCELADA } },
+        data: { estadoAlojamiento: ESTADO_ALOJAMIENTO.CONFIRMADO }
+      });
+      if (resActualizada.count === 0) {
+        throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
+      }
+
+      // 2. RES-05: actualizar la solicitud solo si sigue PENDIENTE
+      const solActualizada = await tx.solicitud.updateMany({
+        where: { idsolicitud: solicitudId, estado: ESTADO_SOLICITUD.PENDIENTE },
+        data: { estado: ESTADO_SOLICITUD.CONFIRMADA }
+      });
+      if (solActualizada.count === 0) {
+        throw CustomError.badRequest("La solicitud ya no está pendiente.");
+      }
+
+      // 3. Registrar la gestión de aceptación
+      await tx.gestionSolicitud.create({
         data: {
-          estadoAlojamiento: "CONFIRMADO"
+          idsolicitud: solicitudId,
+          idservicio: servicioId,
+          resultado: "Aceptada"
         }
       });
 
-      return sol;
+      return { ...solActual, estado: "CONFIRMADA" };
     });
   }
 
@@ -132,18 +142,32 @@ export class SolicitudRepository {
         throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
       }
 
-      // 1. Marcar la solicitud actual como Rechazada
-      const solAnterior = await tx.solicitud.update({
-        where: { idsolicitud: solicitudId },
+      // 1. RES-05: bloquear la reserva (mismo orden que la cancelación). Un count no bloquea la fila:
+      // la cancelación podía confirmarse después y dejar viva la solicitud -R creada acá.
+      const resBloqueada = await tx.reserva.updateMany({
+        where: { idreserva: reservaId, estado: { not: ESTADO_RESERVA.CANCELADA } },
+        data: { estadoAlojamiento: ESTADO_ALOJAMIENTO.PENDIENTE }
+      });
+      if (resBloqueada.count === 0) {
+        throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");
+      }
+
+      // 2. RES-05: marcar la solicitud como Rechazada solo si sigue PENDIENTE
+      const solActualizada = await tx.solicitud.updateMany({
+        where: { idsolicitud: solicitudId, estado: ESTADO_SOLICITUD.PENDIENTE },
+        data: { estado: "RECHAZADA" }
+      });
+      if (solActualizada.count === 0) {
+        throw CustomError.badRequest("La solicitud ya no está pendiente.");
+      }
+
+      // 3. Registrar la gestión de rechazo
+      await tx.gestionSolicitud.create({
         data: {
-          estado: "RECHAZADA",
-          gestiones: {
-            create: {
-              idservicio: servicioId,
-              resultado: "Rechazada",
-              motivoRechazo: motivo
-            }
-          }
+          idsolicitud: solicitudId,
+          idservicio: servicioId,
+          resultado: "Rechazada",
+          motivoRechazo: motivo
         }
       });
 
@@ -156,11 +180,11 @@ export class SolicitudRepository {
           : null
       );
 
-      // 2. Crear una NUEVA solicitud Pendiente (Patrón Creator)
+      // 4. Crear una NUEVA solicitud Pendiente (Patrón Creator)
       const nuevaSol = await tx.solicitud.create({
         data: {
           idreserva: reservaId,
-          nroSolicitud: `${solAnterior.nroSolicitud}-R`, // Sufijo para indicar que es reintento
+          nroSolicitud: `${solActual.nroSolicitud}-R`, // Sufijo para indicar que es reintento
           estado: "PENDIENTE",
           cantidadPlazas: cantPlazas,
           criterios,
