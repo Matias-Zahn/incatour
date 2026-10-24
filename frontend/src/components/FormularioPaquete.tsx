@@ -166,6 +166,10 @@ function FormularioPaquete({
         paqueteEnEdicion?.tipoHabitacionGarantizada ?? "Doble",
     );
 
+    const temporadasPersistidas = new Set(
+        paqueteEnEdicion?.tarifas?.map((t) => t.idtemporada) ?? [],
+    );
+
     const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
         () => tarifasIniciales(paqueteEnEdicion, temporadas),
     );
@@ -447,6 +451,10 @@ function FormularioPaquete({
     }
 
     function quitarFilaPrecio(indice: number) {
+        const fila = matrizPrecios[indice];
+        if (esEdicion && fila && temporadasPersistidas.has(fila.idtemporada)) {
+            return;
+        }
         if (matrizPrecios.length <= 1) {
             setErrorValidacion(
                 "El paquete debe tener al menos una tarifa vigente en su matriz de precios.",
@@ -1055,83 +1063,102 @@ function FormularioPaquete({
                     </p>
                 ) : (
                     <div className="space-y-3">
-                        {matrizPrecios.map((fila, indice) => (
-                            <div
-                                key={indice}
-                                className="grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto]"
-                            >
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Temporada comercial
-                                    <select
-                                        value={fila.idtemporada}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                idtemporada: Number(
-                                                    e.target.value,
-                                                ),
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    >
-                                        {temporadas.map((temp) => (
-                                            <option
-                                                key={temp.idtemporada}
-                                                value={temp.idtemporada}
-                                            >
-                                                {temp.nombre} (
-                                                {temp.fechaInicio.slice(0, 10)}{" "}
-                                                a {temp.fechaFin.slice(0, 10)})
+                        {matrizPrecios.map((fila, indice) => {
+                            const esTarifaPersistida =
+                                esEdicion &&
+                                temporadasPersistidas.has(fila.idtemporada);
+                            return (
+                                <div
+                                    key={indice}
+                                    className="grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto]"
+                                >
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Temporada comercial
+                                        <select
+                                            value={fila.idtemporada}
+                                            disabled={esTarifaPersistida}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    idtemporada: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
+                                        >
+                                            {temporadas.map((temp) => (
+                                                <option
+                                                    key={temp.idtemporada}
+                                                    value={temp.idtemporada}
+                                                >
+                                                    {temp.nombre} (
+                                                    {temp.fechaInicio.slice(
+                                                        0,
+                                                        10,
+                                                    )}{" "}
+                                                    a{" "}
+                                                    {temp.fechaFin.slice(
+                                                        0,
+                                                        10,
+                                                    )}
+                                                    )
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Moneda
+                                        <select
+                                            value={fila.moneda}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    moneda: e.target.value,
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        >
+                                            <option value="USD">USD ($)</option>
+                                            <option value="PEN">
+                                                PEN (S/)
                                             </option>
-                                        ))}
-                                    </select>
-                                </label>
+                                        </select>
+                                    </label>
 
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Moneda
-                                    <select
-                                        value={fila.moneda}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                moneda: e.target.value,
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    >
-                                        <option value="USD">USD ($)</option>
-                                        <option value="PEN">PEN (S/)</option>
-                                    </select>
-                                </label>
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Monto por pasajero
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            step="0.01"
+                                            value={fila.monto}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    monto: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        />
+                                    </label>
 
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Monto por pasajero
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        step="0.01"
-                                        value={fila.monto}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                monto: Number(e.target.value),
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
-
-                                {matrizPrecios.length > 1 ? (
-                                    <Boton
-                                        type="button"
-                                        variante="fantasma"
-                                        className="px-2.5 py-2 text-xs text-peligro hover:bg-peligro/10"
-                                        onClick={() =>
-                                            quitarFilaPrecio(indice)
-                                        }
-                                    >
-                                        Quitar
-                                    </Boton>
-                                ) : null}
-                            </div>
-                        ))}
+                                    {matrizPrecios.length > 1 &&
+                                    !esTarifaPersistida ? (
+                                        <Boton
+                                            type="button"
+                                            variante="fantasma"
+                                            className="px-2.5 py-2 text-xs text-peligro hover:bg-peligro/10"
+                                            onClick={() =>
+                                                quitarFilaPrecio(indice)
+                                            }
+                                        >
+                                            Quitar
+                                        </Boton>
+                                    ) : null}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
