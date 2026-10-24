@@ -182,11 +182,13 @@ type PersonalApi = {
 
 type RespuestaDatos<T> = { data: T };
 type RespuestaAccion<T> = { mensaje: string; data: T };
-/** Excepción del contrato API: POST /api/personal devuelve { mensaje, perfilOperativo, credencialesAcceso } sin data. */
+/** POST /api/personal devuelve { mensaje, data: { perfilOperativo, credencialesAcceso } }. */
 type RespuestaCrearPersonalApi = {
     mensaje: string;
-    perfilOperativo: PersonalApi;
-    credencialesAcceso: CredencialesAccesoGuia | null;
+    data: {
+        perfilOperativo: PersonalApi;
+        credencialesAcceso: CredencialesAccesoGuia | null;
+    };
 };
 
 const extraer = <T,>(respuesta: RespuestaDatos<T>): T => respuesta.data;
@@ -267,8 +269,8 @@ export function crearPersonal(datos: DatosCrearPersonal): Promise<ResultadoCrear
         body: JSON.stringify(cuerpo),
     }).then((respuesta) => ({
         mensaje: respuesta.mensaje,
-        perfilOperativo: normalizarPersonal(respuesta.perfilOperativo),
-        credencialesAcceso: respuesta.credencialesAcceso,
+        perfilOperativo: normalizarPersonal(respuesta.data.perfilOperativo),
+        credencialesAcceso: respuesta.data.credencialesAcceso,
     }));
 }
 
