@@ -13,6 +13,7 @@ import {
     resolverUrlImagenPaquete,
     useDarDeBajaPaquete,
     useModificarPaquete,
+    usePaqueteDetalle,
     usePaquetes,
     useRegistrarPaquete,
     useServiciosDisponiblesCatalogo,
@@ -50,11 +51,29 @@ function obtenerGaleriaPaquete(paquete: Paquete): string[] {
 
 function PaquetesPage() {
     const navegar = useNavigate();
-    const { data: paquetes = [], isPending, isError, error } = usePaquetes();
-    const { data: circuitos = [] } = useCircuitos();
+    const [filtroEstado, setFiltroEstado] = useState<
+        "ACTIVO" | "INACTIVO" | "TODOS"
+    >("TODOS");
+    const [filtroCircuito, setFiltroCircuito] = useState<number>(0);
+    const [filtroTemporada, setFiltroTemporada] = useState<number>(0);
+
+    const {
+        data: paquetes = [],
+        isPending,
+        isError,
+        error,
+    } = usePaquetes({
+        estado: filtroEstado,
+        idcircuito: filtroCircuito > 0 ? filtroCircuito : undefined,
+    });
+    const { data: circuitos = [] } = useCircuitos({ estado: "TODOS" });
+    const circuitosActivos = circuitos.filter((c) => c.estado === "ACTIVO");
     const { data: temporadas = [] } = useTemporadas();
-    const { data: serviciosDisponibles = [] } =
-        useServiciosDisponiblesCatalogo();
+    const {
+        data: serviciosDisponibles = [],
+        isError: errorServiciosCatalogo,
+        error: detalleErrorServiciosCatalogo,
+    } = useServiciosDisponiblesCatalogo();
 
     const registrar = useRegistrarPaquete();
     const modificar = useModificarPaquete();
@@ -84,8 +103,11 @@ function PaquetesPage() {
     const [errorFormulario, setErrorFormulario] = useState("");
     const [errorBaja, setErrorBaja] = useState("");
 
-    const paqueteVistaPrevia =
+    const { data: detalleVistaPrevia } =
+        usePaqueteDetalle(paqueteVistaPreviaId);
+    const paqueteListaPrevia =
         paquetes.find((p) => p.idpaquete === paqueteVistaPreviaId) ?? null;
+    const paqueteVistaPrevia = detalleVistaPrevia ?? paqueteListaPrevia;
 
     function manejarCambioBusqueda(nuevoValor: string) {
         setBusqueda(nuevoValor);
@@ -120,11 +142,22 @@ function PaquetesPage() {
         datos: DatosCrearPaquete,
         imagenesArchivos?: File[],
     ) {
+        let creado: Paquete;
         try {
             setErrorFormulario("");
             setMensajeExito("");
-            const creado = await registrar.mutateAsync(datos);
-            if (imagenesArchivos && imagenesArchivos.length > 0) {
+            creado = await registrar.mutateAsync(datos);
+        } catch (e) {
+            setErrorFormulario(
+                e instanceof Error
+                    ? e.message
+                    : "Ocurrió un error al registrar el paquete.",
+            );
+            return;
+        }
+
+        if (imagenesArchivos && imagenesArchivos.length > 0) {
+            try {
                 const resImg = await subirImagen.mutateAsync({
                     id: creado.idpaquete,
                     archivos: imagenesArchivos,
@@ -134,15 +167,19 @@ function PaquetesPage() {
                 setMensajeExito(
                     `Paquete "${creado.nombrePaquete}" publicado con ${cantidad} ${cantidad === 1 ? "imagen guardada" : "imágenes guardadas"}.`,
                 );
+            } catch (e) {
+                setPaqueteEnEdicion(creado);
+                setErrorFormulario(
+                    `El paquete "${creado.nombrePaquete}" (${creado.nroPaquete}) ya fue creado, pero falló la subida de imágenes: ${
+                        e instanceof Error
+                            ? e.message
+                            : "Error al subir el carrusel."
+                    } Podés corregir las imágenes y guardar los cambios sin duplicar el paquete.`,
+                );
+                return;
             }
-            cerrarFormulario();
-        } catch (e) {
-            setErrorFormulario(
-                e instanceof Error
-                    ? e.message
-                    : "Ocurrió un error al registrar el paquete.",
-            );
         }
+        cerrarFormulario();
     }
 
     async function guardarEdicionPaquete(
@@ -258,7 +295,27 @@ function PaquetesPage() {
     }
 
     const terminoLimpio = busqueda.trim().toLowerCase();
+    const hayFiltrosActivos =
+        Boolean(terminoLimpio) ||
+        filtroEstado !== "TODOS" ||
+        filtroCircuito > 0 ||
+        filtroTemporada > 0;
+
+    function limpiarTodosLosFiltros() {
+        setBusqueda("");
+        setFiltroEstado("TODOS");
+        setFiltroCircuito(0);
+        setFiltroTemporada(0);
+        setPaginaActual(1);
+    }
+
     const paquetesFiltrados = paquetes.filter((paquete) => {
+        if (
+            filtroTemporada > 0 &&
+            !paquete.tarifas?.some((t) => t.idtemporada === filtroTemporada)
+        ) {
+            return false;
+        }
         if (!terminoLimpio) return true;
         return (
             paquete.nombrePaquete.toLowerCase().includes(terminoLimpio) ||
@@ -282,10 +339,10 @@ function PaquetesPage() {
 
     const estado = isPending ? "cargando" : isError ? "error" : "exito";
     const sinPaquetesRegistrados =
-        estado === "exito" && paquetes.length === 0;
+        estado === "exito" && paquetes.length === 0 && !hayFiltrosActivos;
     const sinResultadosBusqueda =
         estado === "exito" &&
-        paquetes.length > 0 &&
+        !sinPaquetesRegistrados &&
         paquetesFiltrados.length === 0;
 
     return (
@@ -320,9 +377,15 @@ function PaquetesPage() {
                 <FormularioPaquete
                     key={paqueteEnEdicion?.idpaquete ?? "nuevo"}
                     paqueteEnEdicion={paqueteEnEdicion}
-                    circuitos={circuitos}
+                    circuitos={circuitosActivos}
                     temporadas={temporadas}
                     serviciosDisponibles={serviciosDisponibles}
+                    errorCargaServicios={
+                        errorServiciosCatalogo
+                            ? (detalleErrorServiciosCatalogo?.message ??
+                              "Error al consultar proveedores y servicios.")
+                            : undefined
+                    }
                     alGuardarNuevo={guardarNuevoPaquete}
                     alGuardarEdicion={guardarEdicionPaquete}
                     alCancelar={cerrarFormulario}
@@ -359,12 +422,10 @@ function PaquetesPage() {
                 </Alerta>
             ) : null}
 
-            {estado === "exito" && paquetes.length > 0 ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative w-full max-w-md">
-                        <label htmlFor="buscar-paquete" className="sr-only">
-                            Buscar paquete turístico
-                        </label>
+            {estado === "exito" && (paquetes.length > 0 || hayFiltrosActivos) ? (
+                <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta md:grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] md:items-end">
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Buscar paquete
                         <input
                             id="buscar-paquete"
                             type="search"
@@ -372,18 +433,83 @@ function PaquetesPage() {
                             onChange={(evento) =>
                                 manejarCambioBusqueda(evento.target.value)
                             }
-                            placeholder="Buscar por código, nombre, circuito o garantía..."
-                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            placeholder="Código, nombre, circuito o garantía..."
+                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
-                    </div>
+                    </label>
 
-                    {busqueda ? (
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Estado
+                        <select
+                            aria-label="Filtrar paquetes por estado"
+                            value={filtroEstado}
+                            onChange={(e) => {
+                                setFiltroEstado(
+                                    e.target.value as
+                                        | "ACTIVO"
+                                        | "INACTIVO"
+                                        | "TODOS",
+                                );
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value="TODOS">Todos los estados</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="INACTIVO">Dados de baja (Inactivos)</option>
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Circuito
+                        <select
+                            aria-label="Filtrar paquetes por circuito"
+                            value={filtroCircuito}
+                            onChange={(e) => {
+                                setFiltroCircuito(Number(e.target.value));
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value={0}>Todos los circuitos</option>
+                            {circuitos.map((c) => (
+                                <option key={c.idcircuito} value={c.idcircuito}>
+                                    {c.nombreCircuito}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Temporada
+                        <select
+                            aria-label="Filtrar paquetes por temporada"
+                            value={filtroTemporada}
+                            onChange={(e) => {
+                                setFiltroTemporada(Number(e.target.value));
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value={0}>Todas las temporadas</option>
+                            {temporadas.map((t) => (
+                                <option
+                                    key={t.idtemporada}
+                                    value={t.idtemporada}
+                                >
+                                    {t.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    {hayFiltrosActivos ? (
                         <Boton
                             variante="fantasma"
-                            className="self-start text-xs text-texto-suave sm:self-auto"
-                            onClick={() => manejarCambioBusqueda("")}
+                            className="px-3 py-2 text-xs text-texto-suave"
+                            onClick={limpiarTodosLosFiltros}
                         >
-                            Limpiar búsqueda
+                            Limpiar filtros
                         </Boton>
                     ) : null}
                 </div>
@@ -402,7 +528,7 @@ function PaquetesPage() {
             ) : sinResultadosBusqueda ? (
                 <EstadoListado
                     estado="vacio"
-                    mensaje={`No se encontraron paquetes que coincidan con "${busqueda.trim()}".`}
+                    mensaje="No se encontraron paquetes que coincidan con los filtros seleccionados."
                 />
             ) : (
                 <div className="overflow-x-auto">
@@ -939,24 +1065,68 @@ function PaquetesPage() {
                                                             : "Por categoría"}
                                                     </span>
                                                 </div>
-                                                <p className="mt-1.5 text-sm font-semibold text-texto">
-                                                    {porEst
-                                                        ? "Alojamiento garantizado en establecimiento específico con bloqueo de plazas."
-                                                        : [
-                                                              paqueteVistaPrevia.categoriaGarantizada
-                                                                  ? `Categoría ${paqueteVistaPrevia.categoriaGarantizada}`
-                                                                  : null,
-                                                              paqueteVistaPrevia.localidadGarantizada
-                                                                  ? `Localidad: ${paqueteVistaPrevia.localidadGarantizada}`
-                                                                  : null,
-                                                              paqueteVistaPrevia.tipoHabitacionGarantizada
-                                                                  ? `Habitación ${paqueteVistaPrevia.tipoHabitacionGarantizada}`
-                                                                  : null,
-                                                          ]
-                                                              .filter(Boolean)
-                                                              .join(" · ") ||
-                                                          "Garantía general por categoría hotelera."}
-                                                </p>
+                                                {porEst ? (
+                                                    (() => {
+                                                        const servicioGarantizado =
+                                                            paqueteVistaPrevia
+                                                                .garantiasEstablecimiento?.[0]
+                                                                ?.servicio;
+                                                        return servicioGarantizado ? (
+                                                            <div className="mt-1.5 space-y-0.5">
+                                                                <p className="text-sm font-semibold text-texto">
+                                                                    {
+                                                                        servicioGarantizado.nombreServicio
+                                                                    }
+                                                                </p>
+                                                                <p className="text-xs text-texto-suave">
+                                                                    {[
+                                                                        servicioGarantizado.localidad
+                                                                            ? `Localidad: ${servicioGarantizado.localidad}`
+                                                                            : null,
+                                                                        servicioGarantizado
+                                                                            .alojamiento
+                                                                            ?.categoria
+                                                                            ? `Categoría ${servicioGarantizado.alojamiento.categoria}`
+                                                                            : null,
+                                                                        servicioGarantizado
+                                                                            .alojamiento
+                                                                            ?.tipoHabitacion
+                                                                            ? `Habitación ${servicioGarantizado.alojamiento.tipoHabitacion}`
+                                                                            : null,
+                                                                        "Bloqueo de plazas",
+                                                                    ]
+                                                                        .filter(
+                                                                            Boolean,
+                                                                        )
+                                                                        .join(
+                                                                            " · ",
+                                                                        )}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="mt-1.5 text-sm font-semibold text-texto">
+                                                                Alojamiento garantizado en establecimiento específico con bloqueo de plazas.
+                                                            </p>
+                                                        );
+                                                    })()
+                                                ) : (
+                                                    <p className="mt-1.5 text-sm font-semibold text-texto">
+                                                        {[
+                                                            paqueteVistaPrevia.categoriaGarantizada
+                                                                ? `Categoría ${paqueteVistaPrevia.categoriaGarantizada}`
+                                                                : null,
+                                                            paqueteVistaPrevia.localidadGarantizada
+                                                                ? `Localidad: ${paqueteVistaPrevia.localidadGarantizada}`
+                                                                : null,
+                                                            paqueteVistaPrevia.tipoHabitacionGarantizada
+                                                                ? `Habitación ${paqueteVistaPrevia.tipoHabitacionGarantizada}`
+                                                                : null,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" · ") ||
+                                                            "Garantía general por categoría hotelera."}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* TARIFAS POR TEMPORADA */}
@@ -1002,19 +1172,16 @@ function PaquetesPage() {
                                             </div>
 
                                             {/* SERVICIOS INCLUIDOS */}
-                                            {paqueteVistaPrevia.servicios &&
-                                            paqueteVistaPrevia.servicios
-                                                .length > 0 ? (
-                                                <div className="rounded-control border border-borde bg-fondo/40 p-4">
-                                                    <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                                        Servicios incluidos (
-                                                        {
-                                                            paqueteVistaPrevia
-                                                                .servicios
-                                                                .length
-                                                        }
-                                                        )
-                                                    </p>
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4">
+                                                <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
+                                                    Servicios incluidos (
+                                                    {paqueteVistaPrevia
+                                                        .servicios?.length ?? 0}
+                                                    )
+                                                </p>
+                                                {paqueteVistaPrevia.servicios &&
+                                                paqueteVistaPrevia.servicios
+                                                    .length > 0 ? (
                                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                                         {paqueteVistaPrevia.servicios.map(
                                                             (item) => (
@@ -1032,8 +1199,12 @@ function PaquetesPage() {
                                                             ),
                                                         )}
                                                     </div>
-                                                </div>
-                                            ) : null}
+                                                ) : (
+                                                    <p className="mt-1 text-xs text-texto-suave">
+                                                        Sin servicios adicionales incluidos.
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 

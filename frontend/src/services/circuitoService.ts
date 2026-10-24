@@ -76,17 +76,48 @@ function normalizarCircuito(circuito: CircuitoApi): Circuito {
     };
 }
 
-function limpiarPayloadCircuito(datos: Partial<DatosCircuito>): Partial<DatosCircuito> {
+function limpiarPayloadCircuito(
+    datos: Partial<DatosCircuito>,
+    esEdicion = false,
+): Partial<DatosCircuito> {
     const copia: Partial<DatosCircuito> = { ...datos };
     if (copia.parametrosPorteadores !== undefined) {
         const texto = copia.parametrosPorteadores.trim();
-        copia.parametrosPorteadores = texto.length > 0 ? texto : undefined;
+        copia.parametrosPorteadores =
+            texto.length > 0 ? texto : esEdicion ? "" : undefined;
     }
     return copia;
 }
 
-export function listarCircuitos(): Promise<Circuito[]> {
-    return solicitarApi<RespuestaDatos<CircuitoApi[]>>("/circuitos")
+export type FiltrosCircuito = {
+    estado?: "ACTIVO" | "INACTIVO" | "TODOS";
+    dificultad?: string;
+    duracionDias?: number;
+};
+
+export function listarCircuitos(
+    filtros?: FiltrosCircuito | Record<string, unknown>,
+): Promise<Circuito[]> {
+    const params = new URLSearchParams();
+    if (typeof filtros?.estado === "string" && filtros.estado) {
+        params.set("estado", filtros.estado);
+    }
+    if (
+        typeof filtros?.dificultad === "string" &&
+        filtros.dificultad.trim()
+    ) {
+        params.set("dificultad", filtros.dificultad.trim());
+    }
+    if (
+        typeof filtros?.duracionDias === "number" &&
+        filtros.duracionDias > 0
+    ) {
+        params.set("duracionDias", String(filtros.duracionDias));
+    }
+    const query = params.toString();
+    return solicitarApi<RespuestaDatos<CircuitoApi[]>>(
+        query ? `/circuitos?${query}` : "/circuitos",
+    )
         .then(respuestaDatos)
         .then((datos) => datos.map(normalizarCircuito));
 }
@@ -94,7 +125,7 @@ export function listarCircuitos(): Promise<Circuito[]> {
 export function registrarCircuito(datos: DatosCircuito): Promise<Circuito> {
     return solicitarApi<RespuestaDatos<CircuitoApi>>("/circuitos", {
         method: "POST",
-        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+        body: JSON.stringify(limpiarPayloadCircuito(datos, false)),
     })
         .then(respuestaDatos)
         .then(normalizarCircuito);
@@ -106,7 +137,7 @@ export function modificarCircuito(
 ): Promise<Circuito> {
     return solicitarApi<RespuestaDatos<CircuitoApi>>(`/circuitos/${id}`, {
         method: "PUT",
-        body: JSON.stringify(limpiarPayloadCircuito(datos)),
+        body: JSON.stringify(limpiarPayloadCircuito(datos, true)),
     })
         .then(respuestaDatos)
         .then(normalizarCircuito);
@@ -150,14 +181,18 @@ export function guardarSecuenciaEtapas(
 
 export const clavesCircuitos = {
     todos: ["circuitos"] as const,
+    lista: (filtros?: FiltrosCircuito) =>
+        filtros
+            ? (["circuitos", filtros] as const)
+            : (["circuitos"] as const),
     uno: (id: number) => ["circuitos", id] as const,
     etapas: (idCircuito: number) => ["circuitos", idCircuito, "etapas"] as const,
 };
 
-export function useCircuitos() {
+export function useCircuitos(filtros?: FiltrosCircuito) {
     return useQuery({
-        queryKey: clavesCircuitos.todos,
-        queryFn: listarCircuitos,
+        queryKey: clavesCircuitos.lista(filtros),
+        queryFn: () => listarCircuitos(filtros),
     });
 }
 

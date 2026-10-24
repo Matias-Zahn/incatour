@@ -13,6 +13,7 @@ import {
     serializarDiasDisponibles,
     useEliminarFotoIndividualPaquete,
     useModificarFotoIndividualPaquete,
+    usePaqueteDetalle,
     type CodigoDia,
     type DatosCrearPaquete,
     type DatosModificarPaquete,
@@ -28,6 +29,7 @@ type FormularioPaqueteProps = {
     circuitos: Circuito[];
     temporadas: Temporada[];
     serviciosDisponibles: ServicioDisponiblePaquete[];
+    errorCargaServicios?: string;
     alGuardarNuevo: (
         datos: DatosCrearPaquete,
         imagenesArchivos?: File[],
@@ -97,6 +99,7 @@ function FormularioPaquete({
     circuitos,
     temporadas,
     serviciosDisponibles,
+    errorCargaServicios,
     alGuardarNuevo,
     alGuardarEdicion,
     alCancelar,
@@ -140,11 +143,21 @@ function FormularioPaquete({
                 s.disponibilidad?.modalidadConfirmacion) === "BLOQUEO_PLAZAS",
     );
 
-    const [idservicioGarantizado, setIdservicioGarantizado] = useState<number>(
-        primerAlojamientoBloqueo?.idservicio ??
-            alojamientosDisponibles[0]?.idservicio ??
-            0,
+    const { data: detallePaquete } = usePaqueteDetalle(
+        paqueteEnEdicion?.idpaquete ?? null,
     );
+
+    const [idservicioGarantizadoEditado, setIdservicioGarantizado] = useState<
+        number | null
+    >(null);
+    const idservicioGarantizado =
+        idservicioGarantizadoEditado ??
+        paqueteEnEdicion?.garantiasEstablecimiento?.[0]?.idservicio ??
+        detallePaquete?.garantiasEstablecimiento?.[0]?.idservicio ??
+        primerAlojamientoBloqueo?.idservicio ??
+        alojamientosDisponibles[0]?.idservicio ??
+        0;
+
     const [localidadGarantizada, setLocalidadGarantizada] = useState(
         paqueteEnEdicion?.localidadGarantizada ?? "Cusco",
     );
@@ -155,13 +168,20 @@ function FormularioPaquete({
         paqueteEnEdicion?.tipoHabitacionGarantizada ?? "Doble",
     );
 
+    const temporadasPersistidas = new Set(
+        paqueteEnEdicion?.tarifas?.map((t) => t.idtemporada) ?? [],
+    );
+
     const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
         () => tarifasIniciales(paqueteEnEdicion, temporadas),
     );
-    const [serviciosIncluidos, setServiciosIncluidos] = useState<number[]>(
-        () =>
-            paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ?? [],
-    );
+    const [serviciosIncluidosEditados, setServiciosIncluidosEditados] =
+        useState<number[] | null>(null);
+    const serviciosIncluidos =
+        serviciosIncluidosEditados ??
+        paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ??
+        detallePaquete?.servicios?.map((item) => item.idservicio) ??
+        [];
     const [imagenesArchivos, setImagenesArchivos] = useState<File[]>([]);
     const [vistasPrevias, setVistasPrevias] = useState<string[]>([]);
     const [errorValidacion, setErrorValidacion] = useState("");
@@ -390,11 +410,12 @@ function FormularioPaquete({
 
     function alternarServicioIncluido(idServicio: number) {
         setErrorValidacion("");
-        setServiciosIncluidos((previos) =>
-            previos.includes(idServicio)
-                ? previos.filter((id) => id !== idServicio)
-                : [...previos, idServicio],
-        );
+        setServiciosIncluidosEditados((previos) => {
+            const base = previos ?? serviciosIncluidos;
+            return base.includes(idServicio)
+                ? base.filter((id) => id !== idServicio)
+                : [...base, idServicio];
+        });
     }
 
     function actualizarFilaPrecio(
@@ -432,6 +453,10 @@ function FormularioPaquete({
     }
 
     function quitarFilaPrecio(indice: number) {
+        const fila = matrizPrecios[indice];
+        if (esEdicion && fila && temporadasPersistidas.has(fila.idtemporada)) {
+            return;
+        }
         if (matrizPrecios.length <= 1) {
             setErrorValidacion(
                 "El paquete debe tener al menos una tarifa vigente en su matriz de precios.",
@@ -500,22 +525,6 @@ function FormularioPaquete({
 
         const diasSerializados = serializarDiasDisponibles(diasSeleccionados);
 
-        if (esEdicion && paqueteEnEdicion) {
-            alGuardarEdicion(
-                paqueteEnEdicion.idpaquete,
-                {
-                    nombrePaquete: nombrePaquete.trim(),
-                    condiciones: condiciones.trim() || undefined,
-                    nochesPrevias,
-                    nochesPosteriores,
-                    diasDisponibles: diasSerializados,
-                    matrizPrecios,
-                },
-                imagenesArchivos,
-            );
-            return;
-        }
-
         if (!idcircuito || idcircuito <= 0) {
             setErrorValidacion("Seleccioná un circuito turístico base.");
             return;
@@ -523,7 +532,7 @@ function FormularioPaquete({
 
         if (cantidadEtapasCircuito === 0) {
             setErrorValidacion(
-                "El circuito seleccionado todavía no tiene etapas cargadas. Configuralas antes de crear el paquete.",
+                "El circuito seleccionado todavía no tiene etapas cargadas. Configuralas antes de guardar el paquete.",
             );
             return;
         }
@@ -550,28 +559,39 @@ function FormularioPaquete({
             }
         }
 
-        alGuardarNuevo(
-            {
-                idcircuito,
-                nombrePaquete: nombrePaquete.trim(),
-                condiciones: condiciones.trim() || undefined,
-                tipoGarantia,
-                ...(tipoGarantia === "POR_ESTABLECIMIENTO"
-                    ? { idservicioGarantizado }
-                    : {
-                          localidadGarantizada: localidadGarantizada.trim(),
-                          categoriaGarantizada: categoriaGarantizada.trim(),
-                          tipoHabitacionGarantizada:
-                              tipoHabitacionGarantizada.trim() || undefined,
-                      }),
-                nochesPrevias,
-                nochesPosteriores,
-                diasDisponibles: diasSerializados,
-                matrizPrecios,
-                serviciosIncluidos,
-            },
-            imagenesArchivos,
-        );
+        const payloadComun: DatosCrearPaquete = {
+            idcircuito,
+            nombrePaquete: nombrePaquete.trim(),
+            condiciones: condiciones.trim() || undefined,
+            tipoGarantia,
+            ...(tipoGarantia === "POR_ESTABLECIMIENTO"
+                ? { idservicioGarantizado }
+                : {
+                      localidadGarantizada: localidadGarantizada.trim(),
+                      categoriaGarantizada: categoriaGarantizada.trim(),
+                      tipoHabitacionGarantizada:
+                          tipoHabitacionGarantizada.trim() || undefined,
+                  }),
+            nochesPrevias,
+            nochesPosteriores,
+            diasDisponibles: diasSerializados,
+            matrizPrecios,
+            serviciosIncluidos,
+        };
+
+        if (esEdicion && paqueteEnEdicion) {
+            alGuardarEdicion(
+                paqueteEnEdicion.idpaquete,
+                {
+                    ...payloadComun,
+                    condiciones: condiciones.trim(),
+                },
+                imagenesArchivos,
+            );
+            return;
+        }
+
+        alGuardarNuevo(payloadComun, imagenesArchivos);
     }
 
     const mensajeError = errorValidacion || errorServidor;
@@ -589,8 +609,8 @@ function FormularioPaquete({
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
                     {esEdicion
-                        ? "Actualizá los datos comerciales, noches de estadía, días de salida y el cuadro tarifario por temporada."
-                        : "Completá los 4 pasos para publicar un paquete comercial con garantía de alojamiento y tarifas por temporada."}
+                        ? "Actualizá el circuito asociado, la modalidad de garantía, los servicios incluidos y el cuadro tarifario por temporada."
+                        : "Completá los pasos para publicar un paquete comercial con garantía de alojamiento y tarifas por temporada."}
                 </p>
             </div>
 
@@ -625,7 +645,6 @@ function FormularioPaquete({
                         <select
                             id="select-circuito"
                             value={idcircuito}
-                            disabled={esEdicion}
                             onChange={(e) =>
                                 setIdcircuito(Number(e.target.value))
                             }
@@ -651,7 +670,7 @@ function FormularioPaquete({
                                 );
                             })}
                         </select>
-                        {!esEdicion && circuitoSeleccionado ? (
+                        {circuitoSeleccionado ? (
                             cantidadEtapasCircuito > 0 ? (
                                 <p className="text-xs font-normal text-exito">
                                     ✓ Circuito válido con{" "}
@@ -787,9 +806,8 @@ function FormularioPaquete({
                 </label>
             </div>
 
-            {/* PASO 2: GARANTÍA DE ALOJAMIENTO (solo en creación) */}
-            {!esEdicion ? (
-                <div className="space-y-4 border-t border-borde pt-5">
+            {/* PASO 2: GARANTÍA DE ALOJAMIENTO */}
+            <div className="space-y-4 border-t border-borde pt-5">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
                             2
@@ -929,7 +947,14 @@ function FormularioPaquete({
                             <p className="text-xs font-semibold text-texto">
                                 Seleccioná el establecimiento de alojamiento garantizado:
                             </p>
-                            {alojamientosDisponibles.length === 0 ? (
+                            {errorCargaServicios ? (
+                                <p
+                                    className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
+                                    role="alert"
+                                >
+                                    No se pudieron cargar los servicios de alojamiento: {errorCargaServicios}
+                                </p>
+                            ) : alojamientosDisponibles.length === 0 ? (
                                 <p className="text-xs text-texto-suave">
                                     No se encontraron servicios de alojamiento activos. Podés registrarlos desde la sección Proveedores.
                                 </p>
@@ -1005,15 +1030,14 @@ function FormularioPaquete({
                             )}
                         </div>
                     )}
-                </div>
-            ) : null}
+            </div>
 
             {/* PASO 3: MATRIZ DE PRECIOS POR TEMPORADA */}
             <div className="space-y-4 border-t border-borde pt-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            {esEdicion ? "2" : "3"}
+                            3
                         </span>
                         <div>
                             <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
@@ -1051,89 +1075,125 @@ function FormularioPaquete({
                     </p>
                 ) : (
                     <div className="space-y-3">
-                        {matrizPrecios.map((fila, indice) => (
-                            <div
-                                key={indice}
-                                className="grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto]"
-                            >
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Temporada comercial
-                                    <select
-                                        value={fila.idtemporada}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                idtemporada: Number(
-                                                    e.target.value,
-                                                ),
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    >
-                                        {temporadas.map((temp) => (
-                                            <option
-                                                key={temp.idtemporada}
-                                                value={temp.idtemporada}
-                                            >
-                                                {temp.nombre} (
-                                                {temp.fechaInicio.slice(0, 10)}{" "}
-                                                a {temp.fechaFin.slice(0, 10)})
+                        {matrizPrecios.map((fila, indice) => {
+                            const esTarifaPersistida =
+                                esEdicion &&
+                                temporadasPersistidas.has(fila.idtemporada);
+                            return (
+                                <div
+                                    key={indice}
+                                    className="grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto]"
+                                >
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Temporada comercial
+                                        <select
+                                            value={fila.idtemporada}
+                                            disabled={esTarifaPersistida}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    idtemporada: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
+                                        >
+                                            {temporadas.map((temp) => (
+                                                <option
+                                                    key={temp.idtemporada}
+                                                    value={temp.idtemporada}
+                                                >
+                                                    {temp.nombre} (
+                                                    {temp.fechaInicio.slice(
+                                                        0,
+                                                        10,
+                                                    )}{" "}
+                                                    a{" "}
+                                                    {temp.fechaFin.slice(
+                                                        0,
+                                                        10,
+                                                    )}
+                                                    )
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Moneda
+                                        <select
+                                            value={fila.moneda}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    moneda: e.target.value,
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        >
+                                            <option value="USD">USD ($)</option>
+                                            <option value="PEN">
+                                                PEN (S/)
                                             </option>
-                                        ))}
-                                    </select>
-                                </label>
+                                        </select>
+                                    </label>
 
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Moneda
-                                    <select
-                                        value={fila.moneda}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                moneda: e.target.value,
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    >
-                                        <option value="USD">USD ($)</option>
-                                        <option value="PEN">PEN (S/)</option>
-                                    </select>
-                                </label>
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Monto por pasajero
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            step="0.01"
+                                            value={fila.monto}
+                                            onChange={(e) =>
+                                                actualizarFilaPrecio(indice, {
+                                                    monto: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        />
+                                    </label>
 
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Monto por pasajero
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        step="0.01"
-                                        value={fila.monto}
-                                        onChange={(e) =>
-                                            actualizarFilaPrecio(indice, {
-                                                monto: Number(e.target.value),
-                                            })
-                                        }
-                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
-
-                                {matrizPrecios.length > 1 ? (
-                                    <Boton
-                                        type="button"
-                                        variante="fantasma"
-                                        className="px-2.5 py-2 text-xs text-peligro hover:bg-peligro/10"
-                                        onClick={() =>
-                                            quitarFilaPrecio(indice)
-                                        }
-                                    >
-                                        Quitar
-                                    </Boton>
-                                ) : null}
-                            </div>
-                        ))}
+                                    {matrizPrecios.length > 1 &&
+                                    !esTarifaPersistida ? (
+                                        <Boton
+                                            type="button"
+                                            variante="fantasma"
+                                            className="px-2.5 py-2 text-xs text-peligro hover:bg-peligro/10"
+                                            onClick={() =>
+                                                quitarFilaPrecio(indice)
+                                            }
+                                        >
+                                            Quitar
+                                        </Boton>
+                                    ) : null}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS (solo en creación) */}
-            {!esEdicion && serviciosDisponibles.length > 0 ? (
+            {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS */}
+            {errorCargaServicios ? (
+                <div className="space-y-3 border-t border-borde pt-5">
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
+                            4
+                        </span>
+                        <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
+                            Servicios operativos incluidos en el paquete
+                        </h3>
+                    </div>
+                    <p
+                        className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
+                        role="alert"
+                    >
+                        No se pudieron cargar los servicios operativos de proveedores: {errorCargaServicios}
+                    </p>
+                </div>
+            ) : serviciosDisponibles.length > 0 ? (
                 <div className="space-y-3 border-t border-borde pt-5">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
@@ -1195,7 +1255,7 @@ function FormularioPaquete({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            {esEdicion ? "4" : "5"}
+                            5
                         </span>
                         <div>
                             <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">

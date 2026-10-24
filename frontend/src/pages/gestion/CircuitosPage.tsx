@@ -8,6 +8,7 @@ import FormularioCircuito from "../../components/FormularioCircuito";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
+    nivelesDificultad,
     useCircuitos,
     useDarDeBajaCircuito,
     useModificarCircuito,
@@ -36,7 +37,27 @@ function estiloEstado(estado: Circuito["estado"]): string {
 }
 
 function CircuitosPage() {
-    const { data: circuitos = [], isPending, isError, error } = useCircuitos();
+    const [filtroEstado, setFiltroEstado] = useState<
+        "ACTIVO" | "INACTIVO" | "TODOS"
+    >("TODOS");
+    const [filtroDificultad, setFiltroDificultad] = useState<string>("");
+    const [filtroDuracion, setFiltroDuracion] = useState<string>("");
+
+    const duracionNumerica =
+        filtroDuracion.trim() !== "" && Number(filtroDuracion) > 0
+            ? Number(filtroDuracion)
+            : undefined;
+
+    const {
+        data: circuitos = [],
+        isPending,
+        isError,
+        error,
+    } = useCircuitos({
+        estado: filtroEstado,
+        dificultad: filtroDificultad || undefined,
+        duracionDias: duracionNumerica,
+    });
     const registrar = useRegistrarCircuito();
     const modificar = useModificarCircuito();
     const darDeBaja = useDarDeBajaCircuito();
@@ -114,6 +135,20 @@ function CircuitosPage() {
     }
 
     const terminoLimpio = busqueda.trim().toLowerCase();
+    const hayFiltrosActivos =
+        Boolean(terminoLimpio) ||
+        filtroEstado !== "TODOS" ||
+        Boolean(filtroDificultad) ||
+        Boolean(duracionNumerica);
+
+    function limpiarTodosLosFiltros() {
+        setBusqueda("");
+        setFiltroEstado("TODOS");
+        setFiltroDificultad("");
+        setFiltroDuracion("");
+        setPaginaActual(1);
+    }
+
     const circuitosFiltrados = circuitos.filter((circuito) => {
         if (!terminoLimpio) return true;
         return (
@@ -137,10 +172,10 @@ function CircuitosPage() {
 
     const estado = isPending ? "cargando" : isError ? "error" : "exito";
     const sinCircuitosRegistrados =
-        estado === "exito" && circuitos.length === 0;
+        estado === "exito" && circuitos.length === 0 && !hayFiltrosActivos;
     const sinResultadosBusqueda =
         estado === "exito" &&
-        circuitos.length > 0 &&
+        !sinCircuitosRegistrados &&
         circuitosFiltrados.length === 0;
 
     return (
@@ -197,12 +232,10 @@ function CircuitosPage() {
                 </Alerta>
             ) : null}
 
-            {estado === "exito" && circuitos.length > 0 ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative w-full max-w-md">
-                        <label htmlFor="buscar-circuito" className="sr-only">
-                            Buscar circuito
-                        </label>
+            {estado === "exito" && (circuitos.length > 0 || hayFiltrosActivos) ? (
+                <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta md:grid-cols-[1.5fr_0.9fr_0.8fr_0.7fr_auto] md:items-end">
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Buscar circuito
                         <input
                             id="buscar-circuito"
                             type="search"
@@ -210,18 +243,76 @@ function CircuitosPage() {
                             onChange={(evento) =>
                                 manejarCambioBusqueda(evento.target.value)
                             }
-                            placeholder="Buscar por nombre, dificultad o porteadores..."
-                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            placeholder="Nombre, dificultad o porteadores..."
+                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
-                    </div>
+                    </label>
 
-                    {busqueda ? (
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Estado
+                        <select
+                            aria-label="Filtrar circuitos por estado"
+                            value={filtroEstado}
+                            onChange={(e) => {
+                                setFiltroEstado(
+                                    e.target.value as
+                                        | "ACTIVO"
+                                        | "INACTIVO"
+                                        | "TODOS",
+                                );
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value="TODOS">Todos los estados</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="INACTIVO">Dados de baja (Inactivos)</option>
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Dificultad
+                        <select
+                            aria-label="Filtrar circuitos por dificultad"
+                            value={filtroDificultad}
+                            onChange={(e) => {
+                                setFiltroDificultad(e.target.value);
+                                setPaginaActual(1);
+                            }}
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        >
+                            <option value="">Todas</option>
+                            {nivelesDificultad.map((nivel) => (
+                                <option key={nivel} value={nivel}>
+                                    {nivel}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                        Duración (días)
+                        <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={filtroDuracion}
+                            onChange={(e) => {
+                                setFiltroDuracion(e.target.value);
+                                setPaginaActual(1);
+                            }}
+                            placeholder="Todos"
+                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                        />
+                    </label>
+
+                    {hayFiltrosActivos ? (
                         <Boton
                             variante="fantasma"
-                            className="self-start text-xs text-texto-suave sm:self-auto"
-                            onClick={() => manejarCambioBusqueda("")}
+                            className="px-3 py-2 text-xs text-texto-suave"
+                            onClick={limpiarTodosLosFiltros}
                         >
-                            Limpiar búsqueda
+                            Limpiar filtros
                         </Boton>
                     ) : null}
                 </div>
@@ -240,7 +331,7 @@ function CircuitosPage() {
             ) : sinResultadosBusqueda ? (
                 <EstadoListado
                     estado="vacio"
-                    mensaje={`No se encontraron circuitos que coincidan con "${busqueda.trim()}".`}
+                    mensaje="No se encontraron circuitos que coincidan con los filtros seleccionados."
                 />
             ) : (
                 <div className="overflow-x-auto">
