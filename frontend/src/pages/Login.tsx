@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Alerta from "../components/Alerta";
 import Boton from "../components/Boton";
 import {
@@ -115,6 +115,26 @@ function Login() {
                 <Boton type="submit" className="w-full" cargando={iniciarSesion.isPending}>
                     Ingresar
                 </Boton>
+
+                <div className="space-y-2 border-t border-borde pt-4 text-center text-xs text-texto-suave">
+                    <p>
+                        ¿No tenés una cuenta?{" "}
+                        <Link
+                            to="/registro"
+                            className="font-bold text-marca hover:underline"
+                        >
+                            Registrate como cliente
+                        </Link>
+                    </p>
+                    <p>
+                        <Link
+                            to="/catalogo"
+                            className="font-semibold text-navegacion hover:underline"
+                        >
+                            Explorar catálogo público →
+                        </Link>
+                    </p>
+                </div>
             </form>
         </main>
     );
