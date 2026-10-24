@@ -67,6 +67,7 @@ function SalidasPage() {
         data: opcionesSalida,
         isFetching: cargandoOpciones,
         error: errorOpciones,
+        refetch: refrescarOpciones,
     } = useOpcionesSalida(parametrosConsulta);
 
     const crearSalidaMutation = useCrearSalida();
@@ -760,6 +761,16 @@ function SalidasPage() {
                     }
                     alConsultarOpciones={(parametros) => {
                         setErrorCreacion("");
+                        // Mismos parámetros: la query no cambia de clave, hay que pedirla de nuevo
+                        if (
+                            parametrosConsulta &&
+                            parametrosConsulta.idpaquete === parametros.idpaquete &&
+                            parametrosConsulta.fechaInicio === parametros.fechaInicio &&
+                            parametrosConsulta.tamanoMaximo === parametros.tamanoMaximo
+                        ) {
+                            void refrescarOpciones();
+                            return;
+                        }
                         setParametrosConsulta(parametros);
                     }}
                     alConfirmarCreacion={manejarConfirmarCreacion}
