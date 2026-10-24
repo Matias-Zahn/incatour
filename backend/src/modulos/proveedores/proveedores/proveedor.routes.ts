@@ -2,6 +2,91 @@ import { Router } from "express";
 import { ProveedorController } from "./proveedor.controller";
 import { autenticar, requierePerfil } from "../../../shared/auth/auth.middleware";
 
+/**
+ * @swagger
+ * tags:
+ *   name: Proveedores
+ *   description: Gestión de Proveedores (CU-14 a CU-17)
+ *
+ * components:
+ *   schemas:
+ *     Proveedor:
+ *       type: object
+ *       properties:
+ *         idproveedor:
+ *           type: integer
+ *           example: 1
+ *         tipoProveedor:
+ *           type: string
+ *           enum: [ALOJAMIENTO, TRANSPORTE, TREN, EQUIPAMIENTO]
+ *           example: ALOJAMIENTO
+ *         razonSocial:
+ *           type: string
+ *           example: Andes Travel
+ *         localidad:
+ *           type: string
+ *           example: Cusco
+ *         datosContacto:
+ *           type: string
+ *           example: reservas@andestravel.com · +51 84 123456
+ *         canalComunicacion:
+ *           type: string
+ *           example: Correo electrónico
+ *         estado:
+ *           type: string
+ *           enum: [ACTIVO, INACTIVO]
+ *           example: ACTIVO
+ *         cantidadServicios:
+ *           type: integer
+ *           example: 2
+ *     ProveedorCrear:
+ *       type: object
+ *       required: [tipoProveedor, razonSocial, localidad, datosContacto, canalComunicacion]
+ *       properties:
+ *         tipoProveedor:
+ *           type: string
+ *           enum: [ALOJAMIENTO, TRANSPORTE, TREN, EQUIPAMIENTO]
+ *           example: ALOJAMIENTO
+ *         razonSocial:
+ *           type: string
+ *           example: Andes Travel
+ *         localidad:
+ *           type: string
+ *           example: Cusco
+ *         datosContacto:
+ *           type: string
+ *           example: reservas@andestravel.com · +51 84 123456
+ *         canalComunicacion:
+ *           type: string
+ *           example: Correo electrónico
+ *         estado:
+ *           type: string
+ *           enum: [ACTIVO, INACTIVO]
+ *           default: ACTIVO
+ *     ProveedorModificar:
+ *       type: object
+ *       description: Modificación parcial. Al menos un campo requerido.
+ *       properties:
+ *         tipoProveedor:
+ *           type: string
+ *           enum: [ALOJAMIENTO, TRANSPORTE, TREN, EQUIPAMIENTO]
+ *           example: ALOJAMIENTO
+ *         razonSocial:
+ *           type: string
+ *           example: Andes Travel
+ *         localidad:
+ *           type: string
+ *           example: Cusco
+ *         datosContacto:
+ *           type: string
+ *           example: reservas@andestravel.com · +51 84 123456
+ *         canalComunicacion:
+ *           type: string
+ *           example: Correo electrónico
+ *         estado:
+ *           type: string
+ *           enum: [ACTIVO, INACTIVO]
+ */
 export class ProveedorRoutes {
   static get getRoutes(): Router {
     const router = Router();

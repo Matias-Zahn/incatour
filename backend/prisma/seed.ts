@@ -56,10 +56,44 @@ async function main() {
   // 2. Proveedores y Servicios
   const proveedor = await db.proveedor.create({
     data: {
-      tipoProveedor: "Operador",
+      tipoProveedor: "ALOJAMIENTO",
       razonSocial: "Andes Travel",
       localidad: "Cusco",
       datosContacto: "reservas@andestravel.com · +51 84 123456",
+      canalComunicacion: "Correo electrónico",
+      estado: "ACTIVO",
+    },
+  });
+
+  const proveedorTransporte = await db.proveedor.create({
+    data: {
+      tipoProveedor: "TRANSPORTE",
+      razonSocial: "Transportes Urubamba",
+      localidad: "Cusco",
+      datosContacto: "operaciones@transurubamba.com · +51 84 654321",
+      canalComunicacion: "WhatsApp",
+      estado: "ACTIVO",
+    },
+  });
+
+  const proveedorTren = await db.proveedor.create({
+    data: {
+      tipoProveedor: "TREN",
+      razonSocial: "Inca Rail",
+      localidad: "Ollantaytambo",
+      datosContacto: "reservas@incarail.com · +51 84 987654",
+      canalComunicacion: "Correo electrónico",
+      estado: "ACTIVO",
+    },
+  });
+
+  const proveedorEquipamiento = await db.proveedor.create({
+    data: {
+      tipoProveedor: "EQUIPAMIENTO",
+      razonSocial: "Andes Outdoor",
+      localidad: "Cusco",
+      datosContacto: "ventas@andesoutdoor.com · +51 84 321987",
+      canalComunicacion: "Correo electrónico",
       estado: "ACTIVO",
     },
   });
@@ -102,7 +136,7 @@ async function main() {
 
   const servTrans = await db.servicioBase.create({
     data: {
-      idproveedor: proveedor.idproveedor,
+      idproveedor: proveedorTransporte.idproveedor,
       nombreServicio: "Minibus Sprinter",
       costoBase: 50.0,
       estado: "ACTIVO",
@@ -119,7 +153,7 @@ async function main() {
 
   const servTren = await db.servicioBase.create({
     data: {
-      idproveedor: proveedor.idproveedor,
+      idproveedor: proveedorTren.idproveedor,
       nombreServicio: "IncaRail Voyager",
       costoBase: 80.0,
       estado: "ACTIVO",
@@ -136,7 +170,7 @@ async function main() {
 
   const servEquip = await db.servicioBase.create({
     data: {
-      idproveedor: proveedor.idproveedor,
+      idproveedor: proveedorEquipamiento.idproveedor,
       nombreServicio: "Carpas Alta Montaña",
       costoBase: 25.0,
       estado: "ACTIVO",
