@@ -72,6 +72,14 @@ export function formatearFechaSalida(fechaIso?: string | null): string {
     }
 }
 
+/** Fecha de hoy en hora LOCAL (YYYY-MM-DD); toISOString() daría la fecha UTC */
+export function fechaLocalHoy(): string {
+    const h = new Date();
+    const mm = String(h.getMonth() + 1).padStart(2, "0");
+    const dd = String(h.getDate()).padStart(2, "0");
+    return `${h.getFullYear()}-${mm}-${dd}`;
+}
+
 export type ItinerarioEtapa = {
     numeroOrden: number;
     puntoInicio: string;

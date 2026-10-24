@@ -7,6 +7,7 @@ import {
     agregarHistorialLocalAvance,
     eliminarAvanceOffline,
     esquemaAvance,
+    fechaLocalHoy,
     estilosEstadoSalida,
     formatearEstadoSalida,
     guardarAvanceOffline,
@@ -80,7 +81,7 @@ export function VistaAvances({
     const [sincronizando, setSincronizando] = useState(false);
 
     // Cargar valores iniciales / borrador guardado
-    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const fechaHoy = fechaLocalHoy();
     const horaActual = new Date().toTimeString().slice(0, 5);
 
     const borrador = idsalida > 0 ? obtenerBorradorAvance(idsalida) : null;
@@ -283,7 +284,7 @@ export function VistaAvances({
             reset({
                 numeroOrden: undefined,
                 estadoTramo: "COMPLETADO",
-                fechaLlegada: new Date().toISOString().slice(0, 10),
+                fechaLlegada: fechaLocalHoy(),
                 horaLlegada: new Date().toTimeString().slice(0, 5),
             });
         } catch (error: unknown) {
