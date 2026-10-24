@@ -13,6 +13,7 @@ import {
     resolverUrlImagenPaquete,
     useDarDeBajaPaquete,
     useModificarPaquete,
+    usePaqueteDetalle,
     usePaquetes,
     useRegistrarPaquete,
     useServiciosDisponiblesCatalogo,
@@ -84,8 +85,11 @@ function PaquetesPage() {
     const [errorFormulario, setErrorFormulario] = useState("");
     const [errorBaja, setErrorBaja] = useState("");
 
-    const paqueteVistaPrevia =
+    const { data: detalleVistaPrevia } =
+        usePaqueteDetalle(paqueteVistaPreviaId);
+    const paqueteListaPrevia =
         paquetes.find((p) => p.idpaquete === paqueteVistaPreviaId) ?? null;
+    const paqueteVistaPrevia = detalleVistaPrevia ?? paqueteListaPrevia;
 
     function manejarCambioBusqueda(nuevoValor: string) {
         setBusqueda(nuevoValor);
@@ -954,24 +958,68 @@ function PaquetesPage() {
                                                             : "Por categoría"}
                                                     </span>
                                                 </div>
-                                                <p className="mt-1.5 text-sm font-semibold text-texto">
-                                                    {porEst
-                                                        ? "Alojamiento garantizado en establecimiento específico con bloqueo de plazas."
-                                                        : [
-                                                              paqueteVistaPrevia.categoriaGarantizada
-                                                                  ? `Categoría ${paqueteVistaPrevia.categoriaGarantizada}`
-                                                                  : null,
-                                                              paqueteVistaPrevia.localidadGarantizada
-                                                                  ? `Localidad: ${paqueteVistaPrevia.localidadGarantizada}`
-                                                                  : null,
-                                                              paqueteVistaPrevia.tipoHabitacionGarantizada
-                                                                  ? `Habitación ${paqueteVistaPrevia.tipoHabitacionGarantizada}`
-                                                                  : null,
-                                                          ]
-                                                              .filter(Boolean)
-                                                              .join(" · ") ||
-                                                          "Garantía general por categoría hotelera."}
-                                                </p>
+                                                {porEst ? (
+                                                    (() => {
+                                                        const servicioGarantizado =
+                                                            paqueteVistaPrevia
+                                                                .garantiasEstablecimiento?.[0]
+                                                                ?.servicio;
+                                                        return servicioGarantizado ? (
+                                                            <div className="mt-1.5 space-y-0.5">
+                                                                <p className="text-sm font-semibold text-texto">
+                                                                    {
+                                                                        servicioGarantizado.nombreServicio
+                                                                    }
+                                                                </p>
+                                                                <p className="text-xs text-texto-suave">
+                                                                    {[
+                                                                        servicioGarantizado.localidad
+                                                                            ? `Localidad: ${servicioGarantizado.localidad}`
+                                                                            : null,
+                                                                        servicioGarantizado
+                                                                            .alojamiento
+                                                                            ?.categoria
+                                                                            ? `Categoría ${servicioGarantizado.alojamiento.categoria}`
+                                                                            : null,
+                                                                        servicioGarantizado
+                                                                            .alojamiento
+                                                                            ?.tipoHabitacion
+                                                                            ? `Habitación ${servicioGarantizado.alojamiento.tipoHabitacion}`
+                                                                            : null,
+                                                                        "Bloqueo de plazas",
+                                                                    ]
+                                                                        .filter(
+                                                                            Boolean,
+                                                                        )
+                                                                        .join(
+                                                                            " · ",
+                                                                        )}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="mt-1.5 text-sm font-semibold text-texto">
+                                                                Alojamiento garantizado en establecimiento específico con bloqueo de plazas.
+                                                            </p>
+                                                        );
+                                                    })()
+                                                ) : (
+                                                    <p className="mt-1.5 text-sm font-semibold text-texto">
+                                                        {[
+                                                            paqueteVistaPrevia.categoriaGarantizada
+                                                                ? `Categoría ${paqueteVistaPrevia.categoriaGarantizada}`
+                                                                : null,
+                                                            paqueteVistaPrevia.localidadGarantizada
+                                                                ? `Localidad: ${paqueteVistaPrevia.localidadGarantizada}`
+                                                                : null,
+                                                            paqueteVistaPrevia.tipoHabitacionGarantizada
+                                                                ? `Habitación ${paqueteVistaPrevia.tipoHabitacionGarantizada}`
+                                                                : null,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" · ") ||
+                                                            "Garantía general por categoría hotelera."}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* TARIFAS POR TEMPORADA */}
@@ -1017,19 +1065,16 @@ function PaquetesPage() {
                                             </div>
 
                                             {/* SERVICIOS INCLUIDOS */}
-                                            {paqueteVistaPrevia.servicios &&
-                                            paqueteVistaPrevia.servicios
-                                                .length > 0 ? (
-                                                <div className="rounded-control border border-borde bg-fondo/40 p-4">
-                                                    <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                                        Servicios incluidos (
-                                                        {
-                                                            paqueteVistaPrevia
-                                                                .servicios
-                                                                .length
-                                                        }
-                                                        )
-                                                    </p>
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4">
+                                                <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
+                                                    Servicios incluidos (
+                                                    {paqueteVistaPrevia
+                                                        .servicios?.length ?? 0}
+                                                    )
+                                                </p>
+                                                {paqueteVistaPrevia.servicios &&
+                                                paqueteVistaPrevia.servicios
+                                                    .length > 0 ? (
                                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                                         {paqueteVistaPrevia.servicios.map(
                                                             (item) => (
@@ -1047,8 +1092,12 @@ function PaquetesPage() {
                                                             ),
                                                         )}
                                                     </div>
-                                                </div>
-                                            ) : null}
+                                                ) : (
+                                                    <p className="mt-1 text-xs text-texto-suave">
+                                                        Sin servicios adicionales incluidos.
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
