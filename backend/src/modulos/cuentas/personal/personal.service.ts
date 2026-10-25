@@ -86,12 +86,15 @@ export class PersonalService {
 
     // 3. Guía: cuenta + legajo + habilitación
     const { email, contrasenia, nroHabilitacion, fechaHabilitacion } = dto;
-    if (!email || !contrasenia || !nroHabilitacion || !fechaHabilitacion) {
-      throw CustomError.badRequest("Faltan datos obligatorios del guía (email, contraseña y habilitación)");
+    if (!nroHabilitacion || !fechaHabilitacion) {
+      throw CustomError.badRequest("Faltan datos obligatorios del guía (habilitación)");
     }
 
-    const existeEmail = await this.repository.checkEmailExists(email);
-    if (existeEmail) throw CustomError.badRequest("El email ya está registrado en el sistema");
+    // CTA-03: la cuenta es opcional; el DTO garantiza que email y contraseña vienen juntos
+    if (email) {
+      const existeEmail = await this.repository.checkEmailExists(email);
+      if (existeEmail) throw CustomError.badRequest("El email ya está registrado en el sistema");
+    }
 
     // Se asume que fechaHabilitacion es la fecha de VENCIMIENTO de la habilitación (CU-40
     // exige habilitación vigente). Si es la fecha de emisión, borrá este control.
@@ -99,8 +102,7 @@ export class PersonalService {
       throw CustomError.badRequest("No se puede registrar un guía con la habilitación vencida");
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const contraseniaHasheada = await bcrypt.hash(contrasenia, salt);
+    const contraseniaHasheada = contrasenia ? await bcrypt.hash(contrasenia, await bcrypt.genSalt(10)) : undefined;
 
     const resultado = await this.repository.crearGuia(
       {
@@ -116,12 +118,16 @@ export class PersonalService {
       contraseniaHasheada
     );
 
-    // Nunca devolver el hash
-    const { contrasenia: _hash, ...usuarioSeguro } = resultado.usuario;
+    // Nunca devolver el hash; sin cuenta, credencialesAcceso es null
+    let credencialesAcceso = null;
+    if (resultado.usuario) {
+      const { contrasenia: _hash, ...usuarioSeguro } = resultado.usuario;
+      credencialesAcceso = usuarioSeguro;
+    }
     return {
       mensaje: "Personal registrado exitosamente",
       perfilOperativo: resultado.personal,
-      credencialesAcceso: usuarioSeguro,
+      credencialesAcceso,
     };
   }
 }

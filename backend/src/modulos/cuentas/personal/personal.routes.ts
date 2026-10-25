@@ -11,11 +11,13 @@ export class PersonalRoutes {
      * @swagger
      * /api/personal:
      *   post:
-     *     summary: Registrar cuenta de Guía operativo
+     *     summary: Registrar personal operativo (guía o porteador)
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.**
-     *       Crea simultáneamente las credenciales de acceso (tabla Usuario con rol GUIA)
-     *       y el legajo operativo (tabla Personal) dentro de una transacción atómica.
+     *       Crea el legajo operativo (tabla Personal). Para un guía, email y contraseña son opcionales
+     *       pero van juntos: si vienen, crea también las credenciales de acceso (tabla Usuario con rol GUIA)
+     *       en la misma transacción; si no, el guía queda sin cuenta y se le crea después con `POST /api/cuentas-guia`.
+     *       La habilitación (nroHabilitacion y fechaHabilitacion) es obligatoria para un guía.
      *       Requiere un token JWT válido con perfil ADMIN en el header Authorization.
      *     tags: [Personal]
      *     security:
@@ -29,8 +31,6 @@ export class PersonalRoutes {
      *             required:
      *               - nombre
      *               - apellido
-     *               - email
-     *               - contrasenia
      *               - nroPasaporte
      *               - nacionalidad
      *               - fechaVencimientoPasaporte
@@ -50,10 +50,21 @@ export class PersonalRoutes {
      *                 type: string
      *                 format: email
      *                 example: carlos.guia2@incatour.com
+     *                 description: Opcional, solo guías. Si se envía, la contraseña es obligatoria.
      *               contrasenia:
      *                 type: string
      *                 minLength: 8
      *                 example: MiClaveSecreta123
+     *                 description: Opcional, solo guías. Si se envía, el email es obligatorio.
+     *               nroHabilitacion:
+     *                 type: string
+     *                 example: H-12345
+     *                 description: Obligatorio para un guía.
+     *               fechaHabilitacion:
+     *                 type: string
+     *                 format: date
+     *                 example: "2030-12-31"
+     *                 description: Obligatoria para un guía. Vencimiento de la habilitación (hoy cuenta como vigente).
      *               nroPasaporte:
      *                 type: string
      *                 example: PE-9876543
