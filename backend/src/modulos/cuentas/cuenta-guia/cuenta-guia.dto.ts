@@ -84,12 +84,14 @@ export class ModificarCuentaGuiaDto {
     public email?: string,
     public contrasenia?: string,
     public nroHabilitacion?: string,
-    public fechaHabilitacion?: Date,
-    public estado?: string
+    public fechaHabilitacion?: Date
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarCuentaGuiaDto?] {
     let { nombre, apellido, email, contrasenia, nroHabilitacion, fechaHabilitacion, estado } = obj;
+
+    // CTA-03: el estado de la cuenta se cambia con la baja (CU-46), no con la modificación
+    if (estado !== undefined) return ["El estado se cambia con la baja (CU-46)"];
 
     if (
       nombre === undefined &&
@@ -97,8 +99,7 @@ export class ModificarCuentaGuiaDto {
       email === undefined &&
       contrasenia === undefined &&
       nroHabilitacion === undefined &&
-      fechaHabilitacion === undefined &&
-      estado === undefined
+      fechaHabilitacion === undefined
     ) {
       return ["No se envió ningún dato para modificar la cuenta de guía"];
     }
@@ -140,13 +141,9 @@ export class ModificarCuentaGuiaDto {
       nroHabilitacion = String(nroHabilitacion).trim();
     }
 
-    if (estado !== undefined && !ESTADOS.includes(estado)) {
-      return [`estado debe ser uno de: ${ESTADOS.join(", ")}.`];
-    }
-
     return [
       undefined,
-      new ModificarCuentaGuiaDto(nombre, apellido, email, contrasenia, nroHabilitacion, fechaHab, estado),
+      new ModificarCuentaGuiaDto(nombre, apellido, email, contrasenia, nroHabilitacion, fechaHab),
     ];
   }
 }

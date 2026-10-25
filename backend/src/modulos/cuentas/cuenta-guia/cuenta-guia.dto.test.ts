@@ -86,6 +86,11 @@ describe("ModificarCuentaGuiaDto", () => {
     expect(dto?.email).toBe("carlos.nuevo@incatour.com");
   });
 
+  it("rechaza el estado: la baja tiene su propio endpoint (CTA-03)", () => {
+    const [err] = ModificarCuentaGuiaDto.create({ nombre: "Carlos", estado: "INACTIVO" });
+    expect(err).toMatch("El estado se cambia con la baja");
+  });
+
   it("rechaza si el body está vacío", () => {
     const [err] = ModificarCuentaGuiaDto.create({});
     expect(err).toMatch("No se envió ningún dato para modificar");

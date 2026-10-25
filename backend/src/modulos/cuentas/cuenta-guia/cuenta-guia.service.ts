@@ -88,7 +88,6 @@ export class CuentaGuiaService {
       contraseniaHasheada,
       nroHabilitacion: dto.nroHabilitacion,
       fechaHabilitacion: dto.fechaHabilitacion,
-      estado: dto.estado,
     });
 
     return this.formatear(cuentaModificada as CuentaGuia);

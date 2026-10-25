@@ -110,7 +110,7 @@ export class CuentaGuiaRoutes {
      *   put:
      *     summary: Modificar cuenta de guía (por administrador)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Permite corregir datos de la cuenta del guía (nombre, apellido, email, contraseña, habilitación o estado).
+     *       **RESTRINGIDO A ADMINISTRADOR.** Permite corregir datos de la cuenta del guía (nombre, apellido, email, contraseña o habilitación). El estado no se modifica acá: la baja es `PATCH /{idusuario}/baja`.
      *     tags: [Cuentas de guía]
      *     security:
      *       - BearerAuth: []

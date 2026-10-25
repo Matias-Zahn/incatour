@@ -129,7 +129,6 @@ export class CuentaGuiaRepository {
       contraseniaHasheada?: string | undefined;
       nroHabilitacion?: string | undefined;
       fechaHabilitacion?: Date | undefined;
-      estado?: string | undefined;
     }
   ) {
     return db.$transaction(async (tx) => {
@@ -138,14 +137,12 @@ export class CuentaGuiaRepository {
         apellido?: string;
         email?: string;
         contrasenia?: string;
-        estado?: string;
       } = {};
 
       if (data.nombre) updateUsuario.nombre = data.nombre;
       if (data.apellido) updateUsuario.apellido = data.apellido;
       if (data.email) updateUsuario.email = data.email;
       if (data.contraseniaHasheada) updateUsuario.contrasenia = data.contraseniaHasheada;
-      if (data.estado) updateUsuario.estado = data.estado;
 
       if (Object.keys(updateUsuario).length > 0) {
         await tx.usuario.update({
