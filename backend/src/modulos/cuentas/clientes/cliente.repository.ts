@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_RESERVA } from "../../../shared/constantes";
+import { ESTADO_RESERVA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { CrearClienteDto, ModificarClienteDto } from "./cliente.dto";
 
 export class ClienteRepository {
@@ -113,12 +113,8 @@ export class ClienteRepository {
       where: { idcliente },
       include: {
         reservas: {
-          where: {
-            OR: [
-              { estado: ESTADO_RESERVA.CONFIRMADA },
-              { estado: "Confirmada" },
-            ],
-          },
+          // CTA-01: solo cuentan las reservas confirmadas de salidas que aún no terminaron
+          where: { estado: ESTADO_RESERVA.CONFIRMADA, salida: { estado: { in: SALIDAS_ACTIVAS } } },
         },
       },
     });
