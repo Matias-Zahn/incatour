@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
+import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 
 const precios = [{ idtemporada: 1, monto: 800, moneda: "USD" }];
 const base = {
@@ -118,5 +118,16 @@ describe("diasMinimosReintegro (RES-06)", () => {
     const [err, dto] = ModificarPaqueteDto.create({ diasMinimosReintegro: null });
     expect(err).toBeUndefined();
     expect(dto!.diasMinimosReintegro).toBeNull();
+  });
+});
+
+describe("FiltrosPaqueteDto (CAT-13)", () => {
+  it("acepta filtros válidos y vacíos", () => {
+    expect(FiltrosPaqueteDto.create({})[0]).toBeUndefined();
+    expect(FiltrosPaqueteDto.create({ idcircuito: "2", estado: "TODOS" })[1]).toMatchObject({ idcircuito: 2, estado: "TODOS" });
+  });
+
+  it.each(["abc", "0", "1e3"])("idcircuito=%s es inválido", (v) => {
+    expect(FiltrosPaqueteDto.create({ idcircuito: v })[0]).toBe("idcircuito debe ser un número entero mayor a 0.");
   });
 });

@@ -1,3 +1,5 @@
+import { enteroOpcional } from "../../../shared/filtros";
+
 export interface PrecioTemporada {
   idtemporada: number;
   monto: number;
@@ -251,5 +253,20 @@ export class ModificarPaqueteDto {
       localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada,
       serviciosIncluidos, diasMinimosReintegro,
     )];
+  }
+}
+
+// CU-10 / CAT-13: filtros del listado (un valor inválido es 400, no un error de Prisma)
+export class FiltrosPaqueteDto {
+  private constructor(
+    public idcircuito?: number,
+    public estado?: string,
+    public nombrePaquete?: string,
+  ) {}
+
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosPaqueteDto?] {
+    const [error, idcircuito] = enteroOpcional(query.idcircuito, "idcircuito");
+    if (error) return [error];
+    return [undefined, new FiltrosPaqueteDto(idcircuito, query.estado, query.nombrePaquete)];
   }
 }

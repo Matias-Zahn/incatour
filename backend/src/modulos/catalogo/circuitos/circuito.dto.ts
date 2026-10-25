@@ -1,3 +1,5 @@
+import { enteroOpcional } from "../../../shared/filtros";
+
 export class CrearCircuitoDto {
   private constructor(
     public nombreCircuito: string,
@@ -68,5 +70,20 @@ export class ModificarCircuitoDto {
     }
 
     return [undefined, new ModificarCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
+  }
+}
+
+// CU-01 / CAT-13: filtros del listado (un valor inválido es 400, no un error de Prisma)
+export class FiltrosCircuitoDto {
+  private constructor(
+    public duracionDias?: number,
+    public dificultad?: string,
+    public estado?: string,
+  ) {}
+
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosCircuitoDto?] {
+    const [error, duracionDias] = enteroOpcional(query.duracionDias, "duracionDias");
+    if (error) return [error];
+    return [undefined, new FiltrosCircuitoDto(duracionDias, query.dificultad, query.estado)];
   }
 }

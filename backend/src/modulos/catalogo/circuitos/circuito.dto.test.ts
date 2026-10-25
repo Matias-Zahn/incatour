@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
+import { CrearCircuitoDto, FiltrosCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 
 const base = { nombreCircuito: "Camino Inca", duracionDias: 4, dificultad: "MEDIA", minimoGuias: 1 };
 
@@ -47,5 +47,16 @@ describe("ModificarCircuitoDto", () => {
     // CAT-11: null explícito no es "sin cambio" (terminaba en 500 de Prisma)
     expect(ModificarCircuitoDto.create({ duracionDias: null })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
     expect(ModificarCircuitoDto.create({ nombreCircuito: "X", minimoGuias: null })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
+  });
+});
+
+describe("FiltrosCircuitoDto (CAT-13)", () => {
+  it("acepta filtros válidos y vacíos", () => {
+    expect(FiltrosCircuitoDto.create({})[0]).toBeUndefined();
+    expect(FiltrosCircuitoDto.create({ duracionDias: "4" })[1]?.duracionDias).toBe(4);
+  });
+
+  it.each(["abc", "0", "-1", "1.5"])("duracionDias=%s es inválido", (v) => {
+    expect(FiltrosCircuitoDto.create({ duracionDias: v })[0]).toBe("duracionDias debe ser un número entero mayor a 0.");
   });
 });
