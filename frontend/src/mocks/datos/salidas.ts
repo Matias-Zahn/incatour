@@ -20,6 +20,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(3),
         fechaFin: fechaRelativa(6, 18),
         estado: "PUBLICADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
@@ -80,6 +81,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(-15),
         fechaFin: fechaRelativa(-12, 18),
         estado: "FINALIZADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: 4,
         paquete: {
             nroPaquete: "PAQ-INC-01",
@@ -140,6 +142,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(-2),
         fechaFin: fechaRelativa(2, 18),
         estado: "EN_CURSO",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: 1,
         paquete: {
             nroPaquete: "PAQ-INC-02",
@@ -200,6 +203,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(5),
         fechaFin: fechaRelativa(8, 18),
         estado: "CERRADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
@@ -242,6 +246,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(40),
         fechaFin: fechaRelativa(43, 18),
         estado: "CANCELADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-01",
@@ -275,6 +280,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(25),
         fechaFin: fechaRelativa(29, 18),
         estado: "PUBLICADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-INC-02",
@@ -327,6 +333,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         fechaInicio: fechaRelativa(14),
         fechaFin: fechaRelativa(19, 18),
         estado: "PUBLICADA",
+        lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
         paquete: {
             nroPaquete: "PAQ-SAL-01",

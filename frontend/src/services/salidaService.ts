@@ -57,6 +57,7 @@ export type SalidaApi = {
     fechaInicio: string;
     fechaFin: string;
     estado: string;
+    lugaresPorLiberar: number;
     ultimaEtapaAlcanzada: number | null;
     paquete: PaqueteSalidaApi;
     personalAsignado: PersonalAsignadoSalidaApi[];
