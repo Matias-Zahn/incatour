@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
@@ -38,6 +38,58 @@ type VistaAvancesProps = {
     cargando?: boolean;
 };
 
+/** Reconstruye el historial combinando avances confirmados del servidor y pendientes offline (FE-08) */
+function construirListaHistorial(
+    detalle: DetalleSalidaGuia | null,
+    idSalida: number,
+    avancesPendientesLocales: AvanceOffline[] = [],
+): RegistroHistorialAvance[] {
+    if (idSalida <= 0) return [];
+
+    // Avances confirmados registrados en el servidor
+    const delServidor: RegistroHistorialAvance[] = (detalle?.itinerario ?? [])
+        .filter((e) => e.estadoTramo !== null && e.estadoTramo !== undefined)
+        .map((e) => ({
+            id: `serv_${e.numeroOrden}`,
+            etapa: `Etapa ${e.numeroOrden}: ${e.puntoInicio} → ${e.puntoFin}`,
+            estadoTramo: (e.estadoTramo as EstadoTramo) ?? "COMPLETADO",
+            fechaHora: e.fechaHoraLlegada
+                ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES")
+                : "Completado previamente",
+            offline: false,
+        }));
+
+    // Avances en localStorage (con prioridad a pendientes offline)
+    const locales = obtenerHistorialLocalAvances(idSalida);
+
+    const mapa = new Map<string, RegistroHistorialAvance>();
+
+    // 1. Añadir pendientes offline primero (tienen prioridad visual por ser cambios locales no confirmados aún)
+    for (const item of avancesPendientesLocales) {
+        mapa.set(item.etapaNombre, {
+            id: item.idLocal,
+            etapa: item.etapaNombre,
+            estadoTramo: item.estadoTramo,
+            fechaHora: `${item.fechaHoraLlegada.slice(0, 10)} (Offline)`,
+            offline: true,
+        });
+    }
+
+    // 2. Añadir del servidor (del más reciente al más antiguo, si no hay uno offline pendiente para esa etapa)
+    for (const item of [...delServidor].reverse()) {
+        if (!mapa.has(item.etapa)) {
+            mapa.set(item.etapa, item);
+        }
+    }
+
+    // 3. Fallback: si no hay en servidor ni offline pendientes, pero hay historial local
+    if (mapa.size === 0 && locales.length > 0) {
+        return locales;
+    }
+
+    return Array.from(mapa.values());
+}
+
 export function VistaAvances({
     salidaActual,
     detalleSalida,
@@ -57,25 +109,11 @@ export function VistaAvances({
         idsalida > 0 ? obtenerAvancesOffline(idsalida) : [],
     );
 
-    const [historialAvances, setHistorialAvances] = useState<RegistroHistorialAvance[]>(() => {
-        if (idsalida <= 0) return [];
-        const local = obtenerHistorialLocalAvances(idsalida);
-        if (local.length > 0) return local;
-        if (detalleSalida?.itinerario) {
-            return detalleSalida.itinerario
-                .filter((e) => e.estadoTramo !== null)
-                .map((e) => ({
-                    id: `serv_${e.numeroOrden}`,
-                    etapa: `Etapa ${e.numeroOrden}: ${e.puntoInicio} → ${e.puntoFin}`,
-                    estadoTramo: (e.estadoTramo as EstadoTramo) ?? "COMPLETADO",
-                    fechaHora: e.fechaHoraLlegada
-                        ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES")
-                        : "Completado previamente",
-                    offline: false,
-                }));
-        }
-        return [];
-    });
+    // Historial reactivo calculado directamente desde el detalle del servidor y pendientes offline (FE-08)
+    const historialAvances = useMemo(
+        () => construirListaHistorial(detalleSalida, idsalida, avancesPendientes),
+        [detalleSalida, idsalida, avancesPendientes],
+    );
 
     const [sincronizando, setSincronizando] = useState(false);
 
@@ -165,13 +203,11 @@ export function VistaAvances({
                 tipo: "error",
                 texto: `El servidor rechazó ${rechazados.length} avance(s) pendiente(s) y se descartaron: ${rechazados.join(" | ")}`,
             });
-            setHistorialAvances(obtenerHistorialLocalAvances(idsalida));
         } else if (exitoCount > 0) {
             setMensajeFeedback({
                 tipo: "exito",
                 texto: `Se sincronizaron exitosamente ${exitoCount} avance(s) pendiente(s) con el servidor.`,
             });
-            setHistorialAvances(obtenerHistorialLocalAvances(idsalida));
         }
     }, [idsalida, registrarAvanceMutation]);
 
@@ -188,16 +224,30 @@ export function VistaAvances({
         return () => window.removeEventListener("online", manejarOnline);
     }, [idsalida, sincronizarPendientes]);
 
-    // Siguiente etapa sugerida
-    const siguienteEtapa = etapasDisponibles.find(
-        (e) => e.estadoTramo === null,
+    // Siguiente etapa sugerida: primera etapa que NO esté completada
+    // Un tramo DEMORADO no avanza la etapa en el backend y debe seguir proponiéndose hasta completarse (FE-09)
+    const etapasConPendientes = etapasDisponibles.map((etapa) => {
+        const pendiente = avancesPendientes.find(
+            (p) => p.numeroOrden === etapa.numeroOrden,
+        );
+        if (pendiente) {
+            return {
+                ...etapa,
+                estadoTramo: pendiente.estadoTramo,
+            };
+        }
+        return etapa;
+    });
+
+    const siguienteEtapa = etapasConPendientes.find(
+        (e) => e.estadoTramo !== "COMPLETADO",
     );
 
     useEffect(() => {
-        if (!borrador?.numeroOrden && siguienteEtapa) {
+        if (siguienteEtapa) {
             setValue("numeroOrden", siguienteEtapa.numeroOrden);
         }
-    }, [siguienteEtapa, borrador, setValue]);
+    }, [siguienteEtapa, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
@@ -256,12 +306,28 @@ export function VistaAvances({
 
             agregarHistorialLocalAvance(idsalida, nuevoRegistro);
             setAvancesPendientes(obtenerAvancesOffline(idsalida));
-            setHistorialAvances((prev) => [nuevoRegistro, ...prev]);
             limpiarBorradorAvance(idsalida);
 
             setMensajeFeedback({
                 tipo: "advertencia",
                 texto: "Sin conexión: el avance se guardó localmente en tu dispositivo y se enviará al servidor cuando recuperes señal.",
+            });
+
+            // Si fue DEMORADO se mantiene la misma etapa; si fue COMPLETADO se propone la siguiente pendiente
+            const siguienteNumeroOffline =
+                datos.estadoTramo === "DEMORADO"
+                    ? Number(datos.numeroOrden)
+                    : (etapasConPendientes.find(
+                          (e) =>
+                              e.numeroOrden > Number(datos.numeroOrden) &&
+                              e.estadoTramo !== "COMPLETADO",
+                      )?.numeroOrden ?? undefined);
+
+            reset({
+                numeroOrden: siguienteNumeroOffline,
+                estadoTramo: "COMPLETADO",
+                fechaLlegada: fechaLocalHoy(),
+                horaLlegada: new Date().toTimeString().slice(0, 5),
             });
             return;
         }
@@ -290,7 +356,6 @@ export function VistaAvances({
             };
 
             agregarHistorialLocalAvance(idsalida, nuevoRegistro);
-            setHistorialAvances((prev) => [nuevoRegistro, ...prev]);
             limpiarBorradorAvance(idsalida);
 
             setMensajeFeedback({
@@ -298,9 +363,18 @@ export function VistaAvances({
                 texto: "Avance registrado exitosamente en el historial del recorrido.",
             });
 
-            // Resetear para próxima etapa
+            // Resetear para próxima etapa (si fue DEMORADO, se mantiene la misma etapa; si fue COMPLETADO, la siguiente etapa pendiente)
+            const siguienteNumero =
+                datos.estadoTramo === "DEMORADO"
+                    ? Number(datos.numeroOrden)
+                    : (etapasConPendientes.find(
+                          (e) =>
+                              e.numeroOrden > Number(datos.numeroOrden) &&
+                              e.estadoTramo !== "COMPLETADO",
+                      )?.numeroOrden ?? undefined);
+
             reset({
-                numeroOrden: undefined,
+                numeroOrden: siguienteNumero,
                 estadoTramo: "COMPLETADO",
                 fechaLlegada: fechaLocalHoy(),
                 horaLlegada: new Date().toTimeString().slice(0, 5),
@@ -337,12 +411,27 @@ export function VistaAvances({
 
                 agregarHistorialLocalAvance(idsalida, nuevoRegistro);
                 setAvancesPendientes(obtenerAvancesOffline(idsalida));
-                setHistorialAvances((prev) => [nuevoRegistro, ...prev]);
                 limpiarBorradorAvance(idsalida);
 
                 setMensajeFeedback({
                     tipo: "advertencia",
                     texto: "Falla de señal detectada: el avance fue guardado localmente de manera segura en tu dispositivo para ser sincronizado luego.",
+                });
+
+                const siguienteNumeroOffline =
+                    datos.estadoTramo === "DEMORADO"
+                        ? Number(datos.numeroOrden)
+                        : (etapasConPendientes.find(
+                              (e) =>
+                                  e.numeroOrden > Number(datos.numeroOrden) &&
+                                  e.estadoTramo !== "COMPLETADO",
+                          )?.numeroOrden ?? undefined);
+
+                reset({
+                    numeroOrden: siguienteNumeroOffline,
+                    estadoTramo: "COMPLETADO",
+                    fechaLlegada: fechaLocalHoy(),
+                    horaLlegada: new Date().toTimeString().slice(0, 5),
                 });
             } else {
                 setMensajeFeedback({
@@ -435,11 +524,21 @@ export function VistaAvances({
                                     className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
                                     <option value="">Selecciona una etapa</option>
-                                    {etapasDisponibles.map((etapa) => (
-                                        <option key={etapa.numeroOrden} value={etapa.numeroOrden}>
-                                            Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin} {etapa.estadoTramo ? `(${formatearEstadoSalida(etapa.estadoTramo)})` : ""}
-                                        </option>
-                                    ))}
+                                    {etapasDisponibles.map((etapa) => {
+                                        const estaCompletada = etapa.estadoTramo === "COMPLETADO";
+                                        const esSugerida = etapa.numeroOrden === siguienteEtapa?.numeroOrden;
+                                        return (
+                                            <option
+                                                key={etapa.numeroOrden}
+                                                value={etapa.numeroOrden}
+                                                disabled={estaCompletada}
+                                            >
+                                                Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin}
+                                                {etapa.estadoTramo ? ` (${formatearEstadoSalida(etapa.estadoTramo)})` : ""}
+                                                {esSugerida && !estaCompletada ? " — Sugerida" : ""}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                                 {errors.numeroOrden ? (
                                     <span className="text-xs font-normal text-peligro">
