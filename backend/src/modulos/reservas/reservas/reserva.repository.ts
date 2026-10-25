@@ -7,6 +7,12 @@ export interface DatosConfirmacionReserva {
   idsalida: number;
   nroReserva: string;
   precioCongelado: number;
+  // RES-07: desglose congelado
+  temporadaAplicada: string;
+  precioPaquetePorPersona: number;
+  adicionalesEquipaje: number;
+  moneda: string;
+  diasMinimosReintegro: number | null; // RES-06
   condicionesComerciales: string;
   medioPago: string;
   pasajeros: PasajeroInput[];
@@ -137,6 +143,11 @@ export class ReservaRepository {
           nroReserva: d.nroReserva,
           cantidadPasajeros: d.pasajeros.length,
           precioCongelado: d.precioCongelado,
+          temporadaAplicada: d.temporadaAplicada,
+          precioPaquetePorPersona: d.precioPaquetePorPersona,
+          adicionalesEquipaje: d.adicionalesEquipaje,
+          moneda: d.moneda,
+          diasMinimosReintegro: d.diasMinimosReintegro,
           condicionesComerciales: d.condicionesComerciales,
           estado: "CONFIRMADA",
           estadoAlojamiento: d.estadoAlojamiento,

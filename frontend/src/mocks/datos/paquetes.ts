@@ -18,6 +18,7 @@ export const paquetesIniciales: PaqueteMock[] = [
         tipoHabitacionGarantizada: "Doble",
         nochesPrevias: 1,
         nochesPosteriores: 1,
+        diasMinimosReintegro: 15,
         diasDisponibles: "L-M-X-J-V-S-D",
         tieneSalidasActivas: true,
         circuito: {

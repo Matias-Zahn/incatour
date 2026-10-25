@@ -2,6 +2,7 @@ import { db } from "../../../config/postgresDatabase";
 import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { DefinicionPaquete } from "../../../shared/definicionPaquete";
 import { ConsultarSalidasDto } from "./salida.dto";
 
 export type SalidaListada = Awaited<ReturnType<SalidaRepository["buscar"]>>[number];
@@ -14,6 +15,7 @@ export interface DatosNuevaSalida {
   tamanoMaximo: number;
   idbloqueo: string;
   idalojamiento: number | undefined;
+  definicionPaquete: DefinicionPaquete; // CAT-05
 }
 
 export class SalidaRepository {
@@ -63,7 +65,9 @@ export class SalidaRepository {
       include: {
         circuito: true,
         tarifas: { include: { temporada: true } },
-        garantiasEstablecimiento: true,
+        // CAT-05: lo necesario para armar la foto de la definición
+        garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+        servicios: { include: { servicio: { include: { transporte: true } } } },
       },
     });
   }
@@ -119,6 +123,7 @@ export class SalidaRepository {
           fechaInicio: d.fechaInicio,
           fechaFin: d.fechaFin,
           estado: ESTADO_SALIDA.PUBLICADA,
+          definicionPaquete: d.definicionPaquete,
           ...(d.idalojamiento && {
             servicios: { create: { idservicio: d.idalojamiento, tipo: TIPO_SERVICIO.ALOJAMIENTO } },
           }),

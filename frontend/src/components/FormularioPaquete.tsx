@@ -126,6 +126,12 @@ function FormularioPaquete({
     const [nochesPosteriores, setNochesPosteriores] = useState<number>(
         paqueteEnEdicion?.nochesPosteriores ?? 0,
     );
+    // Vacío = sin plazo: el reintegro es siempre del 100% (RES-06)
+    const [diasMinimosReintegro, setDiasMinimosReintegro] = useState<string>(
+        paqueteEnEdicion?.diasMinimosReintegro != null
+            ? String(paqueteEnEdicion.diasMinimosReintegro)
+            : "",
+    );
     const [diasSeleccionados, setDiasSeleccionados] = useState<CodigoDia[]>(
         () => parsearDiasDisponibles(paqueteEnEdicion?.diasDisponibles),
     );
@@ -574,6 +580,10 @@ function FormularioPaquete({
                   }),
             nochesPrevias,
             nochesPosteriores,
+            diasMinimosReintegro:
+                diasMinimosReintegro === ""
+                    ? null
+                    : Math.max(0, Math.trunc(Number(diasMinimosReintegro))),
             diasDisponibles: diasSerializados,
             matrizPrecios,
             serviciosIncluidos,
@@ -793,6 +803,22 @@ function FormularioPaquete({
                         </div>
                     </div>
                 </div>
+
+                <label className="grid gap-1.5 text-sm font-semibold text-texto md:max-w-xs">
+                    Días mínimos para reintegro (opcional)
+                    <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={diasMinimosReintegro}
+                        onChange={(e) => setDiasMinimosReintegro(e.target.value)}
+                        placeholder="Sin plazo"
+                        className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                    />
+                    <span className="text-xs font-normal text-texto-suave">
+                        Si el cliente cancela con menos anticipación, no recibe reintegro.
+                    </span>
+                </label>
 
                 <label className="grid gap-1.5 text-sm font-semibold text-texto">
                     Condiciones comerciales y observaciones (opcional)

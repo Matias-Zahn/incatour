@@ -41,6 +41,8 @@ describe("CrearPaqueteDto", () => {
     [{ nochesPrevias: 1.5 }, "nochesPrevias debe ser un número entero mayor o igual a 0."],
     [{ nochesPosteriores: "2" }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
     [{ nochesPosteriores: 2.5 }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
+    [{ diasMinimosReintegro: -1 }, "diasMinimosReintegro debe ser un número entero mayor o igual a 0."],
+    [{ diasMinimosReintegro: 2.5 }, "diasMinimosReintegro debe ser un número entero mayor o igual a 0."],
     [{ serviciosIncluidos: "40" }, "serviciosIncluidos debe ser un arreglo de IDs de servicios."],
     [{ serviciosIncluidos: [40, "x"] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
     [{ serviciosIncluidos: [40, 2.5] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
@@ -103,5 +105,15 @@ describe("ModificarPaqueteDto", () => {
     expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
     expect(ModificarPaqueteDto.create({ nochesPrevias: 1.5 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
     expect(ModificarPaqueteDto.create({ nochesPosteriores: 2.5 })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
+  });
+});
+
+describe("diasMinimosReintegro (RES-06)", () => {
+  it("es opcional al crear y se puede quitar con null al modificar", () => {
+    expect(CrearPaqueteDto.create(base)[1]!.diasMinimosReintegro).toBeNull();
+    expect(CrearPaqueteDto.create({ ...base, diasMinimosReintegro: 15 })[1]!.diasMinimosReintegro).toBe(15);
+    const [err, dto] = ModificarPaqueteDto.create({ diasMinimosReintegro: null });
+    expect(err).toBeUndefined();
+    expect(dto!.diasMinimosReintegro).toBeNull();
   });
 });

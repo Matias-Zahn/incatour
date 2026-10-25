@@ -1,6 +1,7 @@
 // Importamos la conexión desde tu Singleton
 import { db } from "../src/config/postgresDatabase";
 import bcrypt from 'bcrypt';
+import { armarDefinicionPaquete } from "../src/shared/definicionPaquete";
 
 async function main() {
   console.log("🌱 Insertando datos semilla de IncaTour...");
@@ -263,6 +264,7 @@ async function main() {
       categoriaGarantizada: "3 Estrellas",
       localidadGarantizada: "Cusco",
       tipoHabitacionGarantizada: "Doble",
+      diasMinimosReintegro: 15, // RES-06: reintegro del 100% solo con 15 días de anticipación
       tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 650, moneda: "USD" }] },
       servicios: {
         create: [
@@ -307,9 +309,17 @@ async function main() {
     },
   });
 
-  // 6. Salida Publicada
+  // 6. Salida Publicada, con la foto de la definición del paquete (CAT-05)
+  const paqueteCompleto = await db.paquete.findUniqueOrThrow({
+    where: { idpaquete: paquete.idpaquete },
+    include: {
+      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+      servicios: { include: { servicio: { include: { transporte: true } } } },
+    },
+  });
   const salida = await db.salida.create({
     data: {
+      definicionPaquete: armarDefinicionPaquete(paqueteCompleto),
       idpaquete: paquete.idpaquete,
       nroSalida: "SAL-2026-001",
       idbloqueo: "BLQ-SEED-001",
@@ -353,7 +363,13 @@ async function main() {
       idsalida: salida.idsalida,
       nroReserva: "RES-0001",
       cantidadPasajeros: 1,
-      precioCongelado: 1500.0,
+      precioCongelado: 650.0,
+      // RES-07: desglose congelado (tarifa de Alta 2026, sin equipaje excedente)
+      temporadaAplicada: "Alta 2026",
+      precioPaquetePorPersona: 650,
+      adicionalesEquipaje: 0,
+      moneda: "USD",
+      diasMinimosReintegro: 15,
       estado: "CONFIRMADA",
       pasajeros: {
         create: [{ idpasajero: pasajero.idpasajero }],
@@ -388,14 +404,20 @@ async function main() {
       idsalida: salida.idsalida,
       nroReserva: "RES-0002-CANC",
       cantidadPasajeros: 1,
-      precioCongelado: 1500.0,
+      precioCongelado: 650.0,
+      temporadaAplicada: "Alta 2026",
+      precioPaquetePorPersona: 650,
+      adicionalesEquipaje: 0,
+      moneda: "USD",
+      diasMinimosReintegro: 15,
       estado: "CANCELADA",
       reembolsos: {
         create: [
           {
             idusuario: usuarioAdmin.idusuario,
-            montoReembolsado: 1500.0,
+            montoReembolsado: 650.0,
             motivo: "Cancelación temprana sin permisos emitidos",
+            condicionAplicada: "Cancelación con 20 días de anticipación (mínimo 15): 100% del importe abonado",
           },
         ],
       },

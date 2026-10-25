@@ -33,7 +33,7 @@ export class ReemplazoRepository {
 
   /**
    * CU-38 pasos 14, 15, 18 y 20, en una transacción: desvincular al original, asignar al reemplazante,
-   * dejar el permiso viejo dado de baja, registrar el nuevo y auditar el cambio con su motivo.
+   * dejar el permiso viejo Perdido (SAL-11; "Dado de baja" es solo el marcador del reintento), registrar el nuevo y auditar el cambio con su motivo.
    */
   async reemplazar(p: {
     idsalida: number;
@@ -61,7 +61,7 @@ export class ReemplazoRepository {
       if (p.idpermisoAnterior) {
         await tx.permisoPersonal.update({
           where: { idpermisopersonal: p.idpermisoAnterior },
-          data: { estadoTramite: ESTADO_PERMISO.DADO_DE_BAJA },
+          data: { estadoTramite: ESTADO_PERMISO.PERDIDO },
         });
       }
       const nuevo = p.permisoNuevo

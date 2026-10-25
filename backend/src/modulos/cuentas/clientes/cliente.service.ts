@@ -18,6 +18,15 @@ export class ClienteService {
     return cliente;
   }
 
+  // BE-02: el cliente autenticado consulta su propio perfil sin conocer su idcliente
+  async consultarMiPerfil(idusuario: number) {
+    const cliente = await this.repository.findByUsuario(idusuario);
+    if (!cliente) {
+      throw CustomError.notFound("Cliente no encontrado.");
+    }
+    return cliente;
+  }
+
   async crearCliente(dto: CrearClienteDto) {
     const emailExiste = await this.repository.checkEmailExists(dto.email);
     if (emailExiste) {

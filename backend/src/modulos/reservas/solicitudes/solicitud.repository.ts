@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD } from "../../../shared/constantes";
 
@@ -172,11 +173,12 @@ export class SolicitudRepository {
       });
 
       // RES-09: La solicitud -R copia los criterios de alojamiento
+      const def = solActual.reserva?.salida?.paquete ? definicionEfectiva(solActual.reserva.salida) : null;
       const criterios = solActual.criterios ?? (
-        solActual.reserva?.salida?.paquete
-          ? `Localidad: ${solActual.reserva.salida.paquete.localidadGarantizada ?? "-"} | ` +
-            `Categoría: ${solActual.reserva.salida.paquete.categoriaGarantizada ?? "-"} | ` +
-            `Habitación: ${solActual.reserva.salida.paquete.tipoHabitacionGarantizada ?? "-"}`
+        def
+          ? `Localidad: ${def.localidadGarantizada ?? "-"} | ` +
+            `Categoría: ${def.categoriaGarantizada ?? "-"} | ` +
+            `Habitación: ${def.tipoHabitacionGarantizada ?? "-"}`
           : null
       );
 

@@ -4,6 +4,7 @@ import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interfa
 import { PasarelaMock } from "../../../integraciones/pasarela/pasarela.mock";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { DefinicionPaquete, definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaRepository } from "./reserva.repository";
 
@@ -69,8 +70,11 @@ export class ReservaService {
       }
     }
 
+    // CAT-05: lo que se vendió es la definición de la salida (foto), no el paquete como esté hoy
+    const definicion = definicionEfectiva(salida);
+
     // 4. El precio lo calcula el servidor
-    const precio = this.calcularPrecio(salida, dto);
+    const precio = this.calcularPrecio(salida, definicion, dto);
     const nroReserva = `RES-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
     // 5. Reservar cupos (atómico). Si no alcanzan, se corta sin cobrar.
@@ -110,7 +114,12 @@ export class ReservaService {
         idsalida: dto.idsalida,
         nroReserva,
         precioCongelado: precio.total,
-        condicionesComerciales: salida.paquete.condiciones ?? "",
+        temporadaAplicada: precio.temporadaAplicada,
+        precioPaquetePorPersona: precio.precioPaquetePorPersona,
+        adicionalesEquipaje: precio.adicionalesEquipaje,
+        moneda: precio.moneda,
+        diasMinimosReintegro: definicion.diasMinimosReintegro,
+        condicionesComerciales: definicion.condiciones ?? "",
         medioPago: dto.medioPago,
         pasajeros: dto.pasajeros,
         estadoAlojamiento: alojamientoReservado ? "CONFIRMADO" : "PENDIENTE",
@@ -119,9 +128,9 @@ export class ReservaService {
           : {
               nroSolicitud: `SOL-${nroReserva}`,
               criterios:
-                `Localidad: ${salida.paquete.localidadGarantizada ?? "-"} | ` +
-                `Categoría: ${salida.paquete.categoriaGarantizada ?? "-"} | ` +
-                `Habitación: ${salida.paquete.tipoHabitacionGarantizada ?? "-"}`,
+                `Localidad: ${definicion.localidadGarantizada ?? "-"} | ` +
+                `Categoría: ${definicion.categoriaGarantizada ?? "-"} | ` +
+                `Habitación: ${definicion.tipoHabitacionGarantizada ?? "-"}`,
             },
       });
     } catch (error) {
@@ -159,7 +168,7 @@ export class ReservaService {
   }
 
   // Tarifa de la temporada vigente en la fecha de inicio + exceso de equipaje
-  private calcularPrecio(salida: SalidaCompra, dto: CrearReservaDto) {
+  private calcularPrecio(salida: SalidaCompra, definicion: DefinicionPaquete, dto: CrearReservaDto) {
     const tarifa = salida.paquete.tarifas.find(
       (t) =>
         t.temporada.estado === "ACTIVO" &&
@@ -173,7 +182,7 @@ export class ReservaService {
     // Transporte de la salida; si todavía no se asignó, el incluido en el paquete
     const transporte =
       salida.servicios.map((s) => s.servicio.transporte).find((t) => t !== null) ??
-      salida.paquete.servicios.map((s) => s.servicio.transporte).find((t) => t !== null);
+      definicion.servicios.map((s) => s.transporte).find((t) => t !== null);
 
     let extra = 0;
     if (transporte) {
@@ -183,9 +192,13 @@ export class ReservaService {
       }
     }
 
+    // RES-07: se devuelve el desglose para congelarlo en la reserva
     return {
       total: redondear2(tarifa.monto * dto.pasajeros.length + extra),
       moneda: tarifa.moneda,
+      temporadaAplicada: tarifa.temporada.nombre,
+      precioPaquetePorPersona: tarifa.monto,
+      adicionalesEquipaje: redondear2(extra),
     };
   }
 

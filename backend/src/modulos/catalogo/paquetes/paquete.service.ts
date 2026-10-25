@@ -69,6 +69,7 @@ export class PaqueteService {
         nochesPrevias: dto.nochesPrevias ?? 0,
         nochesPosteriores: dto.nochesPosteriores ?? 0,
         diasDisponibles: dto.diasDisponibles,
+        diasMinimosReintegro: dto.diasMinimosReintegro ?? null,
       },
       dto.matrizPrecios,
       dto.serviciosIncluidos ?? []
@@ -88,6 +89,12 @@ export class PaqueteService {
 
     // Validar circuito si se cambia
     if (dto.idcircuito && dto.idcircuito !== paquete.idcircuito) {
+      // CAT-05: las salidas existentes siguen recorriendo el circuito con el que se vendieron
+      if (await this.repository.tieneSalidasActivas(id)) {
+        throw CustomError.badRequest(
+          "No se puede cambiar el circuito de un paquete que tiene salidas activas."
+        );
+      }
       const circuito = await db.circuito.findUnique({
         where: { idcircuito: dto.idcircuito },
       });
@@ -125,6 +132,7 @@ export class PaqueteService {
     if (dto.nochesPrevias !== undefined) dataUpdate.nochesPrevias = dto.nochesPrevias;
     if (dto.nochesPosteriores !== undefined) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
+    if (dto.diasMinimosReintegro !== undefined) dataUpdate.diasMinimosReintegro = dto.diasMinimosReintegro;
 
     const hasData = Object.keys(dataUpdate).length > 0;
     const hasServicios = dto.serviciosIncluidos !== undefined;

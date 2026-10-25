@@ -86,6 +86,7 @@ export const manejadoresPaquetes = [
                 cuerpo.tipoHabitacionGarantizada ?? null,
             nochesPrevias: cuerpo.nochesPrevias ?? 0,
             nochesPosteriores: cuerpo.nochesPosteriores ?? 0,
+            diasMinimosReintegro: cuerpo.diasMinimosReintegro ?? null,
             diasDisponibles: cuerpo.diasDisponibles ?? null,
             tieneSalidasActivas: false,
             circuito,
@@ -141,6 +142,10 @@ export const manejadoresPaquetes = [
                 cuerpo.nochesPosteriores !== undefined
                     ? cuerpo.nochesPosteriores
                     : actual.nochesPosteriores,
+            diasMinimosReintegro:
+                cuerpo.diasMinimosReintegro !== undefined
+                    ? cuerpo.diasMinimosReintegro
+                    : actual.diasMinimosReintegro,
             diasDisponibles:
                 cuerpo.diasDisponibles !== undefined
                     ? cuerpo.diasDisponibles.trim() || null

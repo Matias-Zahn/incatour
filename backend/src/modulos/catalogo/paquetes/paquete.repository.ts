@@ -71,6 +71,7 @@ export class PaqueteRepository {
       nochesPrevias: number;
       nochesPosteriores: number;
       diasDisponibles?: string | undefined;
+      diasMinimosReintegro?: number | null | undefined;
     },
     matrizPrecios: PrecioTemporada[],
     serviciosIncluidos: number[],
@@ -91,6 +92,7 @@ export class PaqueteRepository {
           nochesPrevias: data.nochesPrevias,
           nochesPosteriores: data.nochesPosteriores,
           diasDisponibles: data.diasDisponibles || null,
+          diasMinimosReintegro: data.diasMinimosReintegro ?? null,
         },
       });
 

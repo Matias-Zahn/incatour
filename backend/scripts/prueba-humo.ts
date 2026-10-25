@@ -376,7 +376,7 @@ async function faseD() {
         (e) => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", false, String(e)),
       );
       const compra = await Promise.allSettled([repoReserva.confirmarReserva({
-        idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100,
+        idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100, temporadaAplicada: "Humo", precioPaquetePorPersona: 100, adicionalesEquipaje: 0, moneda: "USD", diasMinimosReintegro: null,
         condicionesComerciales: "humo", medioPago: "TARJETA", estadoAlojamiento: "CONFIRMADO",
         pasajeros: [{ nombreCompleto: "Humo D", nroPasaporte: `DPAS-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2035-01-01" }],
       })]);
