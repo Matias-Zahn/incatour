@@ -67,7 +67,8 @@ export class ReemplazoService {
       throw CustomError.badRequest(`El pasaporte de ${reemplazante.nombreCompleto} vence antes del fin del recorrido`);
     }
 
-    // Pasos 16 a 19: si el original tenía permiso, se da de baja y se emite uno nuevo sobre el mismo lugar
+    // Pasos 16 a 19: si el original tenía permiso, se da de baja y se emite uno nuevo sobre el mismo lugar.
+    // Si estaba Rechazado (RF-47) no hay nada que dar de baja: el reemplazante pide su permiso en el lugar que quedó reservado
     // El más reciente: si la persona ya salió y volvió a esta salida, tiene permisos viejos dados de baja
     const anterior = salida.permisos.findLast(
       (p) => p.idpersonal === original.idpersonal && p.estadoTramite !== ESTADO_PERMISO.PERDIDO
@@ -78,29 +79,35 @@ export class ReemplazoService {
     if (anterior) {
       if (anterior.estadoTramite === ESTADO_PERMISO.EMITIDO) {
         try {
-          await autoridad.darDeBajaPermiso(salida.idbloqueo!, anterior.nroPermiso);
+          await autoridad.darDeBajaPermiso(salida.idbloqueo!, anterior.nroPermiso!);
         } catch {
           throw CustomError.serviceUnavailable("No fue posible dar de baja el permiso ante la autoridad. Reintentá más tarde");
         }
         // Queda registrado ya, por si la emisión del nuevo falla: el reintento salta la baja
         await this.repository.marcarPermisoDadoDeBaja(anterior.idpermisopersonal);
       }
+      const titular = {
+        tipo: "PERSONAL" as const,
+        id: reemplazante.idpersonal,
+        nombreCompleto: reemplazante.nombreCompleto,
+        nacionalidad: reemplazante.nacionalidad,
+        nroPasaporte: reemplazante.nroPasaporte,
+        fechaVencimientoPasaporte: reemplazante.fechaVencimientoPasaporte,
+      };
       try {
-        permisoNuevo = await autoridad.solicitarPermisoIndividual(
-          salida.idbloqueo!,
-          {
-            tipo: "PERSONAL",
-            id: reemplazante.idpersonal,
-            nombreCompleto: reemplazante.nombreCompleto,
-            nacionalidad: reemplazante.nacionalidad,
-            nroPasaporte: reemplazante.nroPasaporte,
-            fechaVencimientoPasaporte: reemplazante.fechaVencimientoPasaporte,
-          },
-          anterior.nroPermiso
-        );
-      } catch {
+        if (anterior.nroPermiso) {
+          permisoNuevo = await autoridad.solicitarPermisoIndividual(salida.idbloqueo!, titular, anterior.nroPermiso);
+        } else {
+          const { emitidos, rechazados } = await autoridad.solicitarEmisionNominal(salida.idbloqueo!, [titular]);
+          if (rechazados.length) throw CustomError.badRequest(`La autoridad rechazó el permiso de ${reemplazante.nombreCompleto} (${rechazados[0]?.motivo})`);
+          permisoNuevo = emitidos[0];
+        }
+      } catch (error) {
+        if (error instanceof CustomError) throw error;
         throw CustomError.serviceUnavailable(
-          `El permiso de ${original.nombreCompleto} ya se dio de baja, pero no se pudo emitir el del reemplazante. Reintentá el reemplazo`
+          anterior.nroPermiso
+            ? `El permiso de ${original.nombreCompleto} ya se dio de baja, pero no se pudo emitir el del reemplazante. Reintentá el reemplazo`
+            : "No fue posible emitir el permiso del reemplazante ante la autoridad. Reintentá más tarde"
         );
       }
     }

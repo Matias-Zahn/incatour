@@ -211,7 +211,7 @@ model PermisoPasajero {
   idpermisopasajero Int      @id @default(autoincrement())
   idreserva         Int
   idpasajero        Int
-  nroPermiso        String   @unique
+  nroPermiso        String?  @unique
   fechaEmision      DateTime
   estadoTramite     String
 
@@ -225,7 +225,7 @@ model PermisoPersonal {
   idpermisopersonal Int      @id @default(autoincrement())
   idsalida          Int
   idpersonal        Int
-  nroPermiso        String   @unique
+  nroPermiso        String?  @unique
   fechaEmision      DateTime
   estadoTramite     String
 
