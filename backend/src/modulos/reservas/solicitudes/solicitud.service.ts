@@ -27,6 +27,25 @@ export class SolicitudService {
     // CAT-05: los criterios son los de la definición de la salida
     const paquete = definicionEfectiva(solicitud.reserva.salida);
     
+    // Regla de negocio: excluir los que ya rechazaron (mirando la tabla de gestiones)
+    const rechazadosIds = solicitud.reserva.solicitudes
+      .flatMap(s => s.gestiones)
+      .filter(g => g.resultado === "Rechazada")
+      .map(g => g.idservicio);
+
+    // RES-04: garantía por establecimiento (sin localidad/categoría): la única opción es ese hotel
+    const est = paquete.establecimiento;
+    if (est) {
+      const hotel = rechazadosIds.includes(est.idservicio) ? null : await this.repository.buscarServicio(est.idservicio);
+      return {
+        solicitudId: solicitud.idsolicitud,
+        reserva: solicitud.reserva.nroReserva,
+        cliente: solicitud.reserva.cliente.nroCliente,
+        criteriosGarantizados: { localidad: est.localidad, categoria: est.categoria, tipoHabitacion: paquete.tipoHabitacionGarantizada },
+        opcionesContacto: hotel ? [this.opcionContacto(hotel)] : []
+      };
+    }
+
     // Obtenemos los criterios garantizados del paquete
     const categoria = paquete.categoriaGarantizada;
     const localidad = paquete.localidadGarantizada;
@@ -35,12 +54,6 @@ export class SolicitudService {
     if (!categoria || !localidad || !tipoHabitacion) {
       throw CustomError.badRequest("El paquete no garantiza categoría/localidad. No se requiere buscar opciones genéricas.");
     }
-
-    // Regla de negocio: excluir los que ya rechazaron (mirando la tabla de gestiones)
-    const rechazadosIds = solicitud.reserva.solicitudes
-      .flatMap(s => s.gestiones)
-      .filter(g => g.resultado === "Rechazada")
-      .map(g => g.idservicio);
 
     // Búsqueda en repositorio
     const serviciosCompatibles = await this.repository.buscarServiciosCompatiblesExcluyendoRechazados(
@@ -60,12 +73,16 @@ export class SolicitudService {
       reserva: solicitud.reserva.nroReserva,
       cliente: solicitud.reserva.cliente.nroCliente,
       criteriosGarantizados: { localidad, categoria, tipoHabitacion },
-      opcionesContacto: serviciosCompatibles.map(s => ({
-        servicioId: s.idservicio,
-        hotel: s.nombreServicio,
-        proveedor: s.proveedor.razonSocial,
-        canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema"
-      }))
+      opcionesContacto: serviciosCompatibles.map(s => this.opcionContacto(s))
+    };
+  }
+
+  private opcionContacto(s: { idservicio: number; nombreServicio: string; proveedor: { razonSocial: string; canalComunicacion: string | null; datosContacto: string | null } }) {
+    return {
+      servicioId: s.idservicio,
+      hotel: s.nombreServicio,
+      proveedor: s.proveedor.razonSocial,
+      canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema"
     };
   }
 
@@ -87,11 +104,13 @@ export class SolicitudService {
     }
 
     const paquete = definicionEfectiva(solicitud.reserva.salida);
-    if (
-      servicio.localidad !== paquete.localidadGarantizada ||
-      servicio.alojamiento.categoria !== paquete.categoriaGarantizada ||
-      servicio.alojamiento.tipoHabitacion !== paquete.tipoHabitacionGarantizada
-    ) {
+    // Garantía por establecimiento: tiene que ser ese hotel; por categoría/localidad, se comparan los criterios
+    const cumple = paquete.establecimiento
+      ? servicio.idservicio === paquete.establecimiento.idservicio
+      : servicio.localidad === paquete.localidadGarantizada &&
+        servicio.alojamiento.categoria === paquete.categoriaGarantizada &&
+        servicio.alojamiento.tipoHabitacion === paquete.tipoHabitacionGarantizada;
+    if (!cumple) {
       throw CustomError.badRequest(
         "El servicio no cumple con los criterios de localidad, categoría o tipo de habitación garantizados."
       );
