@@ -371,6 +371,7 @@ export const manejadoresSalidas = [
             fechaInicio: fechaInicioDate.toISOString(),
             fechaFin: fechaFinDate.toISOString(),
             estado: "PUBLICADA",
+            lugaresPorLiberar: 0,
             ultimaEtapaAlcanzada: null,
             paquete: {
                 nroPaquete: paquete.nroPaquete,
@@ -420,5 +421,28 @@ export const manejadoresSalidas = [
             },
             { status: 201 },
         );
+    }),
+
+    // POST /api/salidas/:idsalida/asignacion/liberar-sobrantes (CU-40 paso 12)
+    http.post("*/api/salidas/:idsalida/asignacion/liberar-sobrantes", async ({ params }) => {
+        await delay(200);
+        const idsalida = Number(params.idsalida);
+        const salida = salidas.find((s) => s.idsalida === idsalida);
+        if (!salida) {
+            return HttpResponse.json({ error: "La salida no existe" }, { status: 404 });
+        }
+        if (salida.estado !== "CERRADA" || !salida.idbloqueo) {
+            return HttpResponse.json(
+                { error: "La salida no tiene lugares sobrantes por liberar" },
+                { status: 400 },
+            );
+        }
+        const n = salida.lugaresPorLiberar ?? 0;
+        salida.lugaresPorLiberar = 0;
+        return HttpResponse.json({
+            data: {
+                lugaresLiberados: n,
+            },
+        });
     }),
 ];

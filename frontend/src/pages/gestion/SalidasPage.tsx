@@ -78,6 +78,11 @@ function SalidasPage() {
         useState<PayloadConfirmarAsignacion | null>(null);
     const [errorConfirmacion, setErrorConfirmacion] = useState("");
     const [errorLiberacionSobrantes, setErrorLiberacionSobrantes] = useState("");
+    const [mensajeExitoLiberacion, setMensajeExitoLiberacion] = useState<{
+        nroSalida: string;
+        lugaresLiberados: number;
+    } | null>(null);
+    const [idSalidaLiberando, setIdSalidaLiberando] = useState<number | null>(null);
     const [mensajeSalidaYaAsignada, setMensajeSalidaYaAsignada] = useState<string | null>(null);
     const [resultadoAsignacion, setResultadoAsignacion] = useState<{
         idsalida: number;
@@ -107,6 +112,7 @@ function SalidasPage() {
         setMensajeExito(null);
         setErrorConfirmacion("");
         setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
@@ -126,6 +132,7 @@ function SalidasPage() {
         setMensajeExito(null);
         setErrorConfirmacion("");
         setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
@@ -221,22 +228,32 @@ function SalidasPage() {
         );
     }
 
-    function manejarReintentarLiberacion(idsalida: number) {
+    function manejarReintentarLiberacion(idsalida: number, nroSalida?: string) {
         setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
+        setIdSalidaLiberando(idsalida);
+
         liberarSobrantesMutation.mutate(idsalida, {
             onSuccess: (resultado) => {
+                setIdSalidaLiberando(null);
                 setResultadoAsignacion((prev) =>
-                    prev
+                    prev && prev.idsalida === idsalida
                         ? {
                               ...prev,
                               lugaresLiberados: resultado.lugaresLiberados,
                               advertencia: undefined,
                           }
-                        : null,
+                        : prev,
                 );
                 setErrorLiberacionSobrantes("");
+                const numero = nroSalida ?? resultadoAsignacion?.nroSalida ?? `ID ${idsalida}`;
+                setMensajeExitoLiberacion({
+                    nroSalida: numero,
+                    lugaresLiberados: resultado.lugaresLiberados,
+                });
             },
             onError: (err: Error) => {
+                setIdSalidaLiberando(null);
                 setErrorLiberacionSobrantes(
                     err.message ||
                         "No fue posible liberar los lugares sobrantes ante la autoridad. Reintentá más tarde.",
@@ -577,7 +594,8 @@ function SalidasPage() {
             renderizar: (fila: Salida) => {
                 const tieneAlertas =
                     Array.isArray(fila.alertas) && fila.alertas.length > 0;
-                if (!tieneAlertas) {
+                const tieneSobrantes = (fila.lugaresPorLiberar ?? 0) > 0;
+                if (!tieneAlertas && !tieneSobrantes) {
                     return (
                         <span className="text-xs text-texto-suave whitespace-nowrap">
                             Sin avisos
@@ -589,7 +607,21 @@ function SalidasPage() {
 
                 return (
                     <div className="whitespace-nowrap flex flex-col gap-1 items-start">
-                        {fila.alertas.includes("SOLICITUD_PENDIENTE") && (
+                        {tieneSobrantes && (
+                            <span
+                                title={`Hay ${fila.lugaresPorLiberar} lugares sobrantes del bloqueo pendientes de liberación ante la autoridad`}
+                                className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-900"
+                            >
+                                <span aria-hidden="true">⚠️</span>
+                                <span>
+                                    {fila.lugaresPorLiberar}{" "}
+                                    {fila.lugaresPorLiberar === 1
+                                        ? "sobrante por liberar"
+                                        : "sobrantes por liberar"}
+                                </span>
+                            </span>
+                        )}
+                        {fila.alertas?.includes("SOLICITUD_PENDIENTE") && (
                             <Link
                                 to="/gestion/solicitudes"
                                 title="Solicitudes de alojamiento pendientes en salida próxima (< 7 días)"
@@ -603,7 +635,7 @@ function SalidasPage() {
                                 </span>
                             </Link>
                         )}
-                        {fila.alertas.includes("PERMISOS_SIN_CONFIRMAR") && (
+                        {fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR") && (
                             <span
                                 title="Permisos sin confirmar en salida próxima (< 7 días)"
                                 className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-xs font-semibold text-rose-900"
@@ -653,9 +685,16 @@ function SalidasPage() {
                     sinPersonal &&
                     !tieneAdvertenciaPendiente;
 
-                if (!tieneSolicitudes && !esFinalizada && !puedeAsignar) {
+                const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
+                const puedeLiberarSobrantes =
+                    esAdmin && fila.estado === "CERRADA" && tieneSobrantesPendientes;
+
+                if (!tieneSolicitudes && !esFinalizada && !puedeAsignar && !puedeLiberarSobrantes) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
+
+                const estaLiberandoEstaSalida =
+                    liberarSobrantesMutation.isPending && idSalidaLiberando === fila.idsalida;
 
                 return (
                     <div className="min-w-[110px] whitespace-nowrap flex flex-col gap-1 items-start text-xs font-semibold">
@@ -670,6 +709,21 @@ function SalidasPage() {
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Asignar recursos
+                            </button>
+                        )}
+                        {puedeLiberarSobrantes && (
+                            <button
+                                type="button"
+                                disabled={
+                                    confirmarAsignacionMutation.isPending ||
+                                    liberarSobrantesMutation.isPending
+                                }
+                                onClick={() =>
+                                    manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
+                                }
+                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
                             </button>
                         )}
                         {tieneSolicitudes && (
@@ -743,6 +797,49 @@ function SalidasPage() {
                             variante="secundario"
                             className="px-2.5 py-1 text-xs"
                             onClick={() => setMensajeExito(null)}
+                        >
+                            Cerrar aviso
+                        </Boton>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {mensajeExitoLiberacion ? (
+                <Alerta tipo="exito" titulo="Lugares sobrantes liberados exitosamente">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>
+                            Se liberaron ante la autoridad{" "}
+                            <span className="font-bold">
+                                {mensajeExitoLiberacion.lugaresLiberados}{" "}
+                                {mensajeExitoLiberacion.lugaresLiberados === 1
+                                    ? "lugar sobrante"
+                                    : "lugares sobrantes"}
+                            </span>{" "}
+                            del bloqueo de la salida{" "}
+                            <span className="font-bold text-navegacion">
+                                {mensajeExitoLiberacion.nroSalida}
+                            </span>
+                            .
+                        </p>
+                        <Boton
+                            variante="secundario"
+                            className="px-2.5 py-1 text-xs"
+                            onClick={() => setMensajeExitoLiberacion(null)}
+                        >
+                            Cerrar aviso
+                        </Boton>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {errorLiberacionSobrantes && !resultadoAsignacion?.advertencia ? (
+                <Alerta tipo="error" titulo="Error al liberar lugares sobrantes">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>{errorLiberacionSobrantes}</p>
+                        <Boton
+                            variante="secundario"
+                            className="px-2.5 py-1 text-xs"
+                            onClick={() => setErrorLiberacionSobrantes("")}
                         >
                             Cerrar aviso
                         </Boton>
@@ -933,7 +1030,10 @@ function SalidasPage() {
                                         cargando={liberarSobrantesMutation.isPending}
                                         disabled={liberarSobrantesMutation.isPending}
                                         onClick={() =>
-                                            manejarReintentarLiberacion(resultadoAsignacion.idsalida)
+                                            manejarReintentarLiberacion(
+                                                resultadoAsignacion.idsalida,
+                                                resultadoAsignacion.nroSalida,
+                                            )
                                         }
                                     >
                                         Reintentar liberación de sobrantes
