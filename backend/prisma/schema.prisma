@@ -49,16 +49,21 @@ model Cliente {
 // ==========================================
 
 model Reserva {
-  idreserva              Int      @id @default(autoincrement())
-  idcliente              Int
-  idsalida               Int
-  nroReserva             String   @unique
-  fechaRealizacion       DateTime @default(now())
-  cantidadPasajeros      Int
-  precioCongelado        Float
-  condicionesComerciales String?
-  estado                 String
-  estadoAlojamiento      String?
+  idreserva               Int      @id @default(autoincrement())
+  idcliente               Int
+  idsalida                Int
+  nroReserva              String   @unique
+  fechaRealizacion        DateTime @default(now())
+  cantidadPasajeros       Int
+  precioCongelado         Float
+  condicionesComerciales  String?
+  estado                  String
+  estadoAlojamiento       String?
+  // RES-07: desglose congelado al comprar (CU-30); null en reservas anteriores
+  temporadaAplicada       String?
+  precioPaquetePorPersona Float?
+  adicionalesEquipaje     Float?
+  moneda                  String?
 
   cliente     Cliente           @relation(fields: [idcliente], references: [idcliente])
   salida      Salida            @relation(fields: [idsalida], references: [idsalida])

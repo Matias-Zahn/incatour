@@ -38,8 +38,8 @@ const crearDto = (over: Record<string, unknown> = {}) =>
     ...over,
   })[1]!;
 
-const temporada = (fechaInicio: string, fechaFin: string, estado = "ACTIVO") => ({
-  estado, fechaInicio: new Date(fechaInicio), fechaFin: new Date(fechaFin),
+const temporada = (fechaInicio: string, fechaFin: string, estado = "ACTIVO", nombre = "Alta") => ({
+  nombre, estado, fechaInicio: new Date(fechaInicio), fechaFin: new Date(fechaFin),
 });
 
 const salida = (over: Record<string, unknown> = {}) => ({
@@ -104,6 +104,17 @@ describe("ReservaService.crearReserva (CU-30)", () => {
 
       expect(repo.obtenerClientePorUsuario).toHaveBeenCalledWith(42);
       expect(repo.confirmarReserva).toHaveBeenCalledWith(expect.objectContaining({ idcliente: 3, condicionesComerciales: "Sin reembolso a menos de 30 días" }));
+    });
+
+    it("congela el desglose del precio en la reserva (RES-07)", async () => {
+      const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
+      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ servicios: [servicioTransporte(15, 10)] }));
+
+      await new ReservaService().crearReserva(dto, 1);
+
+      expect(repo.confirmarReserva).toHaveBeenCalledWith(expect.objectContaining({
+        precioCongelado: 1650, temporadaAplicada: "Alta", precioPaquetePorPersona: 800, adicionalesEquipaje: 50, moneda: "USD",
+      }));
     });
 
     it("suma el exceso de equipaje según el transporte de la salida", async () => {

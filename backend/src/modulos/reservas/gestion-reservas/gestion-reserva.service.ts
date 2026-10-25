@@ -200,9 +200,23 @@ export class GestionReservaService {
   }
 
   private calcularDesglose(r: ReservaDetalle) {
+    // RES-07: las reservas nuevas traen el desglose congelado al comprar
+    if (r.precioPaquetePorPersona != null && r.adicionalesEquipaje != null) {
+      return {
+        temporadaAplicada: r.temporadaAplicada,
+        temporada: r.temporadaAplicada ? { nombre: r.temporadaAplicada } : null,
+        precioUnitario: r.precioPaquetePorPersona,
+        precioPaquete: redondear2(r.precioPaquetePorPersona * r.cantidadPasajeros),
+        adicionales: r.adicionalesEquipaje,
+        adicionalesEquipaje: r.adicionalesEquipaje,
+      };
+    }
+
+    // Reservas anteriores: se reconstruye con las tarifas vivas (solo temporadas activas)
     const tarifas = (r.salida.paquete as any)?.tarifas ?? [];
     const fechaSalida = new Date(r.salida.fechaInicio);
     const tarifaAplicada = tarifas.find((t: any) => {
+      if (t.temporada.estado !== "ACTIVO") return false;
       const inicio = new Date(t.temporada.fechaInicio);
       const fin = new Date(t.temporada.fechaFin);
       return fechaSalida >= inicio && fechaSalida <= fin;

@@ -110,6 +110,10 @@ export class ReservaService {
         idsalida: dto.idsalida,
         nroReserva,
         precioCongelado: precio.total,
+        temporadaAplicada: precio.temporadaAplicada,
+        precioPaquetePorPersona: precio.precioPaquetePorPersona,
+        adicionalesEquipaje: precio.adicionalesEquipaje,
+        moneda: precio.moneda,
         condicionesComerciales: salida.paquete.condiciones ?? "",
         medioPago: dto.medioPago,
         pasajeros: dto.pasajeros,
@@ -183,9 +187,13 @@ export class ReservaService {
       }
     }
 
+    // RES-07: se devuelve el desglose para congelarlo en la reserva
     return {
       total: redondear2(tarifa.monto * dto.pasajeros.length + extra),
       moneda: tarifa.moneda,
+      temporadaAplicada: tarifa.temporada.nombre,
+      precioPaquetePorPersona: tarifa.monto,
+      adicionalesEquipaje: redondear2(extra),
     };
   }
 

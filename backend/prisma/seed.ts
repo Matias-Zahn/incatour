@@ -353,7 +353,12 @@ async function main() {
       idsalida: salida.idsalida,
       nroReserva: "RES-0001",
       cantidadPasajeros: 1,
-      precioCongelado: 1500.0,
+      precioCongelado: 650.0,
+      // RES-07: desglose congelado (tarifa de Alta 2026, sin equipaje excedente)
+      temporadaAplicada: "Alta 2026",
+      precioPaquetePorPersona: 650,
+      adicionalesEquipaje: 0,
+      moneda: "USD",
       estado: "CONFIRMADA",
       pasajeros: {
         create: [{ idpasajero: pasajero.idpasajero }],
@@ -388,13 +393,17 @@ async function main() {
       idsalida: salida.idsalida,
       nroReserva: "RES-0002-CANC",
       cantidadPasajeros: 1,
-      precioCongelado: 1500.0,
+      precioCongelado: 650.0,
+      temporadaAplicada: "Alta 2026",
+      precioPaquetePorPersona: 650,
+      adicionalesEquipaje: 0,
+      moneda: "USD",
       estado: "CANCELADA",
       reembolsos: {
         create: [
           {
             idusuario: usuarioAdmin.idusuario,
-            montoReembolsado: 1500.0,
+            montoReembolsado: 650.0,
             motivo: "Cancelación temprana sin permisos emitidos",
           },
         ],
