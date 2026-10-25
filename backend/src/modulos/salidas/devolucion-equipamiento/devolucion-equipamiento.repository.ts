@@ -1,4 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
+import { CustomError } from "../../../error/CustomError";
 import { ItemDevolucion } from "./devolucion-equipamiento.dto";
 
 export interface DatosRegistroDevolucion {
@@ -48,7 +49,11 @@ export class DevolucionEquipamientoRepository {
    */
   async registrarDevolucion(datos: DatosRegistroDevolucion) {
     return db.$transaction(async (tx) => {
-      // SAL-03: Verificación atómica contra doble devolución dentro de la transacción
+      // SAL-03: lock de la salida para serializar devoluciones concurrentes; sin él, dos
+      // transacciones pasan el chequeo siguiente a la vez y reintegran el stock dos veces
+      await tx.$queryRaw`SELECT 1 FROM public."Salida" WHERE idsalida = ${datos.idsalida} FOR UPDATE`;
+
+      // Verificación contra doble devolución (ya con el lock tomado)
       const yaExiste = await tx.registroAuditoria.findFirst({
         where: {
           idsalida: datos.idsalida,
@@ -56,7 +61,7 @@ export class DevolucionEquipamientoRepository {
         },
       });
       if (yaExiste) {
-        throw new Error("La devolución de equipamiento para esta salida ya fue registrada.");
+        throw CustomError.badRequest("La devolución de equipamiento para esta salida ya fue registrada.");
       }
 
       const resultadosStock = [];
