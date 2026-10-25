@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_RESERVA } from "../../../shared/constantes";
+import { finDelDiaUTC } from "../../../shared/fechas";
 import { FiltrosReseniaDto, PublicarReseniaDto } from "./resenia.dto";
 
 export class ReseniaRepository {
@@ -95,7 +96,7 @@ export class ReseniaRepository {
         valoracion: { ...(f.valoracionMin && { gte: f.valoracionMin }), ...(f.valoracionMax && { lte: f.valoracionMax }) },
       }),
       ...((f.fechaDesde || f.fechaHasta) && {
-        fechaEnvio: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: (() => { const h = new Date(f.fechaHasta); if (h.getUTCHours() === 0 && h.getUTCMinutes() === 0 && h.getUTCSeconds() === 0 && h.getUTCMilliseconds() === 0) { h.setUTCHours(23, 59, 59, 999); } return h; })() }) },
+        fechaEnvio: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: finDelDiaUTC(f.fechaHasta) }) },
       }),
     };
   }

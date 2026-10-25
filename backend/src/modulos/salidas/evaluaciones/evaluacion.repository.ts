@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
+import { finDelDiaUTC } from "../../../shared/fechas";
 
 // Filtros que comparte con la consulta de reseñas (CU-43)
 export interface FiltrosEvaluacion {
@@ -44,7 +45,7 @@ export class EvaluacionRepository {
         puntaje: { ...(f.puntajeMin && { gte: f.puntajeMin }), ...(f.puntajeMax && { lte: f.puntajeMax }) },
       }),
       ...((f.fechaDesde || f.fechaHasta) && {
-        fechaEvaluacion: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: f.fechaHasta }) },
+        fechaEvaluacion: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: finDelDiaUTC(f.fechaHasta) }) },
       }),
     } satisfies Prisma.EvaluacionPersonalWhereInput & Prisma.EvaluacionProveedorWhereInput;
 
