@@ -97,7 +97,7 @@ export class GestionReservaService {
       permisosEmitidos: ev.permisosEmitidos,
       lugaresVuelvenALaVenta: !ev.permisosEmitidos,
       advertencia: ev.permisosEmitidos
-        ? "Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $0 y los lugares no vuelven a la venta."
+        ? `Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $${ev.montoAReintegrar} y los lugares no vuelven a la venta.`
         : null,
     };
   }
