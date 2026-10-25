@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { CircuitoService } from "./circuito.service";
-import { CrearCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
+import { CrearCircuitoDto, FiltrosCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 import { CustomError } from "../../../error/CustomError";
 
 const circuitoService = new CircuitoService();
@@ -10,11 +10,12 @@ export class CircuitoController {
   // CU-01: GET /api/circuitos
   consultarCircuitos = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { duracionDias, dificultad, estado } = req.query;
+      const [error, filtros] = FiltrosCircuitoDto.create(req.query);
+      if (error) throw CustomError.badRequest(error);
       const circuitos = await circuitoService.consultarCircuitos({
-        duracionDias: duracionDias as string | undefined,
-        dificultad: dificultad as string | undefined,
-        estado: estado as string | undefined,
+        duracionDias: filtros!.duracionDias,
+        dificultad: filtros!.dificultad as string | undefined,
+        estado: filtros!.estado as string | undefined,
       });
       return res.json({ data: circuitos });
     } catch (error) {

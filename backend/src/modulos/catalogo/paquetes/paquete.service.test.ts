@@ -130,6 +130,10 @@ describe("PaqueteService", () => {
   });
 
   describe("modificarPaquete (CU-12)", () => {
+    const paqueteCategoria = {
+      estado: "ACTIVO", tipoGarantia: "POR_CATEGORIA",
+      localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", tipoHabitacionGarantizada: "Doble",
+    };
     const modificar = (obj: Record<string, unknown>) => ModificarPaqueteDto.create(obj)[1]!;
 
     it("actualiza solo los campos enviados", async () => {
@@ -164,6 +168,30 @@ describe("PaqueteService", () => {
         40,
         "POR_ESTABLECIMIENTO"
       );
+    });
+
+    it("CAT-08: rechaza idservicioGarantizado en un paquete que queda por categoría", async () => {
+      repo.findById.mockResolvedValue({ ...paqueteCategoria, idpaquete: 10 });
+
+      await expect(new PaqueteService().modificarPaquete(10, modificar({ idservicioGarantizado: 40 }))).rejects.toMatchObject({ statusCode: 400 });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("CAT-14: pasar a POR_CATEGORIA sin criterios (ni enviados ni previos) es 400", async () => {
+      repo.findById.mockResolvedValue({ idpaquete: 10, estado: "ACTIVO", tipoGarantia: "POR_ESTABLECIMIENTO", garantiasEstablecimiento: [{ idservicio: 40 }] });
+
+      await expect(new PaqueteService().modificarPaquete(10, modificar({ tipoGarantia: "POR_CATEGORIA" }))).rejects.toThrow("localidadGarantizada");
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("CAT-14: pasar a POR_CATEGORIA con criterios completos actualiza (el repo borra la garantía)", async () => {
+      repo.findById.mockResolvedValue({ idpaquete: 10, estado: "ACTIVO", tipoGarantia: "POR_ESTABLECIMIENTO", garantiasEstablecimiento: [{ idservicio: 40 }] });
+
+      await new PaqueteService().modificarPaquete(10, modificar({
+        tipoGarantia: "POR_CATEGORIA", localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", tipoHabitacionGarantizada: "Doble",
+      }));
+
+      expect(repo.update).toHaveBeenCalledWith(10, expect.objectContaining({ tipoGarantia: "POR_CATEGORIA" }), undefined, undefined, "POR_CATEGORIA");
     });
 
     it("con matriz nueva valida las temporadas y reemplaza las tarifas", async () => {

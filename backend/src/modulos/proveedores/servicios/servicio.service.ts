@@ -172,6 +172,12 @@ export class ServicioService {
       throw CustomError.badRequest("Error. El servicio es el establecimiento garantizado por un paquete activo");
     }
 
+    // CAT-09: no se da de baja un servicio incluido en paquetes activos
+    const paquetesActivos = await this.repository.contarPaquetesActivosQueLoIncluyen(id);
+    if (paquetesActivos > 0) {
+      throw CustomError.badRequest(`Error. El servicio está incluido en ${paquetesActivos} paquete(s) activo(s).`);
+    }
+
     const baja = await this.repository.updateEstado(id, ESTADO.INACTIVO);
     return this.formatear(baja, 0);
   }
