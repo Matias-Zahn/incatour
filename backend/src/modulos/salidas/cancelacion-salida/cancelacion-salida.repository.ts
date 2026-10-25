@@ -8,6 +8,7 @@ import {
   SALIDAS_NO_INICIADAS,
   redondear2,
 } from "../../../shared/constantes";
+import { plazasADevolverAlHotel } from "./cancelacion-salida.plazas";
 
 export class CancelacionSalidaRepository {
   // Todo lo necesario para validar, mostrar el impacto y decidir
@@ -72,18 +73,6 @@ export class CancelacionSalidaRepository {
           data: { estadoTramite: ESTADO_PERMISO.PERDIDO },
         });
 
-        // SAL-02: Alojamiento: se reponen las plazas bloqueadas al hotel (RF-51)
-        const servicioHotel = await tx.salidaServicio.findFirst({
-          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
-          select: { idservicio: true, salida: { select: { tamanoMaximo: true } } },
-        });
-        if (servicioHotel) {
-          await tx.servicioAlojamiento.update({
-            where: { idservicio: servicioHotel.idservicio },
-            data: { capacidadDisponible: { increment: servicioHotel.salida.tamanoMaximo } },
-          });
-        }
-
         // Equipamiento: se reintegra al stock interno del proveedor
         const equipos = await tx.salidaEquipamiento.findMany({ where: { idsalida: p.idsalida } });
         for (const e of equipos) {
@@ -100,6 +89,8 @@ export class CancelacionSalidaRepository {
             idreserva: true,
             nroReserva: true,
             cantidadPasajeros: true,
+            estadoAlojamiento: true,
+            solicitudes: { select: { estado: true } },
             pagos: { select: { monto: true } },
             cliente: { select: { usuario: { select: { email: true } } } },
           },
@@ -111,6 +102,19 @@ export class CancelacionSalidaRepository {
           email: r.cliente.usuario.email,
           montoReembolsado: redondear2(r.pagos.reduce((acc, pago) => acc + pago.monto, 0)),
         }));
+
+        // SAL-02: Alojamiento: se reponen al hotel las plazas aún bloqueadas y las de las reservas que salieron del bloqueo (RF-51)
+        // Se calcula acá, con las reservas todavía Confirmadas y antes de cancelar las solicitudes
+        const servicioHotel = await tx.salidaServicio.findFirst({
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          select: { idservicio: true, salida: { select: { stockLocalAlojamiento: true } } },
+        });
+        if (servicioHotel) {
+          await tx.servicioAlojamiento.update({
+            where: { idservicio: servicioHotel.idservicio },
+            data: { capacidadDisponible: { increment: plazasADevolverAlHotel(servicioHotel.salida.stockLocalAlojamiento, reservas) } },
+          });
+        }
 
         // Se dan de baja las solicitudes de alojamiento pendientes
         await tx.solicitud.updateMany({
