@@ -97,7 +97,7 @@ Muchas pantallas no son un solo endpoint: primero se consulta, y después se con
 | 39 | Modificar logística | `GET /api/salidas/{id}/logistica`, y después `GET …/logistica/disponibles` | `PUT /api/salidas/{id}/logistica` |
 | 41 | Devolución de equipamiento | `GET /api/salidas/{id}/equipamiento-asignado` | `POST /api/salidas/{id}/devolucion-equipamiento` |
 | 42 | Evaluar personal y proveedores | `GET /api/salidas/{id}/evaluaciones` | `POST /api/salidas/{id}/evaluaciones` con `tipo` (`PERSONAL` o `PROVEEDOR`), `id` y `puntaje` (1 a 5) |
-| 32 | Cancelar reserva (cliente) | `GET /api/reservas/{id}/cancelacion`: liquidación | `POST /api/reservas/{id}/cancelar` |
+| 32 | Cancelar reserva (cliente) | `GET /api/reservas/{id}/cancelacion`: liquidación con `montoAReintegrar` y `condicionAplicada` (el admin siempre reintegra el 100%; el cliente, $0 si cancela con menos días que `diasMinimosReintegro` del paquete o con permisos emitidos) | `POST /api/reservas/{id}/cancelar` |
 | 34 | Resolver solicitud de alojamiento | `GET /api/solicitudes/{id}/opciones` | `POST /api/solicitudes/{id}/resolver` |
 | 47 | Publicar reseña (cliente) | `GET /api/resenias/historial-reservas` | `POST /api/resenias` |
 | 20 | Modificar servicio | `GET /api/servicios/{id}` | `PUT /api/servicios/{id}` |
@@ -109,6 +109,8 @@ Muchas pantallas no son un solo endpoint: primero se consulta, y después se con
 - termina en `1111`: tarjeta robada;
 - CVV `999`: falla de seguridad;
 - cualquier otra: aprobada.
+
+La reserva guarda lo que vio el cliente al comprar: `precioCongelado`, `temporadaAplicada`, `precioPaquetePorPersona`, `adicionalesEquipaje`, `moneda`, `condicionesComerciales` y `diasMinimosReintegro`. Cada salida guarda la definición del paquete con la que se creó (`definicionPaquete`); modificar el paquete no cambia las salidas ya creadas, y su circuito no se puede cambiar mientras tenga salidas activas.
 
 ---
 
