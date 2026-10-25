@@ -1,6 +1,7 @@
 // Importamos la conexión desde tu Singleton
 import { db } from "../src/config/postgresDatabase";
 import bcrypt from 'bcrypt';
+import { armarDefinicionPaquete } from "../src/shared/definicionPaquete";
 
 async function main() {
   console.log("🌱 Insertando datos semilla de IncaTour...");
@@ -308,9 +309,17 @@ async function main() {
     },
   });
 
-  // 6. Salida Publicada
+  // 6. Salida Publicada, con la foto de la definición del paquete (CAT-05)
+  const paqueteCompleto = await db.paquete.findUniqueOrThrow({
+    where: { idpaquete: paquete.idpaquete },
+    include: {
+      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+      servicios: { include: { servicio: { include: { transporte: true } } } },
+    },
+  });
   const salida = await db.salida.create({
     data: {
+      definicionPaquete: armarDefinicionPaquete(paqueteCompleto),
       idpaquete: paquete.idpaquete,
       nroSalida: "SAL-2026-001",
       idbloqueo: "BLQ-SEED-001",

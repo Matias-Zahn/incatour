@@ -89,6 +89,12 @@ export class PaqueteService {
 
     // Validar circuito si se cambia
     if (dto.idcircuito && dto.idcircuito !== paquete.idcircuito) {
+      // CAT-05: las salidas existentes siguen recorriendo el circuito con el que se vendieron
+      if (await this.repository.tieneSalidasActivas(id)) {
+        throw CustomError.badRequest(
+          "No se puede cambiar el circuito de un paquete que tiene salidas activas."
+        );
+      }
       const circuito = await db.circuito.findUnique({
         where: { idcircuito: dto.idcircuito },
       });

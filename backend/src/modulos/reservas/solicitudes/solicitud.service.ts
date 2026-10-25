@@ -1,4 +1,5 @@
 import { CustomError } from "../../../error/CustomError";
+import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
 import { SolicitudRepository } from "./solicitud.repository";
@@ -23,7 +24,8 @@ export class SolicitudService {
       throw CustomError.badRequest("La solicitud no está PENDIENTE");
     }
 
-    const paquete = solicitud.reserva.salida.paquete;
+    // CAT-05: los criterios son los de la definición de la salida
+    const paquete = definicionEfectiva(solicitud.reserva.salida);
     
     // Obtenemos los criterios garantizados del paquete
     const categoria = paquete.categoriaGarantizada;
@@ -84,7 +86,7 @@ export class SolicitudService {
       throw CustomError.badRequest("El servicio no existe, no está activo o no es un servicio de alojamiento.");
     }
 
-    const paquete = solicitud.reserva.salida.paquete;
+    const paquete = definicionEfectiva(solicitud.reserva.salida);
     if (
       servicio.localidad !== paquete.localidadGarantizada ||
       servicio.alojamiento.categoria !== paquete.categoriaGarantizada ||

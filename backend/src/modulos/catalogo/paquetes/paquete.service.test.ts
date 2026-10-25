@@ -139,6 +139,14 @@ describe("PaqueteService", () => {
       expect(repo.reemplazarTarifas).not.toHaveBeenCalled();
     });
 
+    it("rechaza cambiar el circuito si el paquete tiene salidas activas (CAT-05)", async () => {
+      repo.findById.mockResolvedValue({ idpaquete: 10, idcircuito: 1, estado: "ACTIVO" });
+      repo.tieneSalidasActivas.mockResolvedValue(true);
+
+      await expect(new PaqueteService().modificarPaquete(10, modificar({ idcircuito: 2 }))).rejects.toMatchObject({ statusCode: 400 });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
     it("permite modificar circuito, garantía y servicios incluidos (CAT-14)", async () => {
       db.circuito.findUnique.mockResolvedValue({ idcircuito: 2, estado: "ACTIVO" });
 

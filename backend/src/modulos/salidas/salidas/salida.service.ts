@@ -1,6 +1,7 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { hoyUTC } from "../../../shared/fechas";
+import { armarDefinicionPaquete } from "../../../shared/definicionPaquete";
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
@@ -81,6 +82,7 @@ export class SalidaService {
         tamanoMaximo: dto.tamanoMaximo,
         idbloqueo: bloqueo.idBloqueo,
         idalojamiento: dto.idalojamiento,
+        definicionPaquete: armarDefinicionPaquete(paquete),
       });
       return { salida, dotacion, totalLugares };
     } catch (error) {

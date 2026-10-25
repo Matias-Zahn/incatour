@@ -341,6 +341,7 @@ model Salida {
   fechaFin              DateTime
   estado                String
   ultimaEtapaAlcanzada  Int?
+  definicionPaquete     Json? // CAT-05: foto del paquete al crear la salida (null = salida anterior, rige el paquete vivo)
 
   paquete   Paquete          @relation(fields: [idpaquete], references: [idpaquete])
   servicios SalidaServicio[]
