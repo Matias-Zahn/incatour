@@ -50,7 +50,15 @@ export class ProveedorRepository {
   }
 
   async update(id: number, data: ModificarProveedorDto) {
-    return db.proveedor.update({
+    return db.$transaction(async (tx) => {
+      // CAT-10: pasar a INACTIVO por esta vía da de baja en cascada los servicios, igual que updateEstado
+      if (data.estado === "INACTIVO") {
+        await tx.servicioBase.updateMany({
+          where: { idproveedor: id, estado: "ACTIVO" },
+          data: { estado: "INACTIVO" },
+        });
+      }
+      return tx.proveedor.update({
       where: { idproveedor: id },
       data: {
         ...(data.tipoProveedor !== undefined && { tipoProveedor: data.tipoProveedor }),
@@ -61,6 +69,7 @@ export class ProveedorRepository {
         ...(data.estado !== undefined && { estado: data.estado }),
       },
       include: { _count: { select: { servicios: true } } },
+      });
     });
   }
 
