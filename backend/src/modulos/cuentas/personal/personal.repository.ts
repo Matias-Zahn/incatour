@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { ConsultarPersonalDto, ModificarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
@@ -79,7 +80,7 @@ export class PersonalRepository {
 
   // CU-22: la habilitación es del guía, así que filtrar por vigencia deja solo guías
   async buscar(dto: ConsultarPersonalDto) {
-    const hoy = new Date();
+    const hoy = hoyUTC();
     return db.personal.findMany({
       where: {
         ...(dto.rol && { rol: dto.rol }),

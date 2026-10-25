@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
@@ -132,7 +133,7 @@ export class CancelacionSalidaService {
       throw CustomError.badRequest("La salida ya se encuentra cancelada.");
     }
     // Regla de negocio 1: solo si el recorrido no ha comenzado
-    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest("Una salida solo puede cancelarse si su recorrido no ha comenzado.");
     }
     return salida;

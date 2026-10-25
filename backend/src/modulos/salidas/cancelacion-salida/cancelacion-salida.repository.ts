@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
 import {
   ESTADO_PERMISO,
@@ -58,7 +59,7 @@ export class CancelacionSalidaRepository {
     return db.$transaction(
       async (tx) => {
         const guarda = await tx.salida.updateMany({
-          where: { idsalida: p.idsalida, estado: { in: SALIDAS_NO_INICIADAS }, fechaInicio: { gt: new Date() } },
+          where: { idsalida: p.idsalida, estado: { in: SALIDAS_NO_INICIADAS }, fechaInicio: { gt: hoyUTC() } },
           data: { estado: ESTADO_SALIDA.CANCELADA },
         });
         if (guarda.count === 0) return null;
@@ -175,7 +176,7 @@ export class CancelacionSalidaRepository {
         idsalida: { not: idsalidaExcluida },
         estado: ESTADO_SALIDA.PUBLICADA,
         stockLocal: { gt: 0 },
-        fechaInicio: { gt: new Date() },
+        fechaInicio: { gt: hoyUTC() },
       },
       orderBy: { fechaInicio: "asc" },
       take: 5,

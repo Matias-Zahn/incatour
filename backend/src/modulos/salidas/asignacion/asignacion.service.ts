@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
 import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
@@ -193,7 +194,7 @@ export class AsignacionService {
   private async prepararAsignacion(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest("No se pueden asignar recursos a una salida que ya inició o no está activa");
     }
     if (!salida.idbloqueo) throw CustomError.badRequest("La salida no tiene un bloqueo de cupo ante la autoridad");

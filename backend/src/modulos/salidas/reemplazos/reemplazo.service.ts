@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_PERMISO, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
 import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
@@ -140,7 +141,7 @@ export class ReemplazoService {
   private async salidaNoIniciada(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest("No es posible reemplazar personal en una salida que ya inició o no está activa");
     }
     return salida;

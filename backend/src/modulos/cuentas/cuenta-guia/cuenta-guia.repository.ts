@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { FiltrosCuentaGuiaDto } from "./cuenta-guia.dto";
@@ -24,8 +25,7 @@ const INCLUDE_CUENTA = {
 export class CuentaGuiaRepository {
   // CU-44: solo los guías que ya tienen cuenta (idusuario no nulo)
   async findCuentas(f: FiltrosCuentaGuiaDto) {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = hoyUTC();
 
     return db.guia.findMany({
       where: {
