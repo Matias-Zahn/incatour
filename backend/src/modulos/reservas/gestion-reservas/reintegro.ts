@@ -2,11 +2,11 @@ import { redondear2 } from "../../../shared/constantes";
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
-// Días calendario (UTC) entre dos fechas, sin contar la hora
+// Días calendario entre hoy (día local, como hoyUTC) y una fecha date-only guardada a 00:00Z
 const diasCalendario = (desde: Date, hasta: Date) =>
   Math.round(
     (Date.UTC(hasta.getUTCFullYear(), hasta.getUTCMonth(), hasta.getUTCDate()) -
-      Date.UTC(desde.getUTCFullYear(), desde.getUTCMonth(), desde.getUTCDate())) / MS_DIA
+      Date.UTC(desde.getFullYear(), desde.getMonth(), desde.getDate())) / MS_DIA
   );
 
 /**
