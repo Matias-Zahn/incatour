@@ -62,4 +62,19 @@ describe("CrearPersonalDto", () => {
     expect(error).toBeUndefined();
     expect(dto?.email).toBe("ana@mail.com");
   });
+
+  it("email y contraseña son opcionales pero van juntos (CTA-03)", () => {
+    const { email: _e, contrasenia: _c, ...sinCuenta } = guia("x") as any;
+    const [error, dto] = CrearPersonalDto.create(sinCuenta);
+    expect(error).toBeUndefined();
+    expect(dto?.email).toBeUndefined();
+    expect(dto?.contrasenia).toBeUndefined();
+    expect(CrearPersonalDto.create({ ...sinCuenta, email: "a@b.com" })[0]).toMatch("contraseña es requerida");
+    expect(CrearPersonalDto.create({ ...sinCuenta, contrasenia: "clave1234" })[0]).toMatch("email es requerido");
+  });
+
+  it("la habilitación sigue siendo obligatoria para un guía sin cuenta", () => {
+    const { email: _e, contrasenia: _c, nroHabilitacion: _n, ...datos } = guia("x") as any;
+    expect(CrearPersonalDto.create(datos)[0]).toMatch("habilitación");
+  });
 });

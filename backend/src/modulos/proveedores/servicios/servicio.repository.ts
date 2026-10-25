@@ -158,6 +158,11 @@ export class ServicioRepository {
     return db.garantiaEstablecimiento.count({ where: { idservicio, paquete: { estado: ESTADO.ACTIVO } } });
   }
 
+  // CAT-09: paquetes ACTIVOS que incluyen el servicio entre sus servicios
+  async contarPaquetesActivosQueLoIncluyen(idservicio: number): Promise<number> {
+    return db.paqueteServicio.count({ where: { idservicio, paquete: { estado: ESTADO.ACTIVO } } });
+  }
+
   /** Unidades de equipamiento comprometidas en salidas activas o en curso (CU-20). */
   async cantidadComprometida(idservicio: number): Promise<number> {
     const r = await db.salidaEquipamiento.aggregate({

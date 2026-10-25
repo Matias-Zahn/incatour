@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import crypto from "crypto";
 import { CustomError } from "../../../error/CustomError";
 import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interface";
@@ -32,7 +33,7 @@ export class ReservaService {
     if (salida.estado !== "PUBLICADA") {
       throw CustomError.badRequest("La salida no está disponible para la venta.");
     }
-    if (salida.fechaInicio <= new Date()) {
+    if (salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest("La salida ya comenzó o está por comenzar.");
     }
 

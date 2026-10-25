@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
@@ -96,7 +97,7 @@ export class GestionReservaService {
       permisosEmitidos: ev.permisosEmitidos,
       lugaresVuelvenALaVenta: !ev.permisosEmitidos,
       advertencia: ev.permisosEmitidos
-        ? "Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $0 y los lugares no vuelven a la venta."
+        ? `Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $${ev.montoAReintegrar} y los lugares no vuelven a la venta.`
         : null,
     };
   }
@@ -153,7 +154,7 @@ export class GestionReservaService {
 
     // Paso 2 / flujo alternativo 1: no se cancela una vez iniciado el recorrido
     const salidaIniciada =
-      reserva.salida.fechaInicio <= new Date() || ["EN_CURSO", "FINALIZADA", "CANCELADA"].includes(reserva.salida.estado);
+      reserva.salida.fechaInicio <= hoyUTC() || ["EN_CURSO", "FINALIZADA", "CANCELADA"].includes(reserva.salida.estado);
     if (salidaIniciada) {
       throw CustomError.badRequest("Las salidas en curso o finalizadas no admiten cancelaciones.");
     }

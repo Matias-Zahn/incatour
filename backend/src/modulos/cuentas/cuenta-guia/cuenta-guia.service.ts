@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO } from "../../../shared/constantes";
@@ -87,7 +88,6 @@ export class CuentaGuiaService {
       contraseniaHasheada,
       nroHabilitacion: dto.nroHabilitacion,
       fechaHabilitacion: dto.fechaHabilitacion,
-      estado: dto.estado,
     });
 
     return this.formatear(cuentaModificada as CuentaGuia);
@@ -146,8 +146,7 @@ export class CuentaGuiaService {
   // Se asume que fechaHabilitacion es la fecha de VENCIMIENTO (CU-40 exige habilitación vigente)
   private situacionHabilitacion(fecha: Date | null): "VIGENTE" | "VENCIDA" | "SIN_DATOS" {
     if (!fecha) return "SIN_DATOS";
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = hoyUTC();
     return fecha >= hoy ? "VIGENTE" : "VENCIDA";
   }
 }

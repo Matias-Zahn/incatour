@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { hoyUTC, finDelDiaUTC } from "./fechas";
+import { hoyUTC, finDelDiaLocal, inicioDelDiaLocal } from "./fechas";
 
 afterEach(() => vi.useRealTimers());
 
@@ -13,11 +13,19 @@ describe("hoyUTC (BE-01)", () => {
   });
 });
 
-describe("finDelDiaUTC (BE-05)", () => {
-  it("lleva una fecha date-only a las 23:59:59.999Z", () => {
-    expect(finDelDiaUTC(new Date("2026-10-25"))).toEqual(new Date("2026-10-25T23:59:59.999Z"));
+describe("finDelDiaLocal / inicioDelDiaLocal (RES-12/BE-05)", () => {
+  it("una fecha date-only va al fin del día calendario local", () => {
+    const f = finDelDiaLocal(new Date("2026-10-25"));
+    expect([f.getFullYear(), f.getMonth(), f.getDate()]).toEqual([2026, 9, 25]);
+    expect([f.getHours(), f.getMinutes(), f.getSeconds(), f.getMilliseconds()]).toEqual([23, 59, 59, 999]);
+  });
+  it("una fecha date-only va al inicio del día calendario local", () => {
+    const f = inicioDelDiaLocal(new Date("2026-10-25"));
+    expect([f.getFullYear(), f.getMonth(), f.getDate()]).toEqual([2026, 9, 25]);
+    expect([f.getHours(), f.getMinutes(), f.getSeconds(), f.getMilliseconds()]).toEqual([0, 0, 0, 0]);
   });
   it("respeta una fecha que ya trae hora", () => {
-    expect(finDelDiaUTC(new Date("2026-10-25T10:00:00Z"))).toEqual(new Date("2026-10-25T10:00:00Z"));
+    expect(finDelDiaLocal(new Date("2026-10-25T10:00:00Z"))).toEqual(new Date("2026-10-25T10:00:00Z"));
+    expect(inicioDelDiaLocal(new Date("2026-10-25T10:00:00Z"))).toEqual(new Date("2026-10-25T10:00:00Z"));
   });
 });

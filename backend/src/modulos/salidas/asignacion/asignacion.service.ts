@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
 import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
@@ -118,16 +119,9 @@ export class AsignacionService {
         )
       );
 
-    // ponytail: todo o nada hasta la fase 2 (registrar rechazados RF-47)
-    if (rechazados.length) {
-      await darDeBajaEmitidos();
-      const detalle = rechazados.map((r) => {
-        const t = nomina.find((n) => n.tipo === r.titular.tipo && n.id === r.titular.id);
-        return `${t?.nombreCompleto ?? `#${r.titular.id}`} (${r.motivo})`;
-      });
-      throw CustomError.badRequest(`La autoridad rechazó los permisos de: ${detalle.join(", ")}`);
-    }
-
+    // RF-47: los rechazados no ocupan lugar. Se liberan los de pasajeros junto con los sobrantes; los del personal
+    // quedan reservados para su reemplazo (CU-38), que pide ahí un permiso nuevo
+    const pasajerosRechazados = rechazados.filter((r) => r.titular.tipo === "PASAJERO").length;
     let salidaActualizada;
     try {
       salidaActualizada = await this.repository.confirmar({
@@ -136,7 +130,8 @@ export class AsignacionService {
         idtransporte: dto.idtransporte,
         itemsCamping: dto.itemsCamping,
         permisos,
-        lugaresPorLiberar: sobrantes - extra,
+        rechazados,
+        lugaresPorLiberar: sobrantes - extra + pasajerosRechazados,
         reservaDePasajero: new Map(
           salida.reservas.flatMap((r) => r.pasajeros.map((rp) => [rp.idpasajero, r.idreserva] as [number, number]))
         ),
@@ -148,12 +143,18 @@ export class AsignacionService {
 
     // Paso 12: liberar los lugares sobrantes. La salida ya quedó bien, así que si la autoridad
     // falla acá no se deshace nada: la cantidad queda guardada y se reintenta con liberarSobrantes
-    const lugaresALiberar = sobrantes - extra;
+    const lugaresALiberar = sobrantes - extra + pasajerosRechazados;
     const sobrantesLiberados = lugaresALiberar === 0 || (await this.liberar(salida.idbloqueo!, idsalida, lugaresALiberar));
 
     return {
       salida: salidaActualizada,
       permisosEmitidos: permisos.length,
+      rechazados: rechazados.map((r) => ({
+        tipo: r.titular.tipo,
+        id: r.titular.id,
+        nombreCompleto: nomina.find((n) => n.tipo === r.titular.tipo && n.id === r.titular.id)?.nombreCompleto ?? `#${r.titular.id}`,
+        motivo: r.motivo,
+      })),
       lugaresLiberados: sobrantesLiberados ? lugaresALiberar : 0,
       ...(!sobrantesLiberados && {
         advertencia: `La asignación se guardó, pero no se pudieron liberar ${lugaresALiberar} lugares sobrantes ante la autoridad. Reintentá con POST /api/salidas/${idsalida}/asignacion/liberar-sobrantes`,
@@ -193,7 +194,7 @@ export class AsignacionService {
   private async prepararAsignacion(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= new Date()) {
+    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest("No se pueden asignar recursos a una salida que ya inició o no está activa");
     }
     if (!salida.idbloqueo) throw CustomError.badRequest("La salida no tiene un bloqueo de cupo ante la autoridad");

@@ -133,17 +133,41 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(baja).toHaveBeenCalledTimes(7);
   });
 
-  it("si la autoridad rechaza a alguien, da de baja lo emitido y no guarda nada", async () => {
+  // Bloqueo 14, nómina de 7 (3 pasajeros + 4 personal): sobran 7. Sin permiso al primero de la nómina
+  const rechazarPrimero = (indice: number) => {
     const real = autoridad.solicitarEmisionNominal.bind(autoridad);
     vi.spyOn(autoridad, "solicitarEmisionNominal").mockImplementation(async (id, nomina) => {
-      const r = await real(id, nomina.slice(1));
-      return { ...r, rechazados: [{ titular: { tipo: nomina[0]!.tipo, id: nomina[0]!.id }, motivo: "Pasaporte vencido" }] };
+      const r = await real(id, nomina.filter((_, i) => i !== indice));
+      return { ...r, rechazados: [{ titular: { tipo: nomina[indice]!.tipo, id: nomina[indice]!.id }, motivo: "Pasaporte vencido" }] };
     });
-    const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
+  };
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toMatchObject({ statusCode: 400 });
-    expect(baja).toHaveBeenCalledTimes(6);
-    expect(repo.confirmar).not.toHaveBeenCalled();
+  it("RF-47: si la autoridad rechaza a un pasajero, guarda a los demás, registra el rechazo y libera su lugar", async () => {
+    rechazarPrimero(0);
+    repo.confirmar.mockImplementation(async (p) => ({ idsalida: 2, estado: "CERRADA", lugaresPorLiberar: p.lugaresPorLiberar }));
+    const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
+    const liberar = vi.spyOn(autoridad, "liberarLugaresSobrantes");
+
+    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+
+    expect(baja).not.toHaveBeenCalled();
+    expect(r.permisosEmitidos).toBe(6);
+    expect(r.rechazados).toEqual([{ tipo: "PASAJERO", id: 1, nombreCompleto: "Pasajero 1", motivo: "Pasaporte vencido" }]);
+    // 7 sobrantes + 1 del rechazado (no ocupa lugar): quedan 6 permisos en un bloqueo de 6
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 8, rechazados: [expect.objectContaining({ motivo: "Pasaporte vencido" })] }));
+    expect(liberar).toHaveBeenCalledWith(idBloqueo, 8);
+    expect(r.lugaresLiberados).toBe(8);
+  });
+
+  it("RF-47: el lugar de un personal rechazado queda reservado para su reemplazo", async () => {
+    rechazarPrimero(3); // nómina: 3 pasajeros y después el personal
+    repo.confirmar.mockResolvedValue({ idsalida: 2 });
+
+    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+
+    expect(r.rechazados).toEqual([{ tipo: "PERSONAL", id: 1, nombreCompleto: "Persona 1", motivo: "Pasaporte vencido" }]);
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 7 }));
+    expect(r.lugaresLiberados).toBe(7);
   });
 
   it("FA1: rechaza un guía sin habilitación vigente para las fechas", async () => {

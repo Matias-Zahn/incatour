@@ -1,3 +1,5 @@
+import { enteroOpcional } from "../../../shared/filtros";
+
 export class CrearCircuitoDto {
   private constructor(
     public nombreCircuito: string,
@@ -51,15 +53,15 @@ export class ModificarCircuitoDto {
     const { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
 
     // Al menos un campo debe venir
-    if (!nombreCircuito && duracionDias == null && !dificultad && minimoGuias == null && parametrosPorteadores === undefined) {
+    if (!nombreCircuito && duracionDias === undefined && !dificultad && minimoGuias === undefined && parametrosPorteadores === undefined) {
       return ["Debe enviar al menos un campo para modificar"];
     }
 
-    if (duracionDias != null && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {
+    if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {
       return ["duracionDias debe ser un número entero mayor a 0"];
     }
 
-    if (minimoGuias != null && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0)) {
+    if (minimoGuias !== undefined && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0)) {
       return ["minimoGuias debe ser un número entero mayor a 0"];
     }
 
@@ -68,5 +70,20 @@ export class ModificarCircuitoDto {
     }
 
     return [undefined, new ModificarCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
+  }
+}
+
+// CU-01 / CAT-13: filtros del listado (un valor inválido es 400, no un error de Prisma)
+export class FiltrosCircuitoDto {
+  private constructor(
+    public duracionDias?: number,
+    public dificultad?: string,
+    public estado?: string,
+  ) {}
+
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosCircuitoDto?] {
+    const [error, duracionDias] = enteroOpcional(query.duracionDias, "duracionDias");
+    if (error) return [error];
+    return [undefined, new FiltrosCircuitoDto(duracionDias, query.dificultad, query.estado)];
   }
 }

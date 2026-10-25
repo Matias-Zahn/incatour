@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { FiltrosCuentaGuiaDto } from "./cuenta-guia.dto";
@@ -24,8 +25,7 @@ const INCLUDE_CUENTA = {
 export class CuentaGuiaRepository {
   // CU-44: solo los guías que ya tienen cuenta (idusuario no nulo)
   async findCuentas(f: FiltrosCuentaGuiaDto) {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = hoyUTC();
 
     return db.guia.findMany({
       where: {
@@ -129,7 +129,6 @@ export class CuentaGuiaRepository {
       contraseniaHasheada?: string | undefined;
       nroHabilitacion?: string | undefined;
       fechaHabilitacion?: Date | undefined;
-      estado?: string | undefined;
     }
   ) {
     return db.$transaction(async (tx) => {
@@ -138,14 +137,12 @@ export class CuentaGuiaRepository {
         apellido?: string;
         email?: string;
         contrasenia?: string;
-        estado?: string;
       } = {};
 
       if (data.nombre) updateUsuario.nombre = data.nombre;
       if (data.apellido) updateUsuario.apellido = data.apellido;
       if (data.email) updateUsuario.email = data.email;
       if (data.contraseniaHasheada) updateUsuario.contrasenia = data.contraseniaHasheada;
-      if (data.estado) updateUsuario.estado = data.estado;
 
       if (Object.keys(updateUsuario).length > 0) {
         await tx.usuario.update({

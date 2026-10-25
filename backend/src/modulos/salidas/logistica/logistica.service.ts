@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { UsuarioAutenticado } from "../../reservas/gestion-reservas/gestion-reserva.service";
@@ -87,7 +88,7 @@ export class LogisticaService {
         "La salida todavía no tiene recursos asignados (CU-40). La logística solo se modifica sobre salidas con asignación previa."
       );
     }
-    if (salida.estado !== "CERRADA" || salida.fechaInicio <= new Date()) {
+    if (salida.estado !== "CERRADA" || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest(
         "La logística solo puede modificarse en salidas que no hayan comenzado y no estén canceladas ni finalizadas."
       );

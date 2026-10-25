@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_RESERVA } from "../../../shared/constantes";
-import { finDelDiaUTC } from "../../../shared/fechas";
+import { finDelDiaLocal, inicioDelDiaLocal } from "../../../shared/fechas";
 import { FiltrosReseniaDto, PublicarReseniaDto } from "./resenia.dto";
 
 export class ReseniaRepository {
@@ -96,7 +96,7 @@ export class ReseniaRepository {
         valoracion: { ...(f.valoracionMin && { gte: f.valoracionMin }), ...(f.valoracionMax && { lte: f.valoracionMax }) },
       }),
       ...((f.fechaDesde || f.fechaHasta) && {
-        fechaEnvio: { ...(f.fechaDesde && { gte: f.fechaDesde }), ...(f.fechaHasta && { lte: finDelDiaUTC(f.fechaHasta) }) },
+        fechaEnvio: { ...(f.fechaDesde && { gte: inicioDelDiaLocal(f.fechaDesde) }), ...(f.fechaHasta && { lte: finDelDiaLocal(f.fechaHasta) }) },
       }),
     };
   }

@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 
@@ -7,7 +8,7 @@ export class CatalogoService {
   async consultarCatalogo(filtros?: FiltrosCatalogo) {
     // 1. Obtener los paquetes activos desde la base de datos aplicando filtros (CU-26, CAT-13)
     const paquetesDB = await this.repository.buscarPaquetesActivos(filtros);
-    const ahora = new Date();
+    const hoy = hoyUTC();
 
     // 2. Formatear y limpiar los datos para el frontend (escaparate comercial y compra CU-30)
     const catalogo = paquetesDB.map((paquete) => {
@@ -62,7 +63,7 @@ export class CatalogoService {
       // 3. Salidas programadas vigentes (PUBLICADA y con fecha posterior a ahora)
       // CAT-07: Si ninguna tarifa cubre la fecha de la salida, se marca sin precio (null)
       const salidasDisponibles = (paquete.salidas ?? [])
-        .filter((s) => s.estado === "PUBLICADA" && new Date(s.fechaInicio) > ahora)
+        .filter((s) => s.estado === "PUBLICADA" && new Date(s.fechaInicio) > hoy)
         .map((s) => {
           const fechaSalida = new Date(s.fechaInicio);
           const tarifaSalida = paquete.tarifas.find(

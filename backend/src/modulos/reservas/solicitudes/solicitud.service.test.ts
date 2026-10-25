@@ -139,6 +139,26 @@ describe("SolicitudService", () => {
       expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).not.toHaveBeenCalled();
     });
 
+    const porEstablecimiento = (rechazados: number[] = []) => {
+      const sol = solicitud({}, { categoriaGarantizada: null, localidadGarantizada: null, tipoHabitacionGarantizada: null, garantiasEstablecimiento: [{ servicio: { idservicio: 40, nombreServicio: "Hotel 40", localidad: "Cusco", alojamiento: { categoria: "3 estrellas" } } }] });
+      sol.reserva.solicitudes = [{ gestiones: rechazados.map((idservicio) => ({ resultado: "Rechazada", idservicio })) }];
+      repo.buscarPorId.mockResolvedValue(sol);
+    };
+
+    it("RES-04: garantía por establecimiento devuelve como única opción el hotel garantizado", async () => {
+      porEstablecimiento();
+      const r = await new SolicitudService().buscarServiciosCompatibles(5);
+      expect(repo.buscarServicio).toHaveBeenCalledWith(40);
+      expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).not.toHaveBeenCalled();
+      expect(r.opcionesContacto).toEqual([{ servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp" }]);
+    });
+
+    it("RES-04: garantía por establecimiento con el hotel ya rechazado devuelve lista vacía", async () => {
+      porEstablecimiento([40]);
+      const r = await new SolicitudService().buscarServiciosCompatibles(5);
+      expect(r.opcionesContacto).toEqual([]);
+    });
+
     it("FA2: avisa que la salida no podrá consolidarse si no hay hoteles compatibles", async () => {
       repo.buscarServiciosCompatiblesExcluyendoRechazados.mockResolvedValue([]);
 
@@ -147,6 +167,24 @@ describe("SolicitudService", () => {
   });
 
   describe("procesarResolucion (CU-34, fase 2)", () => {
+    const porEstablecimiento = () =>
+      repo.buscarPorId.mockResolvedValue(
+        solicitud({}, { categoriaGarantizada: null, localidadGarantizada: null, tipoHabitacionGarantizada: null, garantiasEstablecimiento: [{ servicio: { idservicio: 40, nombreServicio: "Hotel 40", localidad: "Cusco", alojamiento: { categoria: "3 estrellas" } } }] })
+      );
+
+    it("RES-04: garantía por establecimiento acepta el hotel garantizado", async () => {
+      porEstablecimiento();
+      repo.contarPendientesPorSalida.mockResolvedValue(0);
+      await new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }));
+      expect(repo.resolverComoAceptada).toHaveBeenCalledWith(5, 20, 40);
+    });
+
+    it("RES-04: garantía por establecimiento rechaza otro hotel aunque cumpla categoría y localidad", async () => {
+      porEstablecimiento();
+      repo.buscarServicio.mockResolvedValue(hotel(41));
+      await expect(new SolicitudService().procesarResolucion(5, dto({ servicioId: 41, resolucion: "ACEPTADA" }))).rejects.toMatchObject({ statusCode: 400 });
+    });
+
     it("aceptada: confirma el alojamiento e informa cuántas pendientes quedan en la salida", async () => {
       repo.contarPendientesPorSalida.mockResolvedValue(3);
 

@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { CatalogoService } from "./catalogo.service";
 import { FiltrosCatalogo } from "./catalogo.repository";
+import { FiltrosCatalogoDto } from "./catalogo.dto";
+import { CustomError } from "../../../error/CustomError";
 
 const catalogoService = new CatalogoService();
 
@@ -9,11 +11,13 @@ export class CatalogoController {
   // GET /api/catalogo (CU-26)
   consultarCatalogoPublico = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const [error, dto] = FiltrosCatalogoDto.create(req.query);
+      if (error) throw CustomError.badRequest(error);
       const filtros: FiltrosCatalogo = {
-        dificultad: req.query.dificultad as string | undefined,
-        duracionDias: req.query.duracionDias as string | undefined,
-        fechaDesde: (req.query.fechaDesde ?? req.query.fechaInicio) as string | undefined,
-        fechaHasta: (req.query.fechaHasta ?? req.query.fechaFin) as string | undefined,
+        dificultad: dto!.dificultad as string | undefined,
+        duracionDias: dto!.duracionDias,
+        fechaDesde: dto!.fechaDesde,
+        fechaHasta: dto!.fechaHasta,
       };
 
       const resultados = await catalogoService.consultarCatalogo(filtros);

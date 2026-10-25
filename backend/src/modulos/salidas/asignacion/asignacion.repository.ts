@@ -8,7 +8,7 @@ import {
   SALIDAS_ACTIVAS,
   TIPO_SERVICIO,
 } from "../../../shared/constantes";
-import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
+import { PermisoEmitido, PermisoRechazado } from "../../../integraciones/autoridad/autoridad.interface";
 import { LogisticaRepository } from "../logistica/logistica.repository";
 import { ItemCamping } from "./asignacion.dto";
 
@@ -70,7 +70,7 @@ export class AsignacionRepository {
 
   /**
    * CU-40 pasos 7 a 11 y 14, en una transacción: asignar personal, transporte y equipamiento,
-   * registrar los permisos emitidos, devolver al hotel las plazas que no se vendieron y cerrar la venta.
+   * registrar los permisos emitidos y los rechazados (RF-47), devolver al hotel las plazas que no se vendieron y cerrar la venta.
    * Los permisos ya los emitió la autoridad antes de entrar acá.
    */
   async confirmar(p: {
@@ -79,6 +79,7 @@ export class AsignacionRepository {
     idtransporte: number;
     itemsCamping: ItemCamping[];
     permisos: PermisoEmitido[];
+    rechazados: PermisoRechazado[];
     reservaDePasajero: Map<number, number>;
     lugaresPorLiberar: number;
   }) {
@@ -130,6 +131,18 @@ export class AsignacionRepository {
           });
         } else {
           await tx.permisoPersonal.create({ data: { ...datos, idsalida, idpersonal: permiso.titular.id } });
+        }
+      }
+
+      // RF-47: quien quedó sin permiso se registra como Rechazado, sin número, y no afecta a los demás
+      const sinNumero = { nroPermiso: null, fechaEmision: new Date(), estadoTramite: ESTADO_PERMISO.RECHAZADO };
+      for (const { titular } of p.rechazados) {
+        if (titular.tipo === "PASAJERO") {
+          await tx.permisoPasajero.create({
+            data: { ...sinNumero, idpasajero: titular.id, idreserva: p.reservaDePasajero.get(titular.id)! },
+          });
+        } else {
+          await tx.permisoPersonal.create({ data: { ...sinNumero, idsalida, idpersonal: titular.id } });
         }
       }
 

@@ -1,3 +1,4 @@
+import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { ConsultarPersonalDto, ModificarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
@@ -11,7 +12,7 @@ export interface DatosPersonal {
 }
 
 export interface DatosGuia extends DatosPersonal {
-  email: string;
+  email?: string | undefined; // sin email, el guía queda sin cuenta (CTA-03)
   nroHabilitacion: string;
   fechaHabilitacion: Date;
 }
@@ -26,18 +27,22 @@ export class PersonalRepository {
   }
 
   // Guía = Usuario (acceso) + Personal (legajo) + Guia (habilitación), todo en una transacción
-  async crearGuia(data: DatosGuia, contraseniaHasheada: string) {
+  // Sin cuenta (email y contraseña ausentes) solo se crean Personal y Guia (CTA-03)
+  async crearGuia(data: DatosGuia, contraseniaHasheada?: string) {
     return db.$transaction(async (tx) => {
-      const usuario = await tx.usuario.create({
-        data: {
-          nombre: data.nombre,
-          apellido: data.apellido,
-          email: data.email,
-          contrasenia: contraseniaHasheada,
-          rol: "GUIA", // Rol de sistema
-          estado: "ACTIVO",
-        },
-      });
+      const usuario =
+        data.email && contraseniaHasheada
+          ? await tx.usuario.create({
+              data: {
+                nombre: data.nombre,
+                apellido: data.apellido,
+                email: data.email,
+                contrasenia: contraseniaHasheada,
+                rol: "GUIA", // Rol de sistema
+                estado: "ACTIVO",
+              },
+            })
+          : null;
 
       // El usuario ya NO se enlaza desde Personal: se enlaza desde Guia
       const personal = await tx.personal.create({
@@ -50,7 +55,7 @@ export class PersonalRepository {
           estado: "ACTIVO",
           guia: {
             create: {
-              idusuario: usuario.idusuario,
+              idusuario: usuario?.idusuario ?? null,
               nroHabilitacion: data.nroHabilitacion,
               fechaHabilitacion: data.fechaHabilitacion,
             },
@@ -79,7 +84,7 @@ export class PersonalRepository {
 
   // CU-22: la habilitación es del guía, así que filtrar por vigencia deja solo guías
   async buscar(dto: ConsultarPersonalDto) {
-    const hoy = new Date();
+    const hoy = hoyUTC();
     return db.personal.findMany({
       where: {
         ...(dto.rol && { rol: dto.rol }),

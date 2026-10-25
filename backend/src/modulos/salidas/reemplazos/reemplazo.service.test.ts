@@ -93,6 +93,33 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     expect(repo.marcarPermisoDadoDeBaja).toHaveBeenCalledWith(50);
   });
 
+  it("RF-47: si el original quedó con permiso Rechazado, no da de baja nada y el reemplazante pide permiso nuevo", async () => {
+    repo.buscarSalida.mockResolvedValue({
+      ...salida(),
+      permisos: [{ idpermisopersonal: 50, idpersonal: 1, nroPermiso: null, estadoTramite: "Rechazado" }],
+    });
+    const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
+
+    const r = await new ReemplazoService().confirmarReemplazo(2, dto, "a");
+
+    expect(baja).not.toHaveBeenCalled();
+    expect(r.permisoDadoDeBaja).toBeNull();
+    expect(r.permisoNuevo).toMatch(/^PER-/);
+    expect(repo.marcarPermisoDadoDeBaja).not.toHaveBeenCalled();
+    expect(repo.reemplazar).toHaveBeenCalledWith(expect.objectContaining({ idpermisoAnterior: 50 }));
+  });
+
+  it("RF-47: si la autoridad también rechaza al reemplazante, responde 400 y no cambia nada", async () => {
+    repo.buscarSalida.mockResolvedValue({
+      ...salida(),
+      permisos: [{ idpermisopersonal: 50, idpersonal: 1, nroPermiso: null, estadoTramite: "Rechazado" }],
+    });
+    repo.buscarPersonal.mockResolvedValue({ ...persona(9), nroPasaporte: "" });
+
+    await expect(new ReemplazoService().confirmarReemplazo(2, dto, "a")).rejects.toMatchObject({ statusCode: 400 });
+    expect(repo.reemplazar).not.toHaveBeenCalled();
+  });
+
   it("compensación: si la base falla después de emitir, da de baja el permiso nuevo", async () => {
     repo.reemplazar.mockRejectedValue(new Error("fallo de la base"));
     const baja = vi.spyOn(autoridad, "darDeBajaPermiso");

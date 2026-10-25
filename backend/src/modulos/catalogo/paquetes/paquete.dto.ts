@@ -1,3 +1,5 @@
+import { enteroOpcional } from "../../../shared/filtros";
+
 export interface PrecioTemporada {
   idtemporada: number;
   monto: number;
@@ -166,8 +168,8 @@ export class ModificarPaqueteDto {
     } = obj;
 
     if (
-      !nombrePaquete && condiciones === undefined && nochesPrevias == null &&
-      nochesPosteriores == null && diasDisponibles === undefined && matrizPrecios === undefined &&
+      !nombrePaquete && condiciones === undefined && nochesPrevias === undefined &&
+      nochesPosteriores === undefined && diasDisponibles === undefined && matrizPrecios === undefined &&
       idcircuito == null && tipoGarantia === undefined && idservicioGarantizado === undefined &&
       localidadGarantizada === undefined && categoriaGarantizada === undefined &&
       tipoHabitacionGarantizada === undefined && serviciosIncluidos === undefined &&
@@ -195,10 +197,10 @@ export class ModificarPaqueteDto {
       return ["Con garantía por categoría, no debe indicarse idservicioGarantizado."];
     }
 
-    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
+    if (nochesPrevias !== undefined && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
       return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
     }
-    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
+    if (nochesPosteriores !== undefined && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
       return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
     }
 
@@ -251,5 +253,20 @@ export class ModificarPaqueteDto {
       localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada,
       serviciosIncluidos, diasMinimosReintegro,
     )];
+  }
+}
+
+// CU-10 / CAT-13: filtros del listado (un valor inválido es 400, no un error de Prisma)
+export class FiltrosPaqueteDto {
+  private constructor(
+    public idcircuito?: number,
+    public estado?: string,
+    public nombrePaquete?: string,
+  ) {}
+
+  public static create(query: { [key: string]: any }): [string | undefined, FiltrosPaqueteDto?] {
+    const [error, idcircuito] = enteroOpcional(query.idcircuito, "idcircuito");
+    if (error) return [error];
+    return [undefined, new FiltrosPaqueteDto(idcircuito, query.estado, query.nombrePaquete)];
   }
 }

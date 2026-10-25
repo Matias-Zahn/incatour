@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { CustomError } from "../../../error/CustomError";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
-import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
+import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
 
 const paqueteService = new PaqueteService();
@@ -31,7 +31,13 @@ export class PaqueteController {
   // GET /api/paquetes — CU-10: Consultar paquetes turísticos
   consultarPaquetes = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { estado, idcircuito, nombrePaquete } = req.query; const paquetes = await paqueteService.consultarPaquetes({ estado: estado as string | undefined, idcircuito: idcircuito as string | number | undefined, nombrePaquete: nombrePaquete as string | undefined });
+      const [error, filtros] = FiltrosPaqueteDto.create(req.query);
+      if (error) throw CustomError.badRequest(error);
+      const paquetes = await paqueteService.consultarPaquetes({
+        estado: filtros!.estado as string | undefined,
+        idcircuito: filtros!.idcircuito,
+        nombrePaquete: filtros!.nombrePaquete as string | undefined,
+      });
       return res.json({ data: paquetes.map(enriquecerPaqueteConImagenes) });
     } catch (error) {
       next(error);

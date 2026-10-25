@@ -11,7 +11,7 @@ export class CrearPersonalDto {
     public nacionalidad: string,
     public fechaVencimientoPasaporte: Date,
     public rolOperativo: string,
-    // Solo para guías: cuenta de acceso y habilitación (viven en las tablas Usuario y Guia)
+    // Solo para guías: cuenta de acceso (opcional, email y contraseña juntos) y habilitación (viven en las tablas Usuario y Guia)
     public email?: string,
     public contrasenia?: string,
     public nroHabilitacion?: string,
@@ -59,13 +59,23 @@ export class CrearPersonalDto {
       ];
     }
 
-    // Guía: cuenta de acceso + habilitación obligatorias
-    if (!email || typeof email !== "string") return ["El email es requerido para un guía"];
-    email = email.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(email)) return ["El formato del correo electrónico no es válido"];
+    // Guía: la cuenta de acceso es opcional (CTA-03): email y contraseña van juntos o ninguno.
+    // Sin cuenta, se crea después con POST /api/cuentas-guia. La habilitación sí es obligatoria.
+    const vacio = (v: unknown) => v === undefined || v === null || v === "";
+    if (vacio(email) !== vacio(contrasenia)) {
+      return [vacio(email) ? "El email es requerido si se envía la contraseña" : "La contraseña es requerida si se envía el email"];
+    }
+    if (!vacio(email)) {
+      if (typeof email !== "string") return ["El email debe ser una cadena de texto"];
+      email = email.trim().toLowerCase();
+      if (!EMAIL_REGEX.test(email)) return ["El formato del correo electrónico no es válido"];
 
-    if (!contrasenia || typeof contrasenia !== "string") return ["La contraseña es requerida para un guía"];
-    if (contrasenia.length < 8) return ["La contraseña debe tener como mínimo 8 caracteres"];
+      if (typeof contrasenia !== "string") return ["La contraseña debe ser una cadena de texto"];
+      if (contrasenia.length < 8) return ["La contraseña debe tener como mínimo 8 caracteres"];
+    } else {
+      email = undefined;
+      contrasenia = undefined;
+    }
 
     if (!nroHabilitacion || typeof nroHabilitacion !== "string") {
       return ["El número de habilitación es requerido para un guía"];

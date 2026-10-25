@@ -33,6 +33,15 @@ describe("GestionReservaService.solicitarCancelacion (RES-06)", () => {
     const r = await new GestionReservaService().solicitarCancelacion(1, { idusuario: 1, email: "x@y.com", rol: "ADMIN" });
     expect(r.montoAReintegrar).toBe(1000);
   });
+
+  it("permisos emitidos: la advertencia usa el monto real (admin 100%, cliente $0)", async () => {
+    repo.findParaCancelacion.mockResolvedValue(reserva({ permisos: [{ estadoTramite: "Emitido" }] }));
+    const admin = await new GestionReservaService().solicitarCancelacion(1, { idusuario: 1, email: "x@y.com", rol: "ADMIN" });
+    expect(admin.advertencia).toContain("El reintegro es de $1000");
+    expect(admin.lugaresVuelvenALaVenta).toBe(false);
+    const cliente = await new GestionReservaService().solicitarCancelacion(1, { idusuario: 5, email: "a@b.com", rol: "CLIENTE" });
+    expect(cliente.advertencia).toContain("El reintegro es de $0");
+  });
 });
 
 describe("GestionReservaService.obtenerReserva: desglose (RES-07)", () => {
