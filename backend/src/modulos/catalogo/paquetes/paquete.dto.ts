@@ -166,8 +166,8 @@ export class ModificarPaqueteDto {
     } = obj;
 
     if (
-      !nombrePaquete && condiciones === undefined && nochesPrevias == null &&
-      nochesPosteriores == null && diasDisponibles === undefined && matrizPrecios === undefined &&
+      !nombrePaquete && condiciones === undefined && nochesPrevias === undefined &&
+      nochesPosteriores === undefined && diasDisponibles === undefined && matrizPrecios === undefined &&
       idcircuito == null && tipoGarantia === undefined && idservicioGarantizado === undefined &&
       localidadGarantizada === undefined && categoriaGarantizada === undefined &&
       tipoHabitacionGarantizada === undefined && serviciosIncluidos === undefined &&
@@ -195,10 +195,10 @@ export class ModificarPaqueteDto {
       return ["Con garantía por categoría, no debe indicarse idservicioGarantizado."];
     }
 
-    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
+    if (nochesPrevias !== undefined && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
       return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
     }
-    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
+    if (nochesPosteriores !== undefined && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
       return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
     }
 

@@ -44,5 +44,8 @@ describe("ModificarCircuitoDto", () => {
     expect(ModificarCircuitoDto.create({ duracionDias: 2.5 })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
     expect(ModificarCircuitoDto.create({ minimoGuias: 0 })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
     expect(ModificarCircuitoDto.create({ minimoGuias: 1.5 })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
+    // CAT-11: null explícito no es "sin cambio" (terminaba en 500 de Prisma)
+    expect(ModificarCircuitoDto.create({ duracionDias: null })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
+    expect(ModificarCircuitoDto.create({ nombreCircuito: "X", minimoGuias: null })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
   });
 });

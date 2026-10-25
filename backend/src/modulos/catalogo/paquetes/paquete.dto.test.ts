@@ -104,6 +104,9 @@ describe("ModificarPaqueteDto", () => {
   it("valida las noches enteras (CAT-11)", () => {
     expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
     expect(ModificarPaqueteDto.create({ nochesPrevias: 1.5 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
+    // CAT-11: null explícito no es "sin cambio" (terminaba en 500 de Prisma)
+    expect(ModificarPaqueteDto.create({ nochesPrevias: null })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
+    expect(ModificarPaqueteDto.create({ nombrePaquete: "X", nochesPosteriores: null })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
     expect(ModificarPaqueteDto.create({ nochesPosteriores: 2.5 })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
   });
 });

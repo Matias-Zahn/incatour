@@ -51,15 +51,15 @@ export class ModificarCircuitoDto {
     const { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
 
     // Al menos un campo debe venir
-    if (!nombreCircuito && duracionDias == null && !dificultad && minimoGuias == null && parametrosPorteadores === undefined) {
+    if (!nombreCircuito && duracionDias === undefined && !dificultad && minimoGuias === undefined && parametrosPorteadores === undefined) {
       return ["Debe enviar al menos un campo para modificar"];
     }
 
-    if (duracionDias != null && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {
+    if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {
       return ["duracionDias debe ser un número entero mayor a 0"];
     }
 
-    if (minimoGuias != null && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0)) {
+    if (minimoGuias !== undefined && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0)) {
       return ["minimoGuias debe ser un número entero mayor a 0"];
     }
 
