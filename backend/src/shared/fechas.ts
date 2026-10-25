@@ -7,11 +7,15 @@ export const hoyUTC = () => {
   return new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
 };
 
-// BE-05: un filtro "hasta" date-only (00:00Z) incluye todo ese día; si trae hora, se respeta
-export const finDelDiaUTC = (fecha: Date) => {
-  const f = new Date(fecha);
-  if (f.getUTCHours() === 0 && f.getUTCMinutes() === 0 && f.getUTCSeconds() === 0 && f.getUTCMilliseconds() === 0) {
-    f.setUTCHours(23, 59, 59, 999);
-  }
-  return f;
-};
+// RES-12/BE-05: un filtro date-only (00:00Z) se toma como día calendario y se lleva al día LOCAL del proceso
+// (las columnas timestamp guardan instantes reales); si trae hora, se respeta
+const esDateOnly = (f: Date) =>
+  f.getUTCHours() === 0 && f.getUTCMinutes() === 0 && f.getUTCSeconds() === 0 && f.getUTCMilliseconds() === 0;
+
+export const inicioDelDiaLocal = (fecha: Date) =>
+  esDateOnly(fecha) ? new Date(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()) : new Date(fecha);
+
+export const finDelDiaLocal = (fecha: Date) =>
+  esDateOnly(fecha)
+    ? new Date(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate(), 23, 59, 59, 999)
+    : new Date(fecha);
