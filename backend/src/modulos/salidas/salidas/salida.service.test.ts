@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AutoridadMock } from "../../../integraciones/autoridad/autoridad.mock";
 import { CrearSalidaDto } from "./salida.dto";
 
+import { hoyUTC } from "../../../shared/fechas";
 import { SalidaService, resumirSalida } from "./salida.service";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
@@ -20,13 +21,15 @@ vi.mock("./salida.repository", () => ({
 vi.mock("../autoridad.wiring", () => ({ obtenerAutoridad: () => actual.autoridad }));
 let autoridad: AutoridadMock;
 
-const FECHA = "2026-11-20";
+// Fechas relativas a hoy: una fija se vuelve pasada y rompe los tests
+const enDias = (n: number) => new Date(hoyUTC().getTime() + n * 86400000);
+const FECHA = enDias(20).toISOString().slice(0, 10);
 const paquete = {
   idpaquete: 1,
   nombrePaquete: "Inca Clásico",
   estado: "ACTIVO",
   circuito: { estado: "ACTIVO", duracionDias: 4, minimoGuias: 2, parametrosPorteadores: "1 por cada 2 pasajeros" },
-  tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: new Date("2026-10-01"), fechaFin: new Date("2026-12-31") } }],
+  tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: enDias(-30), fechaFin: enDias(365) } }],
   garantiasEstablecimiento: [],
 };
 const dto = (extra = {}) => CrearSalidaDto.create({ idpaquete: 1, fechaInicio: FECHA, tamanoMaximo: 16, ...extra })[1]!;
@@ -45,7 +48,7 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     const r = await new SalidaService().crearSalida(dto());
 
     expect(r.totalLugares).toBe(26);
-    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ fechaFin: new Date("2026-11-23") }));
+    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ fechaFin: enDias(23) }));
   });
 
   it("FA1: sin cupo suficiente no crea la salida y dice cuántos lugares hay", async () => {
@@ -60,6 +63,21 @@ describe("SalidaService.crearSalida (CU-36)", () => {
 
     await expect(new SalidaService().crearSalida(dto())).rejects.toMatchObject({ statusCode: 503 });
     expect(repo.crearSalida).not.toHaveBeenCalled();
+  });
+
+  it("BE-01: mañana se acepta y hoy se rechaza, a cualquier hora del día", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 9, 25, 23, 30)); // 25/10 23:30 hora local
+      repo.crearSalida.mockResolvedValue({ idsalida: 9 });
+      const paqueteVigente = { ...paquete, tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: new Date("2026-01-01"), fechaFin: new Date("2026-12-31") } }] };
+      repo.buscarPaquete.mockResolvedValue(paqueteVigente);
+
+      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-26" }))).resolves.toBeDefined();
+      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-25" }))).rejects.toMatchObject({ statusCode: 400 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("compensación: si la base falla después del bloqueo, devuelve los lugares a la autoridad", async () => {

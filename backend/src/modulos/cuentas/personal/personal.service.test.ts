@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PersonalService } from "./personal.service";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn() },
+  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), crearPorteador: vi.fn() },
 }));
 vi.mock("./personal.repository", () => ({ PersonalRepository: class { constructor() { return repo; } } }));
 
@@ -27,5 +27,26 @@ describe("PersonalService.modificarPersonal (CU-24)", () => {
       statusCode: 400,
     });
     expect(repo.modificar).not.toHaveBeenCalled();
+  });
+});
+
+describe("PersonalService.crearPersonal: vencimiento del pasaporte (BE-01)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 25, 15, 0)); // 25/10 15:00 hora local
+    repo.checkPasaporteExists.mockResolvedValue(null);
+    repo.crearPorteador.mockResolvedValue({ idpersonal: 1 });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const porteador = (venc: string) => ({ nroPasaporte: "X1", fechaVencimientoPasaporte: new Date(venc), rolOperativo: "PORTEADOR" }) as any;
+
+  it("acepta un pasaporte que vence hoy", async () => {
+    await expect(new PersonalService().crearPersonal(porteador("2026-10-25"))).resolves.toBeDefined();
+  });
+
+  it("rechaza con 400 un pasaporte que venció ayer", async () => {
+    await expect(new PersonalService().crearPersonal(porteador("2026-10-24"))).rejects.toMatchObject({ statusCode: 400 });
   });
 });

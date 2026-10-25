@@ -1,5 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { hoyUTC } from "../../../shared/fechas";
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
@@ -99,7 +100,7 @@ export class SalidaService {
       throw CustomError.badRequest("El paquete o su circuito no están activos");
     }
 
-    if (dto.fechaInicio <= new Date()) throw CustomError.badRequest("La fecha de inicio tiene que ser futura");
+    if (dto.fechaInicio <= hoyUTC()) throw CustomError.badRequest("La fecha de inicio tiene que ser futura");
 
     const tarifaVigente = paquete.tarifas.some(
       (t) =>

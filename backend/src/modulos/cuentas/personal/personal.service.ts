@@ -3,6 +3,7 @@ import { CustomError } from "../../../error/CustomError";
 import { PersonalRepository } from "./personal.repository";
 import { ConsultarPersonalDto, CrearPersonalDto, ModificarPersonalDto, ROL_GUIA } from "./personal.dto";
 import { ESTADO } from "../../../shared/constantes";
+import { hoyUTC } from "../../../shared/fechas";
 
 export class PersonalService {
   private repository = new PersonalRepository();
@@ -22,7 +23,7 @@ export class PersonalService {
       throw CustomError.badRequest("La habilitación solo corresponde a un guía");
     }
 
-    const hoy = new Date();
+    const hoy = hoyUTC();
     if (dto.fechaVencimientoPasaporte && dto.fechaVencimientoPasaporte < hoy) {
       throw CustomError.badRequest("El pasaporte no puede estar vencido");
     }
@@ -62,7 +63,7 @@ export class PersonalService {
   }
 
   async crearPersonal(dto: CrearPersonalDto) {
-    const hoy = new Date();
+    const hoy = hoyUTC();
 
     // 1. Pasaporte: único y vigente (aplica a guías y porteadores)
     const existePasaporte = await this.repository.checkPasaporteExists(dto.nroPasaporte);
