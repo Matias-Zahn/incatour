@@ -114,6 +114,7 @@ export class ReservaService {
         precioPaquetePorPersona: precio.precioPaquetePorPersona,
         adicionalesEquipaje: precio.adicionalesEquipaje,
         moneda: precio.moneda,
+        diasMinimosReintegro: salida.paquete.diasMinimosReintegro,
         condicionesComerciales: salida.paquete.condiciones ?? "",
         medioPago: dto.medioPago,
         pasajeros: dto.pasajeros,

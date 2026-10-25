@@ -134,6 +134,7 @@ export class CancelacionSalidaRepository {
               idusuario: p.idusuario,
               montoReembolsado: r.montoReembolsado,
               motivo: p.motivo,
+              condicionAplicada: "Cancelación de la salida por la empresa: 100%",
             })),
           });
         }

@@ -137,6 +137,7 @@ export class GestionReservaRepository {
     idusuario: number;
     motivo: string;
     montoReembolsado: number;
+    condicionAplicada: string;
     cantidadPasajeros: number;
     permisosEmitidos: boolean;
     alojamientoPorStock: boolean;
@@ -154,6 +155,7 @@ export class GestionReservaRepository {
           idusuario: p.idusuario,
           montoReembolsado: p.montoReembolsado,
           motivo: p.motivo,
+          condicionAplicada: p.condicionAplicada,
         },
       });
 

@@ -10,6 +10,7 @@ import {
 } from "../../../shared/constantes";
 import { CancelarReservaDto, FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 import { GestionReservaRepository } from "./gestion-reserva.repository";
+import { calcularReintegro } from "./reintegro";
 
 export interface UsuarioAutenticado {
   idusuario: number;
@@ -91,6 +92,7 @@ export class GestionReservaService {
       nroReserva: ev.reserva.nroReserva,
       importeAbonado: ev.importeAbonado,
       montoAReintegrar: ev.montoAReintegrar,
+      condicionAplicada: ev.condicionAplicada,
       permisosEmitidos: ev.permisosEmitidos,
       lugaresVuelvenALaVenta: !ev.permisosEmitidos,
       advertencia: ev.permisosEmitidos
@@ -109,6 +111,7 @@ export class GestionReservaService {
       idusuario: usuario.idusuario,
       motivo: dto.motivo ?? "Sin motivo informado",
       montoReembolsado: ev.montoAReintegrar,
+      condicionAplicada: ev.condicionAplicada,
       cantidadPasajeros: ev.reserva.cantidadPasajeros,
       permisosEmitidos: ev.permisosEmitidos,
       alojamientoPorStock: ev.alojamientoPorStock,
@@ -128,6 +131,7 @@ export class GestionReservaService {
         idreembolso: reembolso.idreembolso,
         montoReembolsado: reembolso.montoReembolsado,
         motivo: reembolso.motivo,
+        condicionAplicada: reembolso.condicionAplicada,
         fechaReembolso: reembolso.fechaReembolso,
         nota: "La acreditación del dinero se ejecuta por fuera del sistema.",
       },
@@ -157,16 +161,23 @@ export class GestionReservaService {
     // Paso 3: "No emitido" = no hay fila de permiso; si alguno está Emitido rige el flujo alternativo 2
     const permisosEmitidos = reserva.permisos.some((p) => p.estadoTramite === ESTADO_PERMISO.EMITIDO);
 
-    // Se reintegra el 100% de lo abonado, salvo permisos emitidos ($0)
+    // RES-06: el reintegro depende del rol, los permisos y el plazo congelado en la reserva
     const importeAbonado = sumar(reserva.pagos.map((p) => p.monto));
-    const montoAReintegrar = permisosEmitidos ? 0 : importeAbonado;
+    const { monto: montoAReintegrar, condicionAplicada } = calcularReintegro({
+      abonado: importeAbonado,
+      rol: usuario.rol,
+      permisosEmitidos,
+      diasMinimos: reserva.diasMinimosReintegro,
+      fechaInicio: reserva.salida.fechaInicio,
+      ahora: new Date(),
+    });
 
     // El alojamiento salió del stock bloqueado de la salida solo si está Confirmado SIN solicitud confirmada
     const alojamientoPorStock =
       reserva.estadoAlojamiento === ESTADO_ALOJAMIENTO.CONFIRMADO &&
       !reserva.solicitudes.some((s) => s.estado === ESTADO_SOLICITUD.CONFIRMADA);
 
-    return { reserva, permisosEmitidos, importeAbonado, montoAReintegrar, alojamientoPorStock };
+    return { reserva, permisosEmitidos, importeAbonado, montoAReintegrar, condicionAplicada, alojamientoPorStock };
   }
 
   // Un cliente solo accede a SUS reservas; el administrador, a todas

@@ -51,6 +51,7 @@ const salida = (over: Record<string, unknown> = {}) => ({
   servicios: [] as unknown[],
   paquete: {
     condiciones: "Sin reembolso a menos de 30 días",
+    diasMinimosReintegro: 15,
     localidadGarantizada: "Cusco",
     categoriaGarantizada: "3 estrellas",
     tipoHabitacionGarantizada: "Doble",
@@ -103,7 +104,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       await new ReservaService().crearReserva(crearDto(), 42);
 
       expect(repo.obtenerClientePorUsuario).toHaveBeenCalledWith(42);
-      expect(repo.confirmarReserva).toHaveBeenCalledWith(expect.objectContaining({ idcliente: 3, condicionesComerciales: "Sin reembolso a menos de 30 días" }));
+      expect(repo.confirmarReserva).toHaveBeenCalledWith(expect.objectContaining({ idcliente: 3, condicionesComerciales: "Sin reembolso a menos de 30 días", diasMinimosReintegro: 15 }));
     });
 
     it("congela el desglose del precio en la reserva (RES-07)", async () => {

@@ -69,6 +69,7 @@ export class PaqueteService {
         nochesPrevias: dto.nochesPrevias ?? 0,
         nochesPosteriores: dto.nochesPosteriores ?? 0,
         diasDisponibles: dto.diasDisponibles,
+        diasMinimosReintegro: dto.diasMinimosReintegro ?? null,
       },
       dto.matrizPrecios,
       dto.serviciosIncluidos ?? []
@@ -125,6 +126,7 @@ export class PaqueteService {
     if (dto.nochesPrevias !== undefined) dataUpdate.nochesPrevias = dto.nochesPrevias;
     if (dto.nochesPosteriores !== undefined) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
+    if (dto.diasMinimosReintegro !== undefined) dataUpdate.diasMinimosReintegro = dto.diasMinimosReintegro;
 
     const hasData = Object.keys(dataUpdate).length > 0;
     const hasServicios = dto.serviciosIncluidos !== undefined;

@@ -263,6 +263,7 @@ async function main() {
       categoriaGarantizada: "3 Estrellas",
       localidadGarantizada: "Cusco",
       tipoHabitacionGarantizada: "Doble",
+      diasMinimosReintegro: 15, // RES-06: reintegro del 100% solo con 15 días de anticipación
       tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 650, moneda: "USD" }] },
       servicios: {
         create: [
@@ -359,6 +360,7 @@ async function main() {
       precioPaquetePorPersona: 650,
       adicionalesEquipaje: 0,
       moneda: "USD",
+      diasMinimosReintegro: 15,
       estado: "CONFIRMADA",
       pasajeros: {
         create: [{ idpasajero: pasajero.idpasajero }],
@@ -398,6 +400,7 @@ async function main() {
       precioPaquetePorPersona: 650,
       adicionalesEquipaje: 0,
       moneda: "USD",
+      diasMinimosReintegro: 15,
       estado: "CANCELADA",
       reembolsos: {
         create: [
@@ -405,6 +408,7 @@ async function main() {
             idusuario: usuarioAdmin.idusuario,
             montoReembolsado: 650.0,
             motivo: "Cancelación temprana sin permisos emitidos",
+            condicionAplicada: "Cancelación con 20 días de anticipación (mínimo 15): 100% del importe abonado",
           },
         ],
       },

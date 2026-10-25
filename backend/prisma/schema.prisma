@@ -64,6 +64,7 @@ model Reserva {
   precioPaquetePorPersona Float?
   adicionalesEquipaje     Float?
   moneda                  String?
+  diasMinimosReintegro    Int? // RES-06: plazo del paquete congelado al comprar (CU-30)
 
   cliente     Cliente           @relation(fields: [idcliente], references: [idcliente])
   salida      Salida            @relation(fields: [idsalida], references: [idsalida])
@@ -77,12 +78,13 @@ model Reserva {
 }
 
 model Reembolso {
-  idreembolso      Int      @id @default(autoincrement())
-  idreserva        Int
-  idusuario        Int
-  montoReembolsado Float
-  motivo           String
-  fechaReembolso   DateTime @default(now())
+  idreembolso       Int      @id @default(autoincrement())
+  idreserva         Int
+  idusuario         Int
+  montoReembolsado  Float
+  motivo            String
+  condicionAplicada String? // RES-06: regla de reintegro que se aplicó
+  fechaReembolso    DateTime @default(now())
 
   reserva Reserva @relation(fields: [idreserva], references: [idreserva])
   usuario Usuario @relation(fields: [idusuario], references: [idusuario])
@@ -251,6 +253,7 @@ model Paquete {
   nochesPrevias             Int     @default(0)
   nochesPosteriores         Int     @default(0)
   diasDisponibles           String? // Formato JSON o CSV de días habilitados
+  diasMinimosReintegro      Int? // RES-06: anticipación mínima para el reintegro del 100% (null = sin plazo)
 
   circuito                 Circuito                  @relation(fields: [idcircuito], references: [idcircuito])
   garantiasEstablecimiento GarantiaEstablecimiento[]

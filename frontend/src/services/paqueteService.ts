@@ -138,6 +138,7 @@ export type Paquete = {
     tipoHabitacionGarantizada?: string | null;
     nochesPrevias: number;
     nochesPosteriores: number;
+    diasMinimosReintegro?: number | null;
     diasDisponibles?: string | null;
     imagenPrincipal?: string;
     imagenes?: string[];
@@ -181,6 +182,7 @@ export type DatosCrearPaquete = {
     tipoHabitacionGarantizada?: string;
     nochesPrevias: number;
     nochesPosteriores: number;
+    diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
     matrizPrecios: PrecioTemporadaInput[];
     serviciosIncluidos: number[];
@@ -197,6 +199,7 @@ export type DatosModificarPaquete = {
     tipoHabitacionGarantizada?: string;
     nochesPrevias?: number;
     nochesPosteriores?: number;
+    diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
     matrizPrecios?: PrecioTemporadaInput[];
     serviciosIncluidos?: number[];

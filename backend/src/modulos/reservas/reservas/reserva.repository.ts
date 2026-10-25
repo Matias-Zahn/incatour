@@ -12,6 +12,7 @@ export interface DatosConfirmacionReserva {
   precioPaquetePorPersona: number;
   adicionalesEquipaje: number;
   moneda: string;
+  diasMinimosReintegro: number | null; // RES-06
   condicionesComerciales: string;
   medioPago: string;
   pasajeros: PasajeroInput[];
@@ -146,6 +147,7 @@ export class ReservaRepository {
           precioPaquetePorPersona: d.precioPaquetePorPersona,
           adicionalesEquipaje: d.adicionalesEquipaje,
           moneda: d.moneda,
+          diasMinimosReintegro: d.diasMinimosReintegro,
           condicionesComerciales: d.condicionesComerciales,
           estado: "CONFIRMADA",
           estadoAlojamiento: d.estadoAlojamiento,

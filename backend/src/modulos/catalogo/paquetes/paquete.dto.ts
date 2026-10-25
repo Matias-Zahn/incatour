@@ -19,6 +19,7 @@ export class CrearPaqueteDto {
     public nochesPosteriores?: number,
     public diasDisponibles?: string,
     public serviciosIncluidos?: number[],
+    public diasMinimosReintegro?: number | null,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearPaqueteDto?] {
@@ -28,7 +29,7 @@ export class CrearPaqueteDto {
       idcircuito, nombrePaquete, condiciones, tipoGarantia,
       idservicioGarantizado, localidadGarantizada, categoriaGarantizada,
       tipoHabitacionGarantizada, nochesPrevias, nochesPosteriores,
-      diasDisponibles, matrizPrecios, serviciosIncluidos,
+      diasDisponibles, matrizPrecios, serviciosIncluidos, diasMinimosReintegro,
     } = obj;
 
     // --- Validaciones obligatorias ---
@@ -79,6 +80,11 @@ export class CrearPaqueteDto {
       return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
     }
 
+    // RES-06: plazo de reintegro (opcional; sin plazo, el reintegro es siempre del 100%)
+    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0)) {
+      return ["diasMinimosReintegro debe ser un número entero mayor o igual a 0."];
+    }
+
     // --- Validación de matriz de precios (RN: Viabilidad Comercial, CAT-11) ---
     if (!Array.isArray(matrizPrecios) || matrizPrecios.length === 0) {
       return ["La matriz de precios es obligatoria y debe contener al menos una tarifa."];
@@ -126,6 +132,7 @@ export class CrearPaqueteDto {
       nochesPrevias ?? 0, nochesPosteriores ?? 0,
       diasDisponibles,
       serviciosIncluidos ?? [],
+      diasMinimosReintegro ?? null,
     )];
   }
 }
@@ -145,6 +152,7 @@ export class ModificarPaqueteDto {
     public categoriaGarantizada?: string,
     public tipoHabitacionGarantizada?: string,
     public serviciosIncluidos?: number[],
+    public diasMinimosReintegro?: number | null,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarPaqueteDto?] {
@@ -154,7 +162,7 @@ export class ModificarPaqueteDto {
       nombrePaquete, condiciones, nochesPrevias, nochesPosteriores,
       diasDisponibles, matrizPrecios, idcircuito, tipoGarantia,
       idservicioGarantizado, localidadGarantizada, categoriaGarantizada,
-      tipoHabitacionGarantizada, serviciosIncluidos,
+      tipoHabitacionGarantizada, serviciosIncluidos, diasMinimosReintegro,
     } = obj;
 
     if (
@@ -162,7 +170,8 @@ export class ModificarPaqueteDto {
       nochesPosteriores == null && diasDisponibles === undefined && matrizPrecios === undefined &&
       idcircuito == null && tipoGarantia === undefined && idservicioGarantizado === undefined &&
       localidadGarantizada === undefined && categoriaGarantizada === undefined &&
-      tipoHabitacionGarantizada === undefined && serviciosIncluidos === undefined
+      tipoHabitacionGarantizada === undefined && serviciosIncluidos === undefined &&
+      diasMinimosReintegro === undefined
     ) {
       return ["Debe enviar al menos un campo para modificar."];
     }
@@ -191,6 +200,11 @@ export class ModificarPaqueteDto {
     }
     if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
       return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
+    }
+
+    // RES-06: null quita el plazo (reintegro siempre del 100%)
+    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0)) {
+      return ["diasMinimosReintegro debe ser un número entero mayor o igual a 0."];
     }
 
     // Si mandan matrizPrecios en el PUT, validamos la estructura
@@ -235,7 +249,7 @@ export class ModificarPaqueteDto {
       matrizPrecios as PrecioTemporada[] | undefined,
       idcircuito, tipoGarantia, idservicioGarantizado,
       localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada,
-      serviciosIncluidos,
+      serviciosIncluidos, diasMinimosReintegro,
     )];
   }
 }

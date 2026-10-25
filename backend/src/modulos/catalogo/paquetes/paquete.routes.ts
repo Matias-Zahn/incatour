@@ -57,6 +57,10 @@ import { PaqueteController } from "./paquete.controller";
  *                 type: integer
  *               nochesPosteriores:
  *                 type: integer
+ *               diasMinimosReintegro:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: Días mínimos de anticipación para el reintegro del 100% (RES-06). Vacío = sin plazo.
  *               matrizPrecios:
  *                 type: array
  *                 items:
