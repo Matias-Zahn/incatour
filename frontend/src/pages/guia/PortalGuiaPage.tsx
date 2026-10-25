@@ -37,6 +37,7 @@ export default function PortalGuiaPage() {
         data: salidas = [],
         isLoading: cargandoSalidas,
         isError: errorSalidas,
+        error: errorSalidasObj,
     } = useSalidasGuia();
 
     const [idsalidaSeleccionada, setIdsalidaSeleccionada] = useState<number | null>(
@@ -57,6 +58,15 @@ export default function PortalGuiaPage() {
         data: detalleSalida = null,
         isLoading: cargandoDetalle,
     } = useDetalleSalidaGuia(salidaActual?.idsalida ?? 0);
+
+    const mensajeErrorSalidas =
+        errorSalidasObj instanceof Error && errorSalidasObj.message
+            ? errorSalidasObj.message
+            : typeof errorSalidasObj === "object" &&
+                errorSalidasObj !== null &&
+                "message" in errorSalidasObj
+              ? String((errorSalidasObj as { message: unknown }).message)
+              : "No se pudieron cargar las salidas asignadas.";
 
     useEffect(() => {
         document.title = "Portal Guía · IncaTour";
@@ -86,12 +96,12 @@ export default function PortalGuiaPage() {
             <main className="flex-1 overflow-x-hidden p-4 md:p-8">
                 <div className="mx-auto max-w-6xl">
                     {errorSalidas ? (
-                        <div className="rounded-tarjeta border border-peligro/30 bg-peligro/10 p-5 text-sm text-texto">
+                        <div className="mb-6 rounded-tarjeta border border-peligro/30 bg-peligro/10 p-5 text-sm text-texto">
                             <p className="font-bold text-peligro">
-                                No se pudieron cargar las salidas asignadas.
+                                {mensajeErrorSalidas}
                             </p>
                             <p className="mt-1 text-xs text-texto-suave">
-                                Verifica que tu usuario posea el rol de GUIA y cuente con salidas asignadas.
+                                Verifica que tu cuenta cuente con los permisos necesarios o contacta al administrador.
                             </p>
                         </div>
                     ) : null}
