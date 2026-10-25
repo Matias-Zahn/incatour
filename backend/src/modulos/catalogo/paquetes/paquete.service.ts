@@ -115,6 +115,22 @@ export class PaqueteService {
       await this.validarGarantiaAlojamiento(idGarantizadoFinal);
     }
 
+    // CAT-08/CAT-14: por categoría se valida el estado final (RF-06) y no puede quedar un hotel garantizado
+    if (tipoGarantiaFinal === "POR_CATEGORIA") {
+      if (dto.idservicioGarantizado != null) {
+        throw CustomError.badRequest("Con garantía por categoría, no debe indicarse idservicioGarantizado.");
+      }
+      if (!(dto.localidadGarantizada ?? paquete.localidadGarantizada)) {
+        throw CustomError.badRequest("Con garantía por categoría, localidadGarantizada es obligatoria.");
+      }
+      if (!(dto.categoriaGarantizada ?? paquete.categoriaGarantizada)) {
+        throw CustomError.badRequest("Con garantía por categoría, categoriaGarantizada es obligatoria.");
+      }
+      if (!(dto.tipoHabitacionGarantizada ?? paquete.tipoHabitacionGarantizada)) {
+        throw CustomError.badRequest("Con garantía por categoría, tipoHabitacionGarantizada es obligatoria.");
+      }
+    }
+
     // Validar servicios incluidos si se envían
     if (dto.serviciosIncluidos && dto.serviciosIncluidos.length > 0) {
       await this.validarServiciosExisten(dto.serviciosIncluidos);
