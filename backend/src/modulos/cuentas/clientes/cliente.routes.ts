@@ -31,6 +31,30 @@ export class ClienteRoutes {
 
     /**
      * @swagger
+     * /api/clientes/mi-perfil:
+     *   get:
+     *     summary: Obtener el perfil del cliente autenticado
+     *     description: >
+     *       **RESTRINGIDO AL PERFIL CLIENTE.**
+     *       Deduce el cliente del token, así la pantalla Mi cuenta no necesita el idcliente.
+     *       Devuelve la misma forma que `GET /api/clientes/{id}`.
+     *     tags: [Clientes]
+     *     security:
+     *       - BearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Perfil del cliente.
+     *       401:
+     *         description: Token no proporcionado o inválido/expirado.
+     *       403:
+     *         description: Acceso denegado. Se requiere el perfil CLIENTE.
+     *       404:
+     *         description: El usuario no tiene un cliente asociado.
+     */
+    router.get("/mi-perfil", autenticar, requierePerfil("CLIENTE"), controller.consultarMiPerfil);
+
+    /**
+     * @swagger
      * /api/clientes/{id}:
      *   get:
      *     summary: Obtener un cliente por su ID

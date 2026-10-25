@@ -21,6 +21,7 @@ Se lee junto con `openapi.json`, que tiene el detalle de cada endpoint.
 - **El token** dura **8 horas** y va en cada pedido como `Authorization: Bearer <token>`.
 - **Perfiles (`rol`):** `ADMIN`, `CLIENTE` y `GUIA`. Cada endpoint dice en su descripción qué perfil exige.
 - **El token no trae `idcliente` ni `idpersonal`:** los endpoints del cliente y del guía los deducen del token. Por eso no se mandan en el body.
+  - Para consultar el perfil del cliente sin conocer su `idcliente`: `GET /api/clientes/mi-perfil` (solo CLIENTE; misma forma que `GET /api/clientes/{id}`).
 - **Endpoints públicos (sin token):**
   - `POST /api/auth/login`;
   - `POST /api/clientes` (registro);

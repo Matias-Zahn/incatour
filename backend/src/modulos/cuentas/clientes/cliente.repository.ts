@@ -21,6 +21,15 @@ export class ClienteRepository {
     });
   }
 
+  async findByUsuario(idusuario: number) {
+    return db.cliente.findUnique({
+      where: { idusuario },
+      include: {
+        usuario: { select: { nombre: true, apellido: true, email: true } }
+      }
+    });
+  }
+
   async checkEmailExists(email: string) {
     return db.usuario.findUnique({ where: { email } });
   }

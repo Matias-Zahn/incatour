@@ -15,6 +15,15 @@ export class ClienteController {
     }
   };
 
+  consultarMiPerfil = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const resultado = await service.consultarMiPerfil(req.usuarioAutenticado!.idusuario);
+      return res.status(200).json({ data: resultado });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   consultarClientePorId = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id as string);
