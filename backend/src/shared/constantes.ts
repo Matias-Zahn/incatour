@@ -15,9 +15,9 @@ export const ESTADO_SOLICITUD = {
   CANCELADA: "CANCELADA", // dada de baja por cancelación de reserva o de salida (CU-32, CU-37)
 } as const;
 
-// Plan 9/10: estadoTramite solo toma Emitido, Perdido o Dado de baja.
+// Plan 9/10: estadoTramite solo toma Emitido, Perdido, Dado de baja o Rechazado (RF-47, sin nroPermiso).
 // "No emitido" NO es un estado: es la ausencia de fila de permiso.
-export const ESTADO_PERMISO = { EMITIDO: "Emitido", PERDIDO: "Perdido", DADO_DE_BAJA: "Dado de baja" } as const;
+export const ESTADO_PERMISO = { EMITIDO: "Emitido", PERDIDO: "Perdido", DADO_DE_BAJA: "Dado de baja", RECHAZADO: "Rechazado" } as const;
 
 export const ESTADO_SALIDA = {
   PUBLICADA: "PUBLICADA",

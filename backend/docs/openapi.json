@@ -1752,7 +1752,7 @@
       },
       "post": {
         "summary": "Confirmar asignación de recursos y emitir permisos (CU-40)",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** Asigna personal, transporte y equipamiento, emite los permisos de toda la nómina (pasajeros y personal), devuelve al hotel las plazas no vendidas, libera los lugares sobrantes del bloqueo y cierra la venta. Si la base falla después de emitir, los permisos se dan de baja.\n",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** Asigna personal, transporte y equipamiento, emite los permisos de toda la nómina (pasajeros y personal), devuelve al hotel las plazas no vendidas, libera los lugares sobrantes del bloqueo y cierra la venta. Si la base falla después de emitir, los permisos se dan de baja. Si la autoridad rechaza a alguien (RF-47), la asignación se confirma igual: ese permiso queda registrado como \"Rechazado\", sin número, y la respuesta lo informa en `rechazados`. El lugar de un pasajero rechazado se libera con los sobrantes; el de un personal rechazado queda reservado para su reemplazo (CU-38).\n",
         "tags": [
           "Salidas"
         ],
@@ -1821,7 +1821,7 @@
         },
         "responses": {
           "200": {
-            "description": "Asignación confirmada. Informa los permisos emitidos y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes."
+            "description": "Asignación confirmada. Informa los permisos emitidos, los rechazados por la autoridad (`rechazados`: tipo, id, nombreCompleto y motivo) y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes."
           },
           "400": {
             "description": "Personal ocupado",

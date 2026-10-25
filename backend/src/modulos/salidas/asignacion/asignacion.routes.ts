@@ -45,6 +45,9 @@ export class AsignacionRoutes {
      *       **RESTRINGIDO A ADMINISTRADOR.** Asigna personal, transporte y equipamiento, emite los permisos de
      *       toda la nómina (pasajeros y personal), devuelve al hotel las plazas no vendidas, libera los lugares
      *       sobrantes del bloqueo y cierra la venta. Si la base falla después de emitir, los permisos se dan de baja.
+     *       Si la autoridad rechaza a alguien (RF-47), la asignación se confirma igual: ese permiso queda registrado como
+     *       "Rechazado", sin número, y la respuesta lo informa en `rechazados`. El lugar de un pasajero rechazado se libera
+     *       con los sobrantes; el de un personal rechazado queda reservado para su reemplazo (CU-38).
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -68,7 +71,7 @@ export class AsignacionRoutes {
      *                     idservicio: { type: integer, example: 5 }
      *                     cantidad: { type: integer, example: 4 }
      *     responses:
-     *       200: { description: "Asignación confirmada. Informa los permisos emitidos y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
+     *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados por la autoridad (`rechazados`: tipo, id, nombreCompleto y motivo) y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
      *       400: { description: Personal ocupado, dado de baja o sin habilitación (FA1), stock insuficiente (FA2), transporte sin cupo (FA3), pasaportes vencidos (FA4) o dotación incompleta. }
      *       404: { description: La salida no existe. }
      *       409: { description: Hay reservas con el alojamiento pendiente (FA5), o la salida, el personal o el transporte cambiaron mientras se asignaba. }
