@@ -253,8 +253,8 @@ export function VistaAvances({
         if (sugerida === undefined || ultimaSugerida.current === sugerida) return;
         const esPrimera = ultimaSugerida.current === undefined;
         ultimaSugerida.current = sugerida;
-        if (esPrimera && borrador?.numeroOrden) return;
-        setValue("numeroOrden", sugerida);
+        // La primera vez se fija el borrador (si hay): al cargar el formulario las etapas todavía no estaban
+        setValue("numeroOrden", esPrimera && borrador?.numeroOrden ? borrador.numeroOrden : sugerida);
     }, [sugerida, borrador?.numeroOrden, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
