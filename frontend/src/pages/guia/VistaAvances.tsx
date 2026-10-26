@@ -59,35 +59,33 @@ function construirListaHistorial(
             offline: false,
         }));
 
-    // Avances en localStorage (con prioridad a pendientes offline)
-    const locales = obtenerHistorialLocalAvances(idSalida);
-
-    const mapa = new Map<string, RegistroHistorialAvance>();
-
-    // 1. Añadir pendientes offline primero (tienen prioridad visual por ser cambios locales no confirmados aún)
-    for (const item of avancesPendientesLocales) {
-        mapa.set(item.etapaNombre, {
+    // Pendientes offline (aún sin confirmar), uno por avance, del más reciente al más antiguo
+    const pendientes: RegistroHistorialAvance[] = [...avancesPendientesLocales]
+        .reverse()
+        .map((item) => ({
             id: item.idLocal,
             etapa: item.etapaNombre,
             estadoTramo: item.estadoTramo,
             fechaHora: `${item.fechaHoraLlegada.slice(0, 10)} (Offline)`,
             offline: true,
-        });
-    }
+        }));
+    const idsPendientes = new Set(pendientes.map((p) => p.id));
 
-    // 2. Añadir del servidor (del más reciente al más antiguo, si no hay uno offline pendiente para esa etapa)
-    for (const item of [...delServidor].reverse()) {
-        if (!mapa.has(item.etapa)) {
-            mapa.set(item.etapa, item);
-        }
-    }
+    // Historial local (más reciente primero): trae TODOS los avances enviados desde este dispositivo,
+    // incluidos los DEMORADO que el itinerario del servidor ya no muestra. Un offline que ya no está
+    // en la cola se sincronizó, y los pendientes ya van arriba.
+    const locales = obtenerHistorialLocalAvances(idSalida)
+        .filter((l) => !idsPendientes.has(l.id))
+        .map((l) => ({ ...l, offline: false }));
 
-    // 3. Fallback: si no hay en servidor ni offline pendientes, pero hay historial local
-    if (mapa.size === 0 && locales.length > 0) {
-        return locales;
-    }
+    // El servidor solo informa el último estado de cada etapa: se omite si ya está en el historial local
+    const clave = (r: RegistroHistorialAvance) => `${r.etapa}|${r.estadoTramo}`;
+    const clavesLocales = new Set(locales.map(clave));
+    const soloServidor = [...delServidor]
+        .reverse()
+        .filter((r) => !clavesLocales.has(clave(r)));
 
-    return Array.from(mapa.values());
+    return [...pendientes, ...locales, ...soloServidor];
 }
 
 export function VistaAvances({
