@@ -10,10 +10,12 @@ import Tabla from "../../components/Tabla";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
+import FormularioModificarLogistica from "../../components/FormularioModificarLogistica";
 import { ErrorApi } from "../../services/clienteApi";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
+    fechaLocalHoy,
     formatearEstadoSalida,
     formatearFechaSalida,
 } from "../../services/guiaService";
@@ -28,8 +30,10 @@ import {
     useConfirmarReemplazo,
     useCrearSalida,
     useLiberarSobrantes,
+    useModificarLogistica,
     useOpcionesSalida,
     usePanelAsignacion,
+    usePanelLogistica,
     usePersonalSalida,
     useSalidas,
     type DatosCrearSalida,
@@ -37,9 +41,9 @@ import {
     type ParametrosConsultaOpciones,
     type PayloadConfirmarAsignacion,
     type PayloadConfirmarReemplazo,
+    type PayloadModificarLogistica,
     type Salida,
 } from "../../services/salidaService";
-import { fechaLocalHoy } from "../../services/guiaService";
 import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
@@ -130,10 +134,28 @@ function SalidasPage() {
 
     const confirmarReemplazoMutation = useConfirmarReemplazo();
 
+    // Estados para la modificación de logística (CU-39)
+    const [salidaParaModificarLogistica, setSalidaParaModificarLogistica] = useState<Salida | null>(null);
+    const [errorModificarLogistica, setErrorModificarLogistica] = useState("");
+    const [resultadoModificarLogistica, setResultadoModificarLogistica] = useState<{
+        nroSalida: string;
+        advertencias: string[];
+    } | null>(null);
+
+    const {
+        data: datosLogisticaSalida,
+        isPending: cargandoLogisticaSalida,
+        error: errorLogisticaSalida,
+        refetch: recargarLogisticaSalida,
+    } = usePanelLogistica(salidaParaModificarLogistica?.idsalida ?? null);
+
+    const modificarLogisticaMutation = useModificarLogistica();
+
     function abrirFormulario() {
         setFormularioAbierto(true);
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
+        setSalidaParaModificarLogistica(null);
         setParametrosConsulta(null);
         setErrorCreacion("");
         setMensajeExito(null);
@@ -142,6 +164,7 @@ function SalidasPage() {
         setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
         setErrorReemplazo("");
+        setErrorModificarLogistica("");
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
         }
@@ -157,6 +180,7 @@ function SalidasPage() {
     function abrirAsignacion(salida: Salida) {
         setSalidaParaAsignar(salida);
         setSalidaParaReemplazar(null);
+        setSalidaParaModificarLogistica(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -164,6 +188,7 @@ function SalidasPage() {
         setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
         setErrorReemplazo("");
+        setErrorModificarLogistica("");
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
         }
@@ -179,6 +204,7 @@ function SalidasPage() {
     function abrirReemplazo(salida: Salida) {
         setSalidaParaReemplazar(salida);
         setSalidaParaAsignar(null);
+        setSalidaParaModificarLogistica(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -186,6 +212,7 @@ function SalidasPage() {
         setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
         setErrorReemplazo("");
+        setErrorModificarLogistica("");
         setResultadoReemplazo(null);
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
@@ -196,6 +223,57 @@ function SalidasPage() {
     function cerrarReemplazo() {
         setSalidaParaReemplazar(null);
         setErrorReemplazo("");
+    }
+
+    function abrirModificarLogistica(salida: Salida) {
+        setSalidaParaModificarLogistica(salida);
+        setSalidaParaAsignar(null);
+        setSalidaParaReemplazar(null);
+        setFormularioAbierto(false);
+        setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
+        setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
+        setErrorModificarLogistica("");
+        setResultadoModificarLogistica(null);
+        if (!resultadoAsignacion?.advertencia) {
+            setResultadoAsignacion(null);
+        }
+        setPayloadConfirmarAsignacion(null);
+    }
+
+    function cerrarModificarLogistica() {
+        setSalidaParaModificarLogistica(null);
+        setErrorModificarLogistica("");
+    }
+
+    function manejarConfirmarModificacionLogistica(payload: PayloadModificarLogistica) {
+        if (!salidaParaModificarLogistica || modificarLogisticaMutation.isPending) return;
+
+        setErrorModificarLogistica("");
+        const nroSalida = salidaParaModificarLogistica.nroSalida;
+        const idsalida = salidaParaModificarLogistica.idsalida;
+
+        modificarLogisticaMutation.mutate(
+            { idsalida, datos: payload },
+            {
+                onSuccess: (resultado) => {
+                    setResultadoModificarLogistica({
+                        nroSalida,
+                        advertencias: resultado.advertencias ?? [],
+                    });
+                    setSalidaParaModificarLogistica(null);
+                    setErrorModificarLogistica("");
+                },
+                onError: (error) => {
+                    const mensaje =
+                        error?.message || "Ocurrió un error al modificar la logística de la salida.";
+                    setErrorModificarLogistica(mensaje);
+                },
+            },
+        );
     }
 
     function manejarConfirmarReemplazo(payload: PayloadConfirmarReemplazo) {
@@ -784,12 +862,20 @@ function SalidasPage() {
                     fechaFutura &&
                     !sinPersonal;
 
+                // CU-39: Modificar logística
+                // Únicamente para administradores y salidas en estado CERRADA con fecha de inicio futura.
+                const puedeModificarLogistica =
+                    esAdmin &&
+                    fila.estado === "CERRADA" &&
+                    fechaFutura;
+
                 if (
                     !tieneSolicitudes &&
                     !esFinalizada &&
                     !puedeAsignar &&
                     !puedeLiberarSobrantes &&
-                    !puedeReemplazarPersonal
+                    !puedeReemplazarPersonal &&
+                    !puedeModificarLogistica
                 ) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
@@ -805,7 +891,8 @@ function SalidasPage() {
                                 disabled={
                                     confirmarAsignacionMutation.isPending ||
                                     liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending
+                                    confirmarReemplazoMutation.isPending ||
+                                    modificarLogisticaMutation.isPending
                                 }
                                 onClick={() => abrirAsignacion(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -819,12 +906,28 @@ function SalidasPage() {
                                 disabled={
                                     confirmarAsignacionMutation.isPending ||
                                     liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending
+                                    confirmarReemplazoMutation.isPending ||
+                                    modificarLogisticaMutation.isPending
                                 }
                                 onClick={() => abrirReemplazo(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Reemplazar personal
+                            </button>
+                        )}
+                        {puedeModificarLogistica && (
+                            <button
+                                type="button"
+                                disabled={
+                                    confirmarAsignacionMutation.isPending ||
+                                    liberarSobrantesMutation.isPending ||
+                                    confirmarReemplazoMutation.isPending ||
+                                    modificarLogisticaMutation.isPending
+                                }
+                                onClick={() => abrirModificarLogistica(fila)}
+                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Modificar logística
                             </button>
                         )}
                         {puedeLiberarSobrantes && (
@@ -833,7 +936,8 @@ function SalidasPage() {
                                 disabled={
                                     confirmarAsignacionMutation.isPending ||
                                     liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending
+                                    confirmarReemplazoMutation.isPending ||
+                                    modificarLogisticaMutation.isPending
                                 }
                                 onClick={() =>
                                     manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
@@ -1247,6 +1351,53 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
+            {resultadoModificarLogistica ? (
+                <Alerta
+                    tipo={
+                        resultadoModificarLogistica.advertencias.length > 0
+                            ? "advertencia"
+                            : "exito"
+                    }
+                    titulo={
+                        resultadoModificarLogistica.advertencias.length > 0
+                            ? "Logística modificada con observaciones"
+                            : "Logística modificada exitosamente"
+                    }
+                >
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">
+                                Se actualizaron los recursos de transporte y equipamiento para la salida{" "}
+                                <span className="font-bold text-navegacion">
+                                    {resultadoModificarLogistica.nroSalida}
+                                </span>
+                                .
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setResultadoModificarLogistica(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+
+                        {resultadoModificarLogistica.advertencias.length > 0 && (
+                            <div className="rounded bg-amber-100/70 border border-amber-300 p-2.5 text-xs text-amber-950 space-y-1">
+                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-900">
+                                    Requerimientos pendientes informados por el sistema:
+                                </span>
+                                <ul className="list-disc list-inside space-y-0.5 font-medium">
+                                    {resultadoModificarLogistica.advertencias.map((adv, i) => (
+                                        <li key={i}>{adv}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </Alerta>
+            ) : null}
+
             {salidaParaAsignar ? (
                 <FormularioAsignarRecursos
                     key={salidaParaAsignar.idsalida}
@@ -1277,6 +1428,23 @@ function SalidasPage() {
                     onRecargarDatos={() => recargarPersonalSalida()}
                     onConfirmarReemplazo={manejarConfirmarReemplazo}
                     onCancelar={cerrarReemplazo}
+                />
+            ) : null}
+
+            {salidaParaModificarLogistica ? (
+                <FormularioModificarLogistica
+                    key={salidaParaModificarLogistica.idsalida}
+                    idsalida={salidaParaModificarLogistica.idsalida}
+                    datosLogistica={datosLogisticaSalida}
+                    cargandoLogistica={cargandoLogisticaSalida}
+                    errorLogistica={
+                        errorLogisticaSalida ? errorLogisticaSalida.message : undefined
+                    }
+                    guardando={modificarLogisticaMutation.isPending}
+                    errorModificacion={errorModificarLogistica}
+                    onRecargarDatos={() => recargarLogisticaSalida()}
+                    onConfirmarModificacion={manejarConfirmarModificacionLogistica}
+                    onCancelar={cerrarModificarLogistica}
                 />
             ) : null}
 
