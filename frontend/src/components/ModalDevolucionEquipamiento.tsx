@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useIsMutating } from "@tanstack/react-query";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
 import DialogoConfirmacion from "./DialogoConfirmacion";
 import { ErrorApi } from "../services/clienteApi";
 import { formatearFechaSalida } from "../services/guiaService";
 import {
+    claveMutacionDevolucion,
     useEquipamientoAsignado,
     useRegistrarDevolucion,
     type ItemEquipamientoAsignado,
@@ -473,9 +475,12 @@ export function ModalDevolucionEquipamiento({
         enabled: abierto && idsalida !== null,
     });
 
+    // FE-45: con el registro en curso no se cierra (Escape, clic afuera ni Cancelar)
+    const registrando = useIsMutating({ mutationKey: claveMutacionDevolucion }) > 0;
     const manejarCerrar = useCallback(() => {
+        if (registrando) return;
         onCerrar();
-    }, [onCerrar]);
+    }, [onCerrar, registrando]);
 
     // Cierre con Escape
     useEffect(() => {

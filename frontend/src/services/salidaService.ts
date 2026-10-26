@@ -1222,9 +1222,13 @@ export function useEquipamientoAsignado(
  * Hook para registrar la devolución de equipamiento reintegrándolo al stock (CU-41).
  * Invalida consultas de salidas, equipamiento asignado y catálogo de servicios tras el éxito.
  */
+/** FE-45: el modal de devolución la usa para no cerrarse mientras el registro está en curso. */
+export const claveMutacionDevolucion = ["registrarDevolucion"];
+
 export function useRegistrarDevolucion() {
     const queryClient = useQueryClient();
     return useMutation({
+        mutationKey: claveMutacionDevolucion,
         mutationFn: ({ idsalida, datos }: ParametrosRegistrarDevolucion) =>
             registrarDevolucionEquipamiento(idsalida, datos),
         onSuccess: (_resultado, variables) => {

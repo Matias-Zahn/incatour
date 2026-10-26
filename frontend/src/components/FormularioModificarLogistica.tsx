@@ -104,19 +104,16 @@ export function FormularioModificarLogistica({
         return mapa;
     }, [equipamientos]);
 
-    // Opciones para el selector de nuevo equipamiento (excluyendo los ya asignados y los ya agregados)
+    // Opciones para el selector de nuevo equipamiento (excluyendo los asignados, aunque estén
+    // marcados para quitar (FE-45), y los ya agregados)
     const opcionesEquipamientoDisponibles = useMemo(() => {
-        const idsAsignados = new Set(
-            (datosLogistica?.equipamiento ?? [])
-                .filter((e) => !(estadoOriginalEquipamiento[e.idservicio]?.quitado))
-                .map((e) => e.idservicio),
-        );
+        const idsAsignados = new Set((datosLogistica?.equipamiento ?? []).map((e) => e.idservicio));
         const idsNuevos = new Set(nuevosEquipamientos.map((e) => e.idservicio));
 
         return equipamientos.filter(
             (eq) => !idsAsignados.has(eq.idservicio) && !idsNuevos.has(eq.idservicio),
         );
-    }, [equipamientos, datosLogistica?.equipamiento, estadoOriginalEquipamiento, nuevosEquipamientos]);
+    }, [equipamientos, datosLogistica?.equipamiento, nuevosEquipamientos]);
 
     // Cálculo de itemsDesasignar e itemsNuevos
     const { itemsDesasignar, itemsNuevos, resumenCambios, errorValidacionTransporte } = useMemo(() => {
