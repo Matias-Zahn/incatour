@@ -35,6 +35,7 @@ export class CuentaGuiaService {
     if (personal.guia?.idusuario) {
       throw CustomError.badRequest("Este guía ya posee una cuenta de acceso registrada.");
     }
+    this.validarHabilitacion(dto.fechaHabilitacion);
 
     const emailExiste = await this.repository.checkEmailExists(dto.email);
     if (emailExiste) {
@@ -67,6 +68,11 @@ export class CuentaGuiaService {
     if (!cuenta || !cuenta.usuario) {
       throw CustomError.notFound(`No se encontró una cuenta de guía con ID de usuario ${idusuario}.`);
     }
+    // CTA-07: una cuenta dada de baja no se modifica
+    if (cuenta.usuario.estado === ESTADO.INACTIVO) {
+      throw CustomError.badRequest("No se puede modificar una cuenta de guía dada de baja.");
+    }
+    this.validarHabilitacion(dto.fechaHabilitacion);
 
     if (dto.email && dto.email !== cuenta.usuario.email) {
       const emailExiste = await this.repository.checkEmailExists(dto.email);
@@ -115,6 +121,13 @@ export class CuentaGuiaService {
   }
 
   // ---- helpers ----
+  // CTA-07: misma regla que el legajo del personal (CU-23/24): la habilitación no puede estar vencida
+  private validarHabilitacion(fechaHabilitacion: Date | undefined) {
+    if (fechaHabilitacion && fechaHabilitacion < hoyUTC()) {
+      throw CustomError.badRequest("La habilitación no puede estar vencida");
+    }
+  }
+
   private formatear(c: CuentaGuia) {
     const usuario = c.usuario!;
     const salidasPendientes = c.personal.asignaciones.length;
