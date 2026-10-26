@@ -1628,16 +1628,7 @@ function CatalogoCompraPage() {
                                     Sesión de cliente requerida para abonar
                                 </p>
                                 <p>
-                                    Ingresá con tu cuenta de cliente (por
-                                    ejemplo:{" "}
-                                    <code className="font-mono font-bold">
-                                        juan@test.com
-                                    </code>{" "}
-                                    /{" "}
-                                    <code className="font-mono font-bold">
-                                        hash123
-                                    </code>
-                                    ) para emitir la reserva.
+                                    Ingresá con tu cuenta de cliente para emitir la reserva.
                                 </p>
                                 <Boton
                                     type="button"
