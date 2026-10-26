@@ -1,4 +1,5 @@
 import { CustomError } from "../../../error/CustomError";
+import { hoyUTC } from "../../../shared/fechas";
 import { DevolucionEquipamientoDto } from "./devolucion-equipamiento.dto";
 import { DevolucionEquipamientoRepository } from "./devolucion-equipamiento.repository";
 
@@ -50,9 +51,8 @@ export class DevolucionEquipamientoService {
       );
     }
 
-    // Regla de Negocio: la salida debe haber finalizado
-    const ahora = new Date();
-    const yaConcluyo = salida.estado === "FINALIZADA" || salida.fechaFin <= ahora;
+    // Regla de Negocio: la salida debe haber finalizado. SAL-14: por día calendario local, desde el último día (BE-01)
+    const yaConcluyo = salida.estado === "FINALIZADA" || hoyUTC() >= salida.fechaFin;
     if (!yaConcluyo) {
       throw CustomError.badRequest(
         "Solo se puede registrar la devolución del equipamiento de una salida concluida o en estado FINALIZADA."
