@@ -63,6 +63,31 @@ describe("GestionReservaService.confirmarCancelacion sobre una salida CERRADA (R
   });
 });
 
+describe("GestionReservaService.confirmarCancelacion con cambios en el medio (RES-14)", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const cliente = { idusuario: 5, email: "a@b.com", rol: "CLIENTE" };
+
+  it("si CU-40 emitió permisos mientras tanto, recalcula con los permisos nuevos", async () => {
+    const lejana = { idsalida: 7, estado: "PUBLICADA", fechaInicio: dias(30) };
+    repo.findParaCancelacion
+      .mockResolvedValueOnce(reserva({ salida: lejana }))
+      .mockResolvedValueOnce(reserva({ salida: { ...lejana, estado: "CERRADA" }, permisos: [{ estadoTramite: "Emitido" }] }));
+    repo.cancelarReserva.mockResolvedValueOnce("CAMBIO").mockResolvedValueOnce({ idreembolso: 1, montoReembolsado: 0 });
+
+    const r = await new GestionReservaService().confirmarCancelacion(1, { motivo: "Prueba" }, cliente);
+
+    expect(repo.cancelarReserva).toHaveBeenLastCalledWith(expect.objectContaining({ permisosEmitidos: true, montoReembolsado: 0 }));
+    expect(r.lugaresVuelvenALaVenta).toBe(false);
+  });
+
+  it("si vuelve a cambiar, responde 409", async () => {
+    repo.findParaCancelacion.mockResolvedValue(reserva({ salida: { idsalida: 7, estado: "PUBLICADA", fechaInicio: dias(30) } }));
+    repo.cancelarReserva.mockResolvedValue("CAMBIO");
+
+    await expect(new GestionReservaService().confirmarCancelacion(1, { motivo: "Prueba" }, cliente)).rejects.toMatchObject({ statusCode: 409 });
+  });
+});
+
 describe("GestionReservaService.obtenerReserva: desglose (RES-07)", () => {
   const detalle = (over: Record<string, unknown>) => ({
     idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: null, fechaRealizacion: new Date(),

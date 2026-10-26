@@ -105,20 +105,16 @@ export class GestionReservaService {
 
   // DCD confirmarCancelacion (pasos 5 a 10)
   async confirmarCancelacion(idreserva: number, dto: CancelarReservaDto, usuario: UsuarioAutenticado) {
-    const ev = await this.evaluarCancelacion(idreserva, usuario);
-
-    const reembolso = await this.repository.cancelarReserva({
-      idreserva,
-      idsalida: ev.reserva.salida.idsalida,
-      idusuario: usuario.idusuario,
-      motivo: dto.motivo ?? "Sin motivo informado",
-      montoReembolsado: ev.montoAReintegrar,
-      condicionAplicada: ev.condicionAplicada,
-      cantidadPasajeros: ev.reserva.cantidadPasajeros,
-      permisosEmitidos: ev.permisosEmitidos,
-      alojamientoPorStock: ev.alojamientoPorStock,
-      salidaEnVenta: ev.salidaEnVenta,
-    });
+    // RES-14: si CU-40 emitió permisos o cerró la salida mientras tanto, se recalcula una vez con los datos nuevos
+    let ev = await this.evaluarCancelacion(idreserva, usuario);
+    let reembolso = await this.cancelar(idreserva, dto, usuario, ev);
+    if (reembolso === "CAMBIO") {
+      ev = await this.evaluarCancelacion(idreserva, usuario);
+      reembolso = await this.cancelar(idreserva, dto, usuario, ev);
+    }
+    if (reembolso === "CAMBIO") {
+      throw CustomError.conflict("La reserva cambió mientras se cancelaba. Volvé a consultar la cancelación.");
+    }
     if (!reembolso) throw CustomError.badRequest("La reserva ya había sido cancelada.");
 
     // Constancia al titular: si el mail falla, la cancelación ya está registrada
@@ -143,6 +139,24 @@ export class GestionReservaService {
   }
 
   // ===================== helpers =====================
+
+  private cancelar(
+    idreserva: number, dto: CancelarReservaDto, usuario: UsuarioAutenticado,
+    ev: Awaited<ReturnType<GestionReservaService["evaluarCancelacion"]>>,
+  ) {
+    return this.repository.cancelarReserva({
+      idreserva,
+      idsalida: ev.reserva.salida.idsalida,
+      idusuario: usuario.idusuario,
+      motivo: dto.motivo ?? "Sin motivo informado",
+      montoReembolsado: ev.montoAReintegrar,
+      condicionAplicada: ev.condicionAplicada,
+      cantidadPasajeros: ev.reserva.cantidadPasajeros,
+      permisosEmitidos: ev.permisosEmitidos,
+      alojamientoPorStock: ev.alojamientoPorStock,
+      salidaEnVenta: ev.salidaEnVenta,
+    });
+  }
 
   private async evaluarCancelacion(idreserva: number, usuario: UsuarioAutenticado) {
     const reserva = await this.repository.findParaCancelacion(idreserva);

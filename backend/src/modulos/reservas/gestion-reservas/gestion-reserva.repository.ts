@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 
 const INCLUDE_RESUMEN = {
@@ -131,6 +131,8 @@ export class GestionReservaRepository {
    *  - Sin permisos emitidos: el stock local recupera los lugares.
    *  - Alojamiento: se liberan las plazas bloqueadas o se cancela la solicitud vinculada.
    *  - Salida CERRADA (RES-13): no se vende más, así que el stock local no se toca y las plazas vuelven al hotel.
+   *  - RES-14: bloquea la salida (mismo orden que CU-40) y devuelve "CAMBIO" si los permisos o el estado de la
+   *    salida ya no son los que se usaron para calcular el reintegro; el servicio recalcula y reintenta.
    */
   async cancelarReserva(p: {
     idreserva: number;
@@ -145,6 +147,15 @@ export class GestionReservaRepository {
     salidaEnVenta: boolean;
   }) {
     return db.$transaction(async (tx) => {
+      const [salida] = await tx.$queryRaw<{ estado: string }[]>`
+        SELECT estado FROM public."Salida" WHERE idsalida = ${p.idsalida} FOR UPDATE`;
+      const emitidos = await tx.permisoPasajero.count({
+        where: { idreserva: p.idreserva, estadoTramite: ESTADO_PERMISO.EMITIDO },
+      });
+      if (emitidos > 0 !== p.permisosEmitidos || (salida?.estado === ESTADO_SALIDA.PUBLICADA) !== p.salidaEnVenta) {
+        return "CAMBIO" as const;
+      }
+
       const guarda = await tx.reserva.updateMany({
         where: { idreserva: p.idreserva, estado: ESTADO_RESERVA.CONFIRMADA },
         data: { estado: ESTADO_RESERVA.CANCELADA },
