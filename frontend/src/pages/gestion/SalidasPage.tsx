@@ -763,6 +763,7 @@ function SalidasPage() {
                     estadoAsignable &&
                     fechaFutura &&
                     sinPersonal &&
+                    fila.pasajerosConfirmados > 0 &&
                     !tieneAdvertenciaPendiente;
 
                 const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
