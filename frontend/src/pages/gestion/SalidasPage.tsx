@@ -10,6 +10,7 @@ import Tabla from "../../components/Tabla";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
+import { ErrorApi } from "../../services/clienteApi";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
@@ -969,6 +970,11 @@ function SalidasPage() {
                     creando={crearSalidaMutation.isPending}
                     errorServidor={
                         errorCreacion || (errorOpciones ? errorOpciones.message : undefined)
+                    }
+                    errorEsAutoridad={
+                        Boolean(errorCreacion) &&
+                        crearSalidaMutation.error instanceof ErrorApi &&
+                        crearSalidaMutation.error.estado === 503
                     }
                     alConsultarOpciones={(parametros) => {
                         setErrorCreacion("");

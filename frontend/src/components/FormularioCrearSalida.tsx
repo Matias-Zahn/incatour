@@ -39,6 +39,8 @@ export type FormularioCrearSalidaProps = {
     cargandoOpciones?: boolean;
     creando?: boolean;
     errorServidor?: string;
+    // El back responde 503 si cae la autoridad al crear (FA2); otro error no es FA2
+    errorEsAutoridad?: boolean;
     alConsultarOpciones: (parametros: ParametrosConsultaOpciones) => void;
     alConfirmarCreacion: (datos: DatosConfirmarSalida) => void;
     alCancelar: () => void;
@@ -104,6 +106,7 @@ function FormularioCrearSalida({
     cargandoOpciones = false,
     creando = false,
     errorServidor,
+    errorEsAutoridad,
     alConsultarOpciones,
     alConfirmarCreacion,
     alCancelar,
@@ -177,6 +180,7 @@ function FormularioCrearSalida({
     // Error contextual de autoridad en FA2 al intentar confirmar
     const esErrorAutoridadFA2 = Boolean(
         errorServidor &&
+        errorEsAutoridad &&
         opcionesEstanSincronizadas &&
         opciones?.cupoAutoridad === null,
     );
