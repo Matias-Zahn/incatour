@@ -73,6 +73,21 @@ describe("CrearPaqueteDto", () => {
 });
 
 describe("ModificarPaqueteDto", () => {
+  it("CAT-20: rechaza textos vacíos o de otro tipo", () => {
+    expect(ModificarPaqueteDto.create({ nombrePaquete: "", nochesPrevias: 1 })[0]).toBe("nombrePaquete es requerido.");
+    expect(ModificarPaqueteDto.create({ condiciones: 5 })[0]).toBe("condiciones debe ser un texto.");
+    expect(ModificarPaqueteDto.create({ localidadGarantizada: " " })[0]).toBe("localidadGarantizada es requerido.");
+    expect(ModificarPaqueteDto.create({ condiciones: "" })[0]).toBeUndefined();
+  });
+
+  it("CAT-20: diasDisponibles tiene que ser una lista de días válida", () => {
+    expect(ModificarPaqueteDto.create({ diasDisponibles: "l-m-x" })[1]?.diasDisponibles).toBe("L-M-X");
+    expect(ModificarPaqueteDto.create({ diasDisponibles: null })[0]).toBeUndefined();
+    for (const valor of ["", "Lunes", "L-L", "L-Q", 5]) {
+      expect(ModificarPaqueteDto.create({ diasDisponibles: valor })[0]).toMatch("diasDisponibles");
+    }
+  });
+
   it("exige al menos un campo", () => {
     expect(ModificarPaqueteDto.create({})[0]).toBe("Debe enviar al menos un campo para modificar.");
   });

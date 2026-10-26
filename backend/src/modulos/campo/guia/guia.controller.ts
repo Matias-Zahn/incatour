@@ -2,13 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { NIVEL_GRAVEDAD, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 import { GuiaService } from "./guia.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new GuiaService();
 
 const leerIdSalida = (valor: unknown) => {
-  const id = Number(valor);
-  if (!Number.isInteger(id) || id <= 0) throw CustomError.badRequest("El id de la salida debe ser un entero positivo");
-  return id;
+  return leerIdUrl(valor, "El id de la salida debe ser un entero positivo");
 };
 
 export class GuiaController {

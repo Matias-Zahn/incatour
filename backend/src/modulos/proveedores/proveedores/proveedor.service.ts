@@ -48,8 +48,10 @@ export class ProveedorService {
 
     const razonSocial = dto.razonSocial ?? proveedor.razonSocial;
     const localidad = dto.localidad ?? proveedor.localidad;
+    // CAT-27: reactivar también puede duplicar un proveedor activo con la misma razón social y localidad
+    const reactiva = dto.estado === ESTADO.ACTIVO && proveedor.estado !== ESTADO.ACTIVO;
     if (
-      (dto.razonSocial !== undefined || dto.localidad !== undefined) &&
+      (dto.razonSocial !== undefined || dto.localidad !== undefined || reactiva) &&
       (await this.repository.existeRazonSocial(razonSocial, localidad, id))
     ) {
       throw CustomError.conflict(`Ya existe un proveedor activo "${razonSocial}" en ${localidad}.`);
@@ -81,6 +83,11 @@ export class ProveedorService {
     }
     if (await this.repository.tieneSalidasActivas(id)) {
       throw CustomError.badRequest("Error. El proveedor cuenta con salidas activas");
+    }
+    // CAT-26: la cascada no puede dejar un paquete activo con servicios dados de baja (misma regla que CU-21)
+    const paquetes = await this.repository.contarPaquetesActivosConServicios(id);
+    if (paquetes > 0) {
+      throw CustomError.badRequest(`Error. Hay ${paquetes} paquete(s) activo(s) que usan servicios del proveedor`);
     }
   }
 

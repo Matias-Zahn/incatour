@@ -9,6 +9,7 @@ const ERRORES_PRISMA: Record<string, { estado: number; mensaje: string }> = {
   P2003: { estado: 400, mensaje: "El registro hace referencia a otro que no existe" },
   P2025: { estado: 404, mensaje: "El registro no existe" },
   P2000: { estado: 400, mensaje: "Un valor es demasiado largo para su campo" },
+  P2034: { estado: 409, mensaje: "La operación chocó con otra al mismo tiempo. Reintentá" },
 };
 
 const MENSAJES_MULTER: Partial<Record<multer.ErrorCode, string>> = {
@@ -44,6 +45,19 @@ export const manejadorErrores = (
   if (err instanceof Prisma.PrismaClientKnownRequestError && ERRORES_PRISMA[err.code]) {
     const { estado, mensaje } = ERRORES_PRISMA[err.code]!;
     return res.status(estado).json({ error: mensaje });
+  }
+
+  // INF-02: un valor que Prisma no puede mandar a la base (tipo erróneo, entero fuera de rango) es del pedido
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    // También puede ser un bug del código (un campo mal armado): se loguea completo
+    console.error(err);
+    return res.status(400).json({ error: "Algún dato enviado no tiene el formato esperado" });
+  }
+
+  // INF-02: una regla CHECK de la base (23514) que el código no validó antes
+  if (err instanceof Prisma.PrismaClientUnknownRequestError && /23514|check constraint/i.test(err.message)) {
+    console.error(err);
+    return res.status(400).json({ error: "Los datos no cumplen una regla de la base" });
   }
 
   // archivos subidos (imágenes de paquetes)

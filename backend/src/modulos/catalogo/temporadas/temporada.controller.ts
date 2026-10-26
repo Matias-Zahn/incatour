@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { TemporadaService } from "./temporada.service";
 import { CrearTemporadaDto, ModificarTemporadaDto } from "./temporada.dto";
 import { CustomError } from "../../../error/CustomError";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const temporadaService = new TemporadaService();
 
@@ -37,8 +38,7 @@ export class TemporadaController {
   // CU-08: PUT /api/temporadas/:id
   modificarTemporada = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const [error, dto] = ModificarTemporadaDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -57,8 +57,7 @@ export class TemporadaController {
   // CU-09: PATCH /api/temporadas/:id/baja
   darDeBaja = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const temporada = await temporadaService.darDeBajaTemporada(id);
 

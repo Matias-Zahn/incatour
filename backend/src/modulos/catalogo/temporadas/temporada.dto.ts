@@ -1,3 +1,5 @@
+import { textoRequerido } from "../../../shared/validaciones";
+
 export class CrearTemporadaDto {
   private constructor(
     public nombre: string,
@@ -39,11 +41,18 @@ export class ModificarTemporadaDto {
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarTemporadaDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
 
-    const nombre = obj.nombre ?? obj.nombreTemporada;
+    let nombre = obj.nombre ?? obj.nombreTemporada;
     const { fechaInicio, fechaFin } = obj;
 
     if (!nombre && !fechaInicio && !fechaFin) {
       return ["Debe enviar al menos un campo para modificar"];
+    }
+
+    // CAT-20: si viene el nombre, no puede estar vacío ni ser de otro tipo
+    if (nombre !== undefined) {
+      const [error, limpio] = textoRequerido(nombre, "nombre", 255);
+      if (error) return [error];
+      nombre = limpio;
     }
 
     let parsedInicio: Date | undefined;

@@ -4,26 +4,29 @@ import fs from "fs";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { CustomError } from "../../error/CustomError";
 import { db } from "../../config/postgresDatabase";
+import { leerIdUrl } from "../validaciones";
 
 const BASE_IMG_PATH = path.resolve(process.cwd(), "public/imagenes/paquetes");
-const FORMATOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
+// CAT-21: la extensión sale del tipo validado, nunca del nombre que manda el cliente
+const EXTENSION_POR_FORMATO: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" };
+const FORMATOS_PERMITIDOS = Object.keys(EXTENSION_POR_FORMATO);
 const NOMBRES_FOTOS_VALIDOS = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
+const TEMPORAL = "subiendo_";
+// CAT-22: una subida en curso no es una foto del paquete todavía
+export const esArchivoTemporal = (nombre: string) => nombre.startsWith(TEMPORAL);
+
+// CAT-22: foto_1 es la principal, igual que en el DELETE y en el front
+export const nombreArchivoFoto = (nombreFoto: string) => {
+  const nombre = nombreFoto?.toLowerCase();
+  return nombre === "foto_1" ? "principal" : nombre;
+};
 
 export async function validarPaqueteParaSubida(
   req: Request,
   validarNombreFoto = false
 ): Promise<number> {
-  const rawId = req.params.id;
-
-  // 1. Validar formato estrictamente numérico (evita traversal como %2e%2e, .., /, \)
-  if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
-    throw CustomError.badRequest("El ID proporcionado no es válido.");
-  }
-
-  const id = parseInt(rawId, 10);
-  if (isNaN(id) || id <= 0) {
-    throw CustomError.badRequest("El ID proporcionado no es válido.");
-  }
+  // 1. Formato estrictamente numérico y en rango (evita traversal como %2e%2e, .., /, \). INF-04: regla compartida
+  const id = leerIdUrl(req.params.id);
 
   // 2. Si aplica validarNombreFoto, verificar que sea un nombre permitido
   if (validarNombreFoto) {
@@ -62,36 +65,13 @@ const storageCarrusel = multer.diskStorage({
     }
 
     fs.mkdirSync(dir, { recursive: true });
-
-    if ((req as any)._primerArchivo !== false) {
-      (req as any)._primerArchivo = false;
-      (req as any)._contadorFoto = 1;
-
-      try {
-        const archivos = fs.readdirSync(dir);
-        for (const arch of archivos) {
-          if (
-            arch.startsWith("principal.") ||
-            arch.startsWith("foto_") ||
-            arch.startsWith("imagen_")
-          ) {
-            fs.unlinkSync(path.join(dir, arch));
-          }
-        }
-      } catch {}
-    }
-
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
     const contador = (req as any)._contadorFoto ?? 1;
     (req as any)._contadorFoto = contador + 1;
-    if (contador === 1) {
-      cb(null, `principal${ext}`);
-    } else {
-      cb(null, `foto_${contador}${ext}`);
-    }
+    cb(null, `${TEMPORAL}${contador === 1 ? "principal" : `foto_${contador}`}${ext}`);
   },
 });
 
@@ -116,21 +96,11 @@ const storageImagen = multer.diskStorage({
     }
 
     fs.mkdirSync(dir, { recursive: true });
-
-    try {
-      const archivosPrevios = fs.readdirSync(dir);
-      for (const archivo of archivosPrevios) {
-        if (archivo.startsWith("principal.")) {
-          fs.unlinkSync(path.join(dir, archivo));
-        }
-      }
-    } catch {}
-
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `principal${ext}`);
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
+    cb(null, `${TEMPORAL}principal${ext}`);
   },
 });
 
@@ -156,31 +126,51 @@ const storageModificarFoto = multer.diskStorage({
     }
 
     fs.mkdirSync(dir, { recursive: true });
-
-    try {
-      const archivos = fs.readdirSync(dir);
-      for (const arch of archivos) {
-        if (arch.startsWith(`${nombreFoto}.`)) {
-          fs.unlinkSync(path.join(dir, arch));
-        }
-      }
-    } catch {}
-
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const nombreFoto = (req.params.nombreFoto as string)?.toLowerCase();
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${nombreFoto}${ext}`);
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
+    cb(null, `${TEMPORAL}${nombreArchivoFoto(req.params.nombreFoto as string)}${ext}`);
   },
 });
 
-function envolverMulter(multerInstance: multer.Multer, validarNombreFoto = false): multer.Multer {
+// CAT-22: multer escribe con nombre temporal y, si falla, borra lo que alcanzó a subir.
+// Recién con toda la subida bien se borran las fotos que se reemplazan y las nuevas toman su nombre
+function confirmarSubida(req: Request, prefijosReemplazados: string[]) {
+  const subidos = req.file ? [req.file] : Array.isArray(req.files) ? req.files : [];
+  if (subidos.length === 0) return;
+  const dir = subidos[0]!.destination;
+  for (const arch of fs.readdirSync(dir)) {
+    if (!arch.startsWith(TEMPORAL) && prefijosReemplazados.some((p) => arch.startsWith(p))) {
+      fs.unlinkSync(path.join(dir, arch));
+    }
+  }
+  for (const f of subidos) {
+    f.filename = f.filename.slice(TEMPORAL.length);
+    const final = path.join(dir, f.filename);
+    fs.renameSync(f.path, final);
+    f.path = final;
+  }
+}
+
+function envolverMulter(
+  multerInstance: multer.Multer,
+  validarNombreFoto: boolean,
+  prefijosReemplazados: (req: Request) => string[]
+): multer.Multer {
   const envolver = (handler: RequestHandler): RequestHandler => {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
         await validarPaqueteParaSubida(req, validarNombreFoto);
-        handler(req, res, next);
+        handler(req, res, (error?: unknown) => {
+          if (error) return next(error);
+          try {
+            confirmarSubida(req, prefijosReemplazados(req));
+            next();
+          } catch (e) {
+            next(e);
+          }
+        });
       } catch (error) {
         next(error);
       }
@@ -222,13 +212,15 @@ const multerModificarFotoInterno = multer({
 });
 
 // Middleware para subir galería/carrusel completo: de 1 a 5 fotos
-export const subirCarruselPaquete = envolverMulter(multerCarruselInterno, false);
+export const subirCarruselPaquete = envolverMulter(multerCarruselInterno, false, () => ["principal.", "foto_", "imagen_"]);
 
 // Middleware para foto individual de portada (principal)
-export const subirImagenPaquete = envolverMulter(multerImagenInterno, false);
+export const subirImagenPaquete = envolverMulter(multerImagenInterno, false, () => ["principal."]);
 
 // Middleware para modificar una foto específica del carrusel por su nombre (ej: foto_2, principal, etc.)
-export const modificarFotoEspecifica = envolverMulter(multerModificarFotoInterno, true);
+export const modificarFotoEspecifica = envolverMulter(multerModificarFotoInterno, true, (req) => [
+  `${nombreArchivoFoto(req.params.nombreFoto as string)}.`,
+]);
 
 const IMAGENES_CATALOGO_POR_DEFECTO = [
   "/imagenes/catalogo/camino_inca_tradicional.jpg",
@@ -269,7 +261,7 @@ export function obtenerImagenesDePaquete(
     if (fs.existsSync(dir)) {
       const archivos = fs
         .readdirSync(dir)
-        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f))
+        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f) && !esArchivoTemporal(f))
         .sort((a, b) => {
           const esPrinA = a.startsWith("principal.") ? 0 : 1;
           const esPrinB = b.startsWith("principal.") ? 0 : 1;

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { EstablecerSecuenciaDto } from "./etapa.dto";
 import { EtapaService } from "./etapa.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const etapaService = new EtapaService();
 
@@ -10,8 +11,7 @@ export class EtapaController {
   // GET /api/circuitos/:idcircuito/etapas
   consultarEtapas = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const idcircuito = parseInt(req.params.idcircuito as string);
-      if (isNaN(idcircuito)) throw CustomError.badRequest("El ID del circuito no es válido.");
+      const idcircuito = leerIdUrl(req.params.idcircuito, "El ID del circuito no es válido.");
 
       const etapas = await etapaService.consultarEtapas(idcircuito);
       return res.json({ data: etapas });
@@ -23,8 +23,7 @@ export class EtapaController {
   // PUT /api/circuitos/:idcircuito/etapas (Reemplaza la secuencia completa, según DSS)
   confirmarSecuenciaCompleta = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const idcircuito = parseInt(req.params.idcircuito as string);
-      if (isNaN(idcircuito)) throw CustomError.badRequest("El ID del circuito no es válido.");
+      const idcircuito = leerIdUrl(req.params.idcircuito, "El ID del circuito no es válido.");
 
       // 1. Validar y crear DTO
       const [error, dto] = EstablecerSecuenciaDto.create(req.body);

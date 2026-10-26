@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Prisma } from "@prisma/client";
 import { PaqueteService } from "./paquete.service";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 
@@ -58,6 +59,12 @@ describe("PaqueteService", () => {
 
       await expect(new PaqueteService().consultarPaquetePorId(10)).rejects.toMatchObject({ statusCode: 404 });
     });
+
+    it("CAT-24: el admin ve el detalle de un paquete inactivo", async () => {
+      repo.findById.mockResolvedValue({ idpaquete: 10, estado: "INACTIVO" });
+
+      await expect(new PaqueteService().consultarPaquetePorId(10, true)).resolves.toMatchObject({ estado: "INACTIVO" });
+    });
   });
 
   describe("registrarNuevoPaquete (CU-11)", () => {
@@ -66,6 +73,16 @@ describe("PaqueteService", () => {
 
       expect(p).toMatchObject({ nroPaquete: "PKG-0007", estado: "ACTIVO", nochesPrevias: 0, nochesPosteriores: 0 });
       expect(repo.guardar).toHaveBeenCalledWith(expect.objectContaining({ idcircuito: 1, tipoGarantia: "POR_CATEGORIA" }), precios, [40, 41]);
+    });
+
+    it("CAT-23: si el número ya lo tomó otro alta, reintenta con el siguiente", async () => {
+      repo.contarPaquetes.mockResolvedValue(3);
+      repo.guardar
+        .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("único", { code: "P2002", clientVersion: "5" }))
+        .mockResolvedValueOnce({ idpaquete: 9 });
+
+      await expect(new PaqueteService().registrarNuevoPaquete(crear())).resolves.toEqual({ idpaquete: 9 });
+      expect(repo.guardar.mock.calls.map(([d]) => d.nroPaquete)).toEqual(["PKG-0004", "PKG-0005"]);
     });
 
     it("con garantía por categoría no consulta ningún establecimiento", async () => {
@@ -211,6 +228,24 @@ describe("PaqueteService", () => {
         new PaqueteService().modificarPaquete(10, modificar({ matrizPrecios: precios }))
       ).rejects.toThrow("no existe o no está activa");
       expect(repo.reemplazarTarifas).not.toHaveBeenCalled();
+    });
+
+    it("CAT-16: con una temporada inactiva no guarda ningún otro cambio", async () => {
+      db.temporada.findUnique.mockResolvedValue(null);
+
+      await expect(
+        new PaqueteService().modificarPaquete(10, modificar({ nombrePaquete: "Otro", serviciosIncluidos: [], matrizPrecios: precios }))
+      ).rejects.toThrow("no existe o no está activa");
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("CAT-17: rechaza pasar a un circuito sin etapas", async () => {
+      repo.findById.mockResolvedValue({ ...paqueteCategoria, idcircuito: 1 });
+      repo.tieneSalidasActivas.mockResolvedValue(false);
+      db.etapaRuta.count.mockResolvedValue(0);
+
+      await expect(new PaqueteService().modificarPaquete(10, modificar({ idcircuito: 2 }))).rejects.toThrow("etapas");
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it("404 si el paquete no existe", async () => {

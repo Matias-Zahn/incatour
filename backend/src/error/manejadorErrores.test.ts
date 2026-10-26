@@ -34,6 +34,15 @@ describe("manejadorErrores", () => {
     expect(responder(prisma("P2003")).estado).toBe(400);
   });
 
+  it("INF-02: validación de Prisma y CHECK de la base son 400 (y se loguean); un conflicto de transacción es 409", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(responder(new Prisma.PrismaClientValidationError("Argument idsalida", { clientVersion: "5" })).estado).toBe(400);
+    const check = new Prisma.PrismaClientUnknownRequestError('code: "23514", violates check constraint', { clientVersion: "5" });
+    expect(responder(check).estado).toBe(400);
+    expect(responder(prisma("P2034")).estado).toBe(409);
+    expect(log).toHaveBeenCalledTimes(2);
+  });
+
   it("un archivo demasiado grande es 400", () => {
     const r = responder(new multer.MulterError("LIMIT_FILE_SIZE"));
     expect([r.estado, r.cuerpo.error]).toEqual([400, "El archivo supera el tamaño máximo permitido"]);

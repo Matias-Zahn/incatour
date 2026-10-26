@@ -40,21 +40,24 @@ import { EtapaController } from "./etapa.controller";
  *       content:
  *         application/json:
  *           schema:
- *             type: array
- *             items:
- *               type: object
- *               properties:
- *                 numeroOrden:
- *                   type: integer
- *                 puntoInicio:
- *                   type: string
- *                 puntoFin:
- *                   type: string
+ *             type: object
+ *             required: [etapas]
+ *             properties:
+ *               etapas:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [numeroOrden, puntoInicio, puntoFin]
+ *                   properties:
+ *                     numeroOrden: { type: integer, example: 1 }
+ *                     puntoInicio: { type: string, example: "Km 82" }
+ *                     puntoFin: { type: string, example: "Wayllabamba" }
+ *                     campamentoPrevisto: { type: string, example: "Camp 1" }
  *     responses:
  *       200:
  *         description: Secuencia de etapas actualizada exitosamente
  *       400:
- *         description: Error de validación de correlatividad
+ *         description: Error de validación de correlatividad, paquetes activos sobre el circuito o etapas con avances registrados
  */
 export class EtapaRoutes {
   static get getRoutes(): Router {

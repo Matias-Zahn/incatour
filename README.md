@@ -11,7 +11,7 @@ Proyecto diseñado para desarrollo colaborativo en equipo (**5 integrantes**), e
 | Capa | Tecnologías | Puerto Local |
 | :--- | :--- | :--- |
 | **Frontend** | React 19, TypeScript, Vite, TailwindCSS v4, React Router | `http://localhost:5173` |
-| **Backend** | Node.js, Express 5, TypeScript, tsx, PostgreSQL (`pg`) | `http://localhost:3000` |
+| **Backend** | Node.js, Express 5, TypeScript, tsx, Prisma (PostgreSQL) | `http://localhost:3000` |
 | **Base de Datos** | PostgreSQL 16 (vía Docker Compose) | `localhost:5432` |
 
 ---

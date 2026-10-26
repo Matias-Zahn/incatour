@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
 import { db } from "../../../config/postgresDatabase";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
@@ -10,9 +11,10 @@ export class PaqueteService {
     return this.repository.findAll(filtros);
   }
 
-  async consultarPaquetePorId(id: number) {
+  // CAT-24: el detalle del admin (GET /paquetes/:id) también muestra los inactivos que lista con ?estado=INACTIVO
+  async consultarPaquetePorId(id: number, incluirInactivos = false) {
     const paquete = await this.repository.findById(id);
-    if (!paquete || paquete.estado !== "ACTIVO") {
+    if (!paquete || (!incluirInactivos && paquete.estado !== "ACTIVO")) {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
     return paquete;
@@ -50,10 +52,20 @@ export class PaqueteService {
       await this.validarServiciosExisten(dto.serviciosIncluidos);
     }
 
-    // 6. Generar nroPaquete automáticamente
-    const nroPaquete = await this.generarNroPaquete();
+    // 6 y 7. Generar nroPaquete y guardar(p) de forma atómica.
+    // CAT-23: si otro alta tomó el mismo número (o hay un hueco), se reintenta con el siguiente
+    for (let intento = 0; ; intento++) {
+      const nroPaquete = await this.generarNroPaquete(intento);
+      try {
+        return await this.guardar(dto, nroPaquete);
+      } catch (error) {
+        const choque = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+        if (!choque || intento >= 4) throw error;
+      }
+    }
+  }
 
-    // 7. DSS: guardar(p) — Persistencia atómica
+  private guardar(dto: CrearPaqueteDto, nroPaquete: string) {
     return this.repository.guardar(
       {
         nroPaquete,
@@ -101,6 +113,10 @@ export class PaqueteService {
       if (!circuito || circuito.estado !== "ACTIVO") {
         throw CustomError.badRequest("El circuito no existe o no está activo.");
       }
+      // CAT-17: la misma precondición que el alta
+      if ((await db.etapaRuta.count({ where: { idcircuito: dto.idcircuito } })) === 0) {
+        throw CustomError.badRequest("El circuito debe tener etapas establecidas antes de asignarlo a un paquete.");
+      }
     }
 
     // Si mandan idservicioGarantizado o cambian a POR_ESTABLECIMIENTO, validar
@@ -136,6 +152,11 @@ export class PaqueteService {
       await this.validarServiciosExisten(dto.serviciosIncluidos);
     }
 
+    // CAT-16: las temporadas de la matriz se validan antes de escribir nada, para no dejar el paquete a medias
+    if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
+      await this.validarViabilidadComercial(dto.matrizPrecios);
+    }
+
     // 1. Actualizar datos básicos
     const dataUpdate: any = {};
     if (dto.idcircuito) dataUpdate.idcircuito = dto.idcircuito;
@@ -164,9 +185,8 @@ export class PaqueteService {
       );
     }
 
-    // 2. Si viene matrizPrecios, validar temporadas y reemplazar tarifas (CAT-06)
+    // 2. Si viene matrizPrecios, reemplazar tarifas (CAT-06); las temporadas ya se validaron arriba
     if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
-      await this.validarViabilidadComercial(dto.matrizPrecios);
       await this.repository.reemplazarTarifas(id, dto.matrizPrecios);
     }
 
@@ -266,9 +286,9 @@ export class PaqueteService {
   /**
    * Genera un número de paquete auto-incremental (PKG-0001, PKG-0002, etc.).
    */
-  private async generarNroPaquete(): Promise<string> {
+  private async generarNroPaquete(intento = 0): Promise<string> {
     const total = await this.repository.contarPaquetes();
-    const numero = (total + 1).toString().padStart(4, "0");
+    const numero = (total + 1 + intento).toString().padStart(4, "0");
     return `PKG-${numero}`;
   }
 }

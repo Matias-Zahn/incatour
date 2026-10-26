@@ -4,6 +4,11 @@ import bcrypt from 'bcrypt';
 import { armarDefinicionPaquete } from "../src/shared/definicionPaquete";
 
 async function main() {
+  // INF-05: correrlo dos veces no falla; para empezar de cero está `npx prisma migrate reset`
+  if (await db.usuario.findUnique({ where: { email: "admin@incatour.com" } })) {
+    console.log("🌱 La base ya tiene los datos semilla de IncaTour: no se vuelven a insertar.");
+    return;
+  }
   console.log("🌱 Insertando datos semilla de IncaTour...");
 
   // 1. Usuarios, Clientes y Temporadas
@@ -304,12 +309,11 @@ async function main() {
       idBloqueo: "BLQ-SEED-001",
       fecha: "2026-11-15",
       lugares: 26,
-      // Los mismos permisos que la salida tiene registrados (PermisoPersonal y PermisoPasajero)
-      permisos: { create: [{ nroPermiso: "PERM-GUIA-001" }, { nroPermiso: "PERM-PAS-001" }] },
     },
   });
 
-  // 6. Salida Publicada, con la foto de la definición del paquete (CAT-05)
+  // 6. Salida Publicada, con la foto de la definición del paquete (CAT-05).
+  // INF-05: todavía sin personal ni permisos (eso pasa al cerrarla con CU-40) y con el lugar de la reserva ya vendido
   const paqueteCompleto = await db.paquete.findUniqueOrThrow({
     where: { idpaquete: paquete.idpaquete },
     include: {
@@ -323,31 +327,15 @@ async function main() {
       idpaquete: paquete.idpaquete,
       nroSalida: "SAL-2026-001",
       idbloqueo: "BLQ-SEED-001",
-      stockLocal: 16,
+      stockLocal: 15,
       tamanoMaximo: 16,
       fechaInicio: new Date("2026-11-15T00:00:00Z"),
       fechaFin: new Date("2026-11-18T00:00:00Z"),
       estado: "PUBLICADA",
-      personalAsignado: {
-        create: [
-          { idpersonal: personalGuia.idpersonal },
-          { idpersonal: porteador.idpersonal },
-        ],
-      },
-      permisos: {
-        create: [
-          {
-            idpersonal: personalGuia.idpersonal,
-            nroPermiso: "PERM-GUIA-001",
-            fechaEmision: new Date("2026-10-01T10:00:00Z"),
-            estadoTramite: "Emitido",
-          },
-        ],
-      },
     },
   });
 
-  // 7. Pasajero, Reserva, Solicitud y Permiso de Pasajero
+  // 7. Pasajero, Reserva y Solicitud
   const pasajero = await db.pasajero.create({
     data: {
       nombreCompleto: "Lucía Fernández",
@@ -373,16 +361,6 @@ async function main() {
       estado: "CONFIRMADA",
       pasajeros: {
         create: [{ idpasajero: pasajero.idpasajero }],
-      },
-      permisos: {
-        create: [
-          {
-            idpasajero: pasajero.idpasajero,
-            nroPermiso: "PERM-PAS-001",
-            fechaEmision: new Date("2026-10-02T12:00:00Z"),
-            estadoTramite: "Emitido",
-          },
-        ],
       },
     },
   });

@@ -2,12 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CancelarReservaDto, FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 import { GestionReservaService } from "./gestion-reserva.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new GestionReservaService();
 
 const leerIdReserva = (req: Request): number => {
-  const id = parseInt(req.params.idreserva as string);
-  if (isNaN(id)) throw CustomError.badRequest("El ID de reserva proporcionado no es válido.");
+  const id = leerIdUrl(req.params.idreserva, "El ID de reserva proporcionado no es válido.");
   return id;
 };
 

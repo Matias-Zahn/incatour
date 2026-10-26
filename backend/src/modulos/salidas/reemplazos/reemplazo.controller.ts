@@ -2,13 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { ConfirmarReemplazoDto } from "./reemplazo.dto";
 import { ReemplazoService } from "./reemplazo.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new ReemplazoService();
 
 const leerId = (valor: unknown, campo: string) => {
-  const id = Number(valor);
-  if (!Number.isInteger(id) || id <= 0) throw CustomError.badRequest(`${campo} debe ser un entero positivo`);
-  return id;
+  return leerIdUrl(valor, `${campo} debe ser un entero positivo`);
 };
 
 export class ReemplazoController {

@@ -1,4 +1,5 @@
 import { enteroOpcional } from "../../../shared/filtros";
+import { textoRequerido } from "../../../shared/validaciones";
 
 export interface PrecioTemporada {
   idtemporada: number;
@@ -160,7 +161,7 @@ export class ModificarPaqueteDto {
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarPaqueteDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
 
-    const {
+    let {
       nombrePaquete, condiciones, nochesPrevias, nochesPosteriores,
       diasDisponibles, matrizPrecios, idcircuito, tipoGarantia,
       idservicioGarantizado, localidadGarantizada, categoriaGarantizada,
@@ -176,6 +177,28 @@ export class ModificarPaqueteDto {
       diasMinimosReintegro === undefined
     ) {
       return ["Debe enviar al menos un campo para modificar."];
+    }
+
+    // CAT-20: los textos que vienen no pueden estar vacíos ni ser de otro tipo (null borra los criterios de garantía)
+    if (nombrePaquete !== undefined) {
+      const [error, limpio] = textoRequerido(nombrePaquete, "nombrePaquete", 255);
+      if (error) return [error];
+      nombrePaquete = limpio;
+    }
+    if (condiciones != null && typeof condiciones !== "string") return ["condiciones debe ser un texto."];
+    // CAT-20: días como los arma el front ("L-M-X"): códigos L, M, X, J, V, S o D, sin repetir; null vuelve a todos
+    if (diasDisponibles != null) {
+      const dias = typeof diasDisponibles === "string" ? diasDisponibles.trim().toUpperCase().split(/[-,\s]+/).filter(Boolean) : [];
+      if (dias.length === 0 || dias.some((d) => !"LMXJVSD".includes(d) || d.length !== 1) || new Set(dias).size !== dias.length) {
+        return ["diasDisponibles debe ser una lista de días (L, M, X, J, V, S, D), por ejemplo \"L-M-X\"."];
+      }
+      diasDisponibles = dias.join("-");
+    }
+    const criterios = { localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada };
+    for (const [nombre, valor] of Object.entries(criterios)) {
+      if (valor == null) continue;
+      const [error] = textoRequerido(valor, nombre, 255);
+      if (error) return [error];
     }
 
     if (idcircuito != null && (typeof idcircuito !== "number" || !Number.isInteger(idcircuito) || idcircuito <= 0)) {

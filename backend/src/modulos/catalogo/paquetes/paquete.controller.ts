@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import fs from "fs";
 import path from "path";
 import { CustomError } from "../../../error/CustomError";
-import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
+import { esArchivoTemporal, nombreArchivoFoto, obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const paqueteService = new PaqueteService();
 
@@ -47,10 +48,9 @@ export class PaqueteController {
   // GET /api/paquetes/:id
   consultarPaquetePorId = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
-      const paquete = await paqueteService.consultarPaquetePorId(id);
+      const paquete = await paqueteService.consultarPaquetePorId(id, true);
       return res.json({ data: enriquecerPaqueteConImagenes(paquete) });
     } catch (error) {
       next(error);
@@ -77,8 +77,7 @@ export class PaqueteController {
   // PUT /api/paquetes/:id — CU-12: Modificar Paquete
   modificarPaquete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const [error, dto] = ModificarPaqueteDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -97,8 +96,7 @@ export class PaqueteController {
   // PATCH /api/paquetes/:id/baja — CU-13: Baja de Paquete
   darDeBaja = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const paquete = await paqueteService.darDeBajaPaquete(id);
 
@@ -114,8 +112,7 @@ export class PaqueteController {
   // POST y PUT /api/paquetes/:id/imagen — Subir entre 1 y 5 imágenes del paquete
   subirImagen = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       // Verificamos que el paquete exista
       await paqueteService.consultarPaquetePorId(id);
@@ -158,8 +155,7 @@ export class PaqueteController {
   // POST /api/paquetes/:id/carrusel — Subir carrusel de fotos (de 1 a 5 fotos)
   subirCarrusel = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       await paqueteService.consultarPaquetePorId(id);
 
@@ -188,8 +184,7 @@ export class PaqueteController {
   // GET /api/paquetes/:id/imagenes — Consultar todas las imágenes del paquete
   consultarImagenes = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       await paqueteService.consultarPaquetePorId(id);
 
@@ -198,7 +193,7 @@ export class PaqueteController {
       const carrusel: string[] = [];
 
       if (fs.existsSync(dir)) {
-        const archivos = fs.readdirSync(dir);
+        const archivos = fs.readdirSync(dir).filter((arch) => !esArchivoTemporal(arch));
         for (const arch of archivos) {
           const url = `/imagenes/paquetes/${id}/${arch}`;
           if (arch.startsWith("principal.")) {
@@ -229,10 +224,8 @@ export class PaqueteController {
   // PUT /api/paquetes/:id/carrusel/:nombreFoto — Reemplazar una foto específica del carrusel (ej: foto_2)
   modificarFotoIndividual = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
+      const id = leerIdUrl(req.params.id);
       const nombreFoto = (req.params.nombreFoto as string)?.toLowerCase();
-
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
 
       const nombresValidos = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
       if (!nombresValidos.includes(nombreFoto)) {
@@ -265,10 +258,8 @@ export class PaqueteController {
   // DELETE /api/paquetes/:id/carrusel/:nombreFoto — Eliminar una foto específica del carrusel
   eliminarFotoIndividual = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
+      const id = leerIdUrl(req.params.id);
       const nombreFoto = (req.params.nombreFoto as string)?.toLowerCase();
-
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
 
       const nombresValidos = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
       if (!nombresValidos.includes(nombreFoto)) {
@@ -284,7 +275,7 @@ export class PaqueteController {
 
       if (fs.existsSync(dir)) {
         const archivos = fs.readdirSync(dir);
-        const prefijo = nombreFoto === "foto_1" ? "principal." : `${nombreFoto}.`;
+        const prefijo = `${nombreArchivoFoto(nombreFoto)}.`;
 
         for (const arch of archivos) {
           if (arch.startsWith(prefijo)) {

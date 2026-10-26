@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CircuitoService } from "./circuito.service";
 import { CrearCircuitoDto, FiltrosCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 import { CustomError } from "../../../error/CustomError";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const circuitoService = new CircuitoService();
 
@@ -43,8 +44,7 @@ export class CircuitoController {
   // CU-03: PUT /api/circuitos/:id
   modificarCircuito = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const [error, dto] = ModificarCircuitoDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -63,8 +63,7 @@ export class CircuitoController {
   // CU-04: PATCH /api/circuitos/:id/baja
   darDeBaja = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const circuito = await circuitoService.darDeBajaCircuito(id);
 

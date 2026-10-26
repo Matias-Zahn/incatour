@@ -116,6 +116,16 @@ export class ProveedorRepository {
     return count > 0;
   }
 
+  // CAT-26: paquetes activos que incluyen un servicio del proveedor o lo tienen como establecimiento garantizado (CAT-09)
+  async contarPaquetesActivosConServicios(id: number): Promise<number> {
+    const delProveedor = { servicio: { idproveedor: id }, paquete: { estado: "ACTIVO" } };
+    const [incluidos, garantias] = await Promise.all([
+      db.paqueteServicio.count({ where: delProveedor }),
+      db.garantiaEstablecimiento.count({ where: delProveedor }),
+    ]);
+    return incluidos + garantias;
+  }
+
   // CTA-09: bloquea los servicios del proveedor (CU-39 y CU-40 toman el mismo lock al asignarlos) y revalida la baja
   private async bloquearParaBaja(tx: Prisma.TransactionClient, id: number) {
     await tx.$queryRaw`SELECT 1 FROM public."ServicioBase" WHERE idproveedor = ${id} ORDER BY idservicio FOR UPDATE`;

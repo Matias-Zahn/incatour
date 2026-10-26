@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CrearProveedorDto, FiltrosProveedorDto, ModificarProveedorDto } from "./proveedor.dto";
 import { ProveedorService } from "./proveedor.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const proveedorService = new ProveedorService();
 
@@ -22,8 +23,7 @@ export class ProveedorController {
   // GET /api/proveedores/:id
   obtenerProveedor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const proveedor = await proveedorService.obtenerProveedor(id);
       return res.json({ data: proveedor });
@@ -48,8 +48,7 @@ export class ProveedorController {
   // CU-16: PUT /api/proveedores/:id
   modificarProveedor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const [error, dto] = ModificarProveedorDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -64,8 +63,7 @@ export class ProveedorController {
   // CU-17: PATCH /api/proveedores/:id/baja
   darDeBaja = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
+      const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
       const proveedor = await proveedorService.darDeBaja(id);
       return res.json({ mensaje: "Proveedor dado de baja exitosamente", data: proveedor });

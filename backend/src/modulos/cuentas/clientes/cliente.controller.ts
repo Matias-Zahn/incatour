@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CrearClienteDto, ModificarClienteDto } from "./cliente.dto";
 import { ClienteService } from "./cliente.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new ClienteService();
 
@@ -34,8 +35,7 @@ export class ClienteController {
 
   consultarClientePorId = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
+      const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
       // SEG-01: Si el usuario autenticado es CLIENTE, solo puede ver sus propios datos
       await verificarPropietario(req, id, "No tiene permisos para acceder a los datos de otro cliente.");
@@ -61,8 +61,7 @@ export class ClienteController {
 
   modificarCliente = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
+      const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
       // SEG-01: Si el usuario autenticado es CLIENTE, solo puede modificar sus propios datos
       await verificarPropietario(req, id, "No tiene permisos para modificar los datos de otro cliente.");
@@ -79,8 +78,7 @@ export class ClienteController {
 
   darDeBajaCliente = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) throw CustomError.badRequest("El ID debe ser un número válido");
+      const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
       // CTA-02 & SEG-01: Si el usuario autenticado es CLIENTE, solo puede dar de baja su propia cuenta
       await verificarPropietario(req, id, "No tiene permisos para dar de baja la cuenta de otro cliente.");
