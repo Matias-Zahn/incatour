@@ -252,8 +252,17 @@ export function VistaAvances({
     const sugerida = siguienteEtapa?.numeroOrden;
     const borradorCompletado =
         etapasConPendientes.find((e) => e.numeroOrden === borrador?.numeroOrden)?.estadoTramo === "COMPLETADO";
+    // FE-37: con todas las etapas completadas no queda ninguna para proponer: se descarta el borrador
+    // y no queda elegida una etapa ya completada (0 marca que ya se limpió)
+    const todasCompletadas = etapasConPendientes.length > 0 && sugerida === undefined;
     const ultimaSugerida = useRef<number | undefined>(undefined);
     useEffect(() => {
+        if (todasCompletadas && ultimaSugerida.current !== 0) {
+            ultimaSugerida.current = 0;
+            limpiarBorradorAvance(idsalida);
+            setValue("numeroOrden", undefined as unknown as number);
+            return;
+        }
         if (sugerida === undefined || ultimaSugerida.current === sugerida) return;
         const esPrimera = ultimaSugerida.current === undefined;
         ultimaSugerida.current = sugerida;
@@ -261,7 +270,7 @@ export function VistaAvances({
         // La primera vez se fija el borrador (si hay): al cargar el formulario las etapas todavía no estaban
         const usarBorrador = esPrimera && borrador?.numeroOrden && !borradorCompletado;
         setValue("numeroOrden", usarBorrador ? borrador.numeroOrden! : sugerida);
-    }, [sugerida, borrador?.numeroOrden, borradorCompletado, idsalida, setValue]);
+    }, [sugerida, todasCompletadas, borrador?.numeroOrden, borradorCompletado, idsalida, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
