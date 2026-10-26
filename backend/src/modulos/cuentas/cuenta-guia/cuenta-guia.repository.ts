@@ -1,5 +1,6 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
+import { CustomError } from "../../../error/CustomError";
 import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { FiltrosCuentaGuiaDto } from "./cuenta-guia.dto";
 
@@ -78,6 +79,13 @@ export class CuentaGuiaRepository {
     fechaHabilitacion?: Date
   ) {
     return db.$transaction(async (tx) => {
+      // CTA-08: con el legajo bloqueado, dos altas simultáneas para el mismo guía se serializan
+      await tx.$queryRaw`SELECT 1 FROM public."Personal" WHERE idpersonal = ${idpersonal} FOR UPDATE`;
+      const guiaExistente = await tx.guia.findUnique({ where: { idpersonal } });
+      if (guiaExistente?.idusuario) {
+        throw CustomError.badRequest("Este guía ya posee una cuenta de acceso registrada.");
+      }
+
       const usuario = await tx.usuario.create({
         data: {
           nombre,
@@ -90,7 +98,6 @@ export class CuentaGuiaRepository {
       });
 
       // Si el personal ya tiene fila en Guia, actualizamos su idusuario y habilitación si vino
-      const guiaExistente = await tx.guia.findUnique({ where: { idpersonal } });
       if (guiaExistente) {
         await tx.guia.update({
           where: { idpersonal },
