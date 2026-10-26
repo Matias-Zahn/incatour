@@ -1378,15 +1378,17 @@ function SalidasPage() {
                 <Alerta tipo="advertencia" titulo="Permisos rechazados">
                     <div className="space-y-2 text-sm">
                         <p>
-                            Estas personas no recibieron permiso y no ocupan lugar en la
-                            salida {resultadoAsignacion.nroSalida}. El personal rechazado
-                            se reemplaza con "Reemplazar personal".
+                            Estas personas no recibieron permiso para la salida{" "}
+                            {resultadoAsignacion.nroSalida}.
                         </p>
                         <ul className="list-disc pl-5">
                             {resultadoAsignacion.rechazados.map((r) => (
                                 <li key={`${r.tipo}-${r.id}`}>
                                     <span className="font-bold">{r.nombreCompleto}</span>{" "}
-                                    ({r.tipo === "PASAJERO" ? "pasajero" : "personal"}): {r.motivo}
+                                    ({r.tipo === "PASAJERO" ? "pasajero" : "personal"}): {r.motivo}.{" "}
+                                    {r.tipo === "PASAJERO"
+                                        ? "Su lugar se libera y no ocupa cupo en la salida."
+                                        : 'Su lugar queda reservado para el reemplazo: usá "Reemplazar personal".'}
                                 </li>
                             ))}
                         </ul>
