@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import fs from "fs";
 import path from "path";
 import { CustomError } from "../../../error/CustomError";
-import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
+import { nombreArchivoFoto, obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
 
@@ -284,7 +284,7 @@ export class PaqueteController {
 
       if (fs.existsSync(dir)) {
         const archivos = fs.readdirSync(dir);
-        const prefijo = nombreFoto === "foto_1" ? "principal." : `${nombreFoto}.`;
+        const prefijo = `${nombreArchivoFoto(nombreFoto)}.`;
 
         for (const arch of archivos) {
           if (arch.startsWith(prefijo)) {
