@@ -167,6 +167,100 @@ import { PaqueteController } from "./paquete.controller";
  *         description: Requiere rol ADMIN
  *       404:
  *         description: Paquete no encontrado
+ *   put:
+ *     summary: Reemplazar la imagen principal de un paquete
+ *     description: "**RESTRINGIDO A ADMINISTRADOR.** Igual que el POST: la imagen nueva queda como principal."
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, required: [imagen], properties: { imagen: { type: string, format: binary } } }
+ *     responses:
+ *       200: { description: Imagen reemplazada }
+ *       400: { description: Formato inválido o archivo no proporcionado }
+ *       404: { description: Paquete no encontrado o inactivo }
+ *
+ * /api/paquetes/{id}/imagenes:
+ *   get:
+ *     summary: Imágenes de un paquete (público)
+ *     description: Devuelve la principal y el carrusel de un paquete activo. Sin fotos propias, una imagen por defecto del catálogo.
+ *     tags: [Paquetes]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: Imágenes del paquete
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 idpaquete: { type: integer }
+ *                 principal: { type: string, example: "/imagenes/paquetes/1/principal.jpg" }
+ *                 carrusel: { type: array, items: { type: string } }
+ *       404: { description: Paquete no encontrado o inactivo }
+ *
+ * /api/paquetes/{id}/carrusel:
+ *   post:
+ *     summary: Subir el carrusel de fotos de un paquete (1 a 5)
+ *     description: >
+ *       **RESTRINGIDO A ADMINISTRADOR.** La primera foto queda como principal y las demás como foto_2 a foto_5.
+ *       Reemplaza el carrusel anterior solo si toda la subida termina bien (CAT-22). PUT hace lo mismo.
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [imagenes]
+ *             properties:
+ *               imagenes: { type: array, maxItems: 5, items: { type: string, format: binary } }
+ *     responses:
+ *       200: { description: Carrusel subido }
+ *       400: { description: Formato inválido, más de 5 fotos o archivo demasiado grande }
+ *       404: { description: Paquete no encontrado o inactivo }
+ *
+ * /api/paquetes/{id}/carrusel/{nombreFoto}:
+ *   put:
+ *     summary: Reemplazar una foto del carrusel
+ *     description: "**RESTRINGIDO A ADMINISTRADOR.** nombreFoto es principal o foto_1 a foto_5; foto_1 es la principal."
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *       - { in: path, name: nombreFoto, required: true, schema: { type: string, enum: [principal, foto_1, foto_2, foto_3, foto_4, foto_5] } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, required: [imagen], properties: { imagen: { type: string, format: binary } } }
+ *     responses:
+ *       200: { description: Foto reemplazada }
+ *       400: { description: nombreFoto inválido o formato no soportado }
+ *       404: { description: Paquete no encontrado o inactivo }
+ *   delete:
+ *     summary: Eliminar una foto del carrusel
+ *     description: "**RESTRINGIDO A ADMINISTRADOR.** foto_1 es la principal."
+ *     tags: [Paquetes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *       - { in: path, name: nombreFoto, required: true, schema: { type: string, enum: [principal, foto_1, foto_2, foto_3, foto_4, foto_5] } }
+ *     responses:
+ *       200: { description: Foto eliminada }
+ *       404: { description: Paquete o foto no encontrados }
  */
 import {
   subirImagenPaquete,
