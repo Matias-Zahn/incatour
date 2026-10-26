@@ -116,13 +116,29 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 7);
   });
 
-  it("FA4: con un pasaporte vencido no emite permisos ni guarda nada", async () => {
-    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1), pasajero(2, "2026-11-21")]));
+  it("FA4: con el pasaporte de un integrante del personal vencido no emite permisos ni guarda nada", async () => {
+    repo.buscarPersonal.mockResolvedValue([{ ...persona(1, "Guía"), ...pasaporte("2026-11-21") }, ...equipo.slice(1)]);
     const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("Pasajero 2");
+    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("Persona 1");
     expect(emitir).not.toHaveBeenCalled();
     expect(repo.confirmar).not.toHaveBeenCalled();
+  });
+
+  it("SAL-21: el pasajero con el pasaporte vencido queda rechazado sin ir a la autoridad y el resto sigue", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1), pasajero(2, "2026-11-21"), pasajero(3)]));
+    repo.confirmar.mockResolvedValue({ idsalida: 2 });
+    const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
+
+    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+
+    expect(emitir.mock.calls[0]![1].map((t) => t.nombreCompleto)).not.toContain("Pasajero 2");
+    expect(r.permisosEmitidos).toBe(6);
+    expect(r.rechazados).toEqual([
+      { tipo: "PASAJERO", id: 2, nombreCompleto: "Pasajero 2", motivo: "Pasaporte vence antes de finalizar el recorrido" },
+    ]);
+    // 7 sobrantes + el lugar del rechazado
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 8 }));
   });
 
   it("compensación: si la base falla después de emitir, da de baja los permisos", async () => {
