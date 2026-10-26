@@ -9,6 +9,7 @@ import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
+import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
@@ -23,15 +24,18 @@ import {
     dotacionDeSalida,
     nombresGuiasDeSalida,
     useConfirmarAsignacion,
+    useConfirmarReemplazo,
     useCrearSalida,
     useLiberarSobrantes,
     useOpcionesSalida,
     usePanelAsignacion,
+    usePersonalSalida,
     useSalidas,
     type DatosCrearSalida,
     type FiltrosSalidas,
     type ParametrosConsultaOpciones,
     type PayloadConfirmarAsignacion,
+    type PayloadConfirmarReemplazo,
     type Salida,
 } from "../../services/salidaService";
 import { obtenerUsuario } from "../../services/sesionService";
@@ -104,9 +108,30 @@ function SalidasPage() {
     const confirmarAsignacionMutation = useConfirmarAsignacion();
     const liberarSobrantesMutation = useLiberarSobrantes();
 
+    // Estados para el reemplazo de personal (CU-38)
+    const [salidaParaReemplazar, setSalidaParaReemplazar] = useState<Salida | null>(null);
+    const [errorReemplazo, setErrorReemplazo] = useState("");
+    const [resultadoReemplazo, setResultadoReemplazo] = useState<{
+        nroSalida: string;
+        sale: { idpersonal: number; nombreCompleto: string };
+        entra: { idpersonal: number; nombreCompleto: string };
+        permisoDadoDeBaja: string | null;
+        permisoNuevo: string | null;
+    } | null>(null);
+
+    const {
+        data: datosPersonalSalida,
+        isPending: cargandoPersonalSalida,
+        error: errorPersonalSalida,
+        refetch: recargarPersonalSalida,
+    } = usePersonalSalida(salidaParaReemplazar?.idsalida ?? null);
+
+    const confirmarReemplazoMutation = useConfirmarReemplazo();
+
     function abrirFormulario() {
         setFormularioAbierto(true);
         setSalidaParaAsignar(null);
+        setSalidaParaReemplazar(null);
         setParametrosConsulta(null);
         setErrorCreacion("");
         setMensajeExito(null);
@@ -114,6 +139,7 @@ function SalidasPage() {
         setErrorLiberacionSobrantes("");
         setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
         }
@@ -128,12 +154,14 @@ function SalidasPage() {
 
     function abrirAsignacion(salida: Salida) {
         setSalidaParaAsignar(salida);
+        setSalidaParaReemplazar(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
         setErrorLiberacionSobrantes("");
         setMensajeExitoLiberacion(null);
         setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
         if (!resultadoAsignacion?.advertencia) {
             setResultadoAsignacion(null);
         }
@@ -144,6 +172,58 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setPayloadConfirmarAsignacion(null);
         setErrorConfirmacion("");
+    }
+
+    function abrirReemplazo(salida: Salida) {
+        setSalidaParaReemplazar(salida);
+        setSalidaParaAsignar(null);
+        setFormularioAbierto(false);
+        setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
+        setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
+        setResultadoReemplazo(null);
+        if (!resultadoAsignacion?.advertencia) {
+            setResultadoAsignacion(null);
+        }
+        setPayloadConfirmarAsignacion(null);
+    }
+
+    function cerrarReemplazo() {
+        setSalidaParaReemplazar(null);
+        setErrorReemplazo("");
+    }
+
+    function manejarConfirmarReemplazo(payload: PayloadConfirmarReemplazo) {
+        if (!salidaParaReemplazar || confirmarReemplazoMutation.isPending) return;
+
+        setErrorReemplazo("");
+        const nroSalida = salidaParaReemplazar.nroSalida;
+        const idsalida = salidaParaReemplazar.idsalida;
+
+        confirmarReemplazoMutation.mutate(
+            { idsalida, datos: payload },
+            {
+                onSuccess: (resultado) => {
+                    setResultadoReemplazo({
+                        nroSalida,
+                        sale: resultado.sale,
+                        entra: resultado.entra,
+                        permisoDadoDeBaja: resultado.permisoDadoDeBaja,
+                        permisoNuevo: resultado.permisoNuevo,
+                    });
+                    setSalidaParaReemplazar(null);
+                    setErrorReemplazo("");
+                },
+                onError: (error) => {
+                    const mensaje =
+                        error?.message || "Ocurrió un error al realizar el reemplazo de personal.";
+                    setErrorReemplazo(mensaje);
+                },
+            },
+        );
     }
 
     function manejarSolicitarConfirmacionAsignacion(payload: PayloadConfirmarAsignacion) {
@@ -689,7 +769,24 @@ function SalidasPage() {
                 const puedeLiberarSobrantes =
                     esAdmin && fila.estado === "CERRADA" && tieneSobrantesPendientes;
 
-                if (!tieneSolicitudes && !esFinalizada && !puedeAsignar && !puedeLiberarSobrantes) {
+                // CU-38: Reemplazar personal
+                // Solo para salidas activas que todavía no iniciaron (SALIDAS_NO_INICIADAS: PUBLICADA, ABIERTA, CERRADA),
+                // con fecha futura y que ya cuenten con personal asignado.
+                const estadoReemplazable =
+                    fila.estado === "PUBLICADA" || fila.estado === "ABIERTA" || fila.estado === "CERRADA";
+                const puedeReemplazarPersonal =
+                    esAdmin &&
+                    estadoReemplazable &&
+                    fechaFutura &&
+                    !sinPersonal;
+
+                if (
+                    !tieneSolicitudes &&
+                    !esFinalizada &&
+                    !puedeAsignar &&
+                    !puedeLiberarSobrantes &&
+                    !puedeReemplazarPersonal
+                ) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
 
@@ -703,7 +800,8 @@ function SalidasPage() {
                                 type="button"
                                 disabled={
                                     confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending
+                                    liberarSobrantesMutation.isPending ||
+                                    confirmarReemplazoMutation.isPending
                                 }
                                 onClick={() => abrirAsignacion(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -711,12 +809,27 @@ function SalidasPage() {
                                 Asignar recursos
                             </button>
                         )}
+                        {puedeReemplazarPersonal && (
+                            <button
+                                type="button"
+                                disabled={
+                                    confirmarAsignacionMutation.isPending ||
+                                    liberarSobrantesMutation.isPending ||
+                                    confirmarReemplazoMutation.isPending
+                                }
+                                onClick={() => abrirReemplazo(fila)}
+                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Reemplazar personal
+                            </button>
+                        )}
                         {puedeLiberarSobrantes && (
                             <button
                                 type="button"
                                 disabled={
                                     confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending
+                                    liberarSobrantesMutation.isPending ||
+                                    confirmarReemplazoMutation.isPending
                                 }
                                 onClick={() =>
                                     manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
@@ -1045,6 +1158,82 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
+            {resultadoReemplazo ? (
+                <Alerta
+                    tipo="exito"
+                    titulo="Reemplazo de personal realizado exitosamente"
+                >
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">
+                                Se registró correctamente el reemplazo de personal para la salida{" "}
+                                <span className="font-bold text-navegacion">
+                                    {resultadoReemplazo.nroSalida}
+                                </span>
+                                .
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setResultadoReemplazo(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 pt-1 border-t border-emerald-200/70 text-xs">
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Personal saliente
+                                </span>
+                                <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
+                                    {resultadoReemplazo.sale.nombreCompleto}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Desvinculado de la salida
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Personal ingresante
+                                </span>
+                                <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
+                                    {resultadoReemplazo.entra.nombreCompleto}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Asignado como reemplazante
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Permiso anterior
+                                </span>
+                                <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
+                                    {resultadoReemplazo.permisoDadoDeBaja ?? "Sin permiso / N/A"}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Baja informada a la autoridad
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Nuevo permiso emitido
+                                </span>
+                                <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
+                                    {resultadoReemplazo.permisoNuevo ?? "No emitido"}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Emitido para el reemplazante
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </Alerta>
+            ) : null}
+
             {salidaParaAsignar ? (
                 <FormularioAsignarRecursos
                     key={salidaParaAsignar.idsalida}
@@ -1058,6 +1247,23 @@ function SalidasPage() {
                     onRecargarDatos={() => recargarAsignacion()}
                     onConfirmar={manejarSolicitarConfirmacionAsignacion}
                     onCancelar={cerrarAsignacion}
+                />
+            ) : null}
+
+            {salidaParaReemplazar ? (
+                <FormularioReemplazarPersonal
+                    key={salidaParaReemplazar.idsalida}
+                    idsalida={salidaParaReemplazar.idsalida}
+                    datosPersonal={datosPersonalSalida}
+                    cargandoPersonal={cargandoPersonalSalida}
+                    errorPersonal={
+                        errorPersonalSalida ? errorPersonalSalida.message : undefined
+                    }
+                    guardando={confirmarReemplazoMutation.isPending}
+                    errorReemplazo={errorReemplazo}
+                    onRecargarDatos={() => recargarPersonalSalida()}
+                    onConfirmarReemplazo={manejarConfirmarReemplazo}
+                    onCancelar={cerrarReemplazo}
                 />
             ) : null}
 
