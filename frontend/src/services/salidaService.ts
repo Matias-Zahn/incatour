@@ -509,6 +509,71 @@ type RespuestaCancelarSalidaApi = {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-41 Devolución de Equipamiento
+// ==========================================
+
+export type ItemEquipamientoAsignado = {
+    idservicio: number;
+    nombreServicio: string;
+    tipoEquipamiento: string;
+    proveedor: string;
+    cantidadAsignada: number;
+    stockActualDisponible: number;
+};
+
+export type EquipamientoAsignadoSalida = {
+    idsalida: number;
+    nroSalida: string;
+    estado: string;
+    fechaFin: string;
+    equipamientos: ItemEquipamientoAsignado[];
+};
+
+type RespuestaEquipamientoAsignadoApi = {
+    data: EquipamientoAsignadoSalida;
+};
+
+export type ItemDevolucionPayload = {
+    idservicio: number;
+    cantidadBuenEstado: number;
+    cantidadDaniada?: number;
+    observaciones?: string;
+};
+
+export type PayloadDevolucionEquipamiento = {
+    observacionesGenerales?: string | null;
+    items: ItemDevolucionPayload[];
+};
+
+export type ParametrosRegistrarDevolucion = {
+    idsalida: number;
+    datos: PayloadDevolucionEquipamiento;
+};
+
+export type DetalleItemDevuelto = {
+    idservicio: number;
+    cantidadReintegradaAlStock: number;
+    cantidadDaniadaOExtraviada: number;
+    observaciones: string | null;
+};
+
+export type ResultadoDevolucionEquipamiento = {
+    mensaje: string;
+    idsalida: number;
+    auditoriaId: number;
+    detalle: DetalleItemDevuelto[];
+};
+
+type RespuestaDevolucionEquipamientoApi = {
+    mensaje: string;
+    data: {
+        idsalida: number;
+        auditoriaId: number;
+        detalle: DetalleItemDevuelto[];
+    };
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -803,6 +868,40 @@ export async function cancelarSalida(
     return respuesta.data;
 }
 
+/**
+ * Consulta el equipamiento asignado a la salida para inspección y devolución (CU-41, GET /api/salidas/:idsalida/equipamiento-asignado).
+ */
+export async function obtenerEquipamientoAsignado(
+    idsalida: number,
+): Promise<EquipamientoAsignadoSalida> {
+    const respuesta = await solicitarApi<RespuestaEquipamientoAsignadoApi>(
+        `/salidas/${idsalida}/equipamiento-asignado`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Registra la devolución de equipamiento y reintegra el stock en buen estado (CU-41, POST /api/salidas/:idsalida/devolucion-equipamiento).
+ */
+export async function registrarDevolucionEquipamiento(
+    idsalida: number,
+    payload: PayloadDevolucionEquipamiento,
+): Promise<ResultadoDevolucionEquipamiento> {
+    const respuesta = await solicitarApi<RespuestaDevolucionEquipamientoApi>(
+        `/salidas/${idsalida}/devolucion-equipamiento`,
+        {
+            method: "POST",
+            body: JSON.stringify(payload),
+        },
+    );
+    return {
+        mensaje: respuesta.mensaje,
+        idsalida: respuesta.data.idsalida,
+        auditoriaId: respuesta.data.auditoriaId,
+        detalle: respuesta.data.detalle,
+    };
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -825,6 +924,8 @@ export const clavesSalidas = {
         ["salidas", "logistica", "disponibles", idsalida ?? null, tipo ?? null] as const,
     cancelacion: (idsalida?: number | null) =>
         ["salidas", "cancelacion", idsalida ?? null] as const,
+    equipamientoAsignado: (idsalida?: number | null) =>
+        ["salidas", "equipamientoAsignado", idsalida ?? null] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
@@ -1083,6 +1184,43 @@ export function useCancelarSalida() {
                     queryKey: clavesSalidas.cancelacion(variables.idsalida),
                 });
             }
+        },
+    });
+}
+
+/**
+ * Hook para consultar el equipamiento asignado a una salida concluida (CU-41).
+ */
+export function useEquipamientoAsignado(
+    idsalida: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" && Number.isInteger(idsalida) && idsalida > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.equipamientoAsignado(idsalida),
+        queryFn: () => obtenerEquipamientoAsignado(idsalida!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para registrar la devolución de equipamiento reintegrándolo al stock (CU-41).
+ * Invalida consultas de salidas, equipamiento asignado y catálogo de servicios tras el éxito.
+ */
+export function useRegistrarDevolucion() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ idsalida, datos }: ParametrosRegistrarDevolucion) =>
+            registrarDevolucionEquipamiento(idsalida, datos),
+        onSuccess: (_resultado, variables) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.equipamientoAsignado(variables.idsalida),
+            });
+            queryClient.invalidateQueries({ queryKey: ["servicios"] });
         },
     });
 }
