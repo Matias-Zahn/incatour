@@ -71,6 +71,15 @@ export class ReservaService {
       }
     }
 
+    // RES-15: un pasaporte ya registrado se usa tal como está; con otro nombre es de otra persona
+    const normalizar = (nombre: string) => nombre.trim().toLowerCase();
+    for (const registrado of await this.repository.buscarPasajerosPorPasaporte([...pasaportes])) {
+      const enviado = dto.pasajeros.find((p) => p.nroPasaporte === registrado.nroPasaporte);
+      if (enviado && normalizar(enviado.nombreCompleto) !== normalizar(registrado.nombreCompleto)) {
+        throw CustomError.conflict(`El pasaporte ${registrado.nroPasaporte} ya está registrado a nombre de otra persona.`);
+      }
+    }
+
     // CAT-05: lo que se vendió es la definición de la salida (foto), no el paquete como esté hoy
     const definicion = definicionEfectiva(salida);
 

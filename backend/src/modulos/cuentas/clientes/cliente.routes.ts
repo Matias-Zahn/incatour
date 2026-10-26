@@ -127,7 +127,9 @@ export class ClienteRoutes {
      *       201:
      *         description: Cliente registrado exitosamente.
      *       400:
-     *         description: Error de validación (nombre con símbolos, email duplicado, contraseña menor a 8 caracteres).
+     *         description: Error de validación (nombre con símbolos, contraseña menor a 8 caracteres).
+     *       409:
+     *         description: Email duplicado (CTA-10).
      */
     router.post("/", controller.crearCliente);
 
@@ -174,7 +176,9 @@ export class ClienteRoutes {
      *       200:
      *         description: Cliente actualizado exitosamente.
      *       400:
-     *         description: Cuenta inactiva o email ya en uso.
+     *         description: Cuenta inactiva.
+     *       409:
+     *         description: Email ya en uso (CTA-10).
      *       401:
      *         description: Token no proporcionado o inválido/expirado.
      *       403:

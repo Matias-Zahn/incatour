@@ -1,4 +1,5 @@
 import { CustomError } from "../../../error/CustomError";
+import { hoyUTC } from "../../../shared/fechas";
 import { DevolucionEquipamientoDto } from "./devolucion-equipamiento.dto";
 import { DevolucionEquipamientoRepository } from "./devolucion-equipamiento.repository";
 
@@ -50,9 +51,8 @@ export class DevolucionEquipamientoService {
       );
     }
 
-    // Regla de Negocio: la salida debe haber finalizado
-    const ahora = new Date();
-    const yaConcluyo = salida.estado === "FINALIZADA" || salida.fechaFin <= ahora;
+    // Regla de Negocio: la salida debe haber finalizado. SAL-14: por día calendario local, desde el último día (BE-01)
+    const yaConcluyo = salida.estado === "FINALIZADA" || hoyUTC() >= salida.fechaFin;
     if (!yaConcluyo) {
       throw CustomError.badRequest(
         "Solo se puede registrar la devolución del equipamiento de una salida concluida o en estado FINALIZADA."
@@ -92,6 +92,18 @@ export class DevolucionEquipamientoService {
           `La cantidad devuelta para el servicio #${item.idservicio} (${totalDevueltoItem}) supera la cantidad que la salida tenía asignada (${cantidadAsignada}).`
         );
       }
+    }
+
+    // SAL-15: la devolución cubre todo lo asignado; lo que no volvió se informa como dañado o extraviado
+    const faltantes = salida.equipamientos.flatMap((e) => {
+      const item = dto.items.find((i) => i.idservicio === e.idservicio);
+      const informado = item ? item.cantidadBuenEstado + item.cantidadDaniada : 0;
+      return informado < e.cantidad ? [`${e.servicio.nombreServicio}: faltan ${e.cantidad - informado} de ${e.cantidad}`] : [];
+    });
+    if (faltantes.length) {
+      throw CustomError.badRequest(
+        `Hay que informar todo el equipamiento asignado, en buen estado o dañado/extraviado. ${faltantes.join("; ")}.`
+      );
     }
 
     // Ejecutar el registro atómico y reintegro al stock del proveedor

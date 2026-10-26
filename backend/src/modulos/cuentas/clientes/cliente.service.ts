@@ -30,7 +30,7 @@ export class ClienteService {
   async crearCliente(dto: CrearClienteDto) {
     const emailExiste = await this.repository.checkEmailExists(dto.email);
     if (emailExiste) {
-      throw CustomError.badRequest("Ya existe un usuario registrado con ese correo electrónico.");
+      throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -57,7 +57,7 @@ export class ClienteService {
     if (dto.email) {
       const usuarioConEmail = await this.repository.checkEmailExists(dto.email);
       if (usuarioConEmail && usuarioConEmail.idusuario !== cliente.idusuario) {
-        throw CustomError.badRequest("El correo electrónico ya está en uso por otra cuenta.");
+        throw CustomError.conflict("El correo electrónico ya está en uso por otra cuenta.");
       }
     }
 
@@ -73,11 +73,10 @@ export class ClienteService {
       throw CustomError.badRequest("El cliente ya se encuentra inactivo.");
     }
 
-    const tieneReservas = await this.repository.hasReservasActivas(id);
-    if (tieneReservas) {
+    const baja = await this.repository.softDelete(id, cliente.idusuario);
+    if (!baja) {
       throw CustomError.badRequest("No se puede dar de baja porque tiene reservas activas.");
     }
-
-    return this.repository.softDelete(id, cliente.idusuario);
+    return baja;
   }
 }

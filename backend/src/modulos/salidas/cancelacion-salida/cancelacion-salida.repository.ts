@@ -117,50 +117,14 @@ export class CancelacionSalidaRepository {
           });
         }
 
-        // Se dan de baja las solicitudes de alojamiento pendientes
-        // =================================================================
-        // FIX SAL-18: Liberación de solicitudes de Alojamiento
-        // =================================================================
-        
-        // 1. Buscar las solicitudes CONFIRMADAS y traer su gestión asociada
-        const solicitudesConfirmadas = await tx.solicitud.findMany({
-          where: { 
-            estado: ESTADO_SOLICITUD.CONFIRMADA,
-            reserva: { idsalida: p.idsalida } 
-          },
-          include: {
-            gestiones: {
-              where: { resultado: ESTADO_SOLICITUD.CONFIRMADA } 
-            }
-          }
-        });
-
-        // 2. Cancelar TODAS las solicitudes (PENDIENTES y CONFIRMADAS)
+        // Se dan de baja las solicitudes de alojamiento pendientes y las confirmadas, igual que CU-32 (SAL-18)
         await tx.solicitud.updateMany({
-          where: { 
-            estado: { in: [ESTADO_SOLICITUD.PENDIENTE, ESTADO_SOLICITUD.CONFIRMADA] }, 
-            reserva: { idsalida: p.idsalida } 
+          where: {
+            estado: { in: [ESTADO_SOLICITUD.PENDIENTE, ESTADO_SOLICITUD.CONFIRMADA] },
+            reserva: { idsalida: p.idsalida },
           },
           data: { estado: ESTADO_SOLICITUD.CANCELADA },
         });
-
-       // 3. Restaurar las plazas (capacidadDisponible) del ServicioAlojamiento
-        for (const solicitud of solicitudesConfirmadas) {
-          
-          // Sacamos el primer elemento (TypeScript sabe que esto puede ser undefined)
-          const gestionConfirmada = solicitud.gestiones[0];
-
-          // Si existe, extraemos el id y hacemos el update
-          if (gestionConfirmada) {
-            await tx.servicioAlojamiento.update({
-              where: { idservicio: gestionConfirmada.idservicio },
-              data: {
-                capacidadDisponible: { increment: solicitud.cantidadPlazas }
-              }
-            });
-          }
-          
-        }
 
         // Reservas -> Cancelada, con el reembolso del 100% del importe abonado
         await tx.reserva.updateMany({

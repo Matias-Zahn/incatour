@@ -12,8 +12,8 @@ export class ResolverSolicitudDto {
     const resolucion = obj.resolucion ?? obj.estado;
     const motivo = obj.motivo ?? obj.observaciones;
 
-    if (!servicioId || typeof servicioId !== "number") {
-      return ["El servicioId es requerido y debe ser un número"];
+    if (!Number.isInteger(servicioId) || servicioId <= 0) {
+      return ["El servicioId es requerido y debe ser un número entero"];
     }
 
     if (resolucion !== "ACEPTADA" && resolucion !== "RECHAZADA") {

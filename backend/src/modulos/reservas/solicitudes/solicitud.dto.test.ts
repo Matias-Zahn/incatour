@@ -14,8 +14,9 @@ describe("ResolverSolicitudDto (CU-34)", () => {
   });
 
   it.each([
-    [{ resolucion: "ACEPTADA" }, "El servicioId es requerido y debe ser un número"],
-    [{ servicioId: "40", resolucion: "ACEPTADA" }, "El servicioId es requerido y debe ser un número"],
+    [{ resolucion: "ACEPTADA" }, "El servicioId es requerido y debe ser un número entero"],
+    [{ servicioId: "40", resolucion: "ACEPTADA" }, "El servicioId es requerido y debe ser un número entero"],
+    [{ servicioId: 1.5, resolucion: "ACEPTADA" }, "El servicioId es requerido y debe ser un número entero"],
     [{ servicioId: 40, resolucion: "QUIZAS" }, "La resolución debe ser 'ACEPTADA' o 'RECHAZADA'"],
     [{ servicioId: 40, resolucion: "RECHAZADA" }, "El motivo es obligatorio cuando la resolución es RECHAZADA"],
     [{ servicioId: 40, resolucion: "RECHAZADA", motivo: "   " }, "El motivo es obligatorio cuando la resolución es RECHAZADA"],

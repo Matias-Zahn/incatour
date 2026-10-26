@@ -98,6 +98,16 @@ export class GuiaService {
       throw CustomError.badRequest(`Antes hay que informar la etapa ${ultima + 1}`);
     }
 
+    // CTA-15: un DEMORADO reenviado (la cola offline no recibió la respuesta) devuelve el que ya estaba, sin duplicarlo
+    const ultimoDeLaEtapa = s.avances.find((a) => a.numeroOrden === dto.numeroOrden);
+    if (
+      dto.estadoTramo === ESTADO_TRAMO.DEMORADO &&
+      ultimoDeLaEtapa?.estadoTramo === ESTADO_TRAMO.DEMORADO &&
+      ultimoDeLaEtapa.fechaHoraLlegada?.getTime() === dto.fechaHoraLlegada.getTime()
+    ) {
+      return { avance: ultimoDeLaEtapa, salida: { idsalida, estado: s.estado, ultimaEtapaAlcanzada: s.ultimaEtapaAlcanzada } };
+    }
+
     if (dto.fechaHoraLlegada > new Date()) throw CustomError.badRequest("La fecha y hora de llegada no puede ser futura");
     if (dto.fechaHoraLlegada < s.fechaInicio) {
       throw CustomError.badRequest("La fecha y hora de llegada es anterior al inicio de la salida");

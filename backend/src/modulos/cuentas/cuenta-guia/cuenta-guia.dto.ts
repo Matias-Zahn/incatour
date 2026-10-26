@@ -137,8 +137,10 @@ export class ModificarCuentaGuiaDto {
       if (isNaN(fechaHab.getTime())) return ["La fecha de habilitación no es válida"];
     }
 
+    // CTA-13: igual que el alta, un número vacío no pisa el que ya estaba
     if (nroHabilitacion !== undefined && nroHabilitacion !== null) {
       nroHabilitacion = String(nroHabilitacion).trim();
+      if (nroHabilitacion.length === 0) nroHabilitacion = undefined;
     }
 
     return [

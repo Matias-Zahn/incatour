@@ -1,6 +1,7 @@
 import { db } from "../../../config/postgresDatabase";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_PERMISO } from "../../../shared/constantes";
+import { ESTADO_PERMISO, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
+import { hoyUTC } from "../../../shared/fechas";
 import { AsignacionRepository } from "../asignacion/asignacion.repository";
 import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
 
@@ -47,8 +48,15 @@ export class ReemplazoRepository {
     permisoNuevo: PermisoEmitido | undefined;
   }) {
     return db.$transaction(async (tx) => {
-      // Lock del reemplazante: si otra asignación lo tomó en esas fechas, no se superpone (RF-54)
+      // SAL-17: primero se bloquea la salida (mismo orden que CU-40) y se revalida que siga sin empezar ni cancelarse
       const { idsalida, fechaInicio, fechaFin } = p;
+      const [salida] = await tx.$queryRaw<{ estado: string; fechaInicio: Date }[]>`
+        SELECT estado, "fechaInicio" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
+      if (!salida || !SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
+        throw CustomError.conflict("La salida se canceló o empezó mientras se reemplazaba el personal");
+      }
+
+      // Lock del reemplazante: si otra asignación lo tomó en esas fechas, no se superpone (RF-54)
       if ((await new AsignacionRepository().personalOcupado(tx, { idsalida, fechaInicio, fechaFin }, [p.idreemplazante])).length) {
         throw CustomError.conflict("El reemplazante se asignó a otra salida en esas fechas. Elegí otra persona");
       }

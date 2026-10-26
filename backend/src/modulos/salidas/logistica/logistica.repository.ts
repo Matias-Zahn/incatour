@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
+import { hoyUTC } from "../../../shared/fechas";
 import { ESTADO, ESTADO_RESERVA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { ItemDesasignar, ItemNuevo } from "./logistica.dto";
 
@@ -124,6 +125,13 @@ export class LogisticaRepository {
     try {
       await db.$transaction(
         async (tx) => {
+          // SAL-16: se bloquea la salida antes que nada (mismo orden que CU-37 y CU-40) y se revalida adentro
+          const [fila] = await tx.$queryRaw<{ estado: string; fechaInicio: Date }[]>`
+            SELECT estado, "fechaInicio" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
+          if (fila?.estado !== "CERRADA" || fila.fechaInicio <= hoyUTC()) {
+            throw new ReglaLogisticaViolada("La salida cambió mientras se modificaba la logística: ya no está cerrada o ya comenzó.");
+          }
+
           const antes = await this.instantanea(tx, idsalida);
 
           // 1. Desasignar (SAL-08: atómico - deleteMany primero, solo reintegra si eliminó exactamente la fila)

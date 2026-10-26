@@ -143,6 +143,8 @@ export class PersonalRepository {
    */
   async darDeBaja(idpersonal: number, idusuario: number | null) {
     return db.$transaction(async (tx) => {
+      // CTA-09: mismo lock que CU-40 y CU-38 sobre el legajo: una asignación en curso termina antes de contar
+      await tx.$queryRaw`SELECT 1 FROM public."Personal" WHERE idpersonal = ${idpersonal} FOR UPDATE`;
       const pendientes = await tx.asignacionPersonal.count({
         where: { idpersonal, salida: { estado: { in: SALIDAS_ACTIVAS } } },
       });
