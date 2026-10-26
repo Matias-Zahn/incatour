@@ -98,7 +98,9 @@ export class CuentaGuiaRoutes {
      *       201:
      *         description: Cuenta de guía creada exitosamente.
      *       400:
-     *         description: Error de validación o el guía ya tiene cuenta.
+     *         description: Error de validación, habilitación vencida o el guía ya tiene cuenta.
+     *       409:
+     *         description: Email ya en uso (CTA-10).
      *       404:
      *         description: Personal guía no encontrado.
      */
@@ -123,7 +125,9 @@ export class CuentaGuiaRoutes {
      *       200:
      *         description: Cuenta de guía modificada exitosamente.
      *       400:
-     *         description: Error de validación o email ya en uso.
+     *         description: Error de validación, habilitación vencida o cuenta dada de baja.
+     *       409:
+     *         description: Email ya en uso (CTA-10).
      *       404:
      *         description: Cuenta de guía no encontrada.
      */

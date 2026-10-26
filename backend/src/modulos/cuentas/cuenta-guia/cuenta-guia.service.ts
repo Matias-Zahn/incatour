@@ -39,7 +39,7 @@ export class CuentaGuiaService {
 
     const emailExiste = await this.repository.checkEmailExists(dto.email);
     if (emailExiste) {
-      throw CustomError.badRequest("El email ya se encuentra en uso por otra cuenta.");
+      throw CustomError.conflict("El email ya se encuentra en uso por otra cuenta.");
     }
 
     const partes = personal.nombreCompleto.trim().split(" ");
@@ -77,7 +77,7 @@ export class CuentaGuiaService {
     if (dto.email && dto.email !== cuenta.usuario.email) {
       const emailExiste = await this.repository.checkEmailExists(dto.email);
       if (emailExiste && emailExiste.idusuario !== idusuario) {
-        throw CustomError.badRequest("El email ya se encuentra en uso por otra cuenta.");
+        throw CustomError.conflict("El email ya se encuentra en uso por otra cuenta.");
       }
     }
 
