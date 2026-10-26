@@ -11,6 +11,7 @@ import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
 import FormularioModificarLogistica from "../../components/FormularioModificarLogistica";
+import ModalCancelarSalida from "../../components/ModalCancelarSalida";
 import { ErrorApi } from "../../services/clienteApi";
 import { useCircuitos } from "../../services/circuitoService";
 import {
@@ -36,12 +37,14 @@ import {
     usePanelLogistica,
     usePersonalSalida,
     useSalidas,
+    useCancelarSalida,
     type DatosCrearSalida,
     type FiltrosSalidas,
     type ParametrosConsultaOpciones,
     type PayloadConfirmarAsignacion,
     type PayloadConfirmarReemplazo,
     type PayloadModificarLogistica,
+    type ResultadoCancelarSalida,
     type Salida,
 } from "../../services/salidaService";
 import { obtenerUsuario } from "../../services/sesionService";
@@ -151,11 +154,25 @@ function SalidasPage() {
 
     const modificarLogisticaMutation = useModificarLogistica();
 
+    // Estados para la cancelación de salidas (CU-37)
+    const [salidaParaCancelar, setSalidaParaCancelar] = useState<Salida | null>(null);
+    const [resultadoCancelacion, setResultadoCancelacion] =
+        useState<ResultadoCancelarSalida | null>(null);
+    const [advertenciaCancelacion503, setAdvertenciaCancelacion503] = useState<{
+        idsalida: number;
+        nroSalida: string;
+        mensaje: string;
+    } | null>(null);
+    const [idSalidaReintentandoCupos, setIdSalidaReintentandoCupos] = useState<number | null>(null);
+
+    const cancelarSalidaMutation = useCancelarSalida();
+
     function abrirFormulario() {
         setFormularioAbierto(true);
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
         setSalidaParaModificarLogistica(null);
+        setSalidaParaCancelar(null);
         setParametrosConsulta(null);
         setErrorCreacion("");
         setMensajeExito(null);
@@ -181,6 +198,7 @@ function SalidasPage() {
         setSalidaParaAsignar(salida);
         setSalidaParaReemplazar(null);
         setSalidaParaModificarLogistica(null);
+        setSalidaParaCancelar(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -205,6 +223,7 @@ function SalidasPage() {
         setSalidaParaReemplazar(salida);
         setSalidaParaAsignar(null);
         setSalidaParaModificarLogistica(null);
+        setSalidaParaCancelar(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -229,6 +248,7 @@ function SalidasPage() {
         setSalidaParaModificarLogistica(salida);
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
+        setSalidaParaCancelar(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -247,6 +267,74 @@ function SalidasPage() {
     function cerrarModificarLogistica() {
         setSalidaParaModificarLogistica(null);
         setErrorModificarLogistica("");
+    }
+
+    function abrirCancelarSalida(salida: Salida) {
+        setSalidaParaCancelar(salida);
+        setFormularioAbierto(false);
+        setSalidaParaAsignar(null);
+        setSalidaParaReemplazar(null);
+        setSalidaParaModificarLogistica(null);
+        setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
+        setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
+        setErrorModificarLogistica("");
+        setResultadoCancelacion(null);
+    }
+
+    function cerrarCancelarSalida() {
+        setSalidaParaCancelar(null);
+    }
+
+    function manejarCancelacionExitosa(resultado: ResultadoCancelarSalida) {
+        setResultadoCancelacion(resultado);
+        setAdvertenciaCancelacion503(null);
+        setSalidaParaCancelar(null);
+    }
+
+    function manejarCancelacionConAdvertencia(
+        idsalida: number,
+        nroSalida: string,
+        mensaje: string,
+    ) {
+        setAdvertenciaCancelacion503({ idsalida, nroSalida, mensaje });
+        setResultadoCancelacion(null);
+        setSalidaParaCancelar(null);
+    }
+
+    function manejarReintentarLiberacionCupos(idsalida: number, nroSalida: string) {
+        setIdSalidaReintentandoCupos(idsalida);
+        cancelarSalidaMutation.mutate(
+            {
+                idsalida,
+                datos: { motivo: "Reintento de liberación ante la autoridad" },
+            },
+            {
+                onSuccess: (resultado) => {
+                    setResultadoCancelacion({
+                        idsalida,
+                        nroSalida,
+                        estado: "CANCELADA",
+                        nota: resultado.nota ?? "Cupos liberados ante la autoridad.",
+                    });
+                    setAdvertenciaCancelacion503(null);
+                    setIdSalidaReintentandoCupos(null);
+                },
+                onError: (error) => {
+                    setIdSalidaReintentandoCupos(null);
+                    if (error instanceof ErrorApi) {
+                        setAdvertenciaCancelacion503({
+                            idsalida,
+                            nroSalida,
+                            mensaje: error.message,
+                        });
+                    }
+                },
+            },
+        );
     }
 
     function manejarConfirmarModificacionLogistica(payload: PayloadModificarLogistica) {
@@ -869,13 +957,32 @@ function SalidasPage() {
                     fila.estado === "CERRADA" &&
                     fechaFutura;
 
+                // CU-37: Cancelar salida
+                // Solo administradores y salidas en estado PUBLICADA, ABIERTA o CERRADA con fecha de inicio futura.
+                const estadoCancelable =
+                    fila.estado === "PUBLICADA" ||
+                    fila.estado === "ABIERTA" ||
+                    fila.estado === "CERRADA";
+                const puedeCancelarSalida =
+                    esAdmin &&
+                    estadoCancelable &&
+                    fechaFutura;
+
+                // Salida ya cancelada con bloqueo pendiente de liberación ante la autoridad (por 503 previo)
+                const tieneBloqueoCanceladaPendiente =
+                    esAdmin &&
+                    fila.estado === "CANCELADA" &&
+                    Boolean(fila.idbloqueo);
+
                 if (
                     !tieneSolicitudes &&
                     !esFinalizada &&
                     !puedeAsignar &&
                     !puedeLiberarSobrantes &&
                     !puedeReemplazarPersonal &&
-                    !puedeModificarLogistica
+                    !puedeModificarLogistica &&
+                    !puedeCancelarSalida &&
+                    !tieneBloqueoCanceladaPendiente
                 ) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
@@ -883,17 +990,19 @@ function SalidasPage() {
                 const estaLiberandoEstaSalida =
                     liberarSobrantesMutation.isPending && idSalidaLiberando === fila.idsalida;
 
+                const algunaMutacionPendiente =
+                    confirmarAsignacionMutation.isPending ||
+                    liberarSobrantesMutation.isPending ||
+                    confirmarReemplazoMutation.isPending ||
+                    modificarLogisticaMutation.isPending ||
+                    cancelarSalidaMutation.isPending;
+
                 return (
                     <div className="min-w-[110px] whitespace-nowrap flex flex-col gap-1 items-start text-xs font-semibold">
                         {puedeAsignar && (
                             <button
                                 type="button"
-                                disabled={
-                                    confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending ||
-                                    modificarLogisticaMutation.isPending
-                                }
+                                disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
@@ -903,12 +1012,7 @@ function SalidasPage() {
                         {puedeReemplazarPersonal && (
                             <button
                                 type="button"
-                                disabled={
-                                    confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending ||
-                                    modificarLogisticaMutation.isPending
-                                }
+                                disabled={algunaMutacionPendiente}
                                 onClick={() => abrirReemplazo(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
@@ -918,12 +1022,7 @@ function SalidasPage() {
                         {puedeModificarLogistica && (
                             <button
                                 type="button"
-                                disabled={
-                                    confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending ||
-                                    modificarLogisticaMutation.isPending
-                                }
+                                disabled={algunaMutacionPendiente}
                                 onClick={() => abrirModificarLogistica(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
@@ -933,18 +1032,38 @@ function SalidasPage() {
                         {puedeLiberarSobrantes && (
                             <button
                                 type="button"
-                                disabled={
-                                    confirmarAsignacionMutation.isPending ||
-                                    liberarSobrantesMutation.isPending ||
-                                    confirmarReemplazoMutation.isPending ||
-                                    modificarLogisticaMutation.isPending
-                                }
+                                disabled={algunaMutacionPendiente}
                                 onClick={() =>
                                     manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
                                 }
                                 className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
+                            </button>
+                        )}
+                        {puedeCancelarSalida && (
+                            <button
+                                type="button"
+                                disabled={algunaMutacionPendiente}
+                                onClick={() => abrirCancelarSalida(fila)}
+                                className="text-rose-700 hover:text-rose-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Cancelar salida
+                            </button>
+                        )}
+                        {tieneBloqueoCanceladaPendiente && (
+                            <button
+                                type="button"
+                                disabled={algunaMutacionPendiente}
+                                onClick={() =>
+                                    manejarReintentarLiberacionCupos(fila.idsalida, fila.nroSalida)
+                                }
+                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {cancelarSalidaMutation.isPending &&
+                                idSalidaReintentandoCupos === fila.idsalida
+                                    ? "Liberando cupos..."
+                                    : "Reintentar liberar cupos"}
                             </button>
                         )}
                         {tieneSolicitudes && (
@@ -1446,6 +1565,124 @@ function SalidasPage() {
                     onConfirmarModificacion={manejarConfirmarModificacionLogistica}
                     onCancelar={cerrarModificarLogistica}
                 />
+            ) : null}
+
+            {salidaParaCancelar ? (
+                <ModalCancelarSalida
+                    key={salidaParaCancelar.idsalida}
+                    abierto={salidaParaCancelar !== null}
+                    salida={salidaParaCancelar}
+                    onCerrar={cerrarCancelarSalida}
+                    onCancelacionExitosa={manejarCancelacionExitosa}
+                    onCancelacionConAdvertencia={manejarCancelacionConAdvertencia}
+                />
+            ) : null}
+
+            {/* Aviso de cancelación exitosa (CU-37) */}
+            {resultadoCancelacion ? (
+                <Alerta tipo="exito" titulo="Salida cancelada exitosamente (CU-37)">
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">
+                                La salida{" "}
+                                <span className="font-bold text-navegacion">
+                                    {resultadoCancelacion.nroSalida}
+                                </span>{" "}
+                                pasó al estado <span className="font-bold text-rose-700">CANCELADA</span>.
+                                {resultadoCancelacion.reservasCanceladas !== undefined && (
+                                    <>
+                                        {" "}Se dieron de baja{" "}
+                                        <span className="font-bold">
+                                            {resultadoCancelacion.reservasCanceladas}{" "}
+                                            {resultadoCancelacion.reservasCanceladas === 1
+                                                ? "reserva confirmada"
+                                                : "reservas confirmadas"}
+                                        </span>{" "}
+                                        con un reembolso total registrado de{" "}
+                                        <span className="font-bold">
+                                            {new Intl.NumberFormat("es-AR", {
+                                                style: "currency",
+                                                currency: "ARS",
+                                                minimumFractionDigits: 2,
+                                            }).format(resultadoCancelacion.reembolsoTotal ?? 0)}
+                                        </span>
+                                        .
+                                    </>
+                                )}
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setResultadoCancelacion(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+
+                        {resultadoCancelacion.notificaciones && (
+                            <p className="text-xs text-emerald-900 font-medium">
+                                Notificaciones por correo a titulares:{" "}
+                                {resultadoCancelacion.notificaciones.enviadas}{" "}
+                                {resultadoCancelacion.notificaciones.enviadas === 1
+                                    ? "email enviado"
+                                    : "emails enviados"}
+                                {resultadoCancelacion.notificaciones.fallidas > 0
+                                    ? ` (${resultadoCancelacion.notificaciones.fallidas} fallidos)`
+                                    : ""}
+                                {resultadoCancelacion.notificaciones.salidasAlternativasOfrecidas > 0
+                                    ? ` · ${resultadoCancelacion.notificaciones.salidasAlternativasOfrecidas} salidas alternativas informadas`
+                                    : ""}
+                                .
+                            </p>
+                        )}
+
+                        {resultadoCancelacion.nota && (
+                            <p className="text-xs text-slate-600 italic">
+                                {resultadoCancelacion.nota}
+                            </p>
+                        )}
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {/* Aviso de advertencia 503: salida cancelada pero cupos pendientes */}
+            {advertenciaCancelacion503 ? (
+                <Alerta
+                    tipo="advertencia"
+                    titulo={`Salida ${advertenciaCancelacion503.nroSalida} cancelada con cupos pendientes ante la autoridad (HTTP 503)`}
+                >
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">{advertenciaCancelacion503.mensaje}</p>
+                            <div className="flex items-center gap-2">
+                                <Boton
+                                    variante="principal"
+                                    className="px-2.5 py-1 text-xs"
+                                    cargando={
+                                        cancelarSalidaMutation.isPending &&
+                                        idSalidaReintentandoCupos ===
+                                            advertenciaCancelacion503.idsalida
+                                    }
+                                    onClick={() =>
+                                        manejarReintentarLiberacionCupos(
+                                            advertenciaCancelacion503.idsalida,
+                                            advertenciaCancelacion503.nroSalida,
+                                        )
+                                    }
+                                >
+                                    Reintentar liberar cupos
+                                </Boton>
+                                <Boton
+                                    variante="secundario"
+                                    className="px-2.5 py-1 text-xs"
+                                    onClick={() => setAdvertenciaCancelacion503(null)}
+                                >
+                                    Cerrar aviso
+                                </Boton>
+                            </div>
+                        </div>
+                    </div>
+                </Alerta>
             ) : null}
 
             {/* Advertencia operativa en salidas próximas (< 7 días) (RF-61) */}
