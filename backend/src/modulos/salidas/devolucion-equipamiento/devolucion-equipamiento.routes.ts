@@ -96,7 +96,7 @@ export class DevolucionEquipamientoRoutes {
      *       200:
      *         description: Devolución registrada y stock reintegrado con éxito.
      *       400:
-     *         description: Salida aún no finalizada, cantidades inválidas o servicio no asignado.
+     *         description: Salida aún no finalizada (se acepta desde su último día), cantidades inválidas, servicio no asignado o equipamiento asignado sin informar (SAL-15).
      *       401:
      *         description: No autenticado.
      *       403:

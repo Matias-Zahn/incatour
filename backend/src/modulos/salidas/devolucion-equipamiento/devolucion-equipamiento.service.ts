@@ -94,6 +94,18 @@ export class DevolucionEquipamientoService {
       }
     }
 
+    // SAL-15: la devolución cubre todo lo asignado; lo que no volvió se informa como dañado o extraviado
+    const faltantes = salida.equipamientos.flatMap((e) => {
+      const item = dto.items.find((i) => i.idservicio === e.idservicio);
+      const informado = item ? item.cantidadBuenEstado + item.cantidadDaniada : 0;
+      return informado < e.cantidad ? [`${e.servicio.nombreServicio}: faltan ${e.cantidad - informado} de ${e.cantidad}`] : [];
+    });
+    if (faltantes.length) {
+      throw CustomError.badRequest(
+        `Hay que informar todo el equipamiento asignado, en buen estado o dañado/extraviado. ${faltantes.join("; ")}.`
+      );
+    }
+
     // Ejecutar el registro atómico y reintegro al stock del proveedor
     const resultado = await this.repository.registrarDevolucion({
       idsalida,

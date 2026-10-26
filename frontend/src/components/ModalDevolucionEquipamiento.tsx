@@ -100,10 +100,11 @@ function FormularioDevolucionContenido({
         const mapa = new Map<number, string>();
         for (const item of itemsForm) {
             const total = item.cantidadBuenEstado + item.cantidadDaniada;
-            if (total === 0) {
+            // SAL-15: se informa todo lo asignado; lo que no volvió va como dañado o extraviado
+            if (total < item.cantidadAsignada) {
                 mapa.set(
                     item.idservicio,
-                    "Debe devolver al menos una unidad (en buen estado o dañada).",
+                    `Faltan informar ${item.cantidadAsignada - total} uds.: cargalas como dañadas o extraviadas.`,
                 );
             } else if (total > item.cantidadAsignada) {
                 mapa.set(

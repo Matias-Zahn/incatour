@@ -40,4 +40,11 @@ describe("DevolucionEquipamientoService.registrarDevolucion (CU-41)", () => {
 
     await expect(new DevolucionEquipamientoService().registrarDevolucion(2, dto(8, 2), "a@b.com")).resolves.toMatchObject({ idsalida: 2 });
   });
+
+  it("SAL-15: si no se informa todo lo asignado responde 400 con lo que falta", async () => {
+    vi.setSystemTime(new Date(2026, 10, 14));
+
+    await expect(new DevolucionEquipamientoService().registrarDevolucion(2, dto(6), "a@b.com")).rejects.toThrow("Carpa: faltan 4 de 10");
+    expect(repo.registrarDevolucion).not.toHaveBeenCalled();
+  });
 });
