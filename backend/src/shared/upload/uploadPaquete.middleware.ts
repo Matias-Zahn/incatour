@@ -12,6 +12,8 @@ const EXTENSION_POR_FORMATO: Record<string, string> = { "image/jpeg": ".jpg", "i
 const FORMATOS_PERMITIDOS = Object.keys(EXTENSION_POR_FORMATO);
 const NOMBRES_FOTOS_VALIDOS = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
 const TEMPORAL = "subiendo_";
+// CAT-22: una subida en curso no es una foto del paquete todavía
+export const esArchivoTemporal = (nombre: string) => nombre.startsWith(TEMPORAL);
 
 // CAT-22: foto_1 es la principal, igual que en el DELETE y en el front
 export const nombreArchivoFoto = (nombreFoto: string) => {
@@ -259,7 +261,7 @@ export function obtenerImagenesDePaquete(
     if (fs.existsSync(dir)) {
       const archivos = fs
         .readdirSync(dir)
-        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f))
+        .filter((f) => /\.(jpe?g|png|webp)$/i.test(f) && !esArchivoTemporal(f))
         .sort((a, b) => {
           const esPrinA = a.startsWith("principal.") ? 0 : 1;
           const esPrinB = b.startsWith("principal.") ? 0 : 1;

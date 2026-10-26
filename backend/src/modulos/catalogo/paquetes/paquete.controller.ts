@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import fs from "fs";
 import path from "path";
 import { CustomError } from "../../../error/CustomError";
-import { nombreArchivoFoto, obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
+import { esArchivoTemporal, nombreArchivoFoto, obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
 import { leerIdUrl } from "../../../shared/validaciones";
@@ -193,7 +193,7 @@ export class PaqueteController {
       const carrusel: string[] = [];
 
       if (fs.existsSync(dir)) {
-        const archivos = fs.readdirSync(dir);
+        const archivos = fs.readdirSync(dir).filter((arch) => !esArchivoTemporal(arch));
         for (const arch of archivos) {
           const url = `/imagenes/paquetes/${id}/${arch}`;
           if (arch.startsWith("principal.")) {
