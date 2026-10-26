@@ -11,61 +11,24 @@
  * Resetea incatour_humo con las migraciones y el seed, y levanta el back en el puerto 3999.
  * La base de desarrollo no se toca. Uso, desde backend, con Docker levantado: npm run test:humo
  */
-import { execSync, spawn } from "child_process";
 import fs from "fs";
-import os from "os";
-import path from "path";
-import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { Back, crearEntorno, idDe, resumen } from "./lib-prueba";
 
 // HUMO_DB y HUMO_PUERTO permiten correr varias pruebas a la vez (una por worktree)
 const HUMO_DB = process.env.HUMO_DB ?? "incatour_humo";
 const PUERTO = Number(process.env.HUMO_PUERTO ?? 3999);
-const BASE = `http://localhost:${PUERTO}/api`;
-const DB_URL = process.env.DATABASE_URL!.replace(/\/[^/?]+(\?|$)/, `/${HUMO_DB}$1`);
-const env = { ...process.env, DATABASE_URL: DB_URL, PORT: String(PUERTO), DB_NAME: HUMO_DB };
-const LOG = path.join(os.tmpdir(), `${HUMO_DB}-back.log`);
+const entorno = crearEntorno(HUMO_DB);
+const DB_URL = entorno.DB_URL;
 
 const fallas: string[] = [];
 const avisos: string[] = [];
 const omitidos: string[] = [];
 const token = { admin: "", cliente: "", guia: "" };
-let salidaBack = "";
-let caido = "";
-let terminando = false;
+let back: Back;
 
-const resumen = (b: any) => (typeof b === "string" ? b : JSON.stringify(b?.error ?? b)).slice(0, 160);
-
-// Primera línea útil del error que imprimió el back mientras atendía el pedido
-function errorDelBack(desde: number) {
-  const log = salidaBack.slice(desde);
-  const lineas = log.split("\n").filter((l) => !/^\s*at /.test(l));
-  const linea = lineas.find((l) => /Unknown (argument|field)|Invalid value|must not be null|does not exist|violates/i.test(l))
-    ?? lineas.find((l) => /Error/.test(l));
-  return linea ? `\n      back: ${linea.trim().slice(0, 200)}` : "";
-}
-
-async function llamar(metodo: string, ruta: string, body?: unknown, tok = token.admin) {
-  if (caido) throw new Error(`No sigo: ${caido}`);
-  const desde = salidaBack.length;
-  let r: Response;
-  try {
-    r = await fetch(BASE + ruta, {
-      method: metodo,
-      headers: { "Content-Type": "application/json", ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
-  } catch {
-    await new Promise((res) => setTimeout(res, 500));
-    caido ||= "el back cortó la conexión";
-    throw new Error(`${caido} en ${metodo} ${ruta}`);
-  }
-  const texto = await r.text();
-  let cuerpo: any = texto;
-  try { cuerpo = JSON.parse(texto); } catch { /* sin JSON */ }
-  if (r.status >= 500) await new Promise((res) => setTimeout(res, 100)); // que llegue el log
-  return { status: r.status, body: cuerpo, error: r.status >= 500 ? errorDelBack(desde) : "" };
-}
+const llamar = (metodo: string, ruta: string, body?: unknown, tok = token.admin) => back.llamar(metodo, ruta, body, tok);
+const login = (email: string, contrasenia: string) => back.login(email, contrasenia);
 
 // Paso del recorrido: tiene que dar 2xx. Devuelve data para encadenar ids.
 async function paso(nombre: string, metodo: string, ruta: string, body?: unknown, tok?: string): Promise<any> {
@@ -79,23 +42,6 @@ async function paso(nombre: string, metodo: string, ruta: string, body?: unknown
   console.log(`${ok ? "✓" : "✗"} ${r.status} ${nombre}`);
   if (!ok) fallas.push(`C ${nombre} → ${metodo} ${ruta} → ${r.status} ${resumen(r.body)}${r.error}`);
   return ok ? r.body?.data ?? r.body : undefined;
-}
-
-// Busca un id en la respuesta, esté arriba o anidado (data.salida.idsalida, data.usuario.idusuario...)
-function idDe(obj: any, campo: string): number | undefined {
-  if (!obj || typeof obj !== "object") return undefined;
-  if (typeof obj[campo] === "number") return obj[campo];
-  for (const v of Object.values(obj)) {
-    const id = idDe(v, campo);
-    if (id !== undefined) return id;
-  }
-  return undefined;
-}
-
-async function login(email: string, contrasenia: string) {
-  const r = await llamar("POST", "/auth/login", { email, contrasenia }, "");
-  if (r.status !== 200) throw new Error(`No se pudo entrar como ${email}: ${resumen(r.body)}`);
-  return r.body.data.token as string;
 }
 
 function tokenPara(ruta: string) {
@@ -392,23 +338,17 @@ async function faseD() {
   }
 }
 
-async function esperarServidor() {
-  for (let i = 0; i < 60; i++) {
-    try { await fetch(`${BASE}/catalogo`); return; } catch { await new Promise((r) => setTimeout(r, 500)); }
-  }
-  throw new Error("El back no arrancó");
-}
-
 async function main() {
-  console.log(`Reseteando ${HUMO_DB} (migraciones + seed)...`);
-  execSync("npx prisma migrate reset --force --skip-generate --skip-seed", { env, stdio: "ignore" });
-  execSync("npx tsx prisma/seed.ts", { env, stdio: "ignore" });
-  const server = spawn("npx", ["tsx", "src/app.ts"], { env, shell: true, stdio: ["ignore", "pipe", "pipe"] });
-  server.stdout.on("data", (d) => (salidaBack += d));
-  server.stderr.on("data", (d) => (salidaBack += d));
-  server.on("exit", (code) => { if (!terminando) caido = `el back se cayó (código ${code})`; });
+  entorno.resetear();
   try {
-    await esperarServidor();
+    back = await entorno.levantarBack(PUERTO);
+  } catch (e) {
+    console.log(`
+FALLAS (1):
+  Corte: ${e instanceof Error ? e.message : e}`);
+    process.exit(1);
+  }
+  try {
     token.admin = await login("admin@incatour.com", "AdminIncaTour123");
     token.cliente = await login("juan@test.com", "hash123");
     token.guia = await login("carlos.guia@incatour.com", "guia123");
@@ -418,16 +358,11 @@ async function main() {
   } catch (e) {
     fallas.push(`Corte: ${e instanceof Error ? e.message : e}`);
   } finally {
-    terminando = true;
-    fs.writeFileSync(LOG, salidaBack);
-    // En Windows hay que matar el árbol (npx → tsx → node)
-    if (process.platform === "win32" && server.pid) {
-      try { execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: "ignore" }); } catch { /* ya terminó */ }
-    } else server.kill();
+    back.apagar();
   }
   if (avisos.length) console.log(`\nAvisos (${avisos.length}):\n  ` + avisos.join("\n  "));
   if (omitidos.length) console.log(`\nOmitidos por fallas anteriores: ${omitidos.length}`);
-  console.log(`Salida completa del back: ${LOG}`);
+  console.log(`Salida completa del back: ${back.log}`);
   if (fallas.length) {
     console.log(`\nFALLAS (${fallas.length}):\n  ` + fallas.join("\n  "));
     process.exit(1);
