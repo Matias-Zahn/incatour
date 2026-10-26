@@ -12,6 +12,7 @@ import FormularioAsignarRecursos from "../../components/FormularioAsignarRecurso
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
 import FormularioModificarLogistica from "../../components/FormularioModificarLogistica";
 import ModalCancelarSalida from "../../components/ModalCancelarSalida";
+import ModalDevolucionEquipamiento from "../../components/ModalDevolucionEquipamiento";
 import { ErrorApi } from "../../services/clienteApi";
 import { useCircuitos } from "../../services/circuitoService";
 import {
@@ -45,6 +46,7 @@ import {
     type PayloadConfirmarReemplazo,
     type PayloadModificarLogistica,
     type ResultadoCancelarSalida,
+    type ResultadoDevolucionEquipamiento,
     type Salida,
 } from "../../services/salidaService";
 import { obtenerUsuario } from "../../services/sesionService";
@@ -167,12 +169,19 @@ function SalidasPage() {
 
     const cancelarSalidaMutation = useCancelarSalida();
 
+    // Estados para la devolución de equipamiento (CU-41)
+    const [salidaParaDevolverEquipamiento, setSalidaParaDevolverEquipamiento] =
+        useState<Salida | null>(null);
+    const [resultadoDevolucion, setResultadoDevolucion] =
+        useState<ResultadoDevolucionEquipamiento | null>(null);
+
     function abrirFormulario() {
         setFormularioAbierto(true);
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
         setSalidaParaModificarLogistica(null);
         setSalidaParaCancelar(null);
+        setSalidaParaDevolverEquipamiento(null);
         setParametrosConsulta(null);
         setErrorCreacion("");
         setMensajeExito(null);
@@ -199,6 +208,7 @@ function SalidasPage() {
         setSalidaParaReemplazar(null);
         setSalidaParaModificarLogistica(null);
         setSalidaParaCancelar(null);
+        setSalidaParaDevolverEquipamiento(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -224,6 +234,7 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setSalidaParaModificarLogistica(null);
         setSalidaParaCancelar(null);
+        setSalidaParaDevolverEquipamiento(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -249,6 +260,7 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
         setSalidaParaCancelar(null);
+        setSalidaParaDevolverEquipamiento(null);
         setFormularioAbierto(false);
         setMensajeExito(null);
         setErrorConfirmacion("");
@@ -275,6 +287,7 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setSalidaParaReemplazar(null);
         setSalidaParaModificarLogistica(null);
+        setSalidaParaDevolverEquipamiento(null);
         setMensajeExito(null);
         setErrorConfirmacion("");
         setErrorLiberacionSobrantes("");
@@ -287,6 +300,33 @@ function SalidasPage() {
 
     function cerrarCancelarSalida() {
         setSalidaParaCancelar(null);
+    }
+
+    function abrirDevolucionEquipamiento(salida: Salida) {
+        setSalidaParaDevolverEquipamiento(salida);
+        setFormularioAbierto(false);
+        setSalidaParaAsignar(null);
+        setSalidaParaReemplazar(null);
+        setSalidaParaModificarLogistica(null);
+        setSalidaParaCancelar(null);
+        setMensajeExito(null);
+        setErrorConfirmacion("");
+        setErrorLiberacionSobrantes("");
+        setMensajeExitoLiberacion(null);
+        setMensajeSalidaYaAsignada(null);
+        setErrorReemplazo("");
+        setErrorModificarLogistica("");
+        setResultadoCancelacion(null);
+        setResultadoDevolucion(null);
+    }
+
+    function cerrarDevolucionEquipamiento() {
+        setSalidaParaDevolverEquipamiento(null);
+    }
+
+    function manejarDevolucionExitosa(resultado: ResultadoDevolucionEquipamiento) {
+        setResultadoDevolucion(resultado);
+        setSalidaParaDevolverEquipamiento(null);
     }
 
     function manejarCancelacionExitosa(resultado: ResultadoCancelarSalida) {
@@ -974,6 +1014,15 @@ function SalidasPage() {
                     fila.estado === "CANCELADA" &&
                     Boolean(fila.idbloqueo);
 
+                // CU-41: Devolver equipamiento
+                // Solo administradores y salidas que hayan concluido (FINALIZADA o fechaFin pasada) y no estén canceladas.
+                const yaConcluyo =
+                    esFinalizada || fila.fechaFin.slice(0, 10) <= fechaLocalHoy();
+                const puedeDevolverEquipamiento =
+                    esAdmin &&
+                    fila.estado !== "CANCELADA" &&
+                    yaConcluyo;
+
                 if (
                     !tieneSolicitudes &&
                     !esFinalizada &&
@@ -982,7 +1031,8 @@ function SalidasPage() {
                     !puedeReemplazarPersonal &&
                     !puedeModificarLogistica &&
                     !puedeCancelarSalida &&
-                    !tieneBloqueoCanceladaPendiente
+                    !tieneBloqueoCanceladaPendiente &&
+                    !puedeDevolverEquipamiento
                 ) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
@@ -1081,6 +1131,16 @@ function SalidasPage() {
                             >
                                 Evaluar
                             </Link>
+                        )}
+                        {puedeDevolverEquipamiento && (
+                            <button
+                                type="button"
+                                disabled={algunaMutacionPendiente}
+                                onClick={() => abrirDevolucionEquipamiento(fila)}
+                                className="text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Devolver equipamiento
+                            </button>
                         )}
                     </div>
                 );
@@ -1576,6 +1636,86 @@ function SalidasPage() {
                     onCancelacionExitosa={manejarCancelacionExitosa}
                     onCancelacionConAdvertencia={manejarCancelacionConAdvertencia}
                 />
+            ) : null}
+
+            {salidaParaDevolverEquipamiento ? (
+                <ModalDevolucionEquipamiento
+                    key={salidaParaDevolverEquipamiento.idsalida}
+                    abierto={salidaParaDevolverEquipamiento !== null}
+                    salida={salidaParaDevolverEquipamiento}
+                    onCerrar={cerrarDevolucionEquipamiento}
+                    onDevolucionExitosa={manejarDevolucionExitosa}
+                />
+            ) : null}
+
+            {/* Aviso de devolución de equipamiento exitosa (CU-41) */}
+            {resultadoDevolucion ? (
+                <Alerta
+                    tipo="exito"
+                    titulo="Devolución de equipamiento registrada exitosamente (CU-41)"
+                >
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm">
+                                {resultadoDevolucion.mensaje}
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setResultadoDevolucion(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3 pt-1 border-t border-emerald-200/70 text-xs">
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Artículos devueltos
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950">
+                                    {resultadoDevolucion.detalle.length}{" "}
+                                    {resultadoDevolucion.detalle.length === 1 ? "artículo" : "artículos"}
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Trazabilidad asentada en auditoría #{resultadoDevolucion.auditoriaId} (RF-56)
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Reintegradas a stock
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950">
+                                    {resultadoDevolucion.detalle.reduce(
+                                        (acc, d) => acc + d.cantidadReintegradaAlStock,
+                                        0,
+                                    )}{" "}
+                                    unidades
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Reintegradas al stock del proveedor
+                                </p>
+                            </div>
+
+                            <div className="rounded bg-emerald-100/60 p-2.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                    Dañadas o extraviadas
+                                </span>
+                                <p className="mt-0.5 text-base font-extrabold text-emerald-950">
+                                    {resultadoDevolucion.detalle.reduce(
+                                        (acc, d) => acc + d.cantidadDaniadaOExtraviada,
+                                        0,
+                                    )}{" "}
+                                    unidades
+                                </p>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    No reintegradas (con registro de inspección)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </Alerta>
             ) : null}
 
             {/* Aviso de cancelación exitosa (CU-37) */}

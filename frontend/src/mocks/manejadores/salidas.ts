@@ -1,9 +1,35 @@
 import { http, HttpResponse, delay } from "msw";
 import { alojamientosSalidaMock, salidasMockIniciales } from "../datos/salidas";
 import { paquetesIniciales } from "../datos/paquetes";
-import type { SalidaApi } from "../../services/salidaService";
+import type {
+    ItemDevolucionPayload,
+    ItemEquipamientoAsignado,
+    SalidaApi,
+} from "../../services/salidaService";
 
 const salidas: SalidaApi[] = structuredClone(salidasMockIniciales);
+const devolucionesRegistradasMock = new Set<number>();
+
+const equipamientoSalidasMock: Record<number, ItemEquipamientoAsignado[]> = {
+    2: [
+        {
+            idservicio: 5,
+            nombreServicio: "Carpa de alta montaña 4 estaciones",
+            tipoEquipamiento: "Carpas",
+            proveedor: "Andes Outdoor",
+            cantidadAsignada: 4,
+            stockActualDisponible: 12,
+        },
+        {
+            idservicio: 6,
+            nombreServicio: "Bolsa de dormir -10°C",
+            tipoEquipamiento: "Bolsas de dormir",
+            proveedor: "Andes Outdoor",
+            cantidadAsignada: 8,
+            stockActualDisponible: 20,
+        },
+    ],
+};
 
 export const manejadoresSalidas = [
     // GET /api/salidas (CU-35)
@@ -442,6 +468,203 @@ export const manejadoresSalidas = [
         return HttpResponse.json({
             data: {
                 lugaresLiberados: n,
+            },
+        });
+    }),
+
+    // GET /api/salidas/:idsalida/equipamiento-asignado (CU-41)
+    http.get("*/api/salidas/:idsalida/equipamiento-asignado", async ({ params }) => {
+        await delay(150);
+        const idsalida = Number(params.idsalida);
+        if (!Number.isInteger(idsalida) || idsalida <= 0) {
+            return HttpResponse.json(
+                { error: "idsalida debe ser un número entero." },
+                { status: 400 },
+            );
+        }
+        const salida = salidas.find((s) => s.idsalida === idsalida);
+        if (!salida) {
+            return HttpResponse.json(
+                { error: `La salida #${idsalida} no existe.` },
+                { status: 404 },
+            );
+        }
+
+        const equipamientos = equipamientoSalidasMock[idsalida] ?? [];
+        return HttpResponse.json({
+            data: {
+                idsalida: salida.idsalida,
+                nroSalida: salida.nroSalida,
+                estado: salida.estado,
+                fechaFin: salida.fechaFin,
+                equipamientos,
+            },
+        });
+    }),
+
+    // POST /api/salidas/:idsalida/devolucion-equipamiento (CU-41)
+    http.post("*/api/salidas/:idsalida/devolucion-equipamiento", async ({ params, request }) => {
+        await delay(250);
+        const idsalida = Number(params.idsalida);
+        if (!Number.isInteger(idsalida) || idsalida <= 0) {
+            return HttpResponse.json(
+                { error: "idsalida debe ser un número entero." },
+                { status: 400 },
+            );
+        }
+
+        const salida = salidas.find((s) => s.idsalida === idsalida);
+        if (!salida) {
+            return HttpResponse.json(
+                { error: `La salida #${idsalida} no existe.` },
+                { status: 404 },
+            );
+        }
+
+        if (salida.estado === "CANCELADA") {
+            return HttpResponse.json(
+                {
+                    error: "No se puede registrar la devolución de una salida cancelada (el equipamiento ya fue reintegrado al cancelar).",
+                },
+                { status: 400 },
+            );
+        }
+
+        const ahora = new Date();
+        const yaConcluyo = salida.estado === "FINALIZADA" || new Date(salida.fechaFin) <= ahora;
+        if (!yaConcluyo) {
+            return HttpResponse.json(
+                {
+                    error: "Solo se puede registrar la devolución del equipamiento de una salida concluida o en estado FINALIZADA.",
+                },
+                { status: 400 },
+            );
+        }
+
+        if (devolucionesRegistradasMock.has(idsalida)) {
+            return HttpResponse.json(
+                {
+                    error: `La devolución de equipamiento para la salida #${idsalida} ya fue registrada previamente.`,
+                },
+                { status: 400 },
+            );
+        }
+
+        const equipamientos = equipamientoSalidasMock[idsalida] ?? [];
+        if (equipamientos.length === 0) {
+            return HttpResponse.json(
+                {
+                    error: `La salida #${idsalida} no tenía equipamiento de camping asignado.`,
+                },
+                { status: 400 },
+            );
+        }
+
+        let body: { items?: unknown; observacionesGenerales?: unknown };
+        try {
+            body = (await request.json()) as {
+                items?: unknown;
+                observacionesGenerales?: unknown;
+            };
+        } catch {
+            return HttpResponse.json(
+                { error: "Debe enviar una lista de items a devolver (items)." },
+                { status: 400 },
+            );
+        }
+
+        const itemsRaw = body?.items;
+        if (!Array.isArray(itemsRaw) || itemsRaw.length === 0) {
+            return HttpResponse.json(
+                { error: "Debe enviar una lista de items a devolver (items)." },
+                { status: 400 },
+            );
+        }
+
+        const items = itemsRaw as ItemDevolucionPayload[];
+
+        const mapaAsignados = new Map<number, number>();
+        for (const eq of equipamientos) {
+            mapaAsignados.set(eq.idservicio, eq.cantidadAsignada);
+        }
+
+        const idsVistos = new Set<number>();
+        for (const it of items) {
+            const idservicio = Number(it.idservicio);
+            if (!Number.isInteger(idservicio) || idservicio <= 0) {
+                return HttpResponse.json(
+                    { error: "idservicio debe ser un número entero mayor a 0." },
+                    { status: 400 },
+                );
+            }
+            if (idsVistos.has(idservicio)) {
+                return HttpResponse.json(
+                    { error: `El servicio #${idservicio} está duplicado en la lista de devolución.` },
+                    { status: 400 },
+                );
+            }
+            idsVistos.add(idservicio);
+
+            const buenEstado = Number(it.cantidadBuenEstado ?? 0);
+            const daniada = Number(it.cantidadDaniada ?? 0);
+
+            if (buenEstado < 0 || daniada < 0) {
+                return HttpResponse.json(
+                    { error: `Las cantidades del servicio #${idservicio} deben ser mayores o iguales a 0.` },
+                    { status: 400 },
+                );
+            }
+
+            if (buenEstado === 0 && daniada === 0) {
+                return HttpResponse.json(
+                    { error: `El servicio #${idservicio} debe devolver al menos una unidad (en buen estado o dañada).` },
+                    { status: 400 },
+                );
+            }
+
+            const cantidadAsignada = mapaAsignados.get(idservicio);
+            if (cantidadAsignada === undefined) {
+                return HttpResponse.json(
+                    { error: `El servicio #${idservicio} no formaba parte del equipamiento asignado a la salida #${idsalida}.` },
+                    { status: 400 },
+                );
+            }
+
+            if (buenEstado + daniada > cantidadAsignada) {
+                return HttpResponse.json(
+                    { error: `La cantidad devuelta para el servicio #${idservicio} (${buenEstado + daniada}) supera la cantidad que la salida tenía asignada (${cantidadAsignada}).` },
+                    { status: 400 },
+                );
+            }
+
+            if (typeof it.observaciones === "string" && it.observaciones.trim().length > 250) {
+                return HttpResponse.json(
+                    { error: `Las observaciones del item #${idservicio} no pueden superar los 250 caracteres.` },
+                    { status: 400 },
+                );
+            }
+        }
+
+        if (typeof body.observacionesGenerales === "string" && body.observacionesGenerales.trim().length > 500) {
+            return HttpResponse.json(
+                { error: "observacionesGenerales no puede superar los 500 caracteres." },
+                { status: 400 },
+            );
+        }
+
+        devolucionesRegistradasMock.add(idsalida);
+
+        return HttpResponse.json({
+            mensaje: "Devolución de equipamiento registrada y stock reintegrado exitosamente.",
+            data: {
+                idsalida,
+                auditoriaId: 900 + idsalida,
+                detalle: items.map((it: ItemDevolucionPayload) => ({
+                    idservicio: Number(it.idservicio),
+                    cantidadReintegradaAlStock: Number(it.cantidadBuenEstado ?? 0),
+                    cantidadDaniadaOExtraviada: Number(it.cantidadDaniada ?? 0),
+                    observaciones: it.observaciones ? String(it.observaciones).trim() : null,
+                })),
             },
         });
     }),
