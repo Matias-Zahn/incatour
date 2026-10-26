@@ -72,7 +72,8 @@ export const esquemaServicio = z
             ],
         };
 
-        for (const [campo, mensaje] of requeridos[datos.tipo]) {
+        const camposRequeridos = requeridos[datos.tipo] ?? [];
+        for (const [campo, mensaje] of camposRequeridos) {
             const esCantidadEquipamientoConInventario =
                 datos.tipo === "EQUIPAMIENTO" &&
                 campo === "cantidadDisponible" &&

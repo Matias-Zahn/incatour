@@ -55,6 +55,8 @@ function describirDisponibilidad(servicio: Servicio): string {
             return `${servicio.capacidadVehiculo ?? 0} asientos · ${servicio.pesoEquipajeIncluido ?? 0} kg incl. (+$${servicio.costoPorKgExcedente ?? 0}/kg)`;
         case "TREN":
             return `${servicio.horarioSalida ?? "--:--"} a ${servicio.horarioLlegada ?? "--:--"} (${servicio.diasOperacion ?? "-"})`;
+        default:
+            return "-";
     }
 }
 
@@ -106,6 +108,8 @@ function ServiciosPage() {
         setServicioBaseEdicion(null);
         setErrorFormulario("");
         setAvisoVersionado("");
+        registrar.reset();
+        modificar.reset();
         setFormularioAbierto(true);
     }
 
@@ -113,6 +117,8 @@ function ServiciosPage() {
         setServicioBaseEdicion(servicio);
         setErrorFormulario("");
         setAvisoVersionado("");
+        registrar.reset();
+        modificar.reset();
         setFormularioAbierto(true);
     }
 
@@ -120,9 +126,12 @@ function ServiciosPage() {
         setFormularioAbierto(false);
         setServicioBaseEdicion(null);
         setErrorFormulario("");
+        registrar.reset();
+        modificar.reset();
     }
 
     function guardar(datos: DatosServicio) {
+        setErrorFormulario("");
         if (servicioEnEdicion) {
             // El contrato pide enviar solo lo que cambia en PUT /api/servicios/:id (CU-20).
             const cambios = CAMPOS_COMPARABLES.reduce<ServicioModificar>(

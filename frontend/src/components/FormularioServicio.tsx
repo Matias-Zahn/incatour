@@ -9,12 +9,13 @@ import {
     tiposServicio,
     type DatosServicio,
     type Servicio,
+    type TipoServicio,
 } from "../services/servicioService";
 
 type Props = {
     servicioEnEdicion?: Servicio | null;
     cargandoEdicion?: boolean;
-    tipoProveedor: (typeof tiposServicio)[number];
+    tipoProveedor: (typeof tiposServicio)[number] | string;
     localidadPredeterminada?: string;
     alGuardar: (datos: DatosServicio) => void;
     alCancelar: () => void;
@@ -26,7 +27,7 @@ const valoresIniciales = (
     tipo: Props["tipoProveedor"],
     localidad = "",
 ): DatosServicio => ({
-    tipo,
+    tipo: tipo as TipoServicio,
     nombreServicio: "",
     descripcion: "",
     costoBase: 0,
@@ -77,12 +78,15 @@ function FormularioServicio({
         Boolean(edicion?.garantizaPaquetesActivos);
     const comprometidaEquipamiento = servicioEnEdicion?.cantidadComprometida ?? 0;
 
+    const esTipoValido = (tiposServicio as readonly string[]).includes(tipoProveedor);
+
     function esCampoEditable(campo: string): boolean {
         if (!edicion?.camposEditables) return true;
         return edicion.camposEditables.includes(campo);
     }
 
     function enviarFormulario(datos: DatosServicio) {
+        if (!esTipoValido) return;
         if (
             servicioEnEdicion &&
             tipoProveedor === "EQUIPAMIENTO" &&
@@ -99,7 +103,7 @@ function FormularioServicio({
     }
 
     const campos: Record<
-        Props["tipoProveedor"],
+        TipoServicio,
         {
             nombre: keyof DatosServicio;
             etiqueta: string;
@@ -181,6 +185,15 @@ function FormularioServicio({
                     Rubro del proveedor: <span className="font-semibold text-texto">{tipoProveedor}</span>
                 </p>
             </div>
+
+            {!esTipoValido ? (
+                <Alerta
+                    tipo="error"
+                    titulo="Tipo de proveedor no reconocido"
+                >
+                    El rubro &quot;{tipoProveedor}&quot; no es válido. No se pueden registrar ni modificar servicios para este proveedor.
+                </Alerta>
+            ) : null}
 
             {bloqueadoPorGarantia ? (
                 <Alerta
@@ -271,7 +284,7 @@ function FormularioServicio({
                     ) : null}
                 </label>
 
-                {campos[tipoProveedor].map((campo) => {
+                {(esTipoValido ? campos[tipoProveedor as TipoServicio] : []).map((campo) => {
                     const nombreCampo =
                         servicioEnEdicion &&
                         tipoProveedor === "EQUIPAMIENTO" &&
@@ -375,9 +388,9 @@ function FormularioServicio({
             </div>
 
             {errorServidor ? (
-                <p className="mt-3 text-sm text-peligro" role="alert">
+                <Alerta tipo="error" titulo="Error al guardar el servicio">
                     {errorServidor}
-                </p>
+                </Alerta>
             ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
@@ -389,7 +402,7 @@ function FormularioServicio({
                 >
                     Cancelar
                 </Boton>
-                <Boton type="submit" disabled={guardando}>
+                <Boton type="submit" disabled={guardando || !esTipoValido}>
                     {guardando
                         ? "Guardando..."
                         : servicioEnEdicion
