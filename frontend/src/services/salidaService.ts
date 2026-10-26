@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { solicitarApi } from "./clienteApi";
+import { solicitarApi, ErrorApi } from "./clienteApi";
 
 // ==========================================
 // Tipos TypeScript: Backend real (SalidaApi)
@@ -458,6 +458,57 @@ export type ResultadoModificarLogistica = DatosResultadoModificarLogistica & {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-37 Cancelar Salida
+// ==========================================
+
+export type RecursosLiberadosCancelacion = {
+    personal: number;
+    equipamiento: number;
+    servicios: number;
+};
+
+export type ImpactoCancelacionSalida = {
+    idsalida: number;
+    nroSalida: string;
+    paquete: string;
+    fechaInicio: string;
+    reservasAfectadas: number;
+    totalAReembolsar: number;
+    permisosQuePasanAPerdido: number;
+    recursosQueSeLiberan: RecursosLiberadosCancelacion;
+    notificaAClientes: boolean;
+};
+
+type RespuestaImpactoCancelacionApi = {
+    data: ImpactoCancelacionSalida;
+};
+
+export type DatosCancelarSalida = {
+    motivo: string;
+};
+
+export type NotificacionesCancelacion = {
+    enviadas: number;
+    fallidas: number;
+    salidasAlternativasOfrecidas: number;
+};
+
+export type ResultadoCancelarSalida = {
+    idsalida: number;
+    nroSalida: string;
+    estado: string;
+    reservasCanceladas?: number;
+    reembolsoTotal?: number;
+    notificaciones?: NotificacionesCancelacion;
+    nota?: string;
+};
+
+type RespuestaCancelarSalidaApi = {
+    mensaje: string;
+    data: ResultadoCancelarSalida;
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -723,6 +774,35 @@ export async function modificarLogistica(
     };
 }
 
+/**
+ * Consulta el resumen de impacto de la cancelación de una salida (CU-37, GET /api/salidas/:idsalida/cancelacion).
+ */
+export async function obtenerImpactoCancelacion(
+    idsalida: number,
+): Promise<ImpactoCancelacionSalida> {
+    const respuesta = await solicitarApi<RespuestaImpactoCancelacionApi>(
+        `/salidas/${idsalida}/cancelacion`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Cancela una salida turística en el backend (CU-37, POST /api/salidas/:idsalida/cancelar).
+ */
+export async function cancelarSalida(
+    idsalida: number,
+    datos: DatosCancelarSalida,
+): Promise<ResultadoCancelarSalida> {
+    const respuesta = await solicitarApi<RespuestaCancelarSalidaApi>(
+        `/salidas/${idsalida}/cancelar`,
+        {
+            method: "POST",
+            body: JSON.stringify(datos),
+        },
+    );
+    return respuesta.data;
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -743,6 +823,8 @@ export const clavesSalidas = {
         ["salidas", "logistica", idsalida ?? null] as const,
     logisticaDisponibles: (idsalida?: number | null, tipo?: string | null) =>
         ["salidas", "logistica", "disponibles", idsalida ?? null, tipo ?? null] as const,
+    cancelacion: (idsalida?: number | null) =>
+        ["salidas", "cancelacion", idsalida ?? null] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
@@ -956,6 +1038,51 @@ export function useModificarLogistica() {
             queryClient.invalidateQueries({
                 queryKey: clavesSalidas.logisticaDisponibles(variables.idsalida, null),
             });
+        },
+    });
+}
+
+/**
+ * Hook para consultar el impacto de cancelar una salida (CU-37).
+ */
+export function useImpactoCancelacion(
+    idsalida: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" && Number.isInteger(idsalida) && idsalida > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.cancelacion(idsalida),
+        queryFn: () => obtenerImpactoCancelacion(idsalida!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para cancelar una salida turística (CU-37).
+ * Invalida las consultas de salidas tras el éxito o cuando la salida queda cancelada (incluso con 503).
+ */
+export function useCancelarSalida() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ idsalida, datos }: { idsalida: number; datos: DatosCancelarSalida }) =>
+            cancelarSalida(idsalida, datos),
+        onSuccess: (_resultado, variables) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.cancelacion(variables.idsalida),
+            });
+        },
+        onError: (error, variables) => {
+            // Si el error es 503, la salida ya quedó CANCELADA en base de datos aunque la autoridad no haya respondido.
+            if (error instanceof ErrorApi && error.estado === 503) {
+                queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+                queryClient.invalidateQueries({
+                    queryKey: clavesSalidas.cancelacion(variables.idsalida),
+                });
+            }
         },
     });
 }
