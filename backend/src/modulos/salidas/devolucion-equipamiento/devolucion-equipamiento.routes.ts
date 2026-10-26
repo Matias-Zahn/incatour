@@ -7,9 +7,6 @@ export class DevolucionEquipamientoRoutes {
     const router = Router();
     const controller = new DevolucionEquipamientoController();
 
-    // Solo el Administrador puede gestionar devoluciones de equipamiento
-    router.use(autenticar, requierePerfil("ADMIN"));
-
     /**
      * @swagger
      * /api/salidas/{idsalida}/equipamiento-asignado:
@@ -38,7 +35,8 @@ export class DevolucionEquipamientoRoutes {
      *       404:
      *         description: Salida no encontrada
      */
-    router.get("/:idsalida/equipamiento-asignado", controller.obtenerEquipamientoAsignado);
+    // Solo el Administrador gestiona devoluciones. SAL-19: el middleware va en cada ruta, no en todo /api/salidas
+    router.get("/:idsalida/equipamiento-asignado", autenticar, requierePerfil("ADMIN"), controller.obtenerEquipamientoAsignado);
 
     /**
      * @swagger
@@ -104,7 +102,7 @@ export class DevolucionEquipamientoRoutes {
      *       404:
      *         description: Salida no encontrada.
      */
-    router.post("/:idsalida/devolucion-equipamiento", controller.registrarDevolucion);
+    router.post("/:idsalida/devolucion-equipamiento", autenticar, requierePerfil("ADMIN"), controller.registrarDevolucion);
 
     return router;
   }

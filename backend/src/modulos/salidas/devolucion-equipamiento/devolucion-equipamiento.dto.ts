@@ -26,8 +26,9 @@ export class DevolucionEquipamientoDto {
         return ["Cada item debe ser un objeto válido."];
       }
 
-      const idservicio = parseInt(it.idservicio);
-      if (isNaN(idservicio) || idservicio <= 0) {
+      // SAL-19: enteros estrictos ("2.9" o "3abc" no se redondean en silencio)
+      const idservicio = it.idservicio;
+      if (!Number.isInteger(idservicio) || idservicio <= 0) {
         return ["idservicio debe ser un número entero mayor a 0."];
       }
 
@@ -36,14 +37,14 @@ export class DevolucionEquipamientoDto {
       }
       idsVistos.add(idservicio);
 
-      const cantidadBuenEstado = parseInt(it.cantidadBuenEstado);
-      const cantidadDaniada = parseInt(it.cantidadDaniada ?? 0);
+      const cantidadBuenEstado = it.cantidadBuenEstado;
+      const cantidadDaniada = it.cantidadDaniada ?? 0;
 
-      if (isNaN(cantidadBuenEstado) || cantidadBuenEstado < 0) {
+      if (!Number.isInteger(cantidadBuenEstado) || cantidadBuenEstado < 0) {
         return [`cantidadBuenEstado para el servicio #${idservicio} debe ser un entero mayor o igual a 0.`];
       }
 
-      if (isNaN(cantidadDaniada) || cantidadDaniada < 0) {
+      if (!Number.isInteger(cantidadDaniada) || cantidadDaniada < 0) {
         return [`cantidadDaniada para el servicio #${idservicio} debe ser un entero mayor o igual a 0.`];
       }
 
