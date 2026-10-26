@@ -49,11 +49,14 @@ export const manejadorErrores = (
 
   // INF-02: un valor que Prisma no puede mandar a la base (tipo erróneo, entero fuera de rango) es del pedido
   if (err instanceof Prisma.PrismaClientValidationError) {
+    // También puede ser un bug del código (un campo mal armado): se loguea completo
+    console.error(err);
     return res.status(400).json({ error: "Algún dato enviado no tiene el formato esperado" });
   }
 
   // INF-02: una regla CHECK de la base (23514) que el código no validó antes
   if (err instanceof Prisma.PrismaClientUnknownRequestError && /23514|check constraint/i.test(err.message)) {
+    console.error(err);
     return res.status(400).json({ error: "Los datos no cumplen una regla de la base" });
   }
 
