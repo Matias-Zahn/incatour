@@ -73,11 +73,10 @@ export class ClienteService {
       throw CustomError.badRequest("El cliente ya se encuentra inactivo.");
     }
 
-    const tieneReservas = await this.repository.hasReservasActivas(id);
-    if (tieneReservas) {
+    const baja = await this.repository.softDelete(id, cliente.idusuario);
+    if (!baja) {
       throw CustomError.badRequest("No se puede dar de baja porque tiene reservas activas.");
     }
-
-    return this.repository.softDelete(id, cliente.idusuario);
+    return baja;
   }
 }
