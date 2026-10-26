@@ -154,7 +154,7 @@ function crearPasajeroInicial(): PasajeroFormulario {
         nombreCompleto: "",
         nroPasaporte: "",
         nacionalidad: "Argentina",
-        fechaVencimientoPasaporte: "2031-06-15",
+        fechaVencimientoPasaporte: "",
         pesoDeclarado: 12,
     };
 }
@@ -304,7 +304,7 @@ function CatalogoCompraPage() {
                     nombreCompleto: "",
                     nroPasaporte: "",
                     nacionalidad: "Argentina",
-                    fechaVencimientoPasaporte: "2031-06-15",
+                    fechaVencimientoPasaporte: "",
                     pesoDeclarado: 12,
                 },
             ]);
