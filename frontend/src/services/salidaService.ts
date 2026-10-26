@@ -1186,14 +1186,15 @@ export function useCancelarSalida() {
             queryClient.invalidateQueries({
                 queryKey: clavesSalidas.cancelacion(variables.idsalida),
             });
+            // FE-44: cancelar la salida también cancela sus solicitudes de alojamiento
+            queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
         },
-        onError: (error, variables) => {
+        onError: (error) => {
             // Si el error es 503, la salida ya quedó CANCELADA en base de datos aunque la autoridad no haya respondido.
+            // FE-44: no se recarga el impacto: respondería "ya cancelada" junto al botón de reintentar
             if (error instanceof ErrorApi && error.estado === 503) {
                 queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
-                queryClient.invalidateQueries({
-                    queryKey: clavesSalidas.cancelacion(variables.idsalida),
-                });
+                queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
             }
         },
     });

@@ -122,7 +122,8 @@ export function ModalCancelarSalida({
                     } else if (error instanceof ErrorApi) {
                         setErrorLocal(error.message);
                     } else if (error instanceof Error) {
-                        setErrorLocal(error.message);
+                        // FE-44: sin respuesta HTTP (sin señal, servidor caído) no se muestra "Failed to fetch"
+                        setErrorLocal("No se pudo conectar con el servidor. Revisá la conexión y reintentá.");
                     } else {
                         setErrorLocal("Ocurrió un error inesperado al procesar la cancelación.");
                     }
@@ -226,7 +227,7 @@ export function ModalCancelarSalida({
                 )}
 
                 {/* Error al consultar impacto */}
-                {errorImpacto && !cargandoImpacto && (
+                {errorImpacto && !cargandoImpacto && !error503Autoridad && (
                     <div className="space-y-4">
                         <Alerta tipo="error" titulo="No se pudo consultar el impacto de la cancelación">
                             {errorImpacto instanceof ErrorApi

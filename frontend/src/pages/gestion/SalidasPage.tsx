@@ -949,9 +949,11 @@ function SalidasPage() {
             clave: "idsalida" as const,
             titulo: "Acciones",
             renderizar: (fila: Salida) => {
+                // FE-44: una salida cancelada ya no tiene solicitudes para gestionar
                 const tieneSolicitudes =
-                    (solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
-                    fila.alertas?.includes("SOLICITUD_PENDIENTE");
+                    fila.estado !== "CANCELADA" &&
+                    ((solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
+                        fila.alertas?.includes("SOLICITUD_PENDIENTE"));
                 const esFinalizada = fila.estado === "FINALIZADA";
 
                 // CU-40: Una salida admite asignación si está activa (PUBLICADA o CERRADA),
