@@ -11,9 +11,11 @@ import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
 import FormularioModificarLogistica from "../../components/FormularioModificarLogistica";
+import { ErrorApi } from "../../services/clienteApi";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     estilosEstadoSalida,
+    fechaLocalHoy,
     formatearEstadoSalida,
     formatearFechaSalida,
 } from "../../services/guiaService";
@@ -825,7 +827,8 @@ function SalidasPage() {
                 // Si la salida no tiene pasajeros o tiene restricciones de negocio (FA5, bloqueo),
                 // el backend responderá el error correspondiente y el formulario lo informará.
                 const estadoAsignable = fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
-                const fechaFutura = new Date(fila.fechaInicio) > new Date();
+                // Por día calendario, como el back (hoyUTC): la salida de mañana no "ya inició" a las 22 h
+                const fechaFutura = fila.fechaInicio.slice(0, 10) > fechaLocalHoy();
                 const cantPersonal =
                     typeof fila.cantidadPersonal === "number"
                         ? fila.cantidadPersonal
@@ -841,6 +844,7 @@ function SalidasPage() {
                     estadoAsignable &&
                     fechaFutura &&
                     sinPersonal &&
+                    fila.pasajerosConfirmados > 0 &&
                     !tieneAdvertenciaPendiente;
 
                 const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
@@ -1072,6 +1076,11 @@ function SalidasPage() {
                     creando={crearSalidaMutation.isPending}
                     errorServidor={
                         errorCreacion || (errorOpciones ? errorOpciones.message : undefined)
+                    }
+                    errorEsAutoridad={
+                        Boolean(errorCreacion) &&
+                        crearSalidaMutation.error instanceof ErrorApi &&
+                        crearSalidaMutation.error.estado === 503
                     }
                     alConsultarOpciones={(parametros) => {
                         setErrorCreacion("");
@@ -1318,7 +1327,9 @@ function SalidasPage() {
                                     {resultadoReemplazo.permisoDadoDeBaja ?? "Sin permiso / N/A"}
                                 </p>
                                 <p className="text-[11px] text-emerald-800 mt-0.5">
-                                    Baja informada a la autoridad
+                                    {resultadoReemplazo.permisoDadoDeBaja
+                                        ? "Baja informada a la autoridad"
+                                        : "No había permiso que dar de baja"}
                                 </p>
                             </div>
 
@@ -1330,7 +1341,9 @@ function SalidasPage() {
                                     {resultadoReemplazo.permisoNuevo ?? "No emitido"}
                                 </p>
                                 <p className="text-[11px] text-emerald-800 mt-0.5">
-                                    Emitido para el reemplazante
+                                    {resultadoReemplazo.permisoNuevo
+                                        ? "Emitido para el reemplazante"
+                                        : "El reemplazante no recibió permiso"}
                                 </p>
                             </div>
                         </div>

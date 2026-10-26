@@ -59,6 +59,7 @@ function ProveedoresPage() {
         setFormularioAbierto(false);
         setProveedorEnEdicion(null);
         setErrorFormulario("");
+        modificar.reset();
     }
 
     function guardarProveedor(datos: DatosProveedor) {

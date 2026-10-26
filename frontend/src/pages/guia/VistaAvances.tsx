@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
@@ -7,6 +7,7 @@ import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalAvance,
     eliminarAvanceOffline,
+    eliminarHistorialLocalAvance,
     esquemaAvance,
     fechaLocalHoy,
     estilosEstadoSalida,
@@ -59,35 +60,33 @@ function construirListaHistorial(
             offline: false,
         }));
 
-    // Avances en localStorage (con prioridad a pendientes offline)
-    const locales = obtenerHistorialLocalAvances(idSalida);
-
-    const mapa = new Map<string, RegistroHistorialAvance>();
-
-    // 1. Añadir pendientes offline primero (tienen prioridad visual por ser cambios locales no confirmados aún)
-    for (const item of avancesPendientesLocales) {
-        mapa.set(item.etapaNombre, {
+    // Pendientes offline (aún sin confirmar), uno por avance, del más reciente al más antiguo
+    const pendientes: RegistroHistorialAvance[] = [...avancesPendientesLocales]
+        .reverse()
+        .map((item) => ({
             id: item.idLocal,
             etapa: item.etapaNombre,
             estadoTramo: item.estadoTramo,
             fechaHora: `${item.fechaHoraLlegada.slice(0, 10)} (Offline)`,
             offline: true,
-        });
-    }
+        }));
+    const idsPendientes = new Set(pendientes.map((p) => p.id));
 
-    // 2. Añadir del servidor (del más reciente al más antiguo, si no hay uno offline pendiente para esa etapa)
-    for (const item of [...delServidor].reverse()) {
-        if (!mapa.has(item.etapa)) {
-            mapa.set(item.etapa, item);
-        }
-    }
+    // Historial local (más reciente primero): trae TODOS los avances enviados desde este dispositivo,
+    // incluidos los DEMORADO que el itinerario del servidor ya no muestra. Un offline que ya no está
+    // en la cola se sincronizó, y los pendientes ya van arriba.
+    const locales = obtenerHistorialLocalAvances(idSalida)
+        .filter((l) => !idsPendientes.has(l.id))
+        .map((l) => ({ ...l, offline: false }));
 
-    // 3. Fallback: si no hay en servidor ni offline pendientes, pero hay historial local
-    if (mapa.size === 0 && locales.length > 0) {
-        return locales;
-    }
+    // El servidor solo informa el último estado de cada etapa: se omite si ya está en el historial local
+    const clave = (r: RegistroHistorialAvance) => `${r.etapa}|${r.estadoTramo}`;
+    const clavesLocales = new Set(locales.map(clave));
+    const soloServidor = [...delServidor]
+        .reverse()
+        .filter((r) => !clavesLocales.has(clave(r)));
 
-    return Array.from(mapa.values());
+    return [...pendientes, ...locales, ...soloServidor];
 }
 
 export function VistaAvances({
@@ -162,7 +161,7 @@ export function VistaAvances({
 
         setSincronizando(true);
         let exitoCount = 0;
-        const rechazados: string[] = [];
+        let rechazo: string | null = null;
 
         for (const item of pendientes) {
             try {
@@ -177,7 +176,8 @@ export function VistaAvances({
                 eliminarAvanceOffline(idsalida, item.idLocal);
                 exitoCount += 1;
             } catch (error) {
-                // 4xx = rechazo definitivo del back: se descarta para no trabar la cola.
+                // 4xx = rechazo definitivo del back: se descarta SOLO ese avance y se corta, porque los
+                // siguientes dependen del orden de etapas y se rechazarían en cadena.
                 // 401/408/429 y errores de red o 5xx se reintentan en el próximo intento.
                 if (
                     error instanceof ErrorApi &&
@@ -186,8 +186,9 @@ export function VistaAvances({
                     ![401, 408, 429].includes(error.estado)
                 ) {
                     eliminarAvanceOffline(idsalida, item.idLocal);
-                    rechazados.push(`${item.etapaNombre}: ${error.message}`);
-                    continue;
+                    eliminarHistorialLocalAvance(idsalida, item.idLocal);
+                    rechazo = `${item.etapaNombre}: ${error.message}`;
+                    break;
                 }
                 console.error("Error sincronizando avance", error);
                 break;
@@ -198,10 +199,10 @@ export function VistaAvances({
         setAvancesPendientes(restantes);
         setSincronizando(false);
 
-        if (rechazados.length > 0) {
+        if (rechazo) {
             setMensajeFeedback({
                 tipo: "error",
-                texto: `El servidor rechazó ${rechazados.length} avance(s) pendiente(s) y se descartaron: ${rechazados.join(" | ")}`,
+                texto: `El servidor rechazó un avance pendiente y se descartó (${rechazo}).${restantes.length > 0 ? " Los demás siguen pendientes y se reintentan en la próxima sincronización." : ""}`,
             });
         } else if (exitoCount > 0) {
             setMensajeFeedback({
@@ -227,9 +228,10 @@ export function VistaAvances({
     // Siguiente etapa sugerida: primera etapa que NO esté completada
     // Un tramo DEMORADO no avanza la etapa en el backend y debe seguir proponiéndose hasta completarse (FE-09)
     const etapasConPendientes = etapasDisponibles.map((etapa) => {
-        const pendiente = avancesPendientes.find(
-            (p) => p.numeroOrden === etapa.numeroOrden,
-        );
+        // La cola está en orden de llegada: vale el pendiente más reciente de la etapa
+        const pendiente = [...avancesPendientes]
+            .reverse()
+            .find((p) => p.numeroOrden === etapa.numeroOrden);
         if (pendiente) {
             return {
                 ...etapa,
@@ -243,11 +245,17 @@ export function VistaAvances({
         (e) => e.estadoTramo !== "COMPLETADO",
     );
 
+    // Solo se aplica cuando cambia el NÚMERO sugerido: no pisa la etapa elegida a mano en cada render.
+    // La primera sugerencia respeta el borrador guardado.
+    const sugerida = siguienteEtapa?.numeroOrden;
+    const ultimaSugerida = useRef<number | undefined>(undefined);
     useEffect(() => {
-        if (siguienteEtapa) {
-            setValue("numeroOrden", siguienteEtapa.numeroOrden);
-        }
-    }, [siguienteEtapa, setValue]);
+        if (sugerida === undefined || ultimaSugerida.current === sugerida) return;
+        const esPrimera = ultimaSugerida.current === undefined;
+        ultimaSugerida.current = sugerida;
+        // La primera vez se fija el borrador (si hay): al cargar el formulario las etapas todavía no estaban
+        setValue("numeroOrden", esPrimera && borrador?.numeroOrden ? borrador.numeroOrden : sugerida);
+    }, [sugerida, borrador?.numeroOrden, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
