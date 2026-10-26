@@ -11,9 +11,10 @@ export class PaqueteService {
     return this.repository.findAll(filtros);
   }
 
-  async consultarPaquetePorId(id: number) {
+  // CAT-24: el detalle del admin (GET /paquetes/:id) también muestra los inactivos que lista con ?estado=INACTIVO
+  async consultarPaquetePorId(id: number, incluirInactivos = false) {
     const paquete = await this.repository.findById(id);
-    if (!paquete || paquete.estado !== "ACTIVO") {
+    if (!paquete || (!incluirInactivos && paquete.estado !== "ACTIVO")) {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
     return paquete;

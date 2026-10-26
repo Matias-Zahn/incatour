@@ -59,6 +59,12 @@ describe("PaqueteService", () => {
 
       await expect(new PaqueteService().consultarPaquetePorId(10)).rejects.toMatchObject({ statusCode: 404 });
     });
+
+    it("CAT-24: el admin ve el detalle de un paquete inactivo", async () => {
+      repo.findById.mockResolvedValue({ idpaquete: 10, estado: "INACTIVO" });
+
+      await expect(new PaqueteService().consultarPaquetePorId(10, true)).resolves.toMatchObject({ estado: "INACTIVO" });
+    });
   });
 
   describe("registrarNuevoPaquete (CU-11)", () => {

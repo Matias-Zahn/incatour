@@ -50,7 +50,7 @@ export class PaqueteController {
       const id = parseInt(req.params.id as string);
       if (isNaN(id)) throw CustomError.badRequest("El ID proporcionado no es válido.");
 
-      const paquete = await paqueteService.consultarPaquetePorId(id);
+      const paquete = await paqueteService.consultarPaquetePorId(id, true);
       return res.json({ data: enriquecerPaqueteConImagenes(paquete) });
     } catch (error) {
       next(error);
