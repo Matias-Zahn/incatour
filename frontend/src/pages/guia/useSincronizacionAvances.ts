@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorApi } from "../../services/clienteApi";
 import {
     eliminarAvanceOffline,
@@ -33,16 +33,19 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
     const pendientes = cola.idsalida === idsalida ? cola.lista : leerCola(idsalida);
     const [sincronizando, setSincronizando] = useState(false);
     const [mensaje, setMensaje] = useState<MensajeSincronizacion | null>(null);
+    // FE-40: un segundo "online" o un clic mientras sincroniza no reenvía la cola
+    const enCurso = useRef(false);
 
     const refrescar = useCallback(() => {
         setCola({ idsalida, lista: leerCola(idsalida) });
     }, [idsalida]);
 
     const sincronizar = useCallback(async () => {
-        if (idsalida <= 0) return;
+        if (idsalida <= 0 || enCurso.current) return;
         const envio = leerCola(idsalida);
         if (envio.length === 0) return;
 
+        enCurso.current = true;
         setSincronizando(true);
         let exitoCount = 0;
         let rechazo: string | null = null;
@@ -60,14 +63,20 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
                 eliminarAvanceOffline(idsalida, item.idLocal);
                 exitoCount += 1;
             } catch (error) {
+                // FE-40: un envío anterior llegó al servidor pero se perdió la respuesta: ya está registrado
+                if (error instanceof ErrorApi && error.estado === 400 && error.message.includes("ya se informó")) {
+                    eliminarAvanceOffline(idsalida, item.idLocal);
+                    exitoCount += 1;
+                    continue;
+                }
                 // 4xx = rechazo definitivo del back: se descarta SOLO ese avance y se corta, porque los
                 // siguientes dependen del orden de etapas y se rechazarían en cadena.
-                // 401/408/429 y errores de red o 5xx se reintentan en el próximo intento.
+                // 401/408/409/429 (409: otro avance se registró al mismo tiempo), red y 5xx se reintentan después.
                 if (
                     error instanceof ErrorApi &&
                     error.estado >= 400 &&
                     error.estado < 500 &&
-                    ![401, 408, 429].includes(error.estado)
+                    ![401, 408, 409, 429].includes(error.estado)
                 ) {
                     eliminarAvanceOffline(idsalida, item.idLocal);
                     eliminarHistorialLocalAvance(idsalida, item.idLocal);
@@ -82,6 +91,7 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
         const restantes = leerCola(idsalida);
         setCola({ idsalida, lista: restantes });
         setSincronizando(false);
+        enCurso.current = false;
 
         if (rechazo) {
             setMensaje({
