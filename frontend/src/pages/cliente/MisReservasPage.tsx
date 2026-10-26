@@ -1116,6 +1116,15 @@ function MisReservasPage() {
                                         >
                                             {liquidacionCancelacion.advertencia}
                                         </Alerta>
+                                    ) : liquidacionCancelacion.montoAReintegrar <
+                                      liquidacionCancelacion.importeAbonado ? (
+                                        <Alerta
+                                            tipo="advertencia"
+                                            titulo="No corresponde reintegro"
+                                        >
+                                            {liquidacionCancelacion.condicionAplicada}.
+                                            Los cupos volverán a estar disponibles.
+                                        </Alerta>
                                     ) : (
                                         <Alerta
                                             tipo="informacion"
