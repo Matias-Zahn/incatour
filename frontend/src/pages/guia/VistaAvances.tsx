@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
@@ -227,9 +227,10 @@ export function VistaAvances({
     // Siguiente etapa sugerida: primera etapa que NO esté completada
     // Un tramo DEMORADO no avanza la etapa en el backend y debe seguir proponiéndose hasta completarse (FE-09)
     const etapasConPendientes = etapasDisponibles.map((etapa) => {
-        const pendiente = avancesPendientes.find(
-            (p) => p.numeroOrden === etapa.numeroOrden,
-        );
+        // La cola está en orden de llegada: vale el pendiente más reciente de la etapa
+        const pendiente = [...avancesPendientes]
+            .reverse()
+            .find((p) => p.numeroOrden === etapa.numeroOrden);
         if (pendiente) {
             return {
                 ...etapa,
@@ -243,11 +244,17 @@ export function VistaAvances({
         (e) => e.estadoTramo !== "COMPLETADO",
     );
 
+    // Solo se aplica cuando cambia el NÚMERO sugerido: no pisa la etapa elegida a mano en cada render.
+    // La primera sugerencia respeta el borrador guardado.
+    const sugerida = siguienteEtapa?.numeroOrden;
+    const ultimaSugerida = useRef<number | undefined>(undefined);
     useEffect(() => {
-        if (siguienteEtapa) {
-            setValue("numeroOrden", siguienteEtapa.numeroOrden);
-        }
-    }, [siguienteEtapa, setValue]);
+        if (sugerida === undefined || ultimaSugerida.current === sugerida) return;
+        const esPrimera = ultimaSugerida.current === undefined;
+        ultimaSugerida.current = sugerida;
+        if (esPrimera && borrador?.numeroOrden) return;
+        setValue("numeroOrden", sugerida);
+    }, [sugerida, borrador?.numeroOrden, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
