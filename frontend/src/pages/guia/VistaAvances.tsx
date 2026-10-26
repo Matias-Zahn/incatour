@@ -66,7 +66,8 @@ function construirListaHistorial(
             id: item.idLocal,
             etapa: item.etapaNombre,
             estadoTramo: item.estadoTramo,
-            fechaHora: `${item.fechaHoraLlegada.slice(0, 10)} (Offline)`,
+            // FE-41: en hora local, como los del servidor (el ISO está en UTC)
+            fechaHora: `${new Date(item.fechaHoraLlegada).toLocaleString("es-ES")} (Offline)`,
             offline: true,
         }));
     const idsPendientes = new Set(pendientes.map((p) => p.id));
