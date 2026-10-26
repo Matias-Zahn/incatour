@@ -112,6 +112,16 @@ export class ProveedorRepository {
     return count > 0;
   }
 
+  // CAT-26: paquetes activos que incluyen un servicio del proveedor o lo tienen como establecimiento garantizado (CAT-09)
+  async contarPaquetesActivosConServicios(id: number): Promise<number> {
+    const delProveedor = { servicio: { idproveedor: id }, paquete: { estado: "ACTIVO" } };
+    const [incluidos, garantias] = await Promise.all([
+      db.paqueteServicio.count({ where: delProveedor }),
+      db.garantiaEstablecimiento.count({ where: delProveedor }),
+    ]);
+    return incluidos + garantias;
+  }
+
   // CU-17, flujo alternativo 2: servicios del proveedor asignados a salidas activas o en curso
   async tieneSalidasActivas(id: number): Promise<boolean> {
     const count = await db.salida.count({

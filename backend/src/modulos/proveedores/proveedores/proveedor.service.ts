@@ -82,6 +82,11 @@ export class ProveedorService {
     if (await this.repository.tieneSalidasActivas(id)) {
       throw CustomError.badRequest("Error. El proveedor cuenta con salidas activas");
     }
+    // CAT-26: la cascada no puede dejar un paquete activo con servicios dados de baja (misma regla que CU-21)
+    const paquetes = await this.repository.contarPaquetesActivosConServicios(id);
+    if (paquetes > 0) {
+      throw CustomError.badRequest(`Error. Hay ${paquetes} paquete(s) activo(s) que usan servicios del proveedor`);
+    }
   }
 
   private formatear<T extends { _count: { servicios: number } }>(proveedor: T) {
