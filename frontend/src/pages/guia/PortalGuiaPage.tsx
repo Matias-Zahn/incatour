@@ -16,6 +16,18 @@ import { VistaInicio } from "./VistaInicio";
 import { VistaRecorridos } from "./VistaRecorridos";
 import { VistaSalidas } from "./VistaSalidas";
 
+// Salida elegida a mano, una clave por guía para que sobreviva a la recarga
+const CLAVE_SALIDA_SELECCIONADA = "incatour.guia.salida_seleccionada";
+
+function leerSalidaSeleccionada(clave: string): number | null {
+    try {
+        const n = Number(localStorage.getItem(clave));
+        return Number.isInteger(n) && n > 0 ? n : null;
+    } catch {
+        return null;
+    }
+}
+
 export default function PortalGuiaPage() {
     const navegar = useNavigate();
     const params = useParams<{ seccion?: string }>();
@@ -40,18 +52,39 @@ export default function PortalGuiaPage() {
         error: errorSalidasObj,
     } = useSalidasGuia();
 
+    const claveSalida = `${CLAVE_SALIDA_SELECCIONADA}_${usuario?.idusuario ?? 0}`;
     const [idsalidaSeleccionada, setIdsalidaSeleccionada] = useState<number | null>(
-        null,
+        () => leerSalidaSeleccionada(claveSalida),
     );
 
+    // Elegida en esta sesión (sí puede ser FINALIZADA) vs. recuperada de localStorage
+    const [eligioEnSesion, setEligioEnSesion] = useState(false);
+
+    function seleccionarSalida(id: number) {
+        setIdsalidaSeleccionada(id);
+        setEligioEnSesion(true);
+        try {
+            localStorage.setItem(claveSalida, String(id));
+        } catch (e) {
+            console.warn("No se pudo guardar la salida seleccionada", e);
+        }
+    }
+
     // Salida actual activa
+    // La guardada de una sesión anterior se ignora si ya no existe o está FINALIZADA
     const salidaActual =
-        salidas.find((s) => s.idsalida === idsalidaSeleccionada) ??
+        salidas.find(
+            (s) =>
+                s.idsalida === idsalidaSeleccionada &&
+                (eligioEnSesion || s.estado !== "FINALIZADA"),
+        ) ??
         salidas.find((s) => s.estado !== "FINALIZADA") ??
         salidas[0] ??
         null;
 
-    const proximaSalida = salidas.length > 1 ? salidas[1] : null;
+    // La lista viene ordenada por fechaInicio: la próxima es la que sigue a la actual
+    const indiceActual = salidaActual ? salidas.indexOf(salidaActual) : -1;
+    const proximaSalida = indiceActual >= 0 ? (salidas[indiceActual + 1] ?? null) : null;
 
     // Consultar detalle completo de la salida actual (CU-48)
     const {
@@ -120,7 +153,7 @@ export default function PortalGuiaPage() {
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
                             salidas={salidas}
-                            onSeleccionarSalida={(id) => setIdsalidaSeleccionada(id)}
+                            onSeleccionarSalida={seleccionarSalida}
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
