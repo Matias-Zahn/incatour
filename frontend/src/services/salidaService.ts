@@ -239,9 +239,18 @@ export type ParametrosConfirmarAsignacion = {
     datos: PayloadConfirmarAsignacion;
 };
 
+/** Titular que se quedó sin permiso: lo rechazó la autoridad o tiene el pasaporte vencido (RF-47). */
+export type PermisoRechazadoAsignacion = {
+    tipo: "PASAJERO" | "PERSONAL";
+    id: number;
+    nombreCompleto: string;
+    motivo: string;
+};
+
 export type DatosResultadoConfirmarAsignacion = {
     salida: SalidaApi;
     permisosEmitidos: number;
+    rechazados: PermisoRechazadoAsignacion[];
     lugaresLiberados: number;
     advertencia?: string;
 };
@@ -254,6 +263,7 @@ type RespuestaConfirmarAsignacionApi = {
 export type ResultadoConfirmarAsignacion = {
     salida: Salida;
     permisosEmitidos: number;
+    rechazados: PermisoRechazadoAsignacion[];
     lugaresLiberados: number;
     mensaje: string;
     advertencia?: string;
@@ -728,6 +738,7 @@ export async function confirmarAsignacion(
     return {
         salida: normalizarSalida(respuesta.data.salida),
         permisosEmitidos: respuesta.data.permisosEmitidos,
+        rechazados: respuesta.data.rechazados ?? [],
         lugaresLiberados: respuesta.data.lugaresLiberados,
         mensaje: respuesta.mensaje,
         advertencia: respuesta.data.advertencia,

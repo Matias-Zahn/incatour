@@ -45,6 +45,7 @@ import {
     type PayloadConfirmarAsignacion,
     type PayloadConfirmarReemplazo,
     type PayloadModificarLogistica,
+    type PermisoRechazadoAsignacion,
     type ResultadoCancelarSalida,
     type ResultadoDevolucionEquipamiento,
     type Salida,
@@ -103,6 +104,7 @@ function SalidasPage() {
         idsalida: number;
         nroSalida: string;
         permisosEmitidos: number;
+        rechazados: PermisoRechazadoAsignacion[];
         lugaresLiberados: number;
         estado: string;
         advertencia?: string;
@@ -465,6 +467,7 @@ function SalidasPage() {
                         idsalida,
                         nroSalida: resultado.salida?.nroSalida ?? nroSalida,
                         permisosEmitidos: resultado.permisosEmitidos,
+                        rechazados: resultado.rechazados,
                         lugaresLiberados: resultado.lugaresLiberados,
                         estado: resultado.salida?.estado ?? "CERRADA",
                         advertencia: resultado.advertencia,
@@ -1367,6 +1370,26 @@ function SalidasPage() {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </Alerta>
+            ) : null}
+
+            {resultadoAsignacion && resultadoAsignacion.rechazados.length > 0 ? (
+                <Alerta tipo="advertencia" titulo="Permisos rechazados">
+                    <div className="space-y-2 text-sm">
+                        <p>
+                            Estas personas no recibieron permiso y no ocupan lugar en la
+                            salida {resultadoAsignacion.nroSalida}. El personal rechazado
+                            se reemplaza con "Reemplazar personal".
+                        </p>
+                        <ul className="list-disc pl-5">
+                            {resultadoAsignacion.rechazados.map((r) => (
+                                <li key={`${r.tipo}-${r.id}`}>
+                                    <span className="font-bold">{r.nombreCompleto}</span>{" "}
+                                    ({r.tipo === "PASAJERO" ? "pasajero" : "personal"}): {r.motivo}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 </Alerta>
             ) : null}
