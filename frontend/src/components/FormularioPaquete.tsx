@@ -94,6 +94,10 @@ function tarifasIniciales(
     ];
 }
 
+
+// Marca para que el navegador no muestre la foto vieja desde la caché
+const marcaDeTiempo = () => Date.now();
+
 function FormularioPaquete({
     paqueteEnEdicion,
     circuitos,
@@ -268,7 +272,7 @@ function FormularioPaquete({
                 nombreFoto,
                 archivo,
             });
-            const urlConCacheBust = `${res.url}?v=${Date.now()}`;
+            const urlConCacheBust = `${res.url}?v=${marcaDeTiempo()}`;
             setImagenesServidorEditadas((prev) => {
                 const base = [...(prev ?? imagenesActualesPaquete)];
                 if (indice >= 0 && indice < base.length) {

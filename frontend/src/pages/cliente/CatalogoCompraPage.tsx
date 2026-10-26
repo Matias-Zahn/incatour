@@ -200,6 +200,10 @@ function crearPasajeroInicial(): PasajeroFormulario {
     };
 }
 
+
+// Sufijo de dos dígitos para los pasaportes de prueba (solo en el autocompletado de desarrollo)
+const sufijoAleatorio = () => Math.floor(10 + Math.random() * 89);
+
 function CatalogoCompraPage() {
     const navegar = useNavigate();
     const [parametrosUrl] = useSearchParams();
@@ -233,22 +237,22 @@ function CatalogoCompraPage() {
         number | null
     >(null);
 
-    useEffect(() => {
-        if (
-            idPaquetePreseleccionado > 0 &&
-            paquetes.length > 0 &&
-            preseleccionProcesada !== idPaquetePreseleccionado
-        ) {
-            const encontrado = paquetes.find(
-                (p) => p.id === idPaquetePreseleccionado,
-            );
-            setPreseleccionProcesada(idPaquetePreseleccionado);
-            if (encontrado) {
-                setPaqueteDetalle(encontrado);
-                setIndiceFotoDetalle(0);
-            }
+    // Paquete preseleccionado por la URL: se abre una sola vez, cuando llegan los paquetes.
+    // Se ajusta el estado durante el render (sin efecto) para no encadenar renders
+    if (
+        idPaquetePreseleccionado > 0 &&
+        paquetes.length > 0 &&
+        preseleccionProcesada !== idPaquetePreseleccionado
+    ) {
+        const encontrado = paquetes.find(
+            (p) => p.id === idPaquetePreseleccionado,
+        );
+        setPreseleccionProcesada(idPaquetePreseleccionado);
+        if (encontrado) {
+            setPaqueteDetalle(encontrado);
+            setIndiceFotoDetalle(0);
         }
-    }, [idPaquetePreseleccionado, paquetes, preseleccionProcesada]);
+    }
 
     // Flujo de compra (CU-30). FE-48: si la sesión venció al pagar, se retoma la compra guardada (sin la tarjeta)
     const [compraGuardada] = useState(leerCompraGuardada);
@@ -345,7 +349,7 @@ function CatalogoCompraPage() {
         const idx = pasajeros.length;
         if (autocompletar) {
             const plantilla = PASAJEROS_PRUEBA[idx % PASAJEROS_PRUEBA.length];
-            const sufijo = Math.floor(10 + Math.random() * 89);
+            const sufijo = sufijoAleatorio();
             setPasajeros((prev) => [
                 ...prev,
                 {
@@ -374,7 +378,7 @@ function CatalogoCompraPage() {
     function autocompletarPasajeroExistente(indice: number) {
         setErrorCompra("");
         const plantilla = PASAJEROS_PRUEBA[indice % PASAJEROS_PRUEBA.length];
-        const sufijo = Math.floor(10 + Math.random() * 89);
+        const sufijo = sufijoAleatorio();
         setPasajeros((prev) =>
             prev.map((item, idx) =>
                 idx === indice
