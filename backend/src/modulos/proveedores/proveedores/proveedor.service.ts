@@ -48,8 +48,10 @@ export class ProveedorService {
 
     const razonSocial = dto.razonSocial ?? proveedor.razonSocial;
     const localidad = dto.localidad ?? proveedor.localidad;
+    // CAT-27: reactivar también puede duplicar un proveedor activo con la misma razón social y localidad
+    const reactiva = dto.estado === ESTADO.ACTIVO && proveedor.estado !== ESTADO.ACTIVO;
     if (
-      (dto.razonSocial !== undefined || dto.localidad !== undefined) &&
+      (dto.razonSocial !== undefined || dto.localidad !== undefined || reactiva) &&
       (await this.repository.existeRazonSocial(razonSocial, localidad, id))
     ) {
       throw CustomError.conflict(`Ya existe un proveedor activo "${razonSocial}" en ${localidad}.`);

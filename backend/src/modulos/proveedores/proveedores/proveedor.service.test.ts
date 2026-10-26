@@ -34,3 +34,16 @@ describe("ProveedorService.darDeBaja (CU-17)", () => {
     await expect(new ProveedorService().darDeBaja(7)).resolves.toMatchObject({ estado: "INACTIVO" });
   });
 });
+
+describe("ProveedorService.modificarProveedor (CU-16)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("CAT-27: reactivar controla que no haya otro activo con la misma razón social y localidad", async () => {
+    repo.findById.mockResolvedValue(proveedor("INACTIVO"));
+    repo.existeRazonSocial.mockResolvedValue(true);
+
+    await expect(new ProveedorService().modificarProveedor(7, { estado: "ACTIVO" } as any)).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.existeRazonSocial).toHaveBeenCalledWith("Hotel X", "Cusco", 7);
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+});
