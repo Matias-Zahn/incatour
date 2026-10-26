@@ -10,12 +10,18 @@ import {
 
 const leerCola = (idsalida: number): AvanceOffline[] => (idsalida > 0 ? obtenerAvancesOffline(idsalida) : []);
 
-export type MensajeSincronizacion = { tipo: "exito" | "error"; texto: string };
+// FE-38: los avisos llevan un orden para que en la vista se muestre el último (la sincronización reemplaza
+// al "guardado offline" y un aviso nuevo de la vista reemplaza al de la sincronización)
+let ultimoOrden = 0;
+export const siguienteOrdenAviso = () => ++ultimoOrden;
+
+export type MensajeSincronizacion = { tipo: "exito" | "error"; texto: string; orden: number };
 
 export type SincronizacionAvances = {
     pendientes: AvanceOffline[];
     sincronizando: boolean;
     mensaje: MensajeSincronizacion | null;
+    limpiarMensaje: () => void;
     sincronizar: () => Promise<void>;
     /** Vuelve a leer la cola después de encolar un avance */
     refrescar: () => void;
@@ -32,7 +38,10 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
     const [cola, setCola] = useState(() => ({ idsalida, lista: leerCola(idsalida) }));
     const pendientes = cola.idsalida === idsalida ? cola.lista : leerCola(idsalida);
     const [sincronizando, setSincronizando] = useState(false);
-    const [mensaje, setMensaje] = useState<MensajeSincronizacion | null>(null);
+    // El aviso es de la salida en la que se sincronizó: al cambiar de salida no se muestra
+    const [aviso, setAviso] = useState<(MensajeSincronizacion & { idsalida: number }) | null>(null);
+    const mensaje = aviso?.idsalida === idsalida ? aviso : null;
+    const limpiarMensaje = useCallback(() => setAviso(null), []);
     // FE-40: un segundo "online" o un clic mientras sincroniza no reenvía la cola
     const enCurso = useRef(false);
 
@@ -94,12 +103,16 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
         enCurso.current = false;
 
         if (rechazo) {
-            setMensaje({
+            setAviso({
+                idsalida,
+                orden: siguienteOrdenAviso(),
                 tipo: "error",
                 texto: `El servidor rechazó un avance pendiente y se descartó (${rechazo}).${restantes.length > 0 ? " Los demás siguen pendientes y se reintentan en la próxima sincronización." : ""}`,
             });
         } else if (exitoCount > 0) {
-            setMensaje({
+            setAviso({
+                idsalida,
+                orden: siguienteOrdenAviso(),
                 tipo: "exito",
                 texto: `Se sincronizaron exitosamente ${exitoCount} avance(s) pendiente(s) con el servidor.`,
             });
@@ -119,5 +132,5 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
         };
     }, [idsalida, sincronizar]);
 
-    return { pendientes, sincronizando, mensaje, sincronizar, refrescar };
+    return { pendientes, sincronizando, mensaje, limpiarMensaje, sincronizar, refrescar };
 }

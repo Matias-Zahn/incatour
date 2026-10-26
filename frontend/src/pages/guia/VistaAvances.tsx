@@ -29,7 +29,7 @@ import {
     IconoSincronizar,
     IconoWifiOff,
 } from "./IconosGuia";
-import type { SincronizacionAvances } from "./useSincronizacionAvances";
+import { siguienteOrdenAviso, type SincronizacionAvances } from "./useSincronizacionAvances";
 
 type VistaAvancesProps = {
     salidaActual: SalidaGuiaResumen | null;
@@ -102,7 +102,16 @@ export function VistaAvances({
     const [mensajeFeedback, setMensajeFeedback] = useState<{
         tipo: "exito" | "error" | "advertencia" | "informacion";
         texto: string;
+        orden: number;
     } | null>(null);
+
+    // FE-38: se muestra el aviso más reciente, sea de esta vista o de la sincronización
+    const aviso =
+        mensajeFeedback && sincronizacion.mensaje
+            ? mensajeFeedback.orden > sincronizacion.mensaje.orden
+                ? mensajeFeedback
+                : sincronizacion.mensaje
+            : (mensajeFeedback ?? sincronizacion.mensaje);
 
     // FE-38: la cola y su sincronización viven en el portal (useSincronizacionAvances)
     const avancesPendientes = sincronizacion.pendientes;
@@ -221,6 +230,7 @@ export function VistaAvances({
 
     async function enviarAvance(datos: DatosAvanceForm) {
         setMensajeFeedback(null);
+        sincronizacion.limpiarMensaje();
 
         // Construir ISO Date Time
         const fechaHoraCombinada = `${datos.fechaLlegada}T${datos.horaLlegada}:00`;
@@ -259,6 +269,7 @@ export function VistaAvances({
             limpiarBorradorAvance(idsalida);
 
             setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
                 tipo: "advertencia",
                 texto: "Sin conexión: el avance se guardó localmente en tu dispositivo y se enviará al servidor cuando recuperes señal.",
             });
@@ -310,6 +321,7 @@ export function VistaAvances({
             limpiarBorradorAvance(idsalida);
 
             setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
                 tipo: "exito",
                 texto: "Avance registrado exitosamente en el historial del recorrido.",
             });
@@ -363,6 +375,7 @@ export function VistaAvances({
                 limpiarBorradorAvance(idsalida);
 
                 setMensajeFeedback({
+                    orden: siguienteOrdenAviso(),
                     tipo: "advertencia",
                     texto: "Falla de señal detectada: el avance fue guardado localmente de manera segura en tu dispositivo para ser sincronizado luego.",
                 });
@@ -384,6 +397,7 @@ export function VistaAvances({
                 });
             } else {
                 setMensajeFeedback({
+                    orden: siguienteOrdenAviso(),
                     tipo: "error",
                     texto: mensajeError || "No se pudo registrar el avance.",
                 });
@@ -458,9 +472,9 @@ export function VistaAvances({
                     </h2>
 
                     <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5 space-y-4">
-                        {mensajeFeedback ?? sincronizacion.mensaje ? (
-                            <Alerta tipo={(mensajeFeedback ?? sincronizacion.mensaje)!.tipo}>
-                                {(mensajeFeedback ?? sincronizacion.mensaje)!.texto}
+                        {aviso ? (
+                            <Alerta tipo={aviso.tipo}>
+                                {aviso.texto}
                             </Alerta>
                         ) : null}
 
