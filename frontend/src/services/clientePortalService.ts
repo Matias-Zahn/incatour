@@ -403,6 +403,8 @@ export type ResumenCancelacionReserva = {
     nroReserva: string;
     importeAbonado: number;
     montoAReintegrar: number;
+    /** Regla de reintegro que aplicó el back (RES-06), por ejemplo el plazo mínimo vencido. */
+    condicionAplicada: string;
     permisosEmitidos: boolean;
     lugaresVuelvenALaVenta: boolean;
     advertencia: string | null;
