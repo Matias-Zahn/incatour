@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Prisma } from "@prisma/client";
 import { PaqueteService } from "./paquete.service";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 
@@ -66,6 +67,16 @@ describe("PaqueteService", () => {
 
       expect(p).toMatchObject({ nroPaquete: "PKG-0007", estado: "ACTIVO", nochesPrevias: 0, nochesPosteriores: 0 });
       expect(repo.guardar).toHaveBeenCalledWith(expect.objectContaining({ idcircuito: 1, tipoGarantia: "POR_CATEGORIA" }), precios, [40, 41]);
+    });
+
+    it("CAT-23: si el número ya lo tomó otro alta, reintenta con el siguiente", async () => {
+      repo.contarPaquetes.mockResolvedValue(3);
+      repo.guardar
+        .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("único", { code: "P2002", clientVersion: "5" }))
+        .mockResolvedValueOnce({ idpaquete: 9 });
+
+      await expect(new PaqueteService().registrarNuevoPaquete(crear())).resolves.toEqual({ idpaquete: 9 });
+      expect(repo.guardar.mock.calls.map(([d]) => d.nroPaquete)).toEqual(["PKG-0004", "PKG-0005"]);
     });
 
     it("con garantía por categoría no consulta ningún establecimiento", async () => {

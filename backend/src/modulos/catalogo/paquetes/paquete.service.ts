@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
 import { db } from "../../../config/postgresDatabase";
 import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
@@ -50,10 +51,20 @@ export class PaqueteService {
       await this.validarServiciosExisten(dto.serviciosIncluidos);
     }
 
-    // 6. Generar nroPaquete automáticamente
-    const nroPaquete = await this.generarNroPaquete();
+    // 6 y 7. Generar nroPaquete y guardar(p) de forma atómica.
+    // CAT-23: si otro alta tomó el mismo número (o hay un hueco), se reintenta con el siguiente
+    for (let intento = 0; ; intento++) {
+      const nroPaquete = await this.generarNroPaquete(intento);
+      try {
+        return await this.guardar(dto, nroPaquete);
+      } catch (error) {
+        const choque = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+        if (!choque || intento >= 4) throw error;
+      }
+    }
+  }
 
-    // 7. DSS: guardar(p) — Persistencia atómica
+  private guardar(dto: CrearPaqueteDto, nroPaquete: string) {
     return this.repository.guardar(
       {
         nroPaquete,
@@ -274,9 +285,9 @@ export class PaqueteService {
   /**
    * Genera un número de paquete auto-incremental (PKG-0001, PKG-0002, etc.).
    */
-  private async generarNroPaquete(): Promise<string> {
+  private async generarNroPaquete(intento = 0): Promise<string> {
     const total = await this.repository.contarPaquetes();
-    const numero = (total + 1).toString().padStart(4, "0");
+    const numero = (total + 1 + intento).toString().padStart(4, "0");
     return `PKG-${numero}`;
   }
 }
