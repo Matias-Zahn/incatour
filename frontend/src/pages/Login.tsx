@@ -14,7 +14,11 @@ import { obtenerToken, obtenerUsuario } from "../services/sesionService";
 function Login() {
     const navegar = useNavigate();
     const ubicacion = useLocation();
-    const destino = (ubicacion.state as { desde?: string } | null)?.desde ?? "/";
+    // FE-48: el destino también puede venir en ?desde= (recarga por sesión vencida); solo rutas internas
+    const desdeQuery = new URLSearchParams(ubicacion.search).get("desde");
+    const destino =
+        (ubicacion.state as { desde?: string } | null)?.desde ??
+        (desdeQuery?.startsWith("/") && !desdeQuery.startsWith("//") ? desdeQuery : "/");
     const iniciarSesion = useIniciarSesion();
     const {
         register,
