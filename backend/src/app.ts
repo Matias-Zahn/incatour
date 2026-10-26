@@ -10,6 +10,11 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+// INF-03: Express 5 deja req.body en undefined si el pedido no trae JSON; los DTO esperan un objeto
+app.use((req, _res, next) => {
+  req.body ??= {};
+  next();
+});
 
 // Servir archivos estáticos de imágenes (logo, catálogo)
 app.use(
