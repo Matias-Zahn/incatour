@@ -6,7 +6,9 @@ import { CustomError } from "../../error/CustomError";
 import { db } from "../../config/postgresDatabase";
 
 const BASE_IMG_PATH = path.resolve(process.cwd(), "public/imagenes/paquetes");
-const FORMATOS_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
+// CAT-21: la extensión sale del tipo validado, nunca del nombre que manda el cliente
+const EXTENSION_POR_FORMATO: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" };
+const FORMATOS_PERMITIDOS = Object.keys(EXTENSION_POR_FORMATO);
 const NOMBRES_FOTOS_VALIDOS = ["principal", "foto_1", "foto_2", "foto_3", "foto_4", "foto_5"];
 
 export async function validarPaqueteParaSubida(
@@ -84,7 +86,7 @@ const storageCarrusel = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
     const contador = (req as any)._contadorFoto ?? 1;
     (req as any)._contadorFoto = contador + 1;
     if (contador === 1) {
@@ -129,7 +131,7 @@ const storageImagen = multer.diskStorage({
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
     cb(null, `principal${ext}`);
   },
 });
@@ -170,7 +172,7 @@ const storageModificarFoto = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const nombreFoto = (req.params.nombreFoto as string)?.toLowerCase();
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = EXTENSION_POR_FORMATO[file.mimetype];
     cb(null, `${nombreFoto}${ext}`);
   },
 });
