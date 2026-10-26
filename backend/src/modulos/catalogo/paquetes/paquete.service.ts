@@ -101,6 +101,10 @@ export class PaqueteService {
       if (!circuito || circuito.estado !== "ACTIVO") {
         throw CustomError.badRequest("El circuito no existe o no está activo.");
       }
+      // CAT-17: la misma precondición que el alta
+      if ((await db.etapaRuta.count({ where: { idcircuito: dto.idcircuito } })) === 0) {
+        throw CustomError.badRequest("El circuito debe tener etapas establecidas antes de asignarlo a un paquete.");
+      }
     }
 
     // Si mandan idservicioGarantizado o cambian a POR_ESTABLECIMIENTO, validar

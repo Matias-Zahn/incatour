@@ -222,6 +222,15 @@ describe("PaqueteService", () => {
       expect(repo.update).not.toHaveBeenCalled();
     });
 
+    it("CAT-17: rechaza pasar a un circuito sin etapas", async () => {
+      repo.findById.mockResolvedValue({ ...paqueteCategoria, idcircuito: 1 });
+      repo.tieneSalidasActivas.mockResolvedValue(false);
+      db.etapaRuta.count.mockResolvedValue(0);
+
+      await expect(new PaqueteService().modificarPaquete(10, modificar({ idcircuito: 2 }))).rejects.toThrow("etapas");
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
     it("404 si el paquete no existe", async () => {
       repo.findById.mockResolvedValue(null);
 
