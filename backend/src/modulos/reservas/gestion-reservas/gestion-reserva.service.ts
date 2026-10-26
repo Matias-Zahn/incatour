@@ -115,7 +115,7 @@ export class GestionReservaService {
     if (reembolso === "CAMBIO") {
       throw CustomError.conflict("La reserva cambió mientras se cancelaba. Volvé a consultar la cancelación.");
     }
-    if (!reembolso) throw CustomError.badRequest("La reserva ya había sido cancelada.");
+    if (!reembolso) throw CustomError.conflict("La reserva ya había sido cancelada.");
 
     // Constancia al titular: si el mail falla, la cancelación ya está registrada
     this.notificador

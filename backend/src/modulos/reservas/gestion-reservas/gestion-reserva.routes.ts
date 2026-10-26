@@ -256,7 +256,7 @@ export class GestionReservaRoutes {
      *                         fechaReembolso: { type: string, format: date-time }
      *                         nota: { type: string }
      *       400:
-     *         description: Reserva no confirmada, salida iniciada o ya cancelada.
+     *         description: Reserva no confirmada o salida iniciada.
      *         content:
      *           application/json:
      *             schema: { $ref: '#/components/schemas/ErrorRespuesta' }
@@ -264,6 +264,8 @@ export class GestionReservaRoutes {
      *         description: La reserva pertenece a otro cliente.
      *       404:
      *         description: La reserva no existe.
+     *       409:
+     *         description: Otra petición ya la canceló, o los permisos o la salida cambiaron mientras se cancelaba (RES-14).
      */
     router.post("/:idreserva/cancelar", autenticar, requierePerfil("CLIENTE", "ADMIN"), controller.confirmarCancelacion);
 

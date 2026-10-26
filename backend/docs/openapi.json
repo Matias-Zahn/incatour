@@ -2816,7 +2816,7 @@
             }
           },
           "400": {
-            "description": "Reserva no confirmada, salida iniciada o ya cancelada.",
+            "description": "Reserva no confirmada o salida iniciada.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2830,6 +2830,9 @@
           },
           "404": {
             "description": "La reserva no existe."
+          },
+          "409": {
+            "description": "Otra petición ya la canceló, o los permisos o la salida cambiaron mientras se cancelaba (RES-14)."
           }
         }
       }
