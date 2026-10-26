@@ -6,6 +6,7 @@
  * Resetea INTEGRAL_DB (por defecto incatour_integral) con migraciones y seed, levanta el back en INTEGRAL_PUERTO
  * (por defecto 3996) y un segundo back con la autoridad caída (AUTORIDAD_CAIDA=true) en el puerto siguiente.
  * La base de desarrollo no se toca. Uso, desde backend, con Docker levantado: npm run test:integral
+ * INTEGRAL_SOLO=<módulo> corre uno solo (ventas, salidas, campo o catalogoCuentas).
  *
  * Los escenarios que fallan por un error ya cargado en el tablero van en CONOCIDAS: salen como pendientes y no
  * cuentan como falla. El exit code es 1 solo si aparece una falla nueva.
@@ -42,7 +43,9 @@ async function main() {
     const admin = await back.login("admin@incatour.com", "AdminIncaTour123");
     ctx = crearContexto({ back, backCaido, db, admin, conocidas: CONOCIDAS });
 
-    for (const modulo of [ventas, salidas, campo, catalogoCuentas]) {
+    // INTEGRAL_SOLO=ventas|salidas|campo|catalogoCuentas corre un solo módulo
+    const solo = process.env.INTEGRAL_SOLO;
+    for (const modulo of [ventas, salidas, campo, catalogoCuentas].filter((m) => !solo || m.name === solo)) {
       try {
         await modulo(ctx);
       } catch (e) {
