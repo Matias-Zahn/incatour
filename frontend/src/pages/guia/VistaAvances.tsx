@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
-import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalAvance,
-    eliminarAvanceOffline,
-    eliminarHistorialLocalAvance,
     esquemaAvance,
     fechaLocalHoy,
     estilosEstadoSalida,
@@ -15,7 +12,6 @@ import {
     guardarAvanceOffline,
     guardarBorradorAvance,
     limpiarBorradorAvance,
-    obtenerAvancesOffline,
     obtenerBorradorAvance,
     obtenerHistorialLocalAvances,
     useRegistrarAvance,
@@ -32,10 +28,12 @@ import {
     IconoSincronizar,
     IconoWifiOff,
 } from "./IconosGuia";
+import type { SincronizacionAvances } from "./useSincronizacionAvances";
 
 type VistaAvancesProps = {
     salidaActual: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
+    sincronizacion: SincronizacionAvances;
     cargando?: boolean;
 };
 
@@ -92,6 +90,7 @@ function construirListaHistorial(
 export function VistaAvances({
     salidaActual,
     detalleSalida,
+    sincronizacion,
     cargando = false,
 }: VistaAvancesProps) {
     const idsalida = salidaActual?.idsalida ?? 0;
@@ -103,10 +102,8 @@ export function VistaAvances({
         texto: string;
     } | null>(null);
 
-    // Carga perezosa de estado inicial evitando cascading renders
-    const [avancesPendientes, setAvancesPendientes] = useState<AvanceOffline[]>(() =>
-        idsalida > 0 ? obtenerAvancesOffline(idsalida) : [],
-    );
+    // FE-38: la cola y su sincronización viven en el portal (useSincronizacionAvances)
+    const avancesPendientes = sincronizacion.pendientes;
 
     // Historial reactivo calculado directamente desde el detalle del servidor y pendientes offline (FE-08)
     const historialAvances = useMemo(
@@ -114,7 +111,6 @@ export function VistaAvances({
         [detalleSalida, idsalida, avancesPendientes],
     );
 
-    const [sincronizando, setSincronizando] = useState(false);
 
     // Cargar valores iniciales / borrador guardado
     const fechaHoy = fechaLocalHoy();
@@ -155,77 +151,6 @@ export function VistaAvances({
     }, [valoresFormulario, idsalida, tocado]);
 
     const etapasDisponibles = detalleSalida?.itinerario ?? [];
-
-    const sincronizarPendientes = useCallback(async () => {
-        if (idsalida <= 0) return;
-        const pendientes = obtenerAvancesOffline(idsalida);
-        if (pendientes.length === 0) return;
-
-        setSincronizando(true);
-        let exitoCount = 0;
-        let rechazo: string | null = null;
-
-        for (const item of pendientes) {
-            try {
-                await registrarAvanceMutation.mutateAsync({
-                    idsalida,
-                    payload: {
-                        numeroOrden: item.numeroOrden,
-                        estadoTramo: item.estadoTramo,
-                        fechaHoraLlegada: item.fechaHoraLlegada,
-                    },
-                });
-                eliminarAvanceOffline(idsalida, item.idLocal);
-                exitoCount += 1;
-            } catch (error) {
-                // 4xx = rechazo definitivo del back: se descarta SOLO ese avance y se corta, porque los
-                // siguientes dependen del orden de etapas y se rechazarían en cadena.
-                // 401/408/429 y errores de red o 5xx se reintentan en el próximo intento.
-                if (
-                    error instanceof ErrorApi &&
-                    error.estado >= 400 &&
-                    error.estado < 500 &&
-                    ![401, 408, 429].includes(error.estado)
-                ) {
-                    eliminarAvanceOffline(idsalida, item.idLocal);
-                    eliminarHistorialLocalAvance(idsalida, item.idLocal);
-                    rechazo = `${item.etapaNombre}: ${error.message}`;
-                    break;
-                }
-                console.error("Error sincronizando avance", error);
-                break;
-            }
-        }
-
-        const restantes = obtenerAvancesOffline(idsalida);
-        setAvancesPendientes(restantes);
-        setSincronizando(false);
-
-        if (rechazo) {
-            setMensajeFeedback({
-                tipo: "error",
-                texto: `El servidor rechazó un avance pendiente y se descartó (${rechazo}).${restantes.length > 0 ? " Los demás siguen pendientes y se reintentan en la próxima sincronización." : ""}`,
-            });
-        } else if (exitoCount > 0) {
-            setMensajeFeedback({
-                tipo: "exito",
-                texto: `Se sincronizaron exitosamente ${exitoCount} avance(s) pendiente(s) con el servidor.`,
-            });
-        }
-    }, [idsalida, registrarAvanceMutation]);
-
-    // Sincronización automática cuando el navegador vuelve a tener conexión
-    useEffect(() => {
-        if (idsalida <= 0) return;
-        function manejarOnline() {
-            const pendientes = obtenerAvancesOffline(idsalida);
-            if (pendientes.length > 0) {
-                void sincronizarPendientes();
-            }
-        }
-        window.addEventListener("online", manejarOnline);
-        return () => window.removeEventListener("online", manejarOnline);
-    }, [idsalida, sincronizarPendientes]);
 
     // Siguiente etapa sugerida: primera etapa que NO esté completada
     // Un tramo DEMORADO no avanza la etapa en el backend y debe seguir proponiéndose hasta completarse (FE-09)
@@ -319,7 +244,7 @@ export function VistaAvances({
             };
 
             agregarHistorialLocalAvance(idsalida, nuevoRegistro);
-            setAvancesPendientes(obtenerAvancesOffline(idsalida));
+            sincronizacion.refrescar();
             limpiarBorradorAvance(idsalida);
 
             setMensajeFeedback({
@@ -346,7 +271,8 @@ export function VistaAvances({
             return;
         }
 
-        // Intento de envío normal a la API
+        // Intento de envío normal a la API. FE-38: primero sale lo que estaba en cola, para respetar el orden de etapas
+        if (avancesPendientes.length > 0) await sincronizacion.sincronizar();
         try {
             const respuesta = await registrarAvanceMutation.mutateAsync({
                 idsalida,
@@ -424,7 +350,7 @@ export function VistaAvances({
                 };
 
                 agregarHistorialLocalAvance(idsalida, nuevoRegistro);
-                setAvancesPendientes(obtenerAvancesOffline(idsalida));
+                sincronizacion.refrescar();
                 limpiarBorradorAvance(idsalida);
 
                 setMensajeFeedback({
@@ -503,8 +429,8 @@ export function VistaAvances({
                     <Boton
                         variante="secundario"
                         className="text-xs"
-                        onClick={sincronizarPendientes}
-                        cargando={sincronizando}
+                        onClick={sincronizacion.sincronizar}
+                        cargando={sincronizacion.sincronizando}
                     >
                         <span className="flex items-center gap-1.5">
                             <IconoSincronizar tamano={14} />
@@ -523,9 +449,9 @@ export function VistaAvances({
                     </h2>
 
                     <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5 space-y-4">
-                        {mensajeFeedback ? (
-                            <Alerta tipo={mensajeFeedback.tipo}>
-                                {mensajeFeedback.texto}
+                        {mensajeFeedback ?? sincronizacion.mensaje ? (
+                            <Alerta tipo={(mensajeFeedback ?? sincronizacion.mensaje)!.tipo}>
+                                {(mensajeFeedback ?? sincronizacion.mensaje)!.texto}
                             </Alerta>
                         ) : null}
 

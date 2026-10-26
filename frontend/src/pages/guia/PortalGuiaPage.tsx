@@ -15,6 +15,7 @@ import { VistaIncidentes } from "./VistaIncidentes";
 import { VistaInicio } from "./VistaInicio";
 import { VistaRecorridos } from "./VistaRecorridos";
 import { VistaSalidas } from "./VistaSalidas";
+import { useSincronizacionAvances } from "./useSincronizacionAvances";
 
 // Salida elegida a mano, una clave por guía para que sobreviva a la recarga
 const CLAVE_SALIDA_SELECCIONADA = "incatour.guia.salida_seleccionada";
@@ -85,6 +86,9 @@ export default function PortalGuiaPage() {
     // La lista viene ordenada por fechaInicio: la próxima es la que sigue a la actual
     const indiceActual = salidaActual ? salidas.indexOf(salidaActual) : -1;
     const proximaSalida = indiceActual >= 0 ? (salidas[indiceActual + 1] ?? null) : null;
+
+    // FE-38: la cola de avances se sincroniza al entrar al portal y al volver la señal, en cualquier vista
+    const sincronizacion = useSincronizacionAvances(salidaActual?.idsalida ?? 0);
 
     // Consultar detalle completo de la salida actual (CU-48)
     const {
@@ -167,6 +171,7 @@ export default function PortalGuiaPage() {
                             key={salidaActual?.idsalida ?? "sin_salida"}
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
+                            sincronizacion={sincronizacion}
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
