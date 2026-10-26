@@ -1,14 +1,7 @@
 import { ESTADO, TIPOS_PROVEEDOR } from "../../../shared/constantes";
+import { textoRequerido } from "../../../shared/validaciones";
 
 const ESTADOS_VALIDOS: string[] = [ESTADO.ACTIVO, ESTADO.INACTIVO];
-
-/** Valida un texto obligatorio. Devuelve [error, valorLimpio]. */
-const textoRequerido = (valor: any, nombre: string, max: number): [string | undefined, string?] => {
-  if (typeof valor !== "string" || valor.trim().length === 0) return [`${nombre} es requerido.`];
-  const limpio = valor.trim();
-  if (limpio.length > max) return [`${nombre} no puede superar los ${max} caracteres.`];
-  return [undefined, limpio];
-};
 
 // CU-15: Alta proveedor
 export class CrearProveedorDto {
