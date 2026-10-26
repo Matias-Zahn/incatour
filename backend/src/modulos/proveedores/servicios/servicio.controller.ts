@@ -2,13 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CrearServicioDto, FiltrosServicioDto, ModificarServicioDto } from "./servicio.dto";
 import { ServicioService } from "./servicio.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const servicioService = new ServicioService();
 
 const leerId = (valor: unknown, nombre: string): number => {
-  const id = parseInt(valor as string);
-  if (isNaN(id)) throw CustomError.badRequest(`El ${nombre} proporcionado no es válido.`);
-  return id;
+  return leerIdUrl(valor, `El ${nombre} proporcionado no es válido.`);
 };
 
 export class ServicioController {

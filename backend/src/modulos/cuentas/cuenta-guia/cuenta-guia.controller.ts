@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CrearCuentaGuiaDto, FiltrosCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 import { CuentaGuiaService } from "./cuenta-guia.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const cuentaGuiaService = new CuentaGuiaService();
 
@@ -35,8 +36,7 @@ export class CuentaGuiaController {
   // PUT /api/cuentas-guia/:idusuario — Modificar cuenta de guía (por administrador)
   modificarCuenta = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const idusuario = parseInt(req.params.idusuario as string);
-      if (isNaN(idusuario)) throw CustomError.badRequest("El ID de usuario proporcionado no es válido.");
+      const idusuario = leerIdUrl(req.params.idusuario, "El ID de usuario proporcionado no es válido.");
 
       const [error, dto] = ModificarCuentaGuiaDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -51,8 +51,7 @@ export class CuentaGuiaController {
   // CU-46: PATCH /api/cuentas-guia/:idusuario/baja
   darDeBajaCuenta = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const idusuario = parseInt(req.params.idusuario as string);
-      if (isNaN(idusuario)) throw CustomError.badRequest("El ID de usuario proporcionado no es válido.");
+      const idusuario = leerIdUrl(req.params.idusuario, "El ID de usuario proporcionado no es válido.");
 
       const cuenta = await cuentaGuiaService.darDeBajaCuenta(idusuario);
       return res.json({ mensaje: "Cuenta de guía dada de baja exitosamente", data: cuenta });

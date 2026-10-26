@@ -4,6 +4,7 @@ import fs from "fs";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { CustomError } from "../../error/CustomError";
 import { db } from "../../config/postgresDatabase";
+import { leerIdUrl } from "../validaciones";
 
 const BASE_IMG_PATH = path.resolve(process.cwd(), "public/imagenes/paquetes");
 // CAT-21: la extensión sale del tipo validado, nunca del nombre que manda el cliente
@@ -22,17 +23,8 @@ export async function validarPaqueteParaSubida(
   req: Request,
   validarNombreFoto = false
 ): Promise<number> {
-  const rawId = req.params.id;
-
-  // 1. Validar formato estrictamente numérico (evita traversal como %2e%2e, .., /, \)
-  if (!rawId || typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
-    throw CustomError.badRequest("El ID proporcionado no es válido.");
-  }
-
-  const id = parseInt(rawId, 10);
-  if (isNaN(id) || id <= 0) {
-    throw CustomError.badRequest("El ID proporcionado no es válido.");
-  }
+  // 1. Formato estrictamente numérico y en rango (evita traversal como %2e%2e, .., /, \). INF-04: regla compartida
+  const id = leerIdUrl(req.params.id);
 
   // 2. Si aplica validarNombreFoto, verificar que sea un nombre permitido
   if (validarNombreFoto) {

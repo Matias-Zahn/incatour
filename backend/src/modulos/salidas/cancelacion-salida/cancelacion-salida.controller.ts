@@ -2,12 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
 import { CancelarSalidaDto } from "./cancelacion-salida.dto";
 import { CancelacionSalidaService } from "./cancelacion-salida.service";
+import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new CancelacionSalidaService();
 
 const leerIdSalida = (req: Request): number => {
-  const id = parseInt(req.params.idsalida as string);
-  if (isNaN(id)) throw CustomError.badRequest("El ID de salida proporcionado no es válido.");
+  const id = leerIdUrl(req.params.idsalida, "El ID de salida proporcionado no es válido.");
   return id;
 };
 
