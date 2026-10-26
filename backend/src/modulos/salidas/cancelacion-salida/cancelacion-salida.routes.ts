@@ -71,7 +71,7 @@ export class CancelacionSalidaRoutes {
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** En una única transacción:
      *       los permisos emitidos pasan a Perdido, se reintegra el stock de equipamiento, se dan de baja las
-     *       solicitudes de alojamiento pendientes, todas las reservas pasan a Cancelada con su reembolso del
+     *       solicitudes de alojamiento pendientes y confirmadas, todas las reservas pasan a Cancelada con su reembolso del
      *       100% de lo abonado y la salida queda Cancelada, con el motivo en el registro de auditoría. Después del commit se liberan ante la
      *       autoridad los cupos bloqueados; si no responde, la salida queda cancelada y repetir la petición solo los libera.
      *       Por último se avisa por correo a los titulares con el motivo, el importe y salidas alternativas.

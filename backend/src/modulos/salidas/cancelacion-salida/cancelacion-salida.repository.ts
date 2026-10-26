@@ -117,9 +117,12 @@ export class CancelacionSalidaRepository {
           });
         }
 
-        // Se dan de baja las solicitudes de alojamiento pendientes
+        // Se dan de baja las solicitudes de alojamiento pendientes y las confirmadas, igual que CU-32 (SAL-18)
         await tx.solicitud.updateMany({
-          where: { estado: ESTADO_SOLICITUD.PENDIENTE, reserva: { idsalida: p.idsalida } },
+          where: {
+            estado: { in: [ESTADO_SOLICITUD.PENDIENTE, ESTADO_SOLICITUD.CONFIRMADA] },
+            reserva: { idsalida: p.idsalida },
+          },
           data: { estado: ESTADO_SOLICITUD.CANCELADA },
         });
 
