@@ -21,6 +21,8 @@ import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
 // FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
 const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
 type CompraGuardada = {
+    // Solo la retoma el mismo cliente: otro que entre en la pestaña no ve nombres ni pasaportes ajenos
+    idusuario: number | undefined;
     paqueteEnCompraId: number | null;
     idSalidaSeleccionada: number | null;
     pasajeros: PasajeroFormulario[];
@@ -29,7 +31,12 @@ type CompraGuardada = {
 function leerCompraGuardada(): CompraGuardada | null {
     try {
         const crudo = sessionStorage.getItem(CLAVE_COMPRA_GUARDADA);
-        return crudo ? (JSON.parse(crudo) as CompraGuardada) : null;
+        const compra = crudo ? (JSON.parse(crudo) as CompraGuardada) : null;
+        if (compra && compra.idusuario !== obtenerUsuario()?.idusuario) {
+            sessionStorage.removeItem(CLAVE_COMPRA_GUARDADA);
+            return null;
+        }
+        return compra;
     } catch {
         return null;
     }
@@ -541,7 +548,12 @@ function CatalogoCompraPage() {
         }
 
         // FE-48: si el token venció, clienteApi recarga en /login; la compra se retoma al volver
-        guardarCompra({ paqueteEnCompraId, idSalidaSeleccionada, pasajeros });
+        guardarCompra({
+            idusuario: usuarioSesion?.idusuario,
+            paqueteEnCompraId,
+            idSalidaSeleccionada,
+            pasajeros,
+        });
         try {
             const respuesta = await mutacionReserva.mutateAsync({
                 idsalida: salidaActiva.idsalida,
