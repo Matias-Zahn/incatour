@@ -71,8 +71,8 @@ export class AsignacionRoutes {
      *                     idservicio: { type: integer, example: 5 }
      *                     cantidad: { type: integer, example: 4 }
      *     responses:
-     *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados por la autoridad (`rechazados`: tipo, id, nombreCompleto y motivo) y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
-     *       400: { description: Personal ocupado, dado de baja o sin habilitación (FA1), stock insuficiente (FA2), transporte sin cupo (FA3), pasaportes vencidos (FA4) o dotación incompleta. }
+     *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados (`rechazados`: tipo, id, nombreCompleto y motivo), que son los que rechazó la autoridad y los pasajeros con el pasaporte vencido antes del fin del recorrido (SAL-21), y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
+     *       400: { description: Personal ocupado, dado de baja o sin habilitación (FA1), stock insuficiente (FA2), transporte sin cupo (FA3), pasaportes del personal vencidos (FA4) o dotación incompleta. }
      *       404: { description: La salida no existe. }
      *       409: { description: Hay reservas con el alojamiento pendiente (FA5), o la salida, el personal o el transporte cambiaron mientras se asignaba. }
      *       503: { description: La autoridad no pudo emitir los permisos. No se modificó nada. }

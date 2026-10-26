@@ -84,7 +84,9 @@ export class PersonalRoutes {
      *       201:
      *         description: Cuenta del guía y legajo operativo creados exitosamente.
      *       400:
-     *         description: Error de validación (nombre con símbolos, pasaporte vencido, email o pasaporte duplicado, contraseña menor a 8 caracteres).
+     *         description: Error de validación (nombre con símbolos, pasaporte vencido, contraseña menor a 8 caracteres).
+     *       409:
+     *         description: Email o pasaporte duplicado (CTA-10).
      *       401:
      *         description: Token no proporcionado o inválido/expirado.
      *       403:
@@ -183,7 +185,8 @@ export class PersonalRoutes {
      *               properties:
      *                 mensaje: { type: string }
      *                 data: { $ref: '#/components/schemas/Personal' }
-     *       400: { description: Datos inválidos, body vacío, intento de cambiar rol o estado, habilitación en un porteador, fecha vencida, pasaporte repetido o personal dado de baja. }
+     *       400: { description: Datos inválidos, body vacío, intento de cambiar rol o estado, habilitación en un porteador, fecha vencida o personal dado de baja. }
+     *       409: { description: Pasaporte repetido (CTA-10). }
      *       401: { description: Token no proporcionado o inválido. }
      *       403: { description: Se requiere el perfil ADMIN. }
      *       404: { description: El personal no existe. }

@@ -11,6 +11,7 @@ const { repo, pasarela, notificador } = vi.hoisted(() => ({
     liberarCupos: vi.fn(),
     confirmarReserva: vi.fn(),
     registrarReembolsoPendiente: vi.fn(),
+    buscarPasajerosPorPasaporte: vi.fn(),
   },
   pasarela: { procesarPago: vi.fn(), reembolsar: vi.fn() },
   notificador: { enviarEmailConfirmacion: vi.fn(), enviarEmailRechazo: vi.fn() },
@@ -75,6 +76,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     repo.obtenerClientePorUsuario.mockResolvedValue({ idcliente: 3, estado: "ACTIVO", usuario: { email: "ana@mail.com" } });
     repo.obtenerSalidaParaCompra.mockResolvedValue(salida());
+    repo.buscarPasajerosPorPasaporte.mockResolvedValue([]);
     repo.reservarCupos.mockResolvedValue({ alojamientoReservado: true });
     repo.liberarCupos.mockResolvedValue(undefined);
     repo.confirmarReserva.mockImplementation(async (d) => ({
@@ -179,6 +181,19 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       expect(repo.reservarCupos).not.toHaveBeenCalled();
       expect(pasarela.procesarPago).not.toHaveBeenCalled();
     };
+
+    it("RES-15: rechaza con 409 un pasaporte registrado a nombre de otra persona", async () => {
+      repo.buscarPasajerosPorPasaporte.mockResolvedValue([{ nroPasaporte: "P2", nombreCompleto: "Otra Persona" }]);
+
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 409 });
+      sinEfectos();
+    });
+
+    it("RES-15: acepta un pasaporte registrado con el mismo nombre (sin distinguir mayúsculas ni espacios)", async () => {
+      repo.buscarPasajerosPorPasaporte.mockResolvedValue([{ nroPasaporte: "P2", nombreCompleto: " pasajero 2 " }]);
+
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).resolves.toBeDefined();
+    });
 
     it("rechaza si el usuario no es un cliente activo", async () => {
       repo.obtenerClientePorUsuario.mockResolvedValue({ idcliente: 3, estado: "INACTIVO", usuario: { email: "x" } });

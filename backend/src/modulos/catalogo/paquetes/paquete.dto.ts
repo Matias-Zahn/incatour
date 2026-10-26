@@ -104,9 +104,9 @@ export class CrearPaqueteDto {
       if (monto == null || typeof monto !== "number" || monto <= 0) {
         return [`matrizPrecios[${i}]: monto debe ser un número mayor a 0.`];
       }
-      if (!p.moneda || typeof p.moneda !== "string") {
-        return [`matrizPrecios[${i}]: moneda es requerida.`];
-      }
+      // RES-16: hay una sola moneda; si no viene se asume USD
+      p.moneda = p.moneda ?? "USD";
+      if (p.moneda !== "USD") return [`matrizPrecios[${i}]: la moneda tiene que ser USD.`];
       if (temporadasVistas.has(p.idtemporada)) {
         return [`matrizPrecios[${i}]: la temporada ${p.idtemporada} está duplicada.`];
       }
@@ -248,9 +248,8 @@ export class ModificarPaqueteDto {
         if (monto == null || typeof monto !== "number" || monto <= 0) {
           return [`matrizPrecios[${i}]: monto debe ser mayor a 0.`];
         }
-        if (!p.moneda || typeof p.moneda !== "string") {
-          return [`matrizPrecios[${i}]: moneda es requerida.`];
-        }
+        p.moneda = p.moneda ?? "USD";
+        if (p.moneda !== "USD") return [`matrizPrecios[${i}]: la moneda tiene que ser USD.`];
         if (temporadasVistas.has(p.idtemporada)) {
           return [`matrizPrecios[${i}]: la temporada ${p.idtemporada} está duplicada.`];
         }

@@ -39,7 +39,10 @@ export class CrearReservaDto {
 
     for (const p of pasajeros) {
       if (!p.nombreCompleto) return ["nombreCompleto es requerido para todos los pasajeros."];
-      if (!p.nroPasaporte) return ["nroPasaporte es requerido para todos los pasajeros."];
+      if (typeof p.nroPasaporte !== "string" || !p.nroPasaporte.trim()) {
+        return ["nroPasaporte es requerido para todos los pasajeros."];
+      }
+      p.nroPasaporte = p.nroPasaporte.trim();
       if (!p.nacionalidad) return ["nacionalidad es requerido para todos los pasajeros."];
       if (!p.fechaVencimientoPasaporte) return ["fechaVencimientoPasaporte es requerida."];
       if (isNaN(new Date(p.fechaVencimientoPasaporte).getTime())) {

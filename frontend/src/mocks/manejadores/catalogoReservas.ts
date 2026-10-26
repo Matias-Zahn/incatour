@@ -819,6 +819,9 @@ export const manejadoresCatalogoReservas = [
                 nroReserva: reserva.nroReserva,
                 importeAbonado,
                 montoAReintegrar,
+                condicionAplicada: permisosEmitidos
+                    ? "Permisos emitidos ante la autoridad: sin reintegro"
+                    : "Paquete sin plazo de reintegro: 100% del importe abonado",
                 permisosEmitidos,
                 lugaresVuelvenALaVenta: !permisosEmitidos,
                 advertencia: permisosEmitidos

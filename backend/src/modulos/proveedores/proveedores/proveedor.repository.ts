@@ -1,4 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
+import { CustomError } from "../../../error/CustomError";
 import { SALIDAS_ACTIVAS, ESTADO_SOLICITUD } from "../../../shared/constantes";
 import { CrearProveedorDto, FiltrosProveedorDto, ModificarProveedorDto } from "./proveedor.dto";
 
@@ -53,6 +55,7 @@ export class ProveedorRepository {
     return db.$transaction(async (tx) => {
       // CAT-10: pasar a INACTIVO por esta vía da de baja en cascada los servicios, igual que updateEstado
       if (data.estado === "INACTIVO") {
+        await this.bloquearParaBaja(tx, id);
         await tx.servicioBase.updateMany({
           where: { idproveedor: id, estado: "ACTIVO" },
           data: { estado: "INACTIVO" },
@@ -75,6 +78,7 @@ export class ProveedorRepository {
 
   async updateEstado(id: number, estado: string) {
     return db.$transaction(async (tx) => {
+      if (estado === "INACTIVO") await this.bloquearParaBaja(tx, id);
       const proveedor = await tx.proveedor.update({
         where: { idproveedor: id },
         data: { estado },
@@ -122,9 +126,17 @@ export class ProveedorRepository {
     return incluidos + garantias;
   }
 
+  // CTA-09: bloquea los servicios del proveedor (CU-39 y CU-40 toman el mismo lock al asignarlos) y revalida la baja
+  private async bloquearParaBaja(tx: Prisma.TransactionClient, id: number) {
+    await tx.$queryRaw`SELECT 1 FROM public."ServicioBase" WHERE idproveedor = ${id} ORDER BY idservicio FOR UPDATE`;
+    if (await this.tieneSalidasActivas(id, tx)) {
+      throw CustomError.badRequest("Error. El proveedor cuenta con salidas activas");
+    }
+  }
+
   // CU-17, flujo alternativo 2: servicios del proveedor asignados a salidas activas o en curso
-  async tieneSalidasActivas(id: number): Promise<boolean> {
-    const count = await db.salida.count({
+  async tieneSalidasActivas(id: number, cliente: Prisma.TransactionClient = db): Promise<boolean> {
+    const count = await cliente.salida.count({
       where: {
         estado: { in: SALIDAS_ACTIVAS },
         OR: [

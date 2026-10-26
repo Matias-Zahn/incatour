@@ -33,7 +33,7 @@ export class PersonalService {
 
     if (dto.nroPasaporte && dto.nroPasaporte !== personal.nroPasaporte) {
       const existe = await this.repository.checkPasaporteExists(dto.nroPasaporte);
-      if (existe) throw CustomError.badRequest("Este número de pasaporte ya está registrado");
+      if (existe) throw CustomError.conflict("Este número de pasaporte ya está registrado");
     }
 
     // El nombre del guía vive también en su cuenta (Usuario): se actualiza junto con el legajo
@@ -68,7 +68,7 @@ export class PersonalService {
     // 1. Pasaporte: único y vigente (aplica a guías y porteadores)
     const existePasaporte = await this.repository.checkPasaporteExists(dto.nroPasaporte);
     if (existePasaporte) {
-      throw CustomError.badRequest("Este número de pasaporte ya está registrado en la base de datos");
+      throw CustomError.conflict("Este número de pasaporte ya está registrado en la base de datos");
     }
     if (dto.fechaVencimientoPasaporte < hoy) {
       throw CustomError.badRequest("No se puede registrar personal con un pasaporte vencido");
@@ -93,7 +93,7 @@ export class PersonalService {
     // CTA-03: la cuenta es opcional; el DTO garantiza que email y contraseña vienen juntos
     if (email) {
       const existeEmail = await this.repository.checkEmailExists(email);
-      if (existeEmail) throw CustomError.badRequest("El email ya está registrado en el sistema");
+      if (existeEmail) throw CustomError.conflict("El email ya está registrado en el sistema");
     }
 
     // Se asume que fechaHabilitacion es la fecha de VENCIMIENTO de la habilitación (CU-40

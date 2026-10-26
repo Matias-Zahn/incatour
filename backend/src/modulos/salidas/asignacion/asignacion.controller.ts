@@ -29,7 +29,15 @@ export class AsignacionController {
       if (error) throw CustomError.badRequest(error);
 
       const resultado = await service.confirmarAsignacion(idsalida, dto!);
-      return res.json({ mensaje: "Asignación confirmada y permisos de la nómina emitidos", data: resultado });
+      // SAL-20: con rechazados, el mensaje lo dice. Solo el personal se reemplaza (CU-38)
+      const { permisosEmitidos, rechazados } = resultado;
+      const personalRechazado = rechazados.some((r) => r.tipo === "PERSONAL");
+      const mensaje = rechazados.length
+        ? `Asignación confirmada: ${permisosEmitidos} ${permisosEmitidos === 1 ? "permiso emitido" : "permisos emitidos"} y ` +
+          `${rechazados.length} ${rechazados.length === 1 ? "rechazado" : "rechazados"}` +
+          (personalRechazado ? ". Hay que reemplazar al personal rechazado" : "")
+        : "Asignación confirmada y permisos de la nómina emitidos";
+      return res.json({ mensaje, data: resultado });
     } catch (error) {
       next(error);
     }

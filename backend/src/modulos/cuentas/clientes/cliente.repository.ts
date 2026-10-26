@@ -91,8 +91,16 @@ export class ClienteRepository {
     });
   }
 
+  // Devuelve null si tiene reservas activas (CTA-01)
   async softDelete(idcliente: number, idusuario: number) {
     return db.$transaction(async (tx) => {
+      // CTA-09: el lock espera a una compra en curso (su reserva toma la fila del cliente) y recién ahí cuenta
+      await tx.$queryRaw`SELECT 1 FROM public."Cliente" WHERE idcliente = ${idcliente} FOR UPDATE`;
+      const activas = await tx.reserva.count({
+        where: { idcliente, estado: ESTADO_RESERVA.CONFIRMADA, salida: { estado: { in: SALIDAS_ACTIVAS } } },
+      });
+      if (activas > 0) return null;
+
       // SEG-02: Marcar tanto Cliente como Usuario en INACTIVO
       const cliente = await tx.cliente.update({
         where: { idcliente },
@@ -106,18 +114,5 @@ export class ClienteRepository {
 
       return cliente;
     });
-  }
-
-  async hasReservasActivas(idcliente: number) {
-    const cliente = await db.cliente.findUnique({
-      where: { idcliente },
-      include: {
-        reservas: {
-          // CTA-01: solo cuentan las reservas confirmadas de salidas que aún no terminaron
-          where: { estado: ESTADO_RESERVA.CONFIRMADA, salida: { estado: { in: SALIDAS_ACTIVAS } } },
-        },
-      },
-    });
-    return cliente ? cliente.reservas.length > 0 : false;
   }
 }

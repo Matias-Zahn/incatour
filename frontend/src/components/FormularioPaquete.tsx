@@ -81,7 +81,8 @@ function tarifasIniciales(
         return paquete.tarifas.map((tarifa) => ({
             idtemporada: tarifa.idtemporada,
             monto: tarifa.monto,
-            moneda: tarifa.moneda,
+            // RES-16: la única moneda es USD; un paquete viejo en otra moneda se edita y se guarda en USD
+            moneda: "USD",
         }));
     }
     const primeraTemporada = temporadas[0]?.idtemporada ?? 0;
@@ -1179,9 +1180,6 @@ function FormularioPaquete({
                                             className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                                         >
                                             <option value="USD">USD ($)</option>
-                                            <option value="PEN">
-                                                PEN (S/)
-                                            </option>
                                         </select>
                                     </label>
 

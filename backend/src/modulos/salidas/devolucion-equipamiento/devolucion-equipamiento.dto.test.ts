@@ -40,4 +40,12 @@ describe("CU-41: DevolucionEquipamientoDto", () => {
     });
     expect(err).toMatch("debe devolver al menos una unidad");
   });
+
+  it.each([
+    [{ idservicio: "7", cantidadBuenEstado: 1 }, "idservicio debe ser un número entero mayor a 0."],
+    [{ idservicio: 7, cantidadBuenEstado: 2.9 }, "cantidadBuenEstado para el servicio #7 debe ser un entero mayor o igual a 0."],
+    [{ idservicio: 7, cantidadBuenEstado: "3abc" }, "cantidadBuenEstado para el servicio #7 debe ser un entero mayor o igual a 0."],
+  ])("SAL-19: rechaza valores que no son enteros (%o)", (item, mensaje) => {
+    expect(DevolucionEquipamientoDto.create({ items: [item] })[0]).toBe(mensaje);
+  });
 });

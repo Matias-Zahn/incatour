@@ -21,6 +21,13 @@ describe("CrearPaqueteDto", () => {
     expect(dto).toMatchObject({ nochesPrevias: 0, nochesPosteriores: 0, serviciosIncluidos: [] });
   });
 
+  it("la tarifa sin moneda queda en USD (RES-16)", () => {
+    const [err, dto] = CrearPaqueteDto.create({ ...base, matrizPrecios: [{ idtemporada: 1, monto: 800 }] });
+
+    expect(err).toBeUndefined();
+    expect(dto?.matrizPrecios[0]?.moneda).toBe("USD");
+  });
+
   it("acepta un paquete por establecimiento con idservicioGarantizado", () => {
     expect(error({ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 40 })).toBeUndefined();
   });
@@ -57,7 +64,7 @@ describe("CrearPaqueteDto", () => {
       [[{ monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
       [[{ idtemporada: 1.5, monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
       [[{ idtemporada: 1, monto: 0, moneda: "USD" }], "matrizPrecios[0]: monto debe ser un número mayor a 0."],
-      [[{ idtemporada: 1, monto: 10 }], "matrizPrecios[0]: moneda es requerida."],
+      [[{ idtemporada: 1, monto: 10, moneda: "PEN" }], "matrizPrecios[0]: la moneda tiene que ser USD."],
       [[...precios, { idtemporada: 1, monto: 900, moneda: "USD" }], "matrizPrecios[1]: la temporada 1 está duplicada."],
     ])("rechaza %o", (matrizPrecios, mensaje) => {
       expect(error({ matrizPrecios })).toBe(mensaje);

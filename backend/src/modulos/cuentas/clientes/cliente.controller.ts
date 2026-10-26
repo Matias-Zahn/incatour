@@ -6,6 +6,14 @@ import { leerIdUrl } from "../../../shared/validaciones";
 
 const service = new ClienteService();
 
+// CTA-11: se autoriza antes de buscar, así un CLIENTE recibe 403 por cualquier id ajeno, exista o no
+async function verificarPropietario(req: Request, idcliente: number, mensaje: string) {
+  const usuario = req.usuarioAutenticado;
+  if (usuario?.rol !== "CLIENTE") return;
+  const propio = await service.consultarMiPerfil(usuario.idusuario);
+  if (propio.idcliente !== idcliente) throw CustomError.forbidden(mensaje);
+}
+
 export class ClienteController {
   consultarClientes = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -29,13 +37,9 @@ export class ClienteController {
     try {
       const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
-      const resultado = await service.consultarClientePorId(id);
-
       // SEG-01: Si el usuario autenticado es CLIENTE, solo puede ver sus propios datos
-      const usuarioAutenticado = req.usuarioAutenticado;
-      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && resultado.idusuario !== usuarioAutenticado.idusuario) {
-        throw CustomError.forbidden("No tiene permisos para acceder a los datos de otro cliente.");
-      }
+      await verificarPropietario(req, id, "No tiene permisos para acceder a los datos de otro cliente.");
+      const resultado = await service.consultarClientePorId(id);
 
       return res.status(200).json({ data: resultado });
     } catch (error) {
@@ -59,13 +63,8 @@ export class ClienteController {
     try {
       const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
-      const cliente = await service.consultarClientePorId(id);
-
       // SEG-01: Si el usuario autenticado es CLIENTE, solo puede modificar sus propios datos
-      const usuarioAutenticado = req.usuarioAutenticado;
-      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && cliente.idusuario !== usuarioAutenticado.idusuario) {
-        throw CustomError.forbidden("No tiene permisos para modificar los datos de otro cliente.");
-      }
+      await verificarPropietario(req, id, "No tiene permisos para modificar los datos de otro cliente.");
 
       const [error, dto] = ModificarClienteDto.create(req.body);
       if (error) throw CustomError.badRequest(error);
@@ -81,13 +80,8 @@ export class ClienteController {
     try {
       const id = leerIdUrl(req.params.id, "El ID debe ser un número válido");
 
-      const cliente = await service.consultarClientePorId(id);
-
       // CTA-02 & SEG-01: Si el usuario autenticado es CLIENTE, solo puede dar de baja su propia cuenta
-      const usuarioAutenticado = req.usuarioAutenticado;
-      if (usuarioAutenticado && usuarioAutenticado.rol === "CLIENTE" && cliente.idusuario !== usuarioAutenticado.idusuario) {
-        throw CustomError.forbidden("No tiene permisos para dar de baja la cuenta de otro cliente.");
-      }
+      await verificarPropietario(req, id, "No tiene permisos para dar de baja la cuenta de otro cliente.");
 
       const resultado = await service.darDeBajaCliente(id);
       return res.status(200).json({ mensaje: "Cliente dado de baja", data: resultado });

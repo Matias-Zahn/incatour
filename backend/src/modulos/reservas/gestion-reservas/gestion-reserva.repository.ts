@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SOLICITUD } from "../../../shared/constantes";
+import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 
 const INCLUDE_RESUMEN = {
@@ -130,6 +130,9 @@ export class GestionReservaRepository {
    *  - Permisos emitidos -> Perdido (y el stock local NO se repone).
    *  - Sin permisos emitidos: el stock local recupera los lugares.
    *  - Alojamiento: se liberan las plazas bloqueadas o se cancela la solicitud vinculada.
+   *  - Salida CERRADA (RES-13): no se vende más, así que el stock local no se toca y las plazas vuelven al hotel.
+   *  - RES-14: bloquea la salida (mismo orden que CU-40) y devuelve "CAMBIO" si los permisos o el estado de la
+   *    salida ya no son los que se usaron para calcular el reintegro; el servicio recalcula y reintenta.
    */
   async cancelarReserva(p: {
     idreserva: number;
@@ -141,8 +144,18 @@ export class GestionReservaRepository {
     cantidadPasajeros: number;
     permisosEmitidos: boolean;
     alojamientoPorStock: boolean;
+    salidaEnVenta: boolean;
   }) {
     return db.$transaction(async (tx) => {
+      const [salida] = await tx.$queryRaw<{ estado: string }[]>`
+        SELECT estado FROM public."Salida" WHERE idsalida = ${p.idsalida} FOR UPDATE`;
+      const emitidos = await tx.permisoPasajero.count({
+        where: { idreserva: p.idreserva, estadoTramite: ESTADO_PERMISO.EMITIDO },
+      });
+      if (emitidos > 0 !== p.permisosEmitidos || (salida?.estado === ESTADO_SALIDA.PUBLICADA) !== p.salidaEnVenta) {
+        return "CAMBIO" as const;
+      }
+
       const guarda = await tx.reserva.updateMany({
         where: { idreserva: p.idreserva, estado: ESTADO_RESERVA.CONFIRMADA },
         data: { estado: ESTADO_RESERVA.CANCELADA },
@@ -171,15 +184,28 @@ export class GestionReservaRepository {
         data: { estado: ESTADO_SOLICITUD.CANCELADA },
       });
 
-      const reponerLugares = !p.permisosEmitidos;
-      if (reponerLugares || p.alojamientoPorStock) {
+      const reponerLugares = !p.permisosEmitidos && p.salidaEnVenta;
+      const reponerPlazas = p.alojamientoPorStock && p.salidaEnVenta;
+      if (reponerLugares || reponerPlazas) {
         await tx.salida.update({
           where: { idsalida: p.idsalida },
           data: {
             ...(reponerLugares && { stockLocal: { increment: p.cantidadPasajeros } }),
-            ...(p.alojamientoPorStock && { stockLocalAlojamiento: { increment: p.cantidadPasajeros } }),
+            ...(reponerPlazas && { stockLocalAlojamiento: { increment: p.cantidadPasajeros } }),
           },
         });
+      }
+      if (p.alojamientoPorStock && !p.salidaEnVenta) {
+        const hotel = await tx.salidaServicio.findFirst({
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          select: { idservicio: true },
+        });
+        if (hotel) {
+          await tx.servicioAlojamiento.update({
+            where: { idservicio: hotel.idservicio },
+            data: { capacidadDisponible: { increment: p.cantidadPasajeros } },
+          });
+        }
       }
 
       return reembolso;
