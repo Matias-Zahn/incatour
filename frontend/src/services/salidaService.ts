@@ -1186,14 +1186,15 @@ export function useCancelarSalida() {
             queryClient.invalidateQueries({
                 queryKey: clavesSalidas.cancelacion(variables.idsalida),
             });
+            // FE-44: cancelar la salida también cancela sus solicitudes de alojamiento
+            queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
         },
-        onError: (error, variables) => {
+        onError: (error) => {
             // Si el error es 503, la salida ya quedó CANCELADA en base de datos aunque la autoridad no haya respondido.
+            // FE-44: no se recarga el impacto: respondería "ya cancelada" junto al botón de reintentar
             if (error instanceof ErrorApi && error.estado === 503) {
                 queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
-                queryClient.invalidateQueries({
-                    queryKey: clavesSalidas.cancelacion(variables.idsalida),
-                });
+                queryClient.invalidateQueries({ queryKey: ["solicitudes"] });
             }
         },
     });
@@ -1221,9 +1222,13 @@ export function useEquipamientoAsignado(
  * Hook para registrar la devolución de equipamiento reintegrándolo al stock (CU-41).
  * Invalida consultas de salidas, equipamiento asignado y catálogo de servicios tras el éxito.
  */
+/** FE-45: el modal de devolución la usa para no cerrarse mientras el registro está en curso. */
+export const claveMutacionDevolucion = ["registrarDevolucion"];
+
 export function useRegistrarDevolucion() {
     const queryClient = useQueryClient();
     return useMutation({
+        mutationKey: claveMutacionDevolucion,
         mutationFn: ({ idsalida, datos }: ParametrosRegistrarDevolucion) =>
             registrarDevolucionEquipamiento(idsalida, datos),
         onSuccess: (_resultado, variables) => {

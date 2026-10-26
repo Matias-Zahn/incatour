@@ -50,6 +50,7 @@ import {
     type ResultadoDevolucionEquipamiento,
     type Salida,
 } from "../../services/salidaService";
+import { formatearMontoUsd } from "../../services/clientePortalService";
 import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
@@ -593,8 +594,10 @@ function SalidasPage() {
     const [paginaActual, setPaginaActual] = useState(1);
 
     // Opciones para los selectores de filtros
-    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos();
+    // FE-50: los filtros también ofrecen circuitos y paquetes dados de baja; para crear salidas, solo los activos
+    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos({ estado: "TODOS" });
     const { data: paquetes = [], isPending: cargandoPaquetes } = usePaquetes();
+    const { data: paquetesFiltro = [] } = usePaquetes({ estado: "TODOS" });
     const { data: personalGuias = [], isPending: cargandoGuias } = usePersonal({
         rol: "Guía",
     });
@@ -948,9 +951,11 @@ function SalidasPage() {
             clave: "idsalida" as const,
             titulo: "Acciones",
             renderizar: (fila: Salida) => {
+                // FE-44: una salida cancelada ya no tiene solicitudes para gestionar
                 const tieneSolicitudes =
-                    (solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
-                    fila.alertas?.includes("SOLICITUD_PENDIENTE");
+                    fila.estado !== "CANCELADA" &&
+                    ((solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
+                        fila.alertas?.includes("SOLICITUD_PENDIENTE"));
                 const esFinalizada = fila.estado === "FINALIZADA";
 
                 // CU-40: Una salida admite asignación si está activa (PUBLICADA o CERRADA),
@@ -1765,11 +1770,7 @@ function SalidasPage() {
                                         </span>{" "}
                                         con un reembolso total registrado de{" "}
                                         <span className="font-bold">
-                                            {new Intl.NumberFormat("es-AR", {
-                                                style: "currency",
-                                                currency: "ARS",
-                                                minimumFractionDigits: 2,
-                                            }).format(resultadoCancelacion.reembolsoTotal ?? 0)}
+                                            {formatearMontoUsd(resultadoCancelacion.reembolsoTotal ?? 0)}
                                         </span>
                                         .
                                     </>
@@ -1966,7 +1967,7 @@ function SalidasPage() {
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
                     >
                         <option value="">Todos los paquetes</option>
-                        {paquetes.map((p) => (
+                        {paquetesFiltro.map((p) => (
                             <option key={p.idpaquete} value={p.idpaquete}>
                                 {p.nroPaquete} · {p.nombrePaquete}
                             </option>

@@ -13,6 +13,7 @@ import {
     estilosEstadoReserva,
     etiquetaEstadoReserva,
     etiquetaEstadoSalidaCliente,
+    formatearFechaLocalCorta,
     formatearFechaUtcCorta,
     formatearMontoUsd,
     formatearRangoFechasUtc,
@@ -441,7 +442,7 @@ function MisReservasPage() {
                                                 </p>
                                                 <p className="text-[11px] text-texto-suave">
                                                     Emitida:{" "}
-                                                    {formatearFechaUtcCorta(
+                                                    {formatearFechaLocalCorta(
                                                         fila.fechaRealizacion,
                                                     )}
                                                 </p>

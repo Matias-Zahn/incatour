@@ -15,7 +15,48 @@ import {
     formatearDiasLegibles,
     resolverUrlImagenPaquete,
 } from "../../services/paqueteService";
+import { ErrorApi } from "../../services/clienteApi";
 import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
+
+// FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
+const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
+type CompraGuardada = {
+    // Solo la retoma el mismo cliente: otro que entre en la pestaña no ve nombres ni pasaportes ajenos
+    idusuario: number | undefined;
+    paqueteEnCompraId: number | null;
+    idSalidaSeleccionada: number | null;
+    pasajeros: PasajeroFormulario[];
+};
+
+function leerCompraGuardada(): CompraGuardada | null {
+    try {
+        const crudo = sessionStorage.getItem(CLAVE_COMPRA_GUARDADA);
+        const compra = crudo ? (JSON.parse(crudo) as CompraGuardada) : null;
+        if (compra && compra.idusuario !== obtenerUsuario()?.idusuario) {
+            sessionStorage.removeItem(CLAVE_COMPRA_GUARDADA);
+            return null;
+        }
+        return compra;
+    } catch {
+        return null;
+    }
+}
+
+function guardarCompra(compra: CompraGuardada) {
+    try {
+        sessionStorage.setItem(CLAVE_COMPRA_GUARDADA, JSON.stringify(compra));
+    } catch {
+        // sin sessionStorage la compra simplemente no se recupera
+    }
+}
+
+function borrarCompraGuardada() {
+    try {
+        sessionStorage.removeItem(CLAVE_COMPRA_GUARDADA);
+    } catch {
+        // nada que borrar
+    }
+}
 
 type PasajeroFormulario = PasajeroReservaInput & {
     pesoDeclarado: number;
@@ -209,21 +250,29 @@ function CatalogoCompraPage() {
         }
     }, [idPaquetePreseleccionado, paquetes, preseleccionProcesada]);
 
-    // Flujo de compra (CU-30)
+    // Flujo de compra (CU-30). FE-48: si la sesión venció al pagar, se retoma la compra guardada (sin la tarjeta)
+    const [compraGuardada] = useState(leerCompraGuardada);
+    useEffect(() => {
+        if (compraGuardada) borrarCompraGuardada();
+    }, [compraGuardada]);
     const [paqueteEnCompraId, setPaqueteEnCompraId] = useState<number | null>(
-        null,
+        compraGuardada?.paqueteEnCompraId ?? null,
     );
     const [idSalidaSeleccionada, setIdSalidaSeleccionada] = useState<
         number | null
-    >(null);
-    const [pasajeros, setPasajeros] = useState<PasajeroFormulario[]>(() => [
-        crearPasajeroInicial(),
-    ]);
+    >(compraGuardada?.idSalidaSeleccionada ?? null);
+    const [pasajeros, setPasajeros] = useState<PasajeroFormulario[]>(
+        () => compraGuardada?.pasajeros ?? [crearPasajeroInicial()],
+    );
     const [numeroTarjeta, setNumeroTarjeta] = useState("");
     const [titularTarjeta, setTitularTarjeta] = useState("");
     const [vencimientoTarjeta, setVencimientoTarjeta] = useState("");
     const [cvvTarjeta, setCvvTarjeta] = useState("");
-    const [errorCompra, setErrorCompra] = useState("");
+    const [errorCompra, setErrorCompra] = useState(() =>
+        compraGuardada
+            ? "Tu sesión había vencido: recuperamos la salida y los pasajeros. Volvé a cargar la tarjeta para pagar."
+            : "",
+    );
 
     // Comprobante de reserva exitosa
     const [reservaConfirmada, setReservaConfirmada] = useState<{
@@ -247,10 +296,19 @@ function CatalogoCompraPage() {
         setIndiceFotoDetalle(0);
     }
 
+    // FE-46: los datos de la tarjeta no quedan cargados de una compra a otra
+    function vaciarTarjeta() {
+        setNumeroTarjeta("");
+        setTitularTarjeta("");
+        setVencimientoTarjeta("");
+        setCvvTarjeta("");
+    }
+
     function iniciarCompraPaquete(
         paquete: PaqueteCatalogoPublico,
         idSalidaInicial?: number,
     ) {
+        vaciarTarjeta();
         setPaqueteDetalle(null);
         setReservaConfirmada(null);
         setErrorCompra("");
@@ -267,6 +325,8 @@ function CatalogoCompraPage() {
     }
 
     function volverAlEscaparate() {
+        vaciarTarjeta();
+        borrarCompraGuardada();
         setPaqueteEnCompraId(null);
         setIdSalidaSeleccionada(null);
         setErrorCompra("");
@@ -487,6 +547,13 @@ function CatalogoCompraPage() {
             return;
         }
 
+        // FE-48: si el token venció, clienteApi recarga en /login; la compra se retoma al volver
+        guardarCompra({
+            idusuario: usuarioSesion?.idusuario,
+            paqueteEnCompraId,
+            idSalidaSeleccionada,
+            pasajeros,
+        });
         try {
             const respuesta = await mutacionReserva.mutateAsync({
                 idsalida: salidaActiva.idsalida,
@@ -508,6 +575,8 @@ function CatalogoCompraPage() {
                 },
             });
 
+            vaciarTarjeta();
+            borrarCompraGuardada();
             setReservaConfirmada({
                 resultado: respuesta.reserva,
                 paquete: paqueteEnCompra,
@@ -516,6 +585,8 @@ function CatalogoCompraPage() {
             });
             window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (err) {
+            // Solo un 401 deja la compra guardada (se retoma después del login)
+            if (!(err instanceof ErrorApi && err.estado === 401)) borrarCompraGuardada();
             setErrorCompra(
                 err instanceof Error
                     ? err.message

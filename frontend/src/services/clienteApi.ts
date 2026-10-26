@@ -77,7 +77,8 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
         if (respuesta.status === 401 && !esRutaPublica && !tieneAuthEnOpciones) {
             limpiarSesion();
             if (typeof window !== "undefined") {
-                window.location.assign("/login");
+                // FE-48: al volver a entrar se retoma la pantalla donde estaba
+                window.location.assign(`/login?desde=${encodeURIComponent(window.location.pathname)}`);
             }
         }
         let mensaje = "Ocurrió un error inesperado.";

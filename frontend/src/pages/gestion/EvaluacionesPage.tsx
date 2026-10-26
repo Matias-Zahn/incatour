@@ -9,12 +9,13 @@ import {
   COMENTARIOS_RAPIDOS_EVALUACION,
   type FiltrosConsultaResenias,
 } from "../../services/evaluacionService";
-import { listarPaquetes } from "../../services/paqueteService";
+import { usePaquetes } from "../../services/paqueteService";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import Alerta from "../../components/Alerta";
 
-function formatearFechaCorta(iso?: string): string {
+// FE-50: las fechas sin hora (inicio y fin de la salida) van en UTC; los instantes (envío, evaluación), en hora local
+function formatearFechaCorta(iso?: string, enUtc = true): string {
   if (!iso) return "—";
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return iso;
@@ -22,7 +23,7 @@ function formatearFechaCorta(iso?: string): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    timeZone: "UTC",
+    ...(enUtc && { timeZone: "UTC" }),
   });
 }
 
@@ -221,10 +222,7 @@ export function EvaluacionesPage() {
     subtitulo: string;
   } | null>(null);
 
-  const { data: paquetes = [] } = useQuery({
-    queryKey: ["paquetes"],
-    queryFn: listarPaquetes,
-  });
+  const { data: paquetes = [] } = usePaquetes({ estado: "TODOS" });
 
   const { data: salidas = [] } = useQuery({
     queryKey: ["salidas", "selector-evaluaciones"],
@@ -539,7 +537,7 @@ export function EvaluacionesPage() {
                           </p>
                         )}
                         <div className="mt-2 text-[11px] text-texto-suave">
-                          Enviada el {formatearFechaCorta(r.fechaEnvio)}
+                          Enviada el {formatearFechaCorta(r.fechaEnvio, false)}
                         </div>
                       </div>
                     ))}
@@ -601,7 +599,7 @@ export function EvaluacionesPage() {
                           <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
                         )}
                         <div className="mt-1.5 text-[11px] text-texto-suave">
-                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion)}
+                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
                         </div>
                       </div>
                     ))}
@@ -629,7 +627,7 @@ export function EvaluacionesPage() {
                           <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
                         )}
                         <div className="mt-1.5 text-[11px] text-texto-suave">
-                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion)}
+                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
                         </div>
                       </div>
                     ))}
