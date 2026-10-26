@@ -91,6 +91,13 @@ describe("ModificarCuentaGuiaDto", () => {
     expect(err).toMatch("El estado se cambia con la baja");
   });
 
+  it("un nroHabilitacion vacío no se envía (CTA-13)", () => {
+    const [error, dto] = ModificarCuentaGuiaDto.create({ nroHabilitacion: "  ", nombre: "Ana" });
+
+    expect(error).toBeUndefined();
+    expect(dto?.nroHabilitacion).toBeUndefined();
+  });
+
   it("rechaza si el body está vacío", () => {
     const [err] = ModificarCuentaGuiaDto.create({});
     expect(err).toMatch("No se envió ningún dato para modificar");
