@@ -1,9 +1,13 @@
 import { http, HttpResponse, delay } from "msw";
 import { alojamientosSalidaMock, salidasMockIniciales } from "../datos/salidas";
 import { paquetesIniciales } from "../datos/paquetes";
+import { personalSemilla } from "../datos/personal";
 import type {
     ItemDevolucionPayload,
     ItemEquipamientoAsignado,
+    PanelLogistica,
+    RecursoDisponibleEquipamiento,
+    RecursoDisponibleTransporte,
     SalidaApi,
 } from "../../services/salidaService";
 
@@ -29,6 +33,42 @@ const equipamientoSalidasMock: Record<number, ItemEquipamientoAsignado[]> = {
             stockActualDisponible: 20,
         },
     ],
+};
+
+// ---- FE-51: datos y ayudas de los manejadores de CU-37 a CU-40 ----
+const proveedorMock = { idproveedor: 4, razonSocial: "Andes Outdoor" };
+const equipamientosMock: RecursoDisponibleEquipamiento[] = [
+    { idservicio: 5, nombreServicio: "Carpa de alta montaña 4 estaciones", localidad: "Cusco", costoBase: 25, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Carpas", cantidadDisponible: 12 } },
+    { idservicio: 6, nombreServicio: "Bolsa de dormir -10°C", localidad: "Cusco", costoBase: 10, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Bolsas de dormir", cantidadDisponible: 20 } },
+];
+const transportesMock: RecursoDisponibleTransporte[] = [
+    { idservicio: 3, nombreServicio: "Bus Cusco - Km 82", localidad: "Cusco", costoBase: 120, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" }, disponibilidad: { capacidadVehiculo: 20, pasajerosConfirmados: 0 } },
+];
+
+const buscarSalida = (id: unknown) => salidas.find((s) => s.idsalida === Number(id));
+const noExiste = () => HttpResponse.json({ error: "La salida no existe" }, { status: 404 });
+const cabecera = (s: SalidaApi) => ({ idsalida: s.idsalida, nroSalida: s.nroSalida, fechaInicio: s.fechaInicio, fechaFin: s.fechaFin });
+const personaDe = (idpersonal: number) => {
+    const p = personalSemilla.find((x) => x.idpersonal === idpersonal);
+    return { nombreCompleto: p?.nombreCompleto ?? `Personal ${idpersonal}`, rol: p?.rol ?? "Porteador" };
+};
+const panelLogistica = (s: SalidaApi): PanelLogistica => {
+    const transporte = s.servicios.find((x) => x.tipo === "TRANSPORTE");
+    return {
+        ...cabecera(s),
+        estado: s.estado,
+        equipamiento: (equipamientoSalidasMock[s.idsalida] ?? []).map((e) => ({
+            idservicio: e.idservicio,
+            nombreServicio: e.nombreServicio,
+            tipoEquipamiento: e.tipoEquipamiento,
+            cantidad: e.cantidadAsignada,
+            proveedor: proveedorMock,
+        })),
+        transporte: transporte
+            ? { idservicio: transporte.idservicio, nombreServicio: transporte.servicio.nombreServicio, comprobanteReserva: transporte.comprobanteReserva, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" } }
+            : null,
+        requerimientosSinAsignar: [],
+    };
 };
 
 export const manejadoresSalidas = [
@@ -665,6 +705,217 @@ export const manejadoresSalidas = [
                     cantidadDaniadaOExtraviada: Number(it.cantidadDaniada ?? 0),
                     observaciones: it.observaciones ? String(it.observaciones).trim() : null,
                 })),
+            },
+        });
+    }),
+    // ---- FE-51: lo mínimo de CU-37 a CU-40 para que esas pantallas funcionen con mocks (misma forma que el back) ----
+
+    // GET /api/salidas/:idsalida/asignacion (CU-40)
+    http.get("*/api/salidas/:idsalida/asignacion", async ({ params }) => {
+        await delay(150);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const vendidos = salida.tamanoMaximo - salida.stockLocal;
+        const asignados = new Set(salida.personalAsignado.map((a) => a.idpersonal));
+        return HttpResponse.json({
+            data: {
+                salida: cabecera(salida),
+                pasajerosConfirmados: vendidos,
+                dotacionRequerida: { guias: 2, porteadores: Math.ceil(vendidos / 2) },
+                bloqueoInicial: salida.tamanoMaximo,
+                lugaresSobrantes: salida.stockLocal,
+                personalDisponible: personalSemilla
+                    .filter((p) => p.estado === "ACTIVO" && !asignados.has(p.idpersonal))
+                    .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
+                transportesDisponibles: transportesMock.map((t) => ({
+                    idservicio: t.idservicio,
+                    nombreServicio: t.nombreServicio,
+                    capacidadVehiculo: t.disponibilidad.capacidadVehiculo,
+                })),
+                stockCamping: equipamientosMock.map((e) => ({
+                    idservicio: e.idservicio,
+                    nombreServicio: e.nombreServicio,
+                    tipoEquipamiento: e.disponibilidad.tipoEquipamiento,
+                    cantidadDisponible: e.disponibilidad.cantidadDisponible,
+                })),
+            },
+        });
+    }),
+
+    // POST /api/salidas/:idsalida/asignacion (CU-40)
+    http.post("*/api/salidas/:idsalida/asignacion", async ({ params, request }) => {
+        await delay(250);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const { personalIds = [] } = (await request.json()) as { personalIds?: number[] };
+        const vendidos = salida.tamanoMaximo - salida.stockLocal;
+        const lugaresLiberados = salida.stockLocal;
+        salida.personalAsignado = personalIds.map((idpersonal) => ({
+            idsalida: salida.idsalida,
+            idpersonal,
+            personal: personaDe(idpersonal),
+        }));
+        salida.estado = "CERRADA";
+        salida.stockLocal = 0;
+        return HttpResponse.json({
+            mensaje: "Asignación confirmada y permisos de la nómina emitidos",
+            data: { salida, permisosEmitidos: vendidos + personalIds.length, rechazados: [], lugaresLiberados },
+        });
+    }),
+
+    // GET /api/salidas/:idsalida/personal (CU-38)
+    http.get("*/api/salidas/:idsalida/personal", async ({ params }) => {
+        await delay(150);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        return HttpResponse.json({
+            data: {
+                salida: { ...cabecera(salida), estado: salida.estado },
+                personal: salida.personalAsignado.map((a) => ({
+                    idpersonal: a.idpersonal,
+                    nombreCompleto: a.personal.nombreCompleto,
+                    rol: a.personal.rol,
+                    permiso: `PER-MOCK-${salida.idsalida}-${a.idpersonal}`,
+                })),
+                servicios: salida.servicios.map((s) => ({ tipo: s.tipo, nombreServicio: s.servicio.nombreServicio })),
+                equipamiento: (equipamientoSalidasMock[salida.idsalida] ?? []).map((e) => ({
+                    nombreServicio: e.nombreServicio,
+                    cantidad: e.cantidadAsignada,
+                })),
+            },
+        });
+    }),
+
+    // GET /api/salidas/:idsalida/personal/:idpersonal/reemplazantes (CU-38)
+    http.get("*/api/salidas/:idsalida/personal/:idpersonal/reemplazantes", async ({ params }) => {
+        await delay(150);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const original = salida.personalAsignado.find((a) => a.idpersonal === Number(params.idpersonal));
+        if (!original) {
+            return HttpResponse.json({ error: "Esa persona no está asignada a la salida" }, { status: 400 });
+        }
+        const asignados = new Set(salida.personalAsignado.map((a) => a.idpersonal));
+        return HttpResponse.json({
+            data: personalSemilla
+                .filter((p) => p.estado === "ACTIVO" && p.rol === original.personal.rol && !asignados.has(p.idpersonal))
+                .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
+        });
+    }),
+
+    // POST /api/salidas/:idsalida/reemplazos (CU-38)
+    http.post("*/api/salidas/:idsalida/reemplazos", async ({ params, request }) => {
+        await delay(250);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const { idoriginal, idreemplazante } = (await request.json()) as { idoriginal: number; idreemplazante: number };
+        const asignacion = salida.personalAsignado.find((a) => a.idpersonal === idoriginal);
+        if (!asignacion) {
+            return HttpResponse.json({ error: "Esa persona no está asignada a la salida" }, { status: 400 });
+        }
+        const sale = { idpersonal: idoriginal, nombreCompleto: asignacion.personal.nombreCompleto };
+        asignacion.idpersonal = idreemplazante;
+        asignacion.personal = personaDe(idreemplazante);
+        return HttpResponse.json({
+            mensaje: "Reemplazo registrado",
+            data: {
+                sale,
+                entra: { idpersonal: idreemplazante, nombreCompleto: asignacion.personal.nombreCompleto },
+                permisoDadoDeBaja: `PER-MOCK-${salida.idsalida}-${idoriginal}`,
+                permisoNuevo: `PER-MOCK-${salida.idsalida}-${idreemplazante}`,
+            },
+        });
+    }),
+
+    // GET /api/salidas/:idsalida/logistica/disponibles?tipo= (CU-39)
+    http.get("*/api/salidas/:idsalida/logistica/disponibles", async ({ request }) => {
+        await delay(150);
+        const tipo = new URL(request.url).searchParams.get("tipo");
+        return HttpResponse.json({ data: tipo === "TRANSPORTE" ? transportesMock : equipamientosMock });
+    }),
+
+    // GET /api/salidas/:idsalida/logistica (CU-39)
+    http.get("*/api/salidas/:idsalida/logistica", async ({ params }) => {
+        await delay(150);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        return HttpResponse.json({ data: panelLogistica(salida) });
+    }),
+
+    // PUT /api/salidas/:idsalida/logistica (CU-39)
+    http.put("*/api/salidas/:idsalida/logistica", async ({ params, request }) => {
+        await delay(250);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const { itemsDesasignar = [], itemsNuevos = [] } = (await request.json()) as {
+            itemsDesasignar?: { tipo: string; idservicio: number }[];
+            itemsNuevos?: { tipo: string; idservicio: number; cantidad?: number }[];
+        };
+        const quitados = new Set(itemsDesasignar.filter((i) => i.tipo === "EQUIPAMIENTO").map((i) => i.idservicio));
+        const lista = (equipamientoSalidasMock[salida.idsalida] ?? []).filter((e) => !quitados.has(e.idservicio));
+        for (const nuevo of itemsNuevos.filter((i) => i.tipo === "EQUIPAMIENTO")) {
+            const eq = equipamientosMock.find((e) => e.idservicio === nuevo.idservicio);
+            if (!eq) continue;
+            lista.push({
+                idservicio: eq.idservicio,
+                nombreServicio: eq.nombreServicio,
+                tipoEquipamiento: eq.disponibilidad.tipoEquipamiento ?? "",
+                proveedor: eq.proveedor.razonSocial,
+                cantidadAsignada: nuevo.cantidad ?? 1,
+                stockActualDisponible: eq.disponibilidad.cantidadDisponible,
+            });
+        }
+        equipamientoSalidasMock[salida.idsalida] = lista;
+        return HttpResponse.json({
+            mensaje: "Logística modificada",
+            data: { panel: panelLogistica(salida), advertencias: [] },
+        });
+    }),
+
+    // GET /api/salidas/:idsalida/cancelacion (CU-37)
+    http.get("*/api/salidas/:idsalida/cancelacion", async ({ params }) => {
+        await delay(150);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        if (salida.estado === "CANCELADA") {
+            return HttpResponse.json({ error: "La salida ya se encuentra cancelada" }, { status: 400 });
+        }
+        const vendidos = salida.tamanoMaximo - salida.stockLocal;
+        return HttpResponse.json({
+            data: {
+                idsalida: salida.idsalida,
+                nroSalida: salida.nroSalida,
+                paquete: salida.paquete?.nombrePaquete ?? "",
+                fechaInicio: salida.fechaInicio,
+                reservasAfectadas: vendidos > 0 ? 1 : 0,
+                totalAReembolsar: vendidos * 650,
+                permisosQuePasanAPerdido: salida.estado === "CERRADA" ? vendidos + salida.personalAsignado.length : 0,
+                recursosQueSeLiberan: {
+                    personal: salida.personalAsignado.length,
+                    equipamiento: (equipamientoSalidasMock[salida.idsalida] ?? []).length,
+                    servicios: salida.servicios.length,
+                },
+                notificaAClientes: vendidos > 0,
+            },
+        });
+    }),
+
+    // POST /api/salidas/:idsalida/cancelar (CU-37)
+    http.post("*/api/salidas/:idsalida/cancelar", async ({ params }) => {
+        await delay(250);
+        const salida = buscarSalida(params.idsalida);
+        if (!salida) return noExiste();
+        const vendidos = salida.tamanoMaximo - salida.stockLocal;
+        salida.estado = "CANCELADA";
+        return HttpResponse.json({
+            mensaje: "Salida cancelada",
+            data: {
+                idsalida: salida.idsalida,
+                nroSalida: salida.nroSalida,
+                estado: "CANCELADA",
+                reservasCanceladas: vendidos > 0 ? 1 : 0,
+                reembolsoTotal: vendidos * 650,
+                notificaciones: { enviadas: vendidos > 0 ? 1 : 0, fallidas: 0, salidasAlternativasOfrecidas: 0 },
             },
         });
     }),
