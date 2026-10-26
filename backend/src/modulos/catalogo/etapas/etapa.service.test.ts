@@ -4,7 +4,7 @@ import { EstablecerSecuenciaDto } from "./etapa.dto";
 
 const { repo, db } = vi.hoisted(() => ({
   repo: { circuitoTienePaquetesActivos: vi.fn(), reemplazarSecuenciaEtapas: vi.fn(), getByCircuitoId: vi.fn() },
-  db: { circuito: { findUnique: vi.fn() } },
+  db: { circuito: { findUnique: vi.fn() }, avance: { count: vi.fn() } },
 }));
 vi.mock("./etapa.repository", () => ({ EtapaRepository: class { constructor() { return repo; } } }));
 vi.mock("../../../config/postgresDatabase", () => ({ db }));
@@ -17,9 +17,17 @@ describe("EtapaService (CU-05)", () => {
     vi.clearAllMocks();
     db.circuito.findUnique.mockResolvedValue({ idcircuito: 1, estado: "ACTIVO" });
     repo.circuitoTienePaquetesActivos.mockResolvedValue(false);
+    db.avance.count.mockResolvedValue(0);
   });
 
   describe("registrarSecuenciaEtapas", () => {
+    it("CAT-18: no reemplaza etapas sobre las que ya hay avances", async () => {
+      db.avance.count.mockResolvedValue(2);
+
+      await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toThrow("avances");
+      expect(repo.reemplazarSecuenciaEtapas).not.toHaveBeenCalled();
+    });
+
     it("ordena las etapas y reemplaza la secuencia completa", async () => {
       const dto = secuencia(etapa(2, "Wayllabamba", "Pacaymayo"), etapa(1, "Km 82", "Wayllabamba"), etapa(3, "Pacaymayo", "Machu Picchu"));
 

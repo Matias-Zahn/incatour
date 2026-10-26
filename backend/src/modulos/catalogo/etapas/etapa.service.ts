@@ -25,6 +25,11 @@ export class EtapaService {
       throw CustomError.badRequest("No se pueden modificar las etapas: el circuito ya tiene paquetes comerciales activos.");
     }
 
+    // CAT-18: las etapas con avances informados por un guía no se pueden borrar (FK de Avance)
+    if (await db.avance.count({ where: { idcircuito: circuitoId } })) {
+      throw CustomError.badRequest("No se pueden modificar las etapas: ya hay avances de salidas registrados sobre este circuito.");
+    }
+
     // 3. DSS: validarCorrelatividadTemporal(arrayEtapas)
     // El orden debe ser secuencial (1, 2, 3...) sin saltos.
     const ordenes = etapas.map(e => e.numeroOrden).sort((a, b) => a - b);
