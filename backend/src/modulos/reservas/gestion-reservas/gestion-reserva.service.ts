@@ -6,6 +6,7 @@ import {
   ESTADO_ALOJAMIENTO,
   ESTADO_PERMISO,
   ESTADO_RESERVA,
+  ESTADO_SALIDA,
   ESTADO_SOLICITUD,
   redondear2,
 } from "../../../shared/constantes";
@@ -95,7 +96,7 @@ export class GestionReservaService {
       montoAReintegrar: ev.montoAReintegrar,
       condicionAplicada: ev.condicionAplicada,
       permisosEmitidos: ev.permisosEmitidos,
-      lugaresVuelvenALaVenta: !ev.permisosEmitidos,
+      lugaresVuelvenALaVenta: ev.lugaresVuelvenALaVenta,
       advertencia: ev.permisosEmitidos
         ? `Los permisos ya fueron emitidos ante la autoridad (son nominales e intransferibles). El reintegro es de $${ev.montoAReintegrar} y los lugares no vuelven a la venta.`
         : null,
@@ -116,6 +117,7 @@ export class GestionReservaService {
       cantidadPasajeros: ev.reserva.cantidadPasajeros,
       permisosEmitidos: ev.permisosEmitidos,
       alojamientoPorStock: ev.alojamientoPorStock,
+      salidaEnVenta: ev.salidaEnVenta,
     });
     if (!reembolso) throw CustomError.badRequest("La reserva ya había sido cancelada.");
 
@@ -136,7 +138,7 @@ export class GestionReservaService {
         fechaReembolso: reembolso.fechaReembolso,
         nota: "La acreditación del dinero se ejecuta por fuera del sistema.",
       },
-      lugaresVuelvenALaVenta: !ev.permisosEmitidos,
+      lugaresVuelvenALaVenta: ev.lugaresVuelvenALaVenta,
     };
   }
 
@@ -178,7 +180,14 @@ export class GestionReservaService {
       reserva.estadoAlojamiento === ESTADO_ALOJAMIENTO.CONFIRMADO &&
       !reserva.solicitudes.some((s) => s.estado === ESTADO_SOLICITUD.CONFIRMADA);
 
-    return { reserva, permisosEmitidos, importeAbonado, montoAReintegrar, condicionAplicada, alojamientoPorStock };
+    // RES-13: una salida CERRADA (CU-40) ya no vende: los lugares no vuelven a la venta y el hotel recupera sus plazas
+    const salidaEnVenta = reserva.salida.estado === ESTADO_SALIDA.PUBLICADA;
+    const lugaresVuelvenALaVenta = !permisosEmitidos && salidaEnVenta;
+
+    return {
+      reserva, permisosEmitidos, importeAbonado, montoAReintegrar, condicionAplicada, alojamientoPorStock,
+      salidaEnVenta, lugaresVuelvenALaVenta,
+    };
   }
 
   // Un cliente solo accede a SUS reservas; el administrador, a todas

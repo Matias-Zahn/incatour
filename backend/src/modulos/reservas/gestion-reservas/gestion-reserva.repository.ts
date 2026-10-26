@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SOLICITUD } from "../../../shared/constantes";
+import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 
 const INCLUDE_RESUMEN = {
@@ -130,6 +130,7 @@ export class GestionReservaRepository {
    *  - Permisos emitidos -> Perdido (y el stock local NO se repone).
    *  - Sin permisos emitidos: el stock local recupera los lugares.
    *  - Alojamiento: se liberan las plazas bloqueadas o se cancela la solicitud vinculada.
+   *  - Salida CERRADA (RES-13): no se vende más, así que el stock local no se toca y las plazas vuelven al hotel.
    */
   async cancelarReserva(p: {
     idreserva: number;
@@ -141,6 +142,7 @@ export class GestionReservaRepository {
     cantidadPasajeros: number;
     permisosEmitidos: boolean;
     alojamientoPorStock: boolean;
+    salidaEnVenta: boolean;
   }) {
     return db.$transaction(async (tx) => {
       const guarda = await tx.reserva.updateMany({
@@ -171,15 +173,28 @@ export class GestionReservaRepository {
         data: { estado: ESTADO_SOLICITUD.CANCELADA },
       });
 
-      const reponerLugares = !p.permisosEmitidos;
-      if (reponerLugares || p.alojamientoPorStock) {
+      const reponerLugares = !p.permisosEmitidos && p.salidaEnVenta;
+      const reponerPlazas = p.alojamientoPorStock && p.salidaEnVenta;
+      if (reponerLugares || reponerPlazas) {
         await tx.salida.update({
           where: { idsalida: p.idsalida },
           data: {
             ...(reponerLugares && { stockLocal: { increment: p.cantidadPasajeros } }),
-            ...(p.alojamientoPorStock && { stockLocalAlojamiento: { increment: p.cantidadPasajeros } }),
+            ...(reponerPlazas && { stockLocalAlojamiento: { increment: p.cantidadPasajeros } }),
           },
         });
+      }
+      if (p.alojamientoPorStock && !p.salidaEnVenta) {
+        const hotel = await tx.salidaServicio.findFirst({
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          select: { idservicio: true },
+        });
+        if (hotel) {
+          await tx.servicioAlojamiento.update({
+            where: { idservicio: hotel.idservicio },
+            data: { capacidadDisponible: { increment: p.cantidadPasajeros } },
+          });
+        }
       }
 
       return reembolso;
