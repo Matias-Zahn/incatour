@@ -63,7 +63,7 @@ function FormularioAltaPersonal({
                 </p>
                 <p className="mt-2 rounded-control border border-borde bg-fondo px-3 py-2 text-xs text-texto-suave">
                     {rolSeleccionado === "Guía"
-                        ? "Al registrar un guía se crean en una única operación su legajo operativo, su habilitación y su cuenta de usuario con rol GUIA."
+                        ? "Para un guía la habilitación es obligatoria. Podés crear su cuenta de acceso ahora completando email y contraseña, o registrar solo el legajo y crear la cuenta más adelante."
                         : "Los porteadores no requieren cuenta de acceso al sistema: solo se registrará su legajo operativo con pasaporte vigente."}
                 </p>
             </div>
@@ -176,11 +176,11 @@ function FormularioAltaPersonal({
                 {rolSeleccionado === "Guía" ? (
                     <>
                         <label className="grid gap-2 text-sm font-semibold text-texto">
-                            Correo electrónico (cuenta de guía)
+                            Correo electrónico (cuenta de acceso - opcional)
                             <input
                                 type="email"
                                 {...register("email")}
-                                placeholder="guia@incatour.com"
+                                placeholder="guia@incatour.com (opcional)"
                                 className={`rounded-control border px-3 py-2 font-normal outline-none focus:ring-2 ${
                                     errors.email
                                         ? "border-peligro focus:ring-peligro/20"
@@ -195,11 +195,11 @@ function FormularioAltaPersonal({
                         </label>
 
                         <label className="grid gap-2 text-sm font-semibold text-texto">
-                            Contraseña inicial
+                            Contraseña inicial (opcional)
                             <input
                                 type="password"
                                 {...register("contrasenia")}
-                                placeholder="Mínimo 8 caracteres"
+                                placeholder="Mínimo 8 caracteres si se crea cuenta"
                                 className={`rounded-control border px-3 py-2 font-normal outline-none focus:ring-2 ${
                                     errors.contrasenia
                                         ? "border-peligro focus:ring-peligro/20"

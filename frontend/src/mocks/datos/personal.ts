@@ -72,6 +72,22 @@ export const personalSemilla: Personal[] = [
         rol: "Porteador",
         guia: null,
     },
+    {
+        id: 6,
+        idpersonal: 6,
+        nombreCompleto: "Ana Condori",
+        nroPasaporte: "P456789",
+        nacionalidad: "Peruana",
+        fechaVencimientoPasaporte: "2031-08-20",
+        estado: "ACTIVO",
+        rol: "Guía",
+        guia: {
+            nroHabilitacion: "HAB-004",
+            fechaHabilitacion: "2029-03-15",
+        },
+        nroHabilitacion: "HAB-004",
+        fechaHabilitacion: "2029-03-15",
+    },
 ];
 
 /**

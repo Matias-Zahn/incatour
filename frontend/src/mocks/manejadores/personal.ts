@@ -1,6 +1,11 @@
 import { delay, http, HttpResponse } from "msw";
 import { construirUrl } from "../../services/clienteApi";
-import type { CuentaGuia, SituacionHabilitacion } from "../../services/cuentaGuiaService";
+import type {
+    CuentaGuia,
+    DatosCrearCuentaGuia,
+    SituacionHabilitacion,
+} from "../../services/cuentaGuiaService";
+import { esquemaCrearCuentaGuia } from "../../services/cuentaGuiaService";
 import {
     esquemaCrearPersonal,
     esquemaModificarPersonal,
@@ -176,7 +181,7 @@ export const manejadoresPersonal = [
         listaPersonal = [...listaPersonal, nuevoPersonal];
 
         let credencialesAcceso = null;
-        if (datos.rolOperativo === "Guía") {
+        if (datos.rolOperativo === "Guía" && datos.email && datos.contrasenia) {
             const nuevoIdUsuario =
                 Math.max(
                     3,
@@ -486,6 +491,130 @@ export const manejadoresPersonal = [
             });
 
         return HttpResponse.json({ data: filtradas });
+    }),
+
+    http.post(construirUrl("/cuentas-guia"), async ({ request }) => {
+        await delay();
+        const denegado = exigirRol(request, "ADMIN");
+        if (denegado) return denegado;
+
+        const cuerpo = (await request.json()) as DatosCrearCuentaGuia;
+        const validacion = esquemaCrearCuentaGuia.safeParse(cuerpo);
+        if (!validacion.success) {
+            return HttpResponse.json(
+                { error: validacion.error.issues[0]?.message ?? "Datos inválidos." },
+                { status: 400 },
+            );
+        }
+
+        const datos = validacion.data;
+        const personal = listaPersonal.find((p) => p.idpersonal === datos.idpersonal);
+        if (!personal) {
+            return HttpResponse.json(
+                { error: `No se encontró personal operativo con ID ${datos.idpersonal}.` },
+                { status: 404 },
+            );
+        }
+
+        if (personal.rol !== "Guía") {
+            return HttpResponse.json(
+                { error: "Solo el personal con rol de 'Guía' puede tener una cuenta de acceso." },
+                { status: 400 },
+            );
+        }
+
+        if (personal.estado !== "ACTIVO") {
+            return HttpResponse.json(
+                { error: "No se puede crear una cuenta para un guía dado de baja." },
+                { status: 400 },
+            );
+        }
+
+        const tieneCuenta = cuentasGuia.some((c) => c.guia.idpersonal === datos.idpersonal);
+        if (tieneCuenta) {
+            return HttpResponse.json(
+                { error: "Este guía ya posee una cuenta de acceso registrada." },
+                { status: 400 },
+            );
+        }
+
+        const emailNormalizado = datos.email.trim().toLowerCase();
+        const emailDuplicado =
+            cuentasGuia.some((c) => c.email.toLowerCase() === emailNormalizado) ||
+            cuentasMock.some((item) => item.usuario.email.toLowerCase() === emailNormalizado);
+        if (emailDuplicado) {
+            return HttpResponse.json(
+                { error: "El email ya se encuentra en uso por otra cuenta." },
+                { status: 400 },
+            );
+        }
+
+        const partes = personal.nombreCompleto.trim().split(" ");
+        const nombre = partes[0] || personal.nombreCompleto;
+        const apellido = partes.slice(1).join(" ") || "Guía";
+
+        if (datos.nroHabilitacion?.trim() || datos.fechaHabilitacion) {
+            personal.guia = {
+                nroHabilitacion: datos.nroHabilitacion?.trim() ?? personal.guia?.nroHabilitacion ?? "",
+                fechaHabilitacion: datos.fechaHabilitacion ?? personal.guia?.fechaHabilitacion ?? "",
+            };
+            personal.nroHabilitacion = personal.guia.nroHabilitacion;
+            personal.fechaHabilitacion = personal.guia.fechaHabilitacion;
+        }
+
+        const nuevoIdUsuario =
+            Math.max(
+                3,
+                ...cuentasGuia.map((c) => c.idusuario),
+                ...cuentasMock.map((item) => item.usuario.idusuario),
+            ) + 1;
+
+        const fechaHab = datos.fechaHabilitacion ?? personal.guia?.fechaHabilitacion ?? null;
+        const nroHab = datos.nroHabilitacion?.trim() ?? personal.guia?.nroHabilitacion ?? null;
+
+        const nuevaCuenta: CuentaGuia = {
+            id: nuevoIdUsuario,
+            idusuario: nuevoIdUsuario,
+            email: emailNormalizado,
+            nombre,
+            apellido,
+            rol: "GUIA",
+            estado: "ACTIVO",
+            creadoEn: new Date().toISOString(),
+            guia: {
+                idpersonal: personal.idpersonal,
+                nombreCompleto: personal.nombreCompleto,
+                nroPasaporte: personal.nroPasaporte,
+                estadoPersonal: personal.estado,
+            },
+            habilitacion: {
+                nroHabilitacion: nroHab,
+                fechaHabilitacion: fechaHab,
+                situacion: calcularSituacionHabilitacion(fechaHab),
+            },
+            salidasPendientes: 0,
+            puedeDarseDeBaja: true,
+        };
+
+        cuentasGuia = [...cuentasGuia, nuevaCuenta];
+        cuentasMock.push({
+            contrasenia: datos.contrasenia,
+            usuario: {
+                idusuario: nuevoIdUsuario,
+                email: emailNormalizado,
+                nombre,
+                apellido,
+                rol: "GUIA",
+            },
+        });
+
+        return HttpResponse.json(
+            {
+                mensaje: "Cuenta de guía creada exitosamente",
+                data: nuevaCuenta,
+            },
+            { status: 201 },
+        );
     }),
 
     http.patch(construirUrl("/cuentas-guia/:idusuario/baja"), async ({ params, request }) => {
