@@ -81,7 +81,8 @@ function tarifasIniciales(
         return paquete.tarifas.map((tarifa) => ({
             idtemporada: tarifa.idtemporada,
             monto: tarifa.monto,
-            moneda: tarifa.moneda,
+            // RES-16: la única moneda es USD; un paquete viejo en otra moneda se edita y se guarda en USD
+            moneda: "USD",
         }));
     }
     const primeraTemporada = temporadas[0]?.idtemporada ?? 0;
