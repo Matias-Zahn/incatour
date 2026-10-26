@@ -53,6 +53,10 @@ describe("CrearPersonalDto", () => {
     contrasenia: "clave1234", nroHabilitacion: "H-1", fechaHabilitacion: "2030-01-01",
   });
 
+  it("rechaza un pasaporte con solo espacios (CTA-14)", () => {
+    expect(CrearPersonalDto.create({ ...guia("a@b.com"), nroPasaporte: "   " })[0]).toBe("El número de pasaporte es requerido");
+  });
+
   it("rechaza un email de guía sin formato de correo (CTA-05)", () => {
     expect(CrearPersonalDto.create(guia("abc"))[0]).toBeDefined();
   });

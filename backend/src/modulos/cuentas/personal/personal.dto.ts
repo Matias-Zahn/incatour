@@ -39,6 +39,7 @@ export class CrearPersonalDto {
 
     if (!nroPasaporte || typeof nroPasaporte !== "string") return ["El número de pasaporte es requerido"];
     nroPasaporte = nroPasaporte.trim();
+    if (!nroPasaporte) return ["El número de pasaporte es requerido"];
 
     if (!nacionalidad || typeof nacionalidad !== "string") return ["La nacionalidad es requerida"];
     nacionalidad = nacionalidad.trim();
