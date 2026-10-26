@@ -148,16 +148,14 @@ function obtenerImagenesPaqueteCatalogo(
     return ["/imagenes/catalogo/machu-picchu.jpg"];
 }
 
-function crearPasajeroInicial(indice = 0): PasajeroFormulario {
-    const base = PASAJEROS_PRUEBA[indice % PASAJEROS_PRUEBA.length];
-    const sufijo = Math.floor(10 + Math.random() * 89);
+// FE-13: el pasajero inicial arranca vacío; los datos de prueba solo se ofrecen en DEV
+function crearPasajeroInicial(): PasajeroFormulario {
     return {
-        nombreCompleto: indice === 0 ? base.nombreCompleto : "",
-        nroPasaporte: indice === 0 ? `${base.nroPasaporteBase}${sufijo}` : "",
-        nacionalidad: indice === 0 ? base.nacionalidad : "Argentina",
-        fechaVencimientoPasaporte:
-            indice === 0 ? base.fechaVencimientoPasaporte : "2031-06-15",
-        pesoDeclarado: indice === 0 ? base.pesoDeclarado : 12,
+        nombreCompleto: "",
+        nroPasaporte: "",
+        nacionalidad: "Argentina",
+        fechaVencimientoPasaporte: "2031-06-15",
+        pesoDeclarado: 12,
     };
 }
 
@@ -219,18 +217,12 @@ function CatalogoCompraPage() {
         number | null
     >(null);
     const [pasajeros, setPasajeros] = useState<PasajeroFormulario[]>(() => [
-        crearPasajeroInicial(0),
+        crearPasajeroInicial(),
     ]);
-    const [numeroTarjeta, setNumeroTarjeta] = useState(
-        TARJETAS_PRUEBA[0].numero,
-    );
-    const [titularTarjeta, setTitularTarjeta] = useState(
-        TARJETAS_PRUEBA[0].titular,
-    );
-    const [vencimientoTarjeta, setVencimientoTarjeta] = useState(
-        TARJETAS_PRUEBA[0].vencimiento,
-    );
-    const [cvvTarjeta, setCvvTarjeta] = useState(TARJETAS_PRUEBA[0].cvv);
+    const [numeroTarjeta, setNumeroTarjeta] = useState("");
+    const [titularTarjeta, setTitularTarjeta] = useState("");
+    const [vencimientoTarjeta, setVencimientoTarjeta] = useState("");
+    const [cvvTarjeta, setCvvTarjeta] = useState("");
     const [errorCompra, setErrorCompra] = useState("");
 
     // Comprobante de reserva exitosa
@@ -270,7 +262,7 @@ function CatalogoCompraPage() {
             paquete.salidasDisponibles?.[0]?.idsalida ??
             null;
         setIdSalidaSeleccionada(primeraSalida);
-        setPasajeros([crearPasajeroInicial(0)]);
+        setPasajeros([crearPasajeroInicial()]);
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -395,7 +387,7 @@ function CatalogoCompraPage() {
 
         if (!obtenerToken() || obtenerUsuario()?.rol !== "CLIENTE") {
             setErrorCompra(
-                "Para confirmar la compra debés iniciar sesión con una cuenta de perfil CLIENTE (por ejemplo: juan@test.com / hash123).",
+                "Para confirmar la compra debés iniciar sesión con una cuenta de perfil CLIENTE.",
             );
             return;
         }
@@ -1119,14 +1111,16 @@ function CatalogoCompraPage() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
-                                    <Boton
-                                        type="button"
-                                        variante="secundario"
-                                        className="px-3 py-1.5 text-xs"
-                                        onClick={() => agregarPasajero(true)}
-                                    >
-                                        + Agregar pasajero de prueba
-                                    </Boton>
+                                    {import.meta.env.DEV ? (
+                                        <Boton
+                                            type="button"
+                                            variante="secundario"
+                                            className="px-3 py-1.5 text-xs"
+                                            onClick={() => agregarPasajero(true)}
+                                        >
+                                            + Agregar pasajero de prueba
+                                        </Boton>
+                                    ) : null}
                                     <Boton
                                         type="button"
                                         variante="fantasma"
@@ -1182,17 +1176,19 @@ function CatalogoCompraPage() {
                                                     Pasajero #{idx + 1}
                                                 </span>
                                                 <div className="flex items-center gap-3 text-xs">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            autocompletarPasajeroExistente(
-                                                                idx,
-                                                            )
-                                                        }
-                                                        className="font-semibold text-marca-oscura hover:underline"
-                                                    >
-                                                        Autocompletar datos
-                                                    </button>
+                                                    {import.meta.env.DEV ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                autocompletarPasajeroExistente(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            className="font-semibold text-marca-oscura hover:underline"
+                                                        >
+                                                            Autocompletar datos
+                                                        </button>
+                                                    ) : null}
                                                     {pasajeros.length > 1 ? (
                                                         <button
                                                             type="button"
@@ -1370,7 +1366,8 @@ function CatalogoCompraPage() {
                                 </div>
                             </div>
 
-                            {/* ATAJOS DE TARJETAS DE PRUEBA DEL CONTRATO */}
+                            {/* ATAJOS DE TARJETAS DE PRUEBA DEL CONTRATO (solo DEV) */}
+                            {import.meta.env.DEV ? (
                             <div className="space-y-2 rounded-control border border-borde bg-fondo/50 p-3.5">
                                 <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
                                     Tarjetas de prueba en 1 clic (según Contrato
@@ -1407,6 +1404,7 @@ function CatalogoCompraPage() {
                                     ))}
                                 </div>
                             </div>
+                            ) : null}
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <label className="grid gap-1 text-xs font-semibold text-texto">
