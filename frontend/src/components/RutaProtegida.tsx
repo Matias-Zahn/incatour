@@ -9,8 +9,14 @@ function RutaProtegida({ roles }: RutaProtegidaProps) {
     const ubicacion = useLocation();
     const usuario = obtenerUsuario();
 
-    if (!obtenerToken() || !usuario || !roles.includes(usuario.rol)) {
+    if (!obtenerToken() || !usuario) {
         return <Navigate to="/login" replace state={{ desde: ubicacion.pathname }} />;
+    }
+
+    // Sesión de otro rol: al inicio de su rol (mandarlo a /login rebotaba sin fin con Login)
+    if (!roles.includes(usuario.rol)) {
+        const inicio = usuario.rol === "CLIENTE" ? "/catalogo" : usuario.rol === "GUIA" ? "/guia" : "/";
+        return <Navigate to={inicio} replace />;
     }
 
     return <Outlet />;
