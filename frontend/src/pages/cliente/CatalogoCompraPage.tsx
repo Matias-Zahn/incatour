@@ -247,10 +247,19 @@ function CatalogoCompraPage() {
         setIndiceFotoDetalle(0);
     }
 
+    // FE-46: los datos de la tarjeta no quedan cargados de una compra a otra
+    function vaciarTarjeta() {
+        setNumeroTarjeta("");
+        setTitularTarjeta("");
+        setVencimientoTarjeta("");
+        setCvvTarjeta("");
+    }
+
     function iniciarCompraPaquete(
         paquete: PaqueteCatalogoPublico,
         idSalidaInicial?: number,
     ) {
+        vaciarTarjeta();
         setPaqueteDetalle(null);
         setReservaConfirmada(null);
         setErrorCompra("");
@@ -267,6 +276,7 @@ function CatalogoCompraPage() {
     }
 
     function volverAlEscaparate() {
+        vaciarTarjeta();
         setPaqueteEnCompraId(null);
         setIdSalidaSeleccionada(null);
         setErrorCompra("");
@@ -508,6 +518,7 @@ function CatalogoCompraPage() {
                 },
             });
 
+            vaciarTarjeta();
             setReservaConfirmada({
                 resultado: respuesta.reserva,
                 paquete: paqueteEnCompra,
