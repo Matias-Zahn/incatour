@@ -542,6 +542,19 @@ export type RegistroHistorialIncidente = {
     fechaHora: string;
 };
 
+// Un avance que el servidor rechazó no se registró: se saca también del historial local
+export function eliminarHistorialLocalAvance(idsalida: number, id: string): void {
+    try {
+        const filtrados = obtenerHistorialLocalAvances(idsalida).filter((x) => x.id !== id);
+        localStorage.setItem(
+            `${CLAVE_HISTORIAL_LOCAL_AVANCES}_${idsalida}`,
+            JSON.stringify(filtrados),
+        );
+    } catch (e) {
+        console.warn("No se pudo actualizar historial local de avances", e);
+    }
+}
+
 export function obtenerHistorialLocalIncidentes(
     idsalida: number,
 ): RegistroHistorialIncidente[] {

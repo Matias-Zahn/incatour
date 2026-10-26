@@ -7,6 +7,7 @@ import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalAvance,
     eliminarAvanceOffline,
+    eliminarHistorialLocalAvance,
     esquemaAvance,
     fechaLocalHoy,
     estilosEstadoSalida,
@@ -185,6 +186,7 @@ export function VistaAvances({
                     ![401, 408, 429].includes(error.estado)
                 ) {
                     eliminarAvanceOffline(idsalida, item.idLocal);
+                    eliminarHistorialLocalAvance(idsalida, item.idLocal);
                     rechazo = `${item.etapaNombre}: ${error.message}`;
                     break;
                 }
