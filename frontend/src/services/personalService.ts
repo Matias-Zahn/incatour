@@ -52,26 +52,38 @@ export const esquemaCrearPersonal = z
     .superRefine((datos, contexto) => {
         if (datos.rolOperativo !== "Guía") return;
 
-        if (!datos.email) {
-            contexto.addIssue({
-                code: "custom",
-                path: ["email"],
-                message: "El email es requerido para un guía.",
-            });
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email)) {
-            contexto.addIssue({
-                code: "custom",
-                path: ["email"],
-                message: "Ingresá un email válido.",
-            });
-        }
+        const emailLimpio = datos.email?.trim() ?? "";
+        const tieneContrasenia = Boolean(datos.contrasenia && datos.contrasenia.length > 0);
+        const deseaCrearCuenta = Boolean(emailLimpio || tieneContrasenia);
 
-        if (!datos.contrasenia || datos.contrasenia.length < 8) {
-            contexto.addIssue({
-                code: "custom",
-                path: ["contrasenia"],
-                message: "La contraseña debe tener como mínimo 8 caracteres.",
-            });
+        if (deseaCrearCuenta) {
+            if (!emailLimpio) {
+                contexto.addIssue({
+                    code: "custom",
+                    path: ["email"],
+                    message: "El email es requerido si se crea la cuenta de acceso.",
+                });
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpio)) {
+                contexto.addIssue({
+                    code: "custom",
+                    path: ["email"],
+                    message: "Ingresá un email válido.",
+                });
+            }
+
+            if (!tieneContrasenia) {
+                contexto.addIssue({
+                    code: "custom",
+                    path: ["contrasenia"],
+                    message: "La contraseña es requerida si se crea la cuenta de acceso.",
+                });
+            } else if (datos.contrasenia!.length < 8) {
+                contexto.addIssue({
+                    code: "custom",
+                    path: ["contrasenia"],
+                    message: "La contraseña debe tener como mínimo 8 caracteres.",
+                });
+            }
         }
 
         if (!datos.nroHabilitacion) {
@@ -241,28 +253,29 @@ export function consultarPersonal(filtros: FiltrosPersonal = {}): Promise<Person
 export const listarPersonal = consultarPersonal;
 
 export function crearPersonal(datos: DatosCrearPersonal): Promise<ResultadoCrearPersonal> {
-    const cuerpo =
-        datos.rolOperativo === "Guía"
-            ? {
-                  nombre: datos.nombre.trim(),
-                  apellido: datos.apellido.trim(),
-                  email: datos.email?.trim().toLowerCase(),
-                  contrasenia: datos.contrasenia,
-                  nroPasaporte: datos.nroPasaporte.trim(),
-                  nacionalidad: datos.nacionalidad.trim(),
-                  fechaVencimientoPasaporte: datos.fechaVencimientoPasaporte,
-                  rolOperativo: datos.rolOperativo,
-                  nroHabilitacion: datos.nroHabilitacion?.trim(),
-                  fechaHabilitacion: datos.fechaHabilitacion,
-              }
-            : {
-                  nombre: datos.nombre.trim(),
-                  apellido: datos.apellido.trim(),
-                  nroPasaporte: datos.nroPasaporte.trim(),
-                  nacionalidad: datos.nacionalidad.trim(),
-                  fechaVencimientoPasaporte: datos.fechaVencimientoPasaporte,
-                  rolOperativo: datos.rolOperativo,
-              };
+    const tieneCuenta =
+        datos.rolOperativo === "Guía" &&
+        Boolean(datos.email?.trim()) &&
+        Boolean(datos.contrasenia);
+
+    const cuerpo: Record<string, unknown> = {
+        nombre: datos.nombre.trim(),
+        apellido: datos.apellido.trim(),
+        nroPasaporte: datos.nroPasaporte.trim(),
+        nacionalidad: datos.nacionalidad.trim(),
+        fechaVencimientoPasaporte: datos.fechaVencimientoPasaporte,
+        rolOperativo: datos.rolOperativo,
+    };
+
+    if (datos.rolOperativo === "Guía") {
+        cuerpo.nroHabilitacion = datos.nroHabilitacion?.trim();
+        cuerpo.fechaHabilitacion = datos.fechaHabilitacion;
+
+        if (tieneCuenta) {
+            cuerpo.email = datos.email!.trim().toLowerCase();
+            cuerpo.contrasenia = datos.contrasenia;
+        }
+    }
 
     return solicitarApi<RespuestaCrearPersonalApi>("/personal", {
         method: "POST",

@@ -1,5 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { solicitarApi } from "./clienteApi";
+
+export const esquemaCrearCuentaGuia = z.object({
+    idpersonal: z.number({ error: "Debe seleccionar un guía." }).int().positive("Debe seleccionar un guía válido."),
+    email: z
+        .string()
+        .trim()
+        .min(1, "El email es obligatorio.")
+        .email("Ingresá un correo electrónico válido."),
+    contrasenia: z
+        .string()
+        .min(8, "La contraseña debe tener como mínimo 8 caracteres."),
+    nroHabilitacion: z.string().trim().optional(),
+    fechaHabilitacion: z.string().trim().optional(),
+});
+
+export type DatosCrearCuentaGuia = z.infer<typeof esquemaCrearCuentaGuia>;
 
 export type EstadoCuentaGuia = "ACTIVO" | "INACTIVO";
 export type SituacionHabilitacion = "VIGENTE" | "VENCIDA" | "SIN_DATOS";
@@ -68,6 +85,29 @@ export function consultarUsuariosGuia(filtros: FiltrosCuentaGuia = {}): Promise<
 
 export const listarCuentasGuia = consultarUsuariosGuia;
 
+export function crearCuentaGuia(datos: DatosCrearCuentaGuia): Promise<CuentaGuia> {
+    const cuerpo: Record<string, unknown> = {
+        idpersonal: datos.idpersonal,
+        email: datos.email.trim().toLowerCase(),
+        contrasenia: datos.contrasenia,
+    };
+    if (datos.nroHabilitacion?.trim()) {
+        cuerpo.nroHabilitacion = datos.nroHabilitacion.trim();
+    }
+    if (datos.fechaHabilitacion?.trim()) {
+        cuerpo.fechaHabilitacion = datos.fechaHabilitacion.trim();
+    }
+
+    return solicitarApi<RespuestaAccion<CuentaGuiaApi>>("/cuentas-guia", {
+        method: "POST",
+        body: JSON.stringify(cuerpo),
+    })
+        .then(extraer)
+        .then(normalizarCuentaGuia);
+}
+
+export const registrarCuentaGuia = crearCuentaGuia;
+
 export function darDeBajaCuenta(idusuario: number): Promise<CuentaGuia> {
     return solicitarApi<RespuestaAccion<CuentaGuiaApi>>(`/cuentas-guia/${idusuario}/baja`, {
         method: "PATCH",
@@ -87,6 +127,17 @@ export function useCuentasGuia(filtros?: FiltrosCuentaGuia) {
     return useQuery({
         queryKey: clavesCuentasGuia.lista(filtros),
         queryFn: () => consultarUsuariosGuia(filtros),
+    });
+}
+
+export function useCrearCuentaGuia() {
+    const consultas = useQueryClient();
+    return useMutation({
+        mutationFn: crearCuentaGuia,
+        onSuccess: () => {
+            consultas.invalidateQueries({ queryKey: clavesCuentasGuia.todas });
+            consultas.invalidateQueries({ queryKey: ["personal"] });
+        },
     });
 }
 

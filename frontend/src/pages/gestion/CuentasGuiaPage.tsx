@@ -4,15 +4,19 @@ import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
+import FormularioCuentaGuia from "../../components/FormularioCuentaGuia";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
+    useCrearCuentaGuia,
     useCuentasGuia,
     useDarDeBajaCuenta,
     type CuentaGuia,
+    type DatosCrearCuentaGuia,
     type EstadoCuentaGuia,
     type FiltrosCuentaGuia,
 } from "../../services/cuentaGuiaService";
+import { usePersonal } from "../../services/personalService";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -23,6 +27,9 @@ function CuentasGuiaPage() {
     const [paginaActual, setPaginaActual] = useState(1);
     const [cuentaSeleccionada, setCuentaSeleccionada] = useState<CuentaGuia | null>(null);
     const [ultimaCuentaBaja, setUltimaCuentaBaja] = useState<CuentaGuia | null>(null);
+    const [ultimaCuentaCreada, setUltimaCuentaCreada] = useState<CuentaGuia | null>(null);
+    const [formularioAbierto, setFormularioAbierto] = useState(false);
+    const [errorFormulario, setErrorFormulario] = useState("");
 
     const filtrosConsulta: FiltrosCuentaGuia = {
         ...(filtroEstado ? { estado: filtroEstado } : {}),
@@ -31,7 +38,44 @@ function CuentasGuiaPage() {
     };
 
     const { data: cuentas = [], isPending, isError, error } = useCuentasGuia(filtrosConsulta);
+    const { data: todasLasCuentas = [] } = useCuentasGuia();
+    const { data: listaPersonal = [], isPending: cargandoPersonal } = usePersonal({
+        rol: "Guía",
+        estado: "ACTIVO",
+    });
+
+    const crearCuenta = useCrearCuentaGuia();
     const darDeBaja = useDarDeBajaCuenta();
+
+    const idsConCuenta = new Set(todasLasCuentas.map((c) => c.guia.idpersonal));
+    const guiasDisponibles = listaPersonal.filter(
+        (p) => p.rol === "Guía" && p.estado === "ACTIVO" && !idsConCuenta.has(p.idpersonal),
+    );
+
+    function abrirFormulario() {
+        setErrorFormulario("");
+        setUltimaCuentaCreada(null);
+        setUltimaCuentaBaja(null);
+        setFormularioAbierto(true);
+    }
+
+    function cerrarFormulario() {
+        setFormularioAbierto(false);
+        setErrorFormulario("");
+    }
+
+    function manejarCrearCuenta(datos: DatosCrearCuentaGuia) {
+        crearCuenta.mutate(datos, {
+            onSuccess: (cuentaCreada) => {
+                setUltimaCuentaCreada(cuentaCreada);
+                cerrarFormulario();
+                setPaginaActual(1);
+            },
+            onError: (e: Error) => {
+                setErrorFormulario(e.message);
+            },
+        });
+    }
 
     function confirmarBaja() {
         if (!cuentaSeleccionada) return;
@@ -89,7 +133,32 @@ function CuentasGuiaPage() {
                         Consultá el estado de acceso, vigencia de habilitación y salidas pendientes de cada guía.
                     </p>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <Boton onClick={abrirFormulario}>Nueva cuenta de guía</Boton>
+                </div>
             </header>
+
+            {formularioAbierto ? (
+                <FormularioCuentaGuia
+                    guiasDisponibles={guiasDisponibles}
+                    cargandoGuias={cargandoPersonal}
+                    alCrear={manejarCrearCuenta}
+                    alCancelar={cerrarFormulario}
+                    guardando={crearCuenta.isPending}
+                    errorServidor={errorFormulario}
+                />
+            ) : null}
+
+            {ultimaCuentaCreada ? (
+                <Alerta tipo="exito" titulo="Cuenta de guía creada exitosamente">
+                    Se habilitó el acceso al sistema para{" "}
+                    <span className="font-semibold">
+                        {ultimaCuentaCreada.nombre} {ultimaCuentaCreada.apellido}
+                    </span>{" "}
+                    con el usuario <span className="font-semibold">{ultimaCuentaCreada.email}</span> (rol {ultimaCuentaCreada.rol}).
+                </Alerta>
+            ) : null}
 
             {ultimaCuentaBaja ? (
                 <Alerta tipo="exito" titulo="Cuenta de guía dada de baja exitosamente">
