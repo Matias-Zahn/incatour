@@ -128,29 +128,31 @@ export function VistaAvances({
         control,
         reset,
         setValue,
-        formState: { errors },
+        formState: { errors, dirtyFields },
     } = useForm<DatosAvanceForm>({
         resolver: zodResolver(esquemaAvance),
+        // FE-37: la fecha y la hora de llegada nunca salen del borrador, siempre son las actuales
         defaultValues: {
             numeroOrden: borrador?.numeroOrden ?? undefined,
             estadoTramo: borrador?.estadoTramo ?? "COMPLETADO",
-            fechaLlegada: borrador?.fechaLlegada ?? fechaHoy,
-            horaLlegada: borrador?.horaLlegada ?? horaActual,
+            fechaLlegada: fechaHoy,
+            horaLlegada: horaActual,
         },
     });
 
     const valoresFormulario = useWatch({ control });
 
-    // Guardado automático del borrador en localStorage
+    // Guardado automático del borrador en localStorage, solo si el guía tocó el formulario (FE-37).
+    // dirtyFields y no isDirty: la etapa sugerida con setValue también marca isDirty
+    const tocado = Object.keys(dirtyFields).length > 0;
     useEffect(() => {
-        if (
-            idsalida > 0 &&
-            valoresFormulario &&
-            (valoresFormulario.numeroOrden || valoresFormulario.estadoTramo)
-        ) {
-            guardarBorradorAvance(idsalida, valoresFormulario);
+        if (idsalida > 0 && tocado) {
+            guardarBorradorAvance(idsalida, {
+                numeroOrden: valoresFormulario.numeroOrden,
+                estadoTramo: valoresFormulario.estadoTramo,
+            });
         }
-    }, [valoresFormulario, idsalida]);
+    }, [valoresFormulario, idsalida, tocado]);
 
     const etapasDisponibles = detalleSalida?.itinerario ?? [];
 
@@ -246,16 +248,20 @@ export function VistaAvances({
     );
 
     // Solo se aplica cuando cambia el NÚMERO sugerido: no pisa la etapa elegida a mano en cada render.
-    // La primera sugerencia respeta el borrador guardado.
+    // La primera sugerencia respeta el borrador guardado, salvo que esa etapa ya esté completada (FE-37).
     const sugerida = siguienteEtapa?.numeroOrden;
+    const borradorCompletado =
+        etapasConPendientes.find((e) => e.numeroOrden === borrador?.numeroOrden)?.estadoTramo === "COMPLETADO";
     const ultimaSugerida = useRef<number | undefined>(undefined);
     useEffect(() => {
         if (sugerida === undefined || ultimaSugerida.current === sugerida) return;
         const esPrimera = ultimaSugerida.current === undefined;
         ultimaSugerida.current = sugerida;
+        if (esPrimera && borradorCompletado) limpiarBorradorAvance(idsalida);
         // La primera vez se fija el borrador (si hay): al cargar el formulario las etapas todavía no estaban
-        setValue("numeroOrden", esPrimera && borrador?.numeroOrden ? borrador.numeroOrden : sugerida);
-    }, [sugerida, borrador?.numeroOrden, setValue]);
+        const usarBorrador = esPrimera && borrador?.numeroOrden && !borradorCompletado;
+        setValue("numeroOrden", usarBorrador ? borrador.numeroOrden! : sugerida);
+    }, [sugerida, borrador?.numeroOrden, borradorCompletado, idsalida, setValue]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
