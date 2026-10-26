@@ -186,6 +186,14 @@ export class ModificarPaqueteDto {
       nombrePaquete = limpio;
     }
     if (condiciones != null && typeof condiciones !== "string") return ["condiciones debe ser un texto."];
+    // CAT-20: días como los arma el front ("L-M-X"): códigos L, M, X, J, V, S o D, sin repetir; null vuelve a todos
+    if (diasDisponibles != null) {
+      const dias = typeof diasDisponibles === "string" ? diasDisponibles.trim().toUpperCase().split(/[-,\s]+/).filter(Boolean) : [];
+      if (dias.length === 0 || dias.some((d) => !"LMXJVSD".includes(d) || d.length !== 1) || new Set(dias).size !== dias.length) {
+        return ["diasDisponibles debe ser una lista de días (L, M, X, J, V, S, D), por ejemplo \"L-M-X\"."];
+      }
+      diasDisponibles = dias.join("-");
+    }
     const criterios = { localidadGarantizada, categoriaGarantizada, tipoHabitacionGarantizada };
     for (const [nombre, valor] of Object.entries(criterios)) {
       if (valor == null) continue;
