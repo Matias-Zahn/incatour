@@ -268,6 +268,88 @@ type RespuestaLiberarSobrantesApi = {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-38 Reemplazar Personal
+// ==========================================
+
+export type PersonalSalidaItem = {
+    idpersonal: number;
+    nombreCompleto: string;
+    rol: string;
+    permiso: string | null;
+};
+
+export type ServicioSalidaItem = {
+    tipo: string;
+    nombreServicio: string;
+};
+
+export type EquipamientoSalidaItem = {
+    nombreServicio: string;
+    cantidad: number;
+};
+
+export type SalidaPersonalCabecera = {
+    idsalida: number;
+    nroSalida: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+};
+
+export type DatosPersonalSalida = {
+    salida: SalidaPersonalCabecera;
+    personal: PersonalSalidaItem[];
+    servicios: ServicioSalidaItem[];
+    equipamiento: EquipamientoSalidaItem[];
+};
+
+type RespuestaPersonalSalidaApi = {
+    data: DatosPersonalSalida;
+};
+
+export type ReemplazanteDisponible = {
+    idpersonal: number;
+    nombreCompleto: string;
+    rol: string;
+};
+
+type RespuestaReemplazantesApi = {
+    data: ReemplazanteDisponible[];
+};
+
+export type PayloadConfirmarReemplazo = {
+    idoriginal: number;
+    idreemplazante: number;
+    motivo: string;
+};
+
+export type ParametrosConfirmarReemplazo = {
+    idsalida: number;
+    datos: PayloadConfirmarReemplazo;
+};
+
+export type PersonaInvolucradaReemplazo = {
+    idpersonal: number;
+    nombreCompleto: string;
+};
+
+export type DatosResultadoReemplazo = {
+    sale: PersonaInvolucradaReemplazo;
+    entra: PersonaInvolucradaReemplazo;
+    permisoDadoDeBaja: string | null;
+    permisoNuevo: string | null;
+};
+
+type RespuestaConfirmarReemplazoApi = {
+    mensaje: string;
+    data: DatosResultadoReemplazo;
+};
+
+export type ResultadoConfirmarReemplazo = DatosResultadoReemplazo & {
+    mensaje: string;
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -443,6 +525,51 @@ export async function liberarSobrantes(
     return respuesta.data;
 }
 
+/**
+ * Consulta el personal asignado a la salida y su logística (CU-38, GET /api/salidas/:idsalida/personal).
+ */
+export async function obtenerPersonalSalida(
+    idsalida: number,
+): Promise<DatosPersonalSalida> {
+    const respuesta = await solicitarApi<RespuestaPersonalSalidaApi>(
+        `/salidas/${idsalida}/personal`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Consulta los reemplazantes disponibles para un integrante asignado (CU-38, GET /api/salidas/:idsalida/personal/:idpersonal/reemplazantes).
+ */
+export async function obtenerReemplazantesDisponibles(
+    idsalida: number,
+    idpersonal: number,
+): Promise<ReemplazanteDisponible[]> {
+    const respuesta = await solicitarApi<RespuestaReemplazantesApi>(
+        `/salidas/${idsalida}/personal/${idpersonal}/reemplazantes`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Confirma el reemplazo de personal en una salida (CU-38, POST /api/salidas/:idsalida/reemplazos).
+ */
+export async function confirmarReemplazo(
+    idsalida: number,
+    datos: PayloadConfirmarReemplazo,
+): Promise<ResultadoConfirmarReemplazo> {
+    const respuesta = await solicitarApi<RespuestaConfirmarReemplazoApi>(
+        `/salidas/${idsalida}/reemplazos`,
+        {
+            method: "POST",
+            body: JSON.stringify(datos),
+        },
+    );
+    return {
+        ...respuesta.data,
+        mensaje: respuesta.mensaje,
+    };
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -455,6 +582,10 @@ export const clavesSalidas = {
         ["salidas", "opciones", params ?? {}] as const,
     asignacion: (idsalida?: number | null) =>
         ["salidas", "asignacion", idsalida ?? null] as const,
+    personal: (idsalida?: number | null) =>
+        ["salidas", "personal", idsalida ?? null] as const,
+    reemplazantes: (idsalida?: number | null, idpersonal?: number | null) =>
+        ["salidas", "reemplazantes", idsalida ?? null, idpersonal ?? null] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
@@ -543,6 +674,69 @@ export function useLiberarSobrantes() {
             queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
             queryClient.invalidateQueries({
                 queryKey: clavesSalidas.asignacion(idsalida),
+            });
+        },
+    });
+}
+
+/**
+ * Hook para consultar el personal asignado a una salida y sus permisos vigentes (CU-38).
+ */
+export function usePersonalSalida(
+    idsalida: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" && Number.isInteger(idsalida) && idsalida > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.personal(idsalida),
+        queryFn: () => obtenerPersonalSalida(idsalida!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para consultar los reemplazantes disponibles para una persona asignada (CU-38).
+ */
+export function useReemplazantesDisponibles(
+    idsalida: number | null | undefined,
+    idpersonal: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idsValidos =
+        typeof idsalida === "number" &&
+        Number.isInteger(idsalida) &&
+        idsalida > 0 &&
+        typeof idpersonal === "number" &&
+        Number.isInteger(idpersonal) &&
+        idpersonal > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idsValidos;
+
+    return useQuery({
+        queryKey: clavesSalidas.reemplazantes(idsalida, idpersonal),
+        queryFn: () => obtenerReemplazantesDisponibles(idsalida!, idpersonal!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para ejecutar el reemplazo de personal asignado (CU-38).
+ * Invalida las salidas y el personal asignado tras el éxito.
+ */
+export function useConfirmarReemplazo() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ idsalida, datos }: ParametrosConfirmarReemplazo) =>
+            confirmarReemplazo(idsalida, datos),
+        onSuccess: (_resultado, variables) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.personal(variables.idsalida),
+            });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.asignacion(variables.idsalida),
             });
         },
     });
