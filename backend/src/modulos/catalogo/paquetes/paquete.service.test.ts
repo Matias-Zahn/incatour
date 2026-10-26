@@ -213,6 +213,15 @@ describe("PaqueteService", () => {
       expect(repo.reemplazarTarifas).not.toHaveBeenCalled();
     });
 
+    it("CAT-16: con una temporada inactiva no guarda ningún otro cambio", async () => {
+      db.temporada.findUnique.mockResolvedValue(null);
+
+      await expect(
+        new PaqueteService().modificarPaquete(10, modificar({ nombrePaquete: "Otro", serviciosIncluidos: [], matrizPrecios: precios }))
+      ).rejects.toThrow("no existe o no está activa");
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
     it("404 si el paquete no existe", async () => {
       repo.findById.mockResolvedValue(null);
 

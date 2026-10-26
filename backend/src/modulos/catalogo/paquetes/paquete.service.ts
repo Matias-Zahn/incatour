@@ -136,6 +136,11 @@ export class PaqueteService {
       await this.validarServiciosExisten(dto.serviciosIncluidos);
     }
 
+    // CAT-16: las temporadas de la matriz se validan antes de escribir nada, para no dejar el paquete a medias
+    if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
+      await this.validarViabilidadComercial(dto.matrizPrecios);
+    }
+
     // 1. Actualizar datos básicos
     const dataUpdate: any = {};
     if (dto.idcircuito) dataUpdate.idcircuito = dto.idcircuito;
@@ -164,9 +169,8 @@ export class PaqueteService {
       );
     }
 
-    // 2. Si viene matrizPrecios, validar temporadas y reemplazar tarifas (CAT-06)
+    // 2. Si viene matrizPrecios, reemplazar tarifas (CAT-06); las temporadas ya se validaron arriba
     if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
-      await this.validarViabilidadComercial(dto.matrizPrecios);
       await this.repository.reemplazarTarifas(id, dto.matrizPrecios);
     }
 
