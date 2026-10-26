@@ -594,8 +594,10 @@ function SalidasPage() {
     const [paginaActual, setPaginaActual] = useState(1);
 
     // Opciones para los selectores de filtros
-    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos();
+    // FE-50: los filtros también ofrecen circuitos y paquetes dados de baja; para crear salidas, solo los activos
+    const { data: circuitos = [], isPending: cargandoCircuitos } = useCircuitos({ estado: "TODOS" });
     const { data: paquetes = [], isPending: cargandoPaquetes } = usePaquetes();
+    const { data: paquetesFiltro = [] } = usePaquetes({ estado: "TODOS" });
     const { data: personalGuias = [], isPending: cargandoGuias } = usePersonal({
         rol: "Guía",
     });
@@ -1963,7 +1965,7 @@ function SalidasPage() {
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
                     >
                         <option value="">Todos los paquetes</option>
-                        {paquetes.map((p) => (
+                        {paquetesFiltro.map((p) => (
                             <option key={p.idpaquete} value={p.idpaquete}>
                                 {p.nroPaquete} · {p.nombrePaquete}
                             </option>
