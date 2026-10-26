@@ -66,6 +66,7 @@ function FormularioProveedor({
                     <select {...register("tipoProveedor")} className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20">
                         {tiposProveedor.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                     </select>
+                    {errors.tipoProveedor ? <span className="text-xs font-normal text-peligro" role="alert">{errors.tipoProveedor.message}</span> : null}
                 </label>
                 {([
                     ["razonSocial", "Razón social", "Ej. Andes Travel"],
