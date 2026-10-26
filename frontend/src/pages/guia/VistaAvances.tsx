@@ -3,6 +3,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
+import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalAvance,
     esquemaAvance,
@@ -326,10 +327,8 @@ export function VistaAvances({
                     : typeof error === "string"
                       ? error
                       : "Ocurrió un error inesperado.";
-            const esErrorConexion =
-                mensajeError.includes("Failed to fetch") ||
-                mensajeError.includes("NetworkError") ||
-                !navigator.onLine;
+            // FE-39: todo error que no es una respuesta del servidor es de red ("Load failed" en Safari, etc.)
+            const esErrorConexion = !(error instanceof ErrorApi) || !navigator.onLine;
 
             if (esErrorConexion) {
                 const guardado = guardarAvanceOffline(idsalida, {
