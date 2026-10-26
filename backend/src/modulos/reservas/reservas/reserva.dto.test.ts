@@ -21,6 +21,12 @@ describe("CrearReservaDto (CU-30)", () => {
     expect(dto).not.toHaveProperty("monto");
   });
 
+  it("guarda el pasaporte sin espacios alrededor (CTA-14)", () => {
+    const [, dto] = CrearReservaDto.create({ ...base, pasajeros: [{ ...pasajero, nroPasaporte: " P1 " }] });
+
+    expect(dto?.pasajeros[0]?.nroPasaporte).toBe("P1");
+  });
+
   it.each([
     [{ idsalida: "7" }, "idsalida es requerido y debe ser un número entero."],
     [{ idsalida: 7.5 }, "idsalida es requerido y debe ser un número entero."],
@@ -28,6 +34,7 @@ describe("CrearReservaDto (CU-30)", () => {
     [{ pasajeros: [] }, "Debe registrar al menos un pasajero para la reserva."],
     [{ pasajeros: [{ ...pasajero, nombreCompleto: "" }] }, "nombreCompleto es requerido para todos los pasajeros."],
     [{ pasajeros: [{ ...pasajero, nroPasaporte: "" }] }, "nroPasaporte es requerido para todos los pasajeros."],
+    [{ pasajeros: [{ ...pasajero, nroPasaporte: "   " }] }, "nroPasaporte es requerido para todos los pasajeros."],
     [{ pasajeros: [{ ...pasajero, nacionalidad: "" }] }, "nacionalidad es requerido para todos los pasajeros."],
     [{ pasajeros: [{ ...pasajero, fechaVencimientoPasaporte: "" }] }, "fechaVencimientoPasaporte es requerida."],
     [{ pasajeros: [{ ...pasajero, fechaVencimientoPasaporte: "nunca" }] }, "fechaVencimientoPasaporte inválida para Ana Pérez."],

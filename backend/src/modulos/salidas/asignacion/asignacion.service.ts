@@ -90,14 +90,17 @@ export class AsignacionService {
       }
     }
 
-    // FA4 (paso 13): se valida antes de tocar nada, para que el reintento parta de cero
-    const nomina = armarNomina(salida, elegidos);
-    const vencidos = nomina.filter((t) => t.fechaVencimientoPasaporte < salida.fechaFin);
-    if (vencidos.length) {
+    // FA4 (paso 13): el personal se puede cambiar, así que con su pasaporte vencido se corta antes de tocar nada.
+    // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue
+    const nominaCompleta = armarNomina(salida, elegidos);
+    const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte < salida.fechaFin);
+    const personalVencido = vencidos.filter((t) => t.tipo === "PERSONAL");
+    if (personalVencido.length) {
       throw CustomError.badRequest(
-        `Pasaportes que vencen antes del fin del recorrido: ${vencidos.map((t) => t.nombreCompleto).join(", ")}`
+        `Pasaportes que vencen antes del fin del recorrido: ${personalVencido.map((t) => t.nombreCompleto).join(", ")}`
       );
     }
+    const nomina = nominaCompleta.filter((t) => !vencidos.includes(t));
 
     // Paso 14: emisión nominal. Va antes de la transacción porque es un servicio externo
     const autoridad = obtenerAutoridad();
@@ -108,6 +111,7 @@ export class AsignacionService {
     } catch {
       throw CustomError.serviceUnavailable("No fue posible emitir los permisos ante la autoridad. Reintentá más tarde");
     }
+    rechazados = [...vencidos.map((t) => ({ titular: { tipo: t.tipo, id: t.id }, motivo: MOTIVO_PASAPORTE_VENCIDO })), ...rechazados];
 
     // Si algo falla después de emitir, los permisos emitidos se dan de baja
     const darDeBajaEmitidos = () =>
@@ -152,7 +156,7 @@ export class AsignacionService {
       rechazados: rechazados.map((r) => ({
         tipo: r.titular.tipo,
         id: r.titular.id,
-        nombreCompleto: nomina.find((n) => n.tipo === r.titular.tipo && n.id === r.titular.id)?.nombreCompleto ?? `#${r.titular.id}`,
+        nombreCompleto: nominaCompleta.find((n) => n.tipo === r.titular.tipo && n.id === r.titular.id)?.nombreCompleto ?? `#${r.titular.id}`,
         motivo: r.motivo,
       })),
       lugaresLiberados: sobrantesLiberados ? lugaresALiberar : 0,
@@ -231,6 +235,8 @@ export const habilitacionVigente = (guia: { fechaHabilitacion: Date | null } | n
   !!guia?.fechaHabilitacion && guia.fechaHabilitacion >= hasta;
 
 // Nómina completa (paso 14): pasajeros de las reservas confirmadas y personal asignado
+const MOTIVO_PASAPORTE_VENCIDO = "Pasaporte vence antes de finalizar el recorrido";
+
 const armarNomina = (
   salida: SalidaParaAsignar,
   personal: { idpersonal: number; nombreCompleto: string; nacionalidad: string; nroPasaporte: string; fechaVencimientoPasaporte: Date }[]
