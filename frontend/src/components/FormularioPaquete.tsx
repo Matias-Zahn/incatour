@@ -567,6 +567,13 @@ function FormularioPaquete({
                 );
                 return;
             }
+            // FE-49: el back también la exige; se avisa acá en vez de esperar el 400
+            if (!tipoHabitacionGarantizada.trim()) {
+                setErrorValidacion(
+                    "Con garantía por categoría, el tipo de habitación garantizado es obligatorio.",
+                );
+                return;
+            }
         }
 
         const payloadComun: DatosCrearPaquete = {
