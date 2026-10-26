@@ -99,8 +99,16 @@ function CircuitosPage() {
         };
 
         if (circuitoEnEdicion) {
+            // El back compara por valor: solo se manda si cambió (null, undefined y "" son lo mismo)
+            const { parametrosPorteadores, ...resto } = datos;
+            const cambioParametros =
+                (parametrosPorteadores ?? "").trim() !==
+                (circuitoEnEdicion.parametrosPorteadores ?? "").trim();
             modificar.mutate(
-                { id: circuitoEnEdicion.idcircuito, datos },
+                {
+                    id: circuitoEnEdicion.idcircuito,
+                    datos: cambioParametros ? datos : resto,
+                },
                 opciones,
             );
         } else {

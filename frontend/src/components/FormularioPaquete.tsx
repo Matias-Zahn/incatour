@@ -149,9 +149,13 @@ function FormularioPaquete({
                 s.disponibilidad?.modalidadConfirmacion) === "BLOQUEO_PLAZAS",
     );
 
-    const { data: detallePaquete } = usePaqueteDetalle(
-        paqueteEnEdicion?.idpaquete ?? null,
-    );
+    const {
+        data: detallePaquete,
+        isLoading: cargandoDetalle,
+        isError: errorDetalle,
+    } = usePaqueteDetalle(paqueteEnEdicion?.idpaquete ?? null);
+    // GET /paquetes no trae servicios ni garantías: hasta tener el detalle no se puede guardar
+    const detalleBloqueado = esEdicion && !detallePaquete;
 
     const [idservicioGarantizadoEditado, setIdservicioGarantizado] = useState<
         number | null
@@ -571,7 +575,15 @@ function FormularioPaquete({
             condiciones: condiciones.trim() || undefined,
             tipoGarantia,
             ...(tipoGarantia === "POR_ESTABLECIMIENTO"
-                ? { idservicioGarantizado }
+                ? // En edición sin tocar la garantía no se manda: el back la deja como está
+                  esEdicion &&
+                  idservicioGarantizadoEditado === null &&
+                  tipoGarantia ===
+                      normalizarTipoGarantiaInicial(
+                          paqueteEnEdicion?.tipoGarantia,
+                      )
+                    ? {}
+                    : { idservicioGarantizado }
                 : {
                       localidadGarantizada: localidadGarantizada.trim(),
                       categoriaGarantizada: categoriaGarantizada.trim(),
@@ -590,10 +602,17 @@ function FormularioPaquete({
         };
 
         if (esEdicion && paqueteEnEdicion) {
+            // Solo se manda si el usuario los tocó: reenviarlos falla si hay servicios dados de baja
+            const sinServicios: Partial<DatosCrearPaquete> = {
+                ...payloadComun,
+            };
+            delete sinServicios.serviciosIncluidos;
             alGuardarEdicion(
                 paqueteEnEdicion.idpaquete,
                 {
-                    ...payloadComun,
+                    ...(serviciosIncluidosEditados === null
+                        ? sinServicios
+                        : payloadComun),
                     condiciones: condiciones.trim(),
                 },
                 imagenesArchivos,
@@ -1003,7 +1022,10 @@ function FormularioPaquete({
                                             <button
                                                 key={aloj.idservicio}
                                                 type="button"
-                                                disabled={!esBloqueo}
+                                                disabled={
+                                                    !esBloqueo ||
+                                                    detalleBloqueado
+                                                }
                                                 onClick={() =>
                                                     setIdservicioGarantizado(
                                                         aloj.idservicio,
@@ -1236,7 +1258,35 @@ function FormularioPaquete({
                     </div>
 
                     <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                        {serviciosDisponibles.map((servicio) => {
+                        {[
+                            ...serviciosDisponibles.map((s) => ({
+                                ...s,
+                                inactivo: false,
+                            })),
+                            // Incluidos que ya no están disponibles (dados de baja): se muestran para poder quitarlos
+                            ...serviciosIncluidos
+                                .filter(
+                                    (id) =>
+                                        !serviciosDisponibles.some(
+                                            (s) => s.idservicio === id,
+                                        ),
+                                )
+                                .map((id) => {
+                                    const s = detallePaquete?.servicios?.find(
+                                        (item) => item.idservicio === id,
+                                    )?.servicio;
+                                    return {
+                                        idservicio: id,
+                                        nombreServicio:
+                                            s?.nombreServicio ??
+                                            `Servicio #${id}`,
+                                        tipo: "",
+                                        localidad: s?.localidad,
+                                        costoBase: s?.costoBase ?? 0,
+                                        inactivo: true,
+                                    };
+                                }),
+                        ].map((servicio) => {
                             const marcado = serviciosIncluidos.includes(
                                 servicio.idservicio,
                             );
@@ -1252,6 +1302,7 @@ function FormularioPaquete({
                                     <input
                                         type="checkbox"
                                         checked={marcado}
+                                        disabled={detalleBloqueado}
                                         onChange={() =>
                                             alternarServicioIncluido(
                                                 servicio.idservicio,
@@ -1262,9 +1313,15 @@ function FormularioPaquete({
                                     <div className="min-w-0 flex-1">
                                         <p className="font-semibold text-texto">
                                             {servicio.nombreServicio}
+                                            {servicio.inactivo
+                                                ? " (inactivo)"
+                                                : ""}
                                         </p>
                                         <p className="mt-0.5 text-xs text-texto-suave">
-                                            {servicio.tipo} ·{" "}
+                                            {servicio.tipo
+                                                ? `${servicio.tipo} · `
+                                                : ""}
+                                            {" "}
                                             {servicio.localidad ?? "Cusco"} ·
                                             Costo base USD {servicio.costoBase}
                                         </p>
@@ -1595,6 +1652,18 @@ function FormularioPaquete({
                 </div>
             </div>
 
+            {detalleBloqueado ? (
+                errorDetalle ? (
+                    <p className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-sm text-peligro" role="alert">
+                        No se pudieron cargar los servicios y la garantía del paquete. Cerrá y volvé a abrir la edición para reintentar.
+                    </p>
+                ) : cargandoDetalle ? (
+                    <p className="text-sm text-texto-suave">
+                        Cargando datos del paquete…
+                    </p>
+                ) : null
+            ) : null}
+
             {mensajeError ? (
                 <p className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-sm text-peligro" role="alert">
                     {mensajeError}
@@ -1610,7 +1679,11 @@ function FormularioPaquete({
                 >
                     Cancelar
                 </Boton>
-                <Boton type="submit" cargando={guardando}>
+                <Boton
+                    type="submit"
+                    cargando={guardando}
+                    disabled={detalleBloqueado}
+                >
                     {esEdicion
                         ? "Guardar cambios del paquete"
                         : "Publicar paquete turístico"}
