@@ -350,6 +350,114 @@ export type ResultadoConfirmarReemplazo = DatosResultadoReemplazo & {
 };
 
 // ==========================================
+// Tipos TypeScript: CU-39 Modificar Logística
+// ==========================================
+
+export type ProveedorLogistica = {
+    idproveedor: number;
+    razonSocial: string;
+};
+
+export type EquipamientoLogisticaItem = {
+    idservicio: number;
+    nombreServicio: string;
+    tipoEquipamiento: string | null;
+    cantidad: number;
+    proveedor: ProveedorLogistica;
+};
+
+export type TransporteLogisticaItem = {
+    idservicio: number;
+    nombreServicio: string;
+    comprobanteReserva: string | null;
+    proveedor: ProveedorLogistica;
+};
+
+export type PanelLogistica = {
+    idsalida: number;
+    nroSalida: string;
+    estado: string;
+    fechaInicio: string;
+    fechaFin: string;
+    equipamiento: EquipamientoLogisticaItem[];
+    transporte: TransporteLogisticaItem | null;
+    requerimientosSinAsignar: string[];
+};
+
+type RespuestaPanelLogisticaApi = {
+    data: PanelLogistica;
+};
+
+export type RecursoDisponibleEquipamiento = {
+    idservicio: number;
+    nombreServicio: string;
+    localidad: string;
+    costoBase: number;
+    proveedor: ProveedorLogistica;
+    disponibilidad: {
+        tipoEquipamiento: string | null;
+        cantidadDisponible: number;
+    };
+};
+
+export type RecursoDisponibleTransporte = {
+    idservicio: number;
+    nombreServicio: string;
+    localidad: string;
+    costoBase: number;
+    proveedor: ProveedorLogistica;
+    disponibilidad: {
+        capacidadVehiculo: number;
+        pasajerosConfirmados: number;
+    };
+};
+
+export type RecursoDisponibleLogistica =
+    | RecursoDisponibleEquipamiento
+    | RecursoDisponibleTransporte;
+
+type RespuestaDisponiblesLogisticaApi<T = RecursoDisponibleLogistica> = {
+    data: T[];
+};
+
+export type ItemDesasignarLogistica = {
+    tipo: "EQUIPAMIENTO" | "TRANSPORTE";
+    idservicio: number;
+};
+
+export type ItemNuevoLogistica = {
+    tipo: "EQUIPAMIENTO" | "TRANSPORTE";
+    idservicio: number;
+    cantidad?: number;
+    comprobanteReserva?: string;
+};
+
+export type PayloadModificarLogistica = {
+    itemsDesasignar: ItemDesasignarLogistica[];
+    itemsNuevos: ItemNuevoLogistica[];
+    motivo?: string | null;
+};
+
+export type ParametrosModificarLogistica = {
+    idsalida: number;
+    datos: PayloadModificarLogistica;
+};
+
+export type DatosResultadoModificarLogistica = {
+    panel: PanelLogistica;
+    advertencias: string[];
+};
+
+type RespuestaModificarLogisticaApi = {
+    mensaje: string;
+    data: DatosResultadoModificarLogistica;
+};
+
+export type ResultadoModificarLogistica = DatosResultadoModificarLogistica & {
+    mensaje: string;
+};
+
+// ==========================================
 // Normalización y construcción de Query
 // ==========================================
 
@@ -570,6 +678,51 @@ export async function confirmarReemplazo(
     };
 }
 
+/**
+ * Consulta el panel de logística de una salida (CU-39, GET /api/salidas/:idsalida/logistica).
+ */
+export async function obtenerPanelLogistica(
+    idsalida: number,
+): Promise<PanelLogistica> {
+    const respuesta = await solicitarApi<RespuestaPanelLogisticaApi>(
+        `/salidas/${idsalida}/logistica`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Consulta proveedores disponibles para reasignar logística (CU-39, GET /api/salidas/:idsalida/logistica/disponibles?tipo=...).
+ */
+export async function consultarDisponiblesLogistica(
+    idsalida: number,
+    tipo: "EQUIPAMIENTO" | "TRANSPORTE",
+): Promise<RecursoDisponibleLogistica[]> {
+    const respuesta = await solicitarApi<RespuestaDisponiblesLogisticaApi>(
+        `/salidas/${idsalida}/logistica/disponibles?tipo=${tipo}`,
+    );
+    return respuesta.data;
+}
+
+/**
+ * Confirma las modificaciones de logística de una salida (CU-39, PUT /api/salidas/:idsalida/logistica).
+ */
+export async function modificarLogistica(
+    idsalida: number,
+    datos: PayloadModificarLogistica,
+): Promise<ResultadoModificarLogistica> {
+    const respuesta = await solicitarApi<RespuestaModificarLogisticaApi>(
+        `/salidas/${idsalida}/logistica`,
+        {
+            method: "PUT",
+            body: JSON.stringify(datos),
+        },
+    );
+    return {
+        ...respuesta.data,
+        mensaje: respuesta.mensaje,
+    };
+}
+
 // ==========================================
 // Claves y hooks de TanStack Query
 // ==========================================
@@ -586,6 +739,10 @@ export const clavesSalidas = {
         ["salidas", "personal", idsalida ?? null] as const,
     reemplazantes: (idsalida?: number | null, idpersonal?: number | null) =>
         ["salidas", "reemplazantes", idsalida ?? null, idpersonal ?? null] as const,
+    logistica: (idsalida?: number | null) =>
+        ["salidas", "logistica", idsalida ?? null] as const,
+    logisticaDisponibles: (idsalida?: number | null, tipo?: string | null) =>
+        ["salidas", "logistica", "disponibles", idsalida ?? null, tipo ?? null] as const,
 };
 
 export function useSalidas(filtros?: FiltrosSalidas) {
@@ -737,6 +894,67 @@ export function useConfirmarReemplazo() {
             });
             queryClient.invalidateQueries({
                 queryKey: clavesSalidas.asignacion(variables.idsalida),
+            });
+        },
+    });
+}
+
+/**
+ * Hook para consultar el panel de logística de una salida (CU-39).
+ */
+export function usePanelLogistica(
+    idsalida: number | null | undefined,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" && Number.isInteger(idsalida) && idsalida > 0;
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.logistica(idsalida),
+        queryFn: () => obtenerPanelLogistica(idsalida!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para consultar los recursos disponibles (transporte o equipamiento) para reasignar (CU-39).
+ */
+export function useRecursosDisponiblesLogistica(
+    idsalida: number | null | undefined,
+    tipo: "EQUIPAMIENTO" | "TRANSPORTE" | null,
+    opcionesQuery?: { enabled?: boolean },
+) {
+    const idValido =
+        typeof idsalida === "number" &&
+        Number.isInteger(idsalida) &&
+        idsalida > 0 &&
+        (tipo === "EQUIPAMIENTO" || tipo === "TRANSPORTE");
+    const habilitado = (opcionesQuery?.enabled ?? true) && idValido;
+
+    return useQuery({
+        queryKey: clavesSalidas.logisticaDisponibles(idsalida, tipo),
+        queryFn: () => consultarDisponiblesLogistica(idsalida!, tipo!),
+        enabled: habilitado,
+    });
+}
+
+/**
+ * Hook para confirmar la modificación de la logística de una salida (CU-39).
+ * Invalida salidas y logística tras el éxito.
+ */
+export function useModificarLogistica() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ idsalida, datos }: ParametrosModificarLogistica) =>
+            modificarLogistica(idsalida, datos),
+        onSuccess: (_resultado, variables) => {
+            queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.logistica(variables.idsalida),
+            });
+            queryClient.invalidateQueries({
+                queryKey: clavesSalidas.logisticaDisponibles(variables.idsalida, null),
             });
         },
     });
