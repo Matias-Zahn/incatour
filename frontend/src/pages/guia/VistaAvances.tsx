@@ -160,7 +160,7 @@ export function VistaAvances({
 
         setSincronizando(true);
         let exitoCount = 0;
-        const rechazados: string[] = [];
+        let rechazo: string | null = null;
 
         for (const item of pendientes) {
             try {
@@ -175,7 +175,8 @@ export function VistaAvances({
                 eliminarAvanceOffline(idsalida, item.idLocal);
                 exitoCount += 1;
             } catch (error) {
-                // 4xx = rechazo definitivo del back: se descarta para no trabar la cola.
+                // 4xx = rechazo definitivo del back: se descarta SOLO ese avance y se corta, porque los
+                // siguientes dependen del orden de etapas y se rechazarían en cadena.
                 // 401/408/429 y errores de red o 5xx se reintentan en el próximo intento.
                 if (
                     error instanceof ErrorApi &&
@@ -184,8 +185,8 @@ export function VistaAvances({
                     ![401, 408, 429].includes(error.estado)
                 ) {
                     eliminarAvanceOffline(idsalida, item.idLocal);
-                    rechazados.push(`${item.etapaNombre}: ${error.message}`);
-                    continue;
+                    rechazo = `${item.etapaNombre}: ${error.message}`;
+                    break;
                 }
                 console.error("Error sincronizando avance", error);
                 break;
@@ -196,10 +197,10 @@ export function VistaAvances({
         setAvancesPendientes(restantes);
         setSincronizando(false);
 
-        if (rechazados.length > 0) {
+        if (rechazo) {
             setMensajeFeedback({
                 tipo: "error",
-                texto: `El servidor rechazó ${rechazados.length} avance(s) pendiente(s) y se descartaron: ${rechazados.join(" | ")}`,
+                texto: `El servidor rechazó un avance pendiente y se descartó (${rechazo}).${restantes.length > 0 ? " Los demás siguen pendientes y se reintentan en la próxima sincronización." : ""}`,
             });
         } else if (exitoCount > 0) {
             setMensajeFeedback({
