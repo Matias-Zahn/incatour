@@ -133,6 +133,16 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
     expect(r).toMatchObject({ estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
   });
 
+  it("CTA-15: un DEMORADO reenviado con la misma llegada devuelve el que ya estaba sin crear otro", async () => {
+    const previo = { idavance: 40, numeroOrden: 2, estadoTramo: "DEMORADO", fechaHoraLlegada: new Date("2026-01-11T15:00:00Z") };
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 1, avances: [previo] }));
+
+    const r = await new GuiaService().registrarAvance(1, 2, avance(2, "DEMORADO"));
+
+    expect(r).toMatchObject({ avance: { idavance: 40 } });
+    expect(repo.registrarAvance).not.toHaveBeenCalled();
+  });
+
   it("rechaza saltear etapas, repetir una completada o una etapa de otro circuito", async () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "EN_CURSO", ultimaEtapaAlcanzada: 1 }));
     const servicio = new GuiaService();
