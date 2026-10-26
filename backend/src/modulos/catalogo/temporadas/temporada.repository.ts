@@ -57,8 +57,9 @@ export class TemporadaRepository {
   }
 
   async tieneTarifasAsociadas(id: number) {
+    // CAT-19: las tarifas de paquetes dados de baja no bloquean la temporada
     const count = await db.tarifaPaquete.count({
-      where: { idtemporada: id },
+      where: { idtemporada: id, paquete: { estado: "ACTIVO" } },
     });
     return count > 0;
   }
