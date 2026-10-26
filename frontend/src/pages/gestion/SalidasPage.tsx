@@ -50,6 +50,7 @@ import {
     type ResultadoDevolucionEquipamiento,
     type Salida,
 } from "../../services/salidaService";
+import { formatearMontoUsd } from "../../services/clientePortalService";
 import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
@@ -1763,11 +1764,7 @@ function SalidasPage() {
                                         </span>{" "}
                                         con un reembolso total registrado de{" "}
                                         <span className="font-bold">
-                                            {new Intl.NumberFormat("es-AR", {
-                                                style: "currency",
-                                                currency: "ARS",
-                                                minimumFractionDigits: 2,
-                                            }).format(resultadoCancelacion.reembolsoTotal ?? 0)}
+                                            {formatearMontoUsd(resultadoCancelacion.reembolsoTotal ?? 0)}
                                         </span>
                                         .
                                     </>

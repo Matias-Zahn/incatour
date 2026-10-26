@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
 import { ErrorApi } from "../services/clienteApi";
+import { formatearMontoUsd } from "../services/clientePortalService";
 import { formatearFechaSalida } from "../services/guiaService";
 import {
     useCancelarSalida,
@@ -21,14 +22,6 @@ export type ModalCancelarSalidaProps = {
         mensaje: string,
     ) => void;
 };
-
-function formatearImporte(monto: number): string {
-    return new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: "ARS",
-        minimumFractionDigits: 2,
-    }).format(monto);
-}
 
 export function ModalCancelarSalida({
     abierto,
@@ -321,7 +314,7 @@ export function ModalCancelarSalida({
                                                 Total de reintegros registrados (100%)
                                             </span>
                                             <p className="text-xl font-extrabold text-rose-900 mt-0.5">
-                                                {formatearImporte(impacto.totalAReembolsar)}
+                                                {formatearMontoUsd(impacto.totalAReembolsar)}
                                             </p>
                                         </div>
                                     </div>
