@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { solicitarApi } from "./clienteApi";
 import { clavesCatalogoCompra } from "./catalogoCompraService";
+import { fechaLocalHoy } from "./guiaService";
 import {
     guardarSesion,
     limpiarSesion,
@@ -674,6 +675,14 @@ export function formatearFechaUtcCorta(iso?: string | null): string {
     });
 }
 
+/** FE-47: para instantes (fecha de emisión): en hora local, no en UTC. */
+export function formatearFechaLocalCorta(iso?: string | null): string {
+    if (!iso) return "--/--/----";
+    const fecha = new Date(iso);
+    if (Number.isNaN(fecha.getTime())) return iso;
+    return fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export function formatearRangoFechasUtc(
     fechaInicioIso?: string | null,
     fechaFinIso?: string | null,
@@ -739,11 +748,8 @@ export function reservaAdmiteCancelacion(reserva: {
     if (["EN_CURSO", "FINALIZADA", "CANCELADA"].includes(estadoSalida)) {
         return false;
     }
-    const fechaInicio = new Date(reserva.salida.fechaInicio);
-    if (!Number.isNaN(fechaInicio.getTime()) && fechaInicio <= new Date()) {
-        return false;
-    }
-    return true;
+    // FE-47: por día calendario local, igual que hoyUTC() en el back (la fecha de inicio viene a las 00:00Z)
+    return reserva.salida.fechaInicio.slice(0, 10) > fechaLocalHoy();
 }
 
 export function generarTextoComprobanteDescargable(
@@ -755,7 +761,7 @@ export function generarTextoComprobanteDescargable(
         "============================================================",
         `N° Reserva:          ${comprobante.nroReserva}`,
         `Estado:              ${etiquetaEstadoReserva(comprobante.estado)}`,
-        `Fecha de emisión:    ${formatearFechaUtcCorta(comprobante.fechaRealizacion)}`,
+        `Fecha de emisión:    ${formatearFechaLocalCorta(comprobante.fechaRealizacion)}`,
         "",
         "--- TITULAR DE LA RESERVA ---",
         `Nombre:              ${comprobante.titular.nombre} ${comprobante.titular.apellido}`,
