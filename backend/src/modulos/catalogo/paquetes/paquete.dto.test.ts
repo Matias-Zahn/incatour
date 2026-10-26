@@ -66,6 +66,13 @@ describe("CrearPaqueteDto", () => {
 });
 
 describe("ModificarPaqueteDto", () => {
+  it("CAT-20: rechaza textos vacíos o de otro tipo", () => {
+    expect(ModificarPaqueteDto.create({ nombrePaquete: "", nochesPrevias: 1 })[0]).toBe("nombrePaquete es requerido.");
+    expect(ModificarPaqueteDto.create({ condiciones: 5 })[0]).toBe("condiciones debe ser un texto.");
+    expect(ModificarPaqueteDto.create({ localidadGarantizada: " " })[0]).toBe("localidadGarantizada es requerido.");
+    expect(ModificarPaqueteDto.create({ condiciones: "" })[0]).toBeUndefined();
+  });
+
   it("exige al menos un campo", () => {
     expect(ModificarPaqueteDto.create({})[0]).toBe("Debe enviar al menos un campo para modificar.");
   });

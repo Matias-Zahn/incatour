@@ -28,6 +28,12 @@ describe("CrearCircuitoDto", () => {
 });
 
 describe("ModificarCircuitoDto", () => {
+  it("CAT-20: rechaza textos vacíos o de otro tipo", () => {
+    expect(ModificarCircuitoDto.create({ nombreCircuito: "  ", minimoGuias: 2 })[0]).toBe("nombreCircuito es requerido.");
+    expect(ModificarCircuitoDto.create({ nombreCircuito: 5 })[0]).toBe("nombreCircuito es requerido.");
+    expect(ModificarCircuitoDto.create({ dificultad: "", duracionDias: 3 })[0]).toBe("dificultad es requerido.");
+  });
+
   it("exige al menos un campo", () => {
     expect(ModificarCircuitoDto.create({})[0]).toBe("Debe enviar al menos un campo para modificar");
   });

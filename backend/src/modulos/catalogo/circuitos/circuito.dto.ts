@@ -1,4 +1,5 @@
 import { enteroOpcional } from "../../../shared/filtros";
+import { textoRequerido } from "../../../shared/validaciones";
 
 export class CrearCircuitoDto {
   private constructor(
@@ -50,11 +51,23 @@ export class ModificarCircuitoDto {
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarCircuitoDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
 
-    const { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
+    let { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
 
     // Al menos un campo debe venir
     if (!nombreCircuito && duracionDias === undefined && !dificultad && minimoGuias === undefined && parametrosPorteadores === undefined) {
       return ["Debe enviar al menos un campo para modificar"];
+    }
+
+    // CAT-20: un texto que viene no puede estar vacío ni ser de otro tipo
+    if (nombreCircuito !== undefined) {
+      const [error, limpio] = textoRequerido(nombreCircuito, "nombreCircuito", 255);
+      if (error) return [error];
+      nombreCircuito = limpio;
+    }
+    if (dificultad !== undefined) {
+      const [error, limpio] = textoRequerido(dificultad, "dificultad", 255);
+      if (error) return [error];
+      dificultad = limpio;
     }
 
     if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {

@@ -26,6 +26,11 @@ describe("CrearTemporadaDto", () => {
 });
 
 describe("ModificarTemporadaDto", () => {
+  it("CAT-20: rechaza un nombre vacío o de otro tipo", () => {
+    expect(ModificarTemporadaDto.create({ nombre: " ", fechaFin: "2030-01-01" })[0]).toBe("nombre es requerido.");
+    expect(ModificarTemporadaDto.create({ nombre: 5 })[0]).toBe("nombre es requerido.");
+  });
+
   it("exige al menos un campo", () => {
     expect(ModificarTemporadaDto.create({})[0]).toBe("Debe enviar al menos un campo para modificar");
   });
