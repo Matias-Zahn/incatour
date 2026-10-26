@@ -36,6 +36,14 @@ export class ReservaRepository {
   }
 
   // Todo lo que el servicio necesita para validar y calcular el precio (solo lectura)
+  // RES-15: pasajeros ya registrados con alguno de estos pasaportes
+  async buscarPasajerosPorPasaporte(nrosPasaporte: string[]) {
+    return db.pasajero.findMany({
+      where: { nroPasaporte: { in: nrosPasaporte } },
+      select: { nroPasaporte: true, nombreCompleto: true },
+    });
+  }
+
   async obtenerSalidaParaCompra(idsalida: number) {
     return db.salida.findUnique({
       where: { idsalida },
@@ -98,16 +106,13 @@ export class ReservaRepository {
       const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
 
-      // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza y se actualizan sus datos
+      // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza tal como está (RES-15: no se pisa su historial).
+      // El update reescribe el mismo pasaporte solo para bloquear la fila, como necesita RES-03
       const idsPasajeros: number[] = [];
       for (const p of d.pasajeros) {
         const pasajero = await tx.pasajero.upsert({
           where: { nroPasaporte: p.nroPasaporte },
-          update: {
-            nombreCompleto: p.nombreCompleto,
-            nacionalidad: p.nacionalidad,
-            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte),
-          },
+          update: { nroPasaporte: p.nroPasaporte },
           create: {
             nombreCompleto: p.nombreCompleto,
             nroPasaporte: p.nroPasaporte,
