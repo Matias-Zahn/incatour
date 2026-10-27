@@ -40,7 +40,7 @@ export class ReservaRepository {
   async buscarPasajerosPorPasaporte(nrosPasaporte: string[]) {
     return db.pasajero.findMany({
       where: { nroPasaporte: { in: nrosPasaporte } },
-      select: { nroPasaporte: true, nombreCompleto: true },
+      select: { nroPasaporte: true, nombreCompleto: true,fechaVencimientoPasaporte: true },
     });
   }
 
@@ -99,32 +99,15 @@ export class ReservaRepository {
     });
   }
 
-  // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
+ // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
   async confirmarReserva(d: DatosConfirmacionReserva) {
     return db.$transaction(async (tx) => {
       // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan (y ven) el cierre de la asignación (CU-40)
       const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
 
-      // Pasajero.nroPasaporte es único: si ya viajó antes se reutiliza tal como está (RES-15: no se pisa su historial).
-      // El update reescribe el mismo pasaporte solo para bloquear la fila, como necesita RES-03
-      const idsPasajeros: number[] = [];
-      for (const p of d.pasajeros) {
-        const pasajero = await tx.pasajero.upsert({
-          where: { nroPasaporte: p.nroPasaporte },
-          update: { nroPasaporte: p.nroPasaporte },
-          create: {
-            nombreCompleto: p.nombreCompleto,
-            nroPasaporte: p.nroPasaporte,
-            nacionalidad: p.nacionalidad,
-            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte),
-          },
-        });
-        idsPasajeros.push(pasajero.idpasajero);
-      }
-
       // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida.
-      // Va después del upsert: este bloquea la fila del Pasajero hasta el commit, así dos compras simultáneas se serializan
+      // Movemos esto ANTES de la inserción de pasajeros para evitar conflictos tempranos
       const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte);
       const ocupado = await tx.reservaPasajero.findFirst({
         where: {
@@ -138,10 +121,14 @@ export class ReservaRepository {
         },
         select: { pasajero: { select: { nroPasaporte: true } } },
       });
+      
       if (ocupado) {
         throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
       }
 
+      // FIX RES-15: connectOrCreate asegura que si el pasaporte ya existe,
+      // reutiliza la fila INTACTA (no modifica ni nombre ni fecha de vencimiento).
+      // Si no existe, lo crea.
       return tx.reserva.create({
         data: {
           idcliente: d.idcliente,
@@ -157,7 +144,22 @@ export class ReservaRepository {
           condicionesComerciales: d.condicionesComerciales,
           estado: "CONFIRMADA",
           estadoAlojamiento: d.estadoAlojamiento,
-          pasajeros: { create: idsPasajeros.map((idpasajero) => ({ idpasajero })) },
+          // Mapeamos los pasajeros usando connectOrCreate en lugar del for loop + upsert manual
+          pasajeros: { 
+            create: d.pasajeros.map(p => ({
+              pasajero: {
+                connectOrCreate: {
+                  where: { nroPasaporte: p.nroPasaporte.trim() },
+                  create: {
+                    nroPasaporte: p.nroPasaporte.trim(),
+                    nombreCompleto: p.nombreCompleto,
+                    nacionalidad: p.nacionalidad,
+                    fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte)
+                  }
+                }
+              }
+            })) 
+          },
           pagos: {
             create: {
               monto: d.precioCongelado,
