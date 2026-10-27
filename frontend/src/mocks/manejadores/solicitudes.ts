@@ -5,7 +5,7 @@ import type {
   ResolverSolicitudPayload,
 } from "../../services/solicitudService";
 
-const solicitudes: SolicitudPendiente[] = structuredClone(solicitudesIniciales);
+const solicitudes: Omit<SolicitudPendiente, "garantia">[] = structuredClone(solicitudesIniciales);
 const serviciosRechazadosPorReserva = new Map<number, Set<number>>();
 let proximoId = 2;
 
@@ -13,7 +13,22 @@ export const manejadoresSolicitudes = [
   // CU-33: GET /api/solicitudes
   http.get("*/api/solicitudes", async () => {
     await delay(150);
-    const pendientes = solicitudes.filter((s) => s.estado === "PENDIENTE");
+    // RES-19: el back agrega la garantía de la salida; en el mock coincide con la del paquete
+    const pendientes = solicitudes
+      .filter((s) => s.estado === "PENDIENTE")
+      .map((s) => {
+        const p = s.reserva.salida.paquete;
+        return {
+          ...s,
+          garantia: {
+            tipoGarantia: p.tipoGarantia,
+            localidad: p.localidadGarantizada,
+            categoria: p.categoriaGarantizada,
+            tipoHabitacion: p.tipoHabitacionGarantizada,
+            establecimiento: null,
+          },
+        };
+      });
     return HttpResponse.json({
       mensaje: "Solicitudes pendientes recuperadas con éxito",
       cantidad: pendientes.length,
@@ -93,7 +108,7 @@ export const manejadoresSolicitudes = [
       serviciosRechazadosPorReserva.set(sol.idreserva, setRechazados);
 
       const nuevoId = proximoId++;
-      const nuevaSol: SolicitudPendiente = {
+      const nuevaSol: Omit<SolicitudPendiente, "garantia"> = {
         ...structuredClone(sol),
         id: nuevoId,
         idsolicitud: nuevoId,

@@ -35,6 +35,14 @@ export interface SolicitudPendiente {
       };
     };
   };
+  // RES-19: la garantía vendida (foto de la salida), no la del paquete de hoy
+  garantia: {
+    tipoGarantia: string;
+    localidad: string | null;
+    categoria: string | null;
+    tipoHabitacion: string | null;
+    establecimiento: string | null;
+  };
 }
 
 export interface OpcionContactoHotel {

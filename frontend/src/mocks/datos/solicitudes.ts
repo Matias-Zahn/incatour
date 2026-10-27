@@ -22,7 +22,7 @@ export const hotelesCompatiblesMock = [
   },
 ];
 
-export const solicitudesIniciales: SolicitudPendiente[] = [
+export const solicitudesIniciales: Omit<SolicitudPendiente, "garantia">[] = [
   {
     id: 1,
     idsolicitud: 1,
