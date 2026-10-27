@@ -62,16 +62,50 @@ export class CuentaGuiaService {
     return this.formatear(cuentaCreada as CuentaGuia);
   }
 
-  // Modificar cuenta de guía (por administrador)
+ // Modificar cuenta de guía (por administrador)
   async modificarCuenta(idusuario: number, dto: ModificarCuentaGuiaDto) {
     const cuenta = await this.repository.findCuenta(idusuario);
     if (!cuenta || !cuenta.usuario) {
       throw CustomError.notFound(`No se encontró una cuenta de guía con ID de usuario ${idusuario}.`);
     }
+
     // CTA-07: una cuenta dada de baja no se modifica
     if (cuenta.usuario.estado === ESTADO.INACTIVO) {
       throw CustomError.badRequest("No se puede modificar una cuenta de guía dada de baja.");
     }
+
+    // FIX CTA-17 y CTA-16: Validaciones contra asignaciones en salidas activas
+    const asignaciones = await this.repository.consultarAsignacionesActivas(cuenta.idpersonal);
+
+    if (asignaciones.length > 0) {
+      const maximaFechaFin = new Date(
+        Math.max(...asignaciones.map((a) => new Date(a.salida.fechaFin).getTime()))
+      );
+
+      // CTA-17: La habilitación no puede vencer antes de terminar su última salida asignada
+      if (dto.fechaHabilitacion && new Date(dto.fechaHabilitacion) < maximaFechaFin) {
+        throw CustomError.conflict(
+          `La habilitación no puede vencer antes de que termine su última salida asignada (${maximaFechaFin.toISOString().split('T')[0]}).`
+        );
+      }
+
+      // CTA-16: No cambiar el nombre si la autoridad ya le emitió permiso en salidas activas
+      const cambiaNombre =
+        (dto.nombre && dto.nombre !== cuenta.usuario.nombre) ||
+        (dto.apellido && dto.apellido !== cuenta.usuario.apellido);
+
+      if (cambiaNombre) {
+        const tienePermisoEmitido = asignaciones.some(
+          (a) => a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === "EMITIDO")
+        );
+        if (tienePermisoEmitido) {
+          throw CustomError.conflict(
+            "No se puede modificar el nombre del guía porque posee permisos emitidos en salidas activas."
+          );
+        }
+      }
+    }
+
     this.validarHabilitacion(dto.fechaHabilitacion);
 
     if (dto.email && dto.email !== cuenta.usuario.email) {

@@ -31,6 +31,47 @@ export class PersonalService {
       throw CustomError.badRequest("La habilitación no puede estar vencida");
     }
 
+    // FIX CTA-16 y CTA-17: Validaciones contra salidas y asignaciones activas
+    const asignaciones = await this.repository.consultarAsignacionesActivas(idpersonal);
+
+    if (asignaciones.length > 0) {
+      // 1. Calculamos la fecha exacta en la que finaliza su última salida asignada
+      const maximaFechaFin = new Date(
+        Math.max(...asignaciones.map((a) => new Date(a.salida.fechaFin).getTime()))
+      );
+
+      // CTA-16: El pasaporte debe cubrir toda la duración de las salidas activas
+      if (dto.fechaVencimientoPasaporte && new Date(dto.fechaVencimientoPasaporte) < maximaFechaFin) {
+        throw CustomError.conflict(
+          `El pasaporte no puede vencer antes de que termine su última salida asignada (${maximaFechaFin.toISOString().split('T')[0]}).`
+        );
+      }
+
+      // CTA-17: La habilitación del guía debe cubrir toda la duración de las salidas activas
+      if (dto.fechaHabilitacion && new Date(dto.fechaHabilitacion) < maximaFechaFin) {
+        throw CustomError.conflict(
+          `La habilitación no puede vencer antes de que termine su última salida asignada (${maximaFechaFin.toISOString().split('T')[0]}).`
+        );
+      }
+
+      // CTA-16: Bloquear modificación de datos nominales (nombre/pasaporte) si hay permiso EMITIDO
+      const cambiaDatosNominales =
+        (dto.nroPasaporte && dto.nroPasaporte !== personal.nroPasaporte) ||
+        (dto.nombreCompleto && dto.nombreCompleto !== personal.nombreCompleto);
+
+      if (cambiaDatosNominales) {
+        const tienePermisoEmitido = asignaciones.some((a) =>
+          a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === "EMITIDO")
+        );
+
+        if (tienePermisoEmitido) {
+          throw CustomError.conflict(
+            "No se pueden modificar datos nominales (nombre o pasaporte) porque el personal tiene un permiso emitido en salidas activas."
+          );
+        }
+      }
+    }
+
     if (dto.nroPasaporte && dto.nroPasaporte !== personal.nroPasaporte) {
       const existe = await this.repository.checkPasaporteExists(dto.nroPasaporte);
       if (existe) throw CustomError.conflict("Este número de pasaporte ya está registrado");

@@ -38,6 +38,18 @@ export class AsignacionRepository {
       where: {
         ...(ids && { idpersonal: { in: ids } }),
         estado: ESTADO.ACTIVO,
+        // FIX CTA-18: Si es un guía, debe poseer una cuenta de usuario vinculada y ACTIVA
+        OR: [
+          { guia: null }, // Personal no guía (ej: porteadores)
+          {
+            guia: {
+              usuario: {
+                isNot: null,
+                estado: ESTADO.ACTIVO,
+              },
+            },
+          },
+        ],
         NOT: {
           asignaciones: {
             some: {
@@ -51,7 +63,7 @@ export class AsignacionRepository {
           },
         },
       },
-      include: { guia: true },
+      include: { guia: { include: { usuario: true } } },
       orderBy: { nombreCompleto: "asc" },
     });
   }

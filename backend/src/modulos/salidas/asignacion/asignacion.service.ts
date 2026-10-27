@@ -29,8 +29,14 @@ export class AsignacionService {
       bloqueoInicial,
       lugaresSobrantes: sobrantes,
       personalDisponible: personal
-        .filter((p) => p.rol !== ROL_GUIA || habilitacionVigente(p.guia, salida.fechaFin))
+        // FIX CTA-18: El guía debe tener habilitación vigente Y cuenta de usuario activa
+        .filter(
+          (p) =>
+            p.rol !== ROL_GUIA ||
+            (habilitacionVigente(p.guia, salida.fechaFin) && p.guia?.usuario?.estado === ESTADO.ACTIVO)
+        )
         .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
+      personalDisponible: personal
       transportesDisponibles: transportes.map((t) => ({
         idservicio: t.idservicio,
         nombreServicio: t.nombreServicio,
@@ -59,6 +65,9 @@ export class AsignacionService {
       else if (!libres.has(id)) problemas.push(`${p.nombreCompleto} está dado de baja o asignado a otra salida en esas fechas`);
       else if (p.rol === ROL_GUIA && !habilitacionVigente(p.guia, salida.fechaFin)) {
         problemas.push(`${p.nombreCompleto} no tiene la habilitación vigente para las fechas de la salida`);
+      } else if (p.rol === ROL_GUIA && (!p.guia?.usuario || p.guia.usuario.estado !== ESTADO.ACTIVO)) {
+        // FIX CTA-18: Rechazar si el guía no tiene cuenta de usuario activa
+        problemas.push(`${p.nombreCompleto} no posee una cuenta de usuario activa para reportar avances`);
       }
     }
     if (problemas.length) throw CustomError.badRequest(problemas.join(". "));
