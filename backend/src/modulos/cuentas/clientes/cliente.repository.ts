@@ -69,6 +69,40 @@ export class ClienteRepository {
     });
   }
 
+  // Busca al cliente usando el email de su tabla Usuario
+  async buscarPorEmail(email: string) {
+    return db.cliente.findFirst({
+      where: { usuario: { email: email } },
+      include: { usuario: true }
+    });
+  }
+
+  // Ejecuta la reactivación mágica en una transacción segura
+  async reactivarCliente(idcliente: number, idusuario: number, dto: CrearClienteDto, contraseniaHasheada: string) {
+    return db.$transaction(async (tx) => {
+      // 1. Actualizamos los datos base del usuario y su contraseña
+      await tx.usuario.update({
+        where: { idusuario },
+        data: {
+          nombre: dto.nombre,
+          apellido: dto.apellido,
+          contrasenia: contraseniaHasheada,
+          estado: "ACTIVO" // Ponlo aquí si tu tabla Usuario también tiene estado
+        }
+      });
+
+      // 2. Reactivamos al cliente
+      return tx.cliente.update({
+        where: { idcliente },
+        data: {
+          estado: "ACTIVO"
+          // Si tu CrearClienteDto tiene otros campos (ej: telefono), los agregas aquí:
+          // telefono: dto.telefono
+        }
+      });
+    });
+  }
+
   async update(idcliente: number, idusuario: number, data: ModificarClienteDto) {
     return db.$transaction(async (tx) => {
       const updateData: { nombre?: string; apellido?: string; email?: string } = {};
