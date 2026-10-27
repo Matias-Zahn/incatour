@@ -4,6 +4,7 @@ import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import {
+    paqueteDeSalida,
     useCatalogoPublico,
     useCrearReservaPaquete,
     type PaqueteCatalogoPublico,
@@ -304,6 +305,9 @@ function CatalogoCompraPage() {
         salidasDelPaquete.find((s) => s.idsalida === idSalidaSeleccionada) ??
         salidasDelPaquete[0] ??
         null;
+    // CAT-30: lo que se compra es la salida elegida (su foto), no el paquete tal como está hoy
+    const paqueteVendido =
+        paqueteEnCompra && salidaActiva ? paqueteDeSalida(paqueteEnCompra, salidaActiva) : paqueteEnCompra;
 
     function abrirDetallePaquete(paquete: PaqueteCatalogoPublico) {
         setPaqueteDetalle(paquete);
@@ -438,7 +442,7 @@ function CatalogoCompraPage() {
     const monedaActiva = salidaActiva?.moneda ?? "USD";
     const subtotalPasajeros = precioUnitario * pasajeros.length;
 
-    const infoEquipaje = paqueteEnCompra?.equipajeTransporte ?? null;
+    const infoEquipaje = paqueteVendido?.equipajeTransporte ?? null;
     const recargoEquipajeTotal = infoEquipaje
         ? pasajeros.reduce((acum, p) => {
               const exceso =
@@ -591,7 +595,7 @@ function CatalogoCompraPage() {
             borrarCompraGuardada();
             setReservaConfirmada({
                 resultado: respuesta.reserva,
-                paquete: paqueteEnCompra,
+                paquete: paqueteDeSalida(paqueteEnCompra, salidaActiva),
                 salida: salidaActiva,
                 pasajeros: [...pasajeros],
             });
@@ -1614,8 +1618,8 @@ function CatalogoCompraPage() {
                                 {paqueteEnCompra.circuito.nombre} ·{" "}
                                 {paqueteEnCompra.circuito.dias} días de
                                 trekking +{" "}
-                                {paqueteEnCompra.nochesAlojamiento.previas +
-                                    paqueteEnCompra.nochesAlojamiento
+                                {(paqueteVendido ?? paqueteEnCompra).nochesAlojamiento.previas +
+                                    (paqueteVendido ?? paqueteEnCompra).nochesAlojamiento
                                         .posteriores}{" "}
                                 noches de hotel
                             </p>
@@ -1638,7 +1642,7 @@ function CatalogoCompraPage() {
                                 </span>
                                 <span className="text-right font-semibold text-texto">
                                     {salidaActiva?.garantia ??
-                                        paqueteEnCompra.nochesAlojamiento.garantia}
+                                        (paqueteVendido ?? paqueteEnCompra).nochesAlojamiento.garantia}
                                 </span>
                             </div>
                             {salidaActiva
@@ -1646,9 +1650,9 @@ function CatalogoCompraPage() {
                                       const fechas = derivarFechasAlojamiento(
                                           salidaActiva.fechaInicio,
                                           salidaActiva.fechaFin,
-                                          paqueteEnCompra.nochesAlojamiento
+                                          (paqueteVendido ?? paqueteEnCompra).nochesAlojamiento
                                               .previas,
-                                          paqueteEnCompra.nochesAlojamiento
+                                          (paqueteVendido ?? paqueteEnCompra).nochesAlojamiento
                                               .posteriores,
                                       );
                                       return (
@@ -1681,10 +1685,10 @@ function CatalogoCompraPage() {
                                       );
                                   })()
                                 : null}
-                            {paqueteEnCompra.condiciones ? (
+                            {(paqueteVendido ?? paqueteEnCompra).condiciones ? (
                                 <p className="rounded-control border border-borde bg-fondo/50 p-2 text-[11px] text-texto">
                                     <strong>Condiciones comerciales:</strong>{" "}
-                                    {paqueteEnCompra.condiciones}
+                                    {(paqueteVendido ?? paqueteEnCompra).condiciones}
                                     <span className="block text-texto-suave">
                                         Quedan congeladas en tu reserva al
                                         confirmar el pago.
