@@ -82,6 +82,28 @@ export class PersonalRepository {
     });
   }
 
+  // consultamos  las asignaciones activas
+  async consultarAsignacionesActivas(idpersonal: number) {
+    return db.asignacionPersonal.findMany({
+      where: {
+        idpersonal,
+        salida: { estado: { notIn: ["CANCELADA", "FINALIZADA"] } } 
+      },
+      include: {
+        salida: { 
+          select: { 
+            fechaFin: true,
+            // Buscamos el permiso de ESTE personal en ESTA salida
+            permisos: {
+              where: { idpersonal },
+              select: { estadoTramite: true } // El nombre correcto del campo según Prisma
+            }
+          } 
+        },
+      }
+    });
+  }
+
   // CU-22: la habilitación es del guía, así que filtrar por vigencia deja solo guías
   async buscar(dto: ConsultarPersonalDto) {
     const hoy = hoyUTC();

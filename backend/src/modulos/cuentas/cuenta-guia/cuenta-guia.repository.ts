@@ -125,6 +125,26 @@ export class CuentaGuiaRepository {
     });
   }
 
+  async consultarAsignacionesActivas(idpersonal: number) {
+    return db.asignacionPersonal.findMany({
+      where: {
+        idpersonal,
+        salida: { estado: { notIn: ["CANCELADA", "FINALIZADA"] } }
+      },
+      include: {
+        salida: {
+          select: {
+            fechaFin: true,
+            permisos: {
+              where: { idpersonal },
+              select: { estadoTramite: true }
+            }
+          }
+        }
+      }
+    });
+  }
+
   // Modificar cuenta de guía (por administrador)
   async modificarCuenta(
     idusuario: number,
