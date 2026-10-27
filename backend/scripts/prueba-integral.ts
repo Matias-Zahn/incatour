@@ -23,9 +23,7 @@ const INTEGRAL_DB = process.env.INTEGRAL_DB ?? "incatour_integral";
 const PUERTO = Number(process.env.INTEGRAL_PUERTO ?? 3996);
 
 // Nombre del escenario (exacto, como se pasa a esperar/controlar) → error del tablero que lo explica
-const CONOCIDAS: Record<string, string> = {
-  "Reemplazar etapas de un circuito con salidas programadas": "CAT-28",
-};
+const CONOCIDAS: Record<string, string> = {};
 
 async function main() {
   const entorno = crearEntorno(INTEGRAL_DB);
