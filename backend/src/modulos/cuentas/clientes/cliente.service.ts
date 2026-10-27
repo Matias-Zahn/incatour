@@ -28,20 +28,35 @@ export class ClienteService {
   }
 
   async crearCliente(dto: CrearClienteDto) {
-    const emailExiste = await this.repository.checkEmailExists(dto.email);
-    if (emailExiste) {
-      throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
-    }
+    // 1. Buscamos si el correo ya pertenece a alguien
+    const clienteExistente = await this.repository.buscarPorEmail(dto.email);
 
     const salt = await bcrypt.genSalt(10);
     const contraseniaHasheada = await bcrypt.hash(dto.contrasenia, salt);
 
-    // Generación más segura para alta concurrencia
+    // 2. Si el correo ya existe, evaluamos su estado
+    if (clienteExistente) {
+      if (clienteExistente.estado === "INACTIVO") {
+        // MODO MÁGICO: La cuenta estaba de baja. La reactivamos con los datos nuevos.
+        return await this.repository.reactivarCliente(
+          clienteExistente.idcliente, 
+          clienteExistente.idusuario, 
+          dto, 
+          contraseniaHasheada
+        );
+      } else {
+        // FIX CTA-10: La cuenta existe y está ACTIVA. Bloqueamos el registro.
+        throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
+      }
+    }
+
+    // 3. Si el correo NO existe, seguimos el flujo de creación normal
     const nroCliente = `CLI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    return this.repository.createWithUser(dto, contraseniaHasheada, nroCliente);
+    
+    // Ya no hace falta el try/catch para el "CONFLICTO_DUPLICADO" porque lo validamos arriba
+    return await this.repository.createWithUser(dto, contraseniaHasheada, nroCliente);
   }
-
+  
   async modificarCliente(id: number, dto: ModificarClienteDto) {
     const cliente = await this.repository.findById(id);
     if (!cliente) {
