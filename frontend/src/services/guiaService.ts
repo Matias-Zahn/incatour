@@ -589,3 +589,25 @@ export function agregarHistorialLocalIncidente(
         console.warn("No se pudo actualizar historial local de incidentes", e);
     }
 }
+
+// CU-50: GET /api/incidentes (solo ADMIN), del más reciente al más viejo
+export type IncidenteAdmin = {
+    idincidente: number;
+    idsalida: number;
+    tipoIncidente: string;
+    descripcion: string;
+    nivelGravedad: "BAJO" | "MEDIO" | "CRITICO";
+    fechaHoraOcurrencia: string;
+    fechaHoraReporte: string;
+    salida: { nroSalida: string };
+    pasajeros: { pasajero: { nombreCompleto: string } }[];
+};
+
+export async function listarIncidentes(): Promise<IncidenteAdmin[]> {
+    const res = await solicitarApi<{ data: IncidenteAdmin[] }>("/incidentes");
+    return res.data;
+}
+
+export function useIncidentes() {
+    return useQuery({ queryKey: ["incidentes"], queryFn: listarIncidentes });
+}
