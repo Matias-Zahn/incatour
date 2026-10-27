@@ -228,6 +228,11 @@ export class PaqueteRepository {
   }
 
   // CAT-02: Considera todas las salidas activas, incluyendo PUBLICADA
+  // CAT-35: salidas programadas o ya realizadas (todas menos las canceladas)
+  async tieneSalidasNoCanceladas(id: number): Promise<boolean> {
+    return (await db.salida.count({ where: { idpaquete: id, estado: { not: "CANCELADA" } } })) > 0;
+  }
+
   async tieneSalidasActivas(id: number): Promise<boolean> {
     const count = await db.salida.count({
       where: {

@@ -101,10 +101,11 @@ export class PaqueteService {
 
     // Validar circuito si se cambia
     if (dto.idcircuito && dto.idcircuito !== paquete.idcircuito) {
-      // CAT-05: las salidas existentes siguen recorriendo el circuito con el que se vendieron
-      if (await this.repository.tieneSalidasActivas(id)) {
+      // CAT-05 / CAT-35: las salidas siguen recorriendo el circuito con el que se vendieron, también las ya realizadas
+      // (su historial e itinerario lo leen del circuito del paquete). Solo las canceladas no lo frenan.
+      if (await this.repository.tieneSalidasNoCanceladas(id)) {
         throw CustomError.badRequest(
-          "No se puede cambiar el circuito de un paquete que tiene salidas activas."
+          "No se puede cambiar el circuito de un paquete que tiene salidas programadas o realizadas: creá un paquete nuevo."
         );
       }
       const circuito = await db.circuito.findUnique({

@@ -7,7 +7,7 @@ import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 const { repo, db } = vi.hoisted(() => ({
   repo: {
     findAll: vi.fn(), findById: vi.fn(), guardar: vi.fn(), update: vi.fn(), updateEstado: vi.fn(),
-    reemplazarTarifas: vi.fn(), tieneSalidasActivas: vi.fn(), contarPaquetes: vi.fn(),
+    reemplazarTarifas: vi.fn(), tieneSalidasActivas: vi.fn(), tieneSalidasNoCanceladas: vi.fn(), contarPaquetes: vi.fn(),
   },
   db: {
     circuito: { findUnique: vi.fn() },
@@ -43,6 +43,7 @@ describe("PaqueteService", () => {
     repo.guardar.mockImplementation(async (datos) => ({ idpaquete: 10, ...datos }));
     repo.findById.mockResolvedValue({ idpaquete: 10, estado: "ACTIVO" });
     repo.tieneSalidasActivas.mockResolvedValue(false);
+    repo.tieneSalidasNoCanceladas.mockResolvedValue(false);
   });
 
   describe("consultarPaquetes (CU-10)", () => {
@@ -160,9 +161,9 @@ describe("PaqueteService", () => {
       expect(repo.reemplazarTarifas).not.toHaveBeenCalled();
     });
 
-    it("rechaza cambiar el circuito si el paquete tiene salidas activas (CAT-05)", async () => {
+    it("rechaza cambiar el circuito si el paquete tiene salidas programadas o realizadas (CAT-05, CAT-35)", async () => {
       repo.findById.mockResolvedValue({ idpaquete: 10, idcircuito: 1, estado: "ACTIVO" });
-      repo.tieneSalidasActivas.mockResolvedValue(true);
+      repo.tieneSalidasNoCanceladas.mockResolvedValue(true);
 
       await expect(new PaqueteService().modificarPaquete(10, modificar({ idcircuito: 2 }))).rejects.toMatchObject({ statusCode: 400 });
       expect(repo.update).not.toHaveBeenCalled();
