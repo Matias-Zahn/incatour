@@ -106,20 +106,6 @@ export class ReservaRepository {
       const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
 
-      // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida.
-      const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte.trim());
-      const ocupado = await tx.reservaPasajero.findFirst({
-        where: {
-          reserva: { idsalida: d.idsalida, estado: { not: "CANCELADA" } },
-          pasajero: { nroPasaporte: { in: pasaportesInput } },
-        },
-        select: { pasajero: { select: { nroPasaporte: true } } },
-      });
-      
-      if (ocupado) {
-        throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
-      }
-
       // FIX P2025 y RES-20: Desacoplamos la creación de pasajeros.
       const idsPasajeros: number[] = [];
       for (const p of d.pasajeros) {
@@ -139,6 +125,22 @@ export class ReservaRepository {
           }
         });
         idsPasajeros.push(pasajeroDb.idpasajero);
+      }
+
+      // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida.
+      // Va DESPUÉS del upsert: este bloquea la fila del Pasajero hasta el commit, así dos compras simultáneas
+      // con el mismo pasaporte se serializan y la segunda ve la reserva de la primera.
+      const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte.trim());
+      const ocupado = await tx.reservaPasajero.findFirst({
+        where: {
+          reserva: { idsalida: d.idsalida, estado: { not: "CANCELADA" } },
+          pasajero: { nroPasaporte: { in: pasaportesInput } },
+        },
+        select: { pasajero: { select: { nroPasaporte: true } } },
+      });
+      
+      if (ocupado) {
+        throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
       }
 
       // Ahora creamos la reserva conectando los IDs directamente
