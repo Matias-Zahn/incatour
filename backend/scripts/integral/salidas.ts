@@ -600,6 +600,56 @@ export async function salidas(ctx: Ctx) {
   });
 
   // ======================================================================
+  ctx.seccion("CU-20 Modificar servicios en salidas activas (sin versionar)");
+
+  await ctx.escenario("CAT-31 hotel editado en el lugar y cancelación", async () => {
+    const pq = await f.paquete();
+    const hotel = await f.hotel(pq.localidad, 30);
+    const idsalida = await f.salida(pq.idpaquete, proximoInicio(), 10, hotel.idservicio);
+    ok("CAT-31 hotel 30 con una salida de 10: queda 20", (await capacidad(hotel.idservicio)) === 20);
+    const r = await ctx.esperar("CAT-31 editar capacidad del hotel en una salida activa → 200", "PUT", `/servicios/${hotel.idservicio}`, { capacidadDisponible: 25 }, admin, 200);
+    ok("CAT-31 no versiona: mismo id, ACTIVO, sin versionado en la respuesta", r?.idservicio === hotel.idservicio && r.estado === "ACTIVO" && !("versionado" in (r ?? {})), JSON.stringify(r));
+    ok("CAT-31 el hotel quedó en 25 y sin copias", (await capacidad(hotel.idservicio)) === 25 && (await db.servicioBase.count({ where: { idproveedor: hotel.idproveedor } })) === 1);
+    await ctx.esperar("CAT-31 cancelar la salida → 200", "POST", `/salidas/${idsalida}/cancelar`, { motivo: "Sin ventas" }, admin, 200);
+    ok("CAT-31 las plazas vuelven al MISMO hotel vigente (25 + 10 = 35)", (await capacidad(hotel.idservicio)) === 35, `capacidad ${await capacidad(hotel.idservicio)}`);
+  });
+
+  await ctx.escenario("CAT-32 garantía por establecimiento tras editar el hotel", async () => {
+    const hotel = await f.hotel(`Loc ${ctx.unico()}`, 3);
+    const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
+    const pq = await ctx.preparar("Paquete con hotel garantizado", "POST", "/paquetes", {
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${ctx.unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: 500, moneda: "USD" })),
+    });
+    const idsalida = await f.salida(ctx.idDe(pq, "idpaquete")!, proximoInicio(), 6); // FA3: el hotel (3) no alcanza, sin bloqueo
+    ok("CAT-32 salida creada sin bloqueo de hotel", (await salidaDb(idsalida)).stockLocalAlojamiento === 0);
+    const cli = await f.cliente();
+    const res = await f.comprar(cli.token, idsalida, { n: 2 });
+    ok("CAT-32 la compra queda con alojamiento PENDIENTE", res.data.estadoAlojamiento === "PENDIENTE", JSON.stringify(res.data));
+    const sol = await db.solicitud.findFirstOrThrow({ where: { idreserva: res.idreserva } });
+    await ctx.esperar("CAT-32 editar la capacidad del hotel garantizado → 200", "PUT", `/servicios/${hotel.idservicio}`, { capacidadDisponible: 20 }, admin, 200);
+    await ctx.esperar("CAT-32 resolver la solicitud con el mismo hotel → 200", "POST", `/solicitudes/${sol.idsolicitud}/resolver`, { servicioId: hotel.idservicio, resolucion: "ACEPTADA" }, admin, 200);
+    ok("CAT-32 solicitud resuelta y reserva con alojamiento CONFIRMADO", (await db.solicitud.findUniqueOrThrow({ where: { idsolicitud: sol.idsolicitud } })).estado !== "PENDIENTE" && (await db.reserva.findUniqueOrThrow({ where: { idreserva: res.idreserva } })).estadoAlojamiento === "CONFIRMADO");
+  });
+
+  await ctx.escenario("CAT-33 transporte asignado editado en el lugar y protecciones", async () => {
+    const a = await asignada([2]); // transporte de 30 asignado a una salida CERRADA con 2 pasajeros
+    const hotel = a.hotel!.idservicio;
+    ok("CAT-33 la salida quedó CERRADA", (await salidaDb(a.idsalida)).estado === "CERRADA");
+    await ctx.esperar("CAT-33 bajar la capacidad por debajo de los pasajeros confirmados → 400", "PUT", `/servicios/${a.transporte}`, { capacidadVehiculo: 1 }, admin, 400);
+    const r = await ctx.esperar("CAT-33 subir la capacidad del transporte asignado → 200", "PUT", `/servicios/${a.transporte}`, { capacidadVehiculo: 40 }, admin, 200);
+    ok("CAT-33 mismo id, ACTIVO y asignado a la salida", r?.idservicio === a.transporte && r.estado === "ACTIVO" && (await db.salidaServicio.count({ where: { idsalida: a.idsalida, idservicio: a.transporte } })) === 1, JSON.stringify(r));
+    const m2 = await montar({ pax: [1], inicio: sumar(a.inicio, 1) });
+    const p2 = await plantel({ porteadores: 1 });
+    await ctx.esperar("CAT-33 asignar el mismo transporte a una salida superpuesta → 400", "POST", `/salidas/${m2.idsalida}/asignacion`, { ...cuerpo(p2, [p2.guias[0]!, p2.porteadores[0]!]), idtransporte: a.transporte }, admin, 400);
+    ok("CAT-33 la salida superpuesta sigue sin transporte", (await db.salidaServicio.count({ where: { idsalida: m2.idsalida, tipo: "TRANSPORTE" } })) === 0);
+    // Hotel bloqueado en la salida activa: no cambia su criterio, pero sí su nombre
+    await ctx.esperar("CU-20 cambiar la categoría de un hotel en una salida activa → 400", "PUT", `/servicios/${hotel}`, { categoria: "5 Estrellas" }, admin, 400);
+    await ctx.esperar("CU-20 cambiar la localidad de un hotel en una salida activa → 400", "PUT", `/servicios/${hotel}`, { localidad: "Otra" }, admin, 400);
+    await ctx.esperar("CU-20 editar el nombre de un hotel en una salida activa → 200", "PUT", `/servicios/${hotel}`, { nombreServicio: `Renombrado ${ctx.unico()}` }, admin, 200);
+  });
+
+  // ======================================================================
   ctx.seccion("CU-41 Devolución de equipamiento");
 
   await ctx.escenario("CU-41 devolución", async () => {
