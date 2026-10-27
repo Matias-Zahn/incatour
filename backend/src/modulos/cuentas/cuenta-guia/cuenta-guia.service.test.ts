@@ -3,7 +3,7 @@ import { CuentaGuiaService } from "./cuenta-guia.service";
 import { CrearCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { findPersonalGuia: vi.fn(), findCuenta: vi.fn(), checkEmailExists: vi.fn(), crearCuentaGuia: vi.fn(), modificarCuenta: vi.fn() },
+  repo: { findPersonalGuia: vi.fn(), findCuenta: vi.fn(), checkEmailExists: vi.fn(), crearCuentaGuia: vi.fn(), modificarCuenta: vi.fn(), consultarAsignacionesActivas: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock("./cuenta-guia.repository", () => ({ CuentaGuiaRepository: class { constructor() { return repo; } } }));
 

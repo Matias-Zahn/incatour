@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
 import { PersonalRepository } from "./personal.repository";
 import { ConsultarPersonalDto, CrearPersonalDto, ModificarPersonalDto, ROL_GUIA } from "./personal.dto";
-import { ESTADO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_PERMISO } from "../../../shared/constantes";
 import { hoyUTC } from "../../../shared/fechas";
 
 export class PersonalService {
@@ -61,7 +61,7 @@ export class PersonalService {
 
       if (cambiaDatosNominales) {
         const tienePermisoEmitido = asignaciones.some((a) =>
-          a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === "EMITIDO")
+          a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === ESTADO_PERMISO.EMITIDO)
         );
 
         if (tienePermisoEmitido) {

@@ -1,7 +1,7 @@
 import { hoyUTC } from "../../../shared/fechas";
 import bcrypt from "bcrypt";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_PERMISO } from "../../../shared/constantes";
 import { CrearCuentaGuiaDto, FiltrosCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 import { CuentaGuiaRepository } from "./cuenta-guia.repository";
 
@@ -96,7 +96,7 @@ export class CuentaGuiaService {
 
       if (cambiaNombre) {
         const tienePermisoEmitido = asignaciones.some(
-          (a) => a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === "EMITIDO")
+          (a) => a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === ESTADO_PERMISO.EMITIDO)
         );
         if (tienePermisoEmitido) {
           throw CustomError.conflict(
