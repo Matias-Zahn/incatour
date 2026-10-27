@@ -42,7 +42,8 @@ export function crearEntorno(nombreDb: string) {
     let salida = "";
     let caido = "";
     let terminando = false;
-    const server = spawn("npx", ["tsx", "src/app.ts"], { env: { ...env, PORT: String(puerto), ...extraEnv }, shell: true, stdio: ["ignore", "pipe", "pipe"] });
+    // detached fuera de Windows: el back queda en su propio grupo de procesos y se mata entero (shell → npx → tsx → node)
+    const server = spawn("npx", ["tsx", "src/app.ts"], { env: { ...env, PORT: String(puerto), ...extraEnv }, shell: true, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
     server.stdout.on("data", (d) => (salida += d));
     server.stderr.on("data", (d) => (salida += d));
     server.on("exit", (code) => { if (!terminando) caido = `el back del puerto ${puerto} se cayó (código ${code})`; });
@@ -89,7 +90,9 @@ export function crearEntorno(nombreDb: string) {
       // En Windows hay que matar el árbol (npx → tsx → node)
       if (process.platform === "win32" && server.pid) {
         try { execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: "ignore" }); } catch { /* ya terminó */ }
-      } else server.kill();
+      } else if (server.pid) {
+        try { process.kill(-server.pid, "SIGTERM"); } catch { /* ya terminó */ }
+      }
     }
 
     for (let i = 0; i < 60; i++) {
