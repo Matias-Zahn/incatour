@@ -44,6 +44,10 @@ export class ClienteService {
       // Si la cuenta está activa
       throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
     }
+    // El email puede ser de un admin o de un guía (no es cliente): mismo 409 claro, no el genérico de la base
+    if (await this.repository.checkEmailExists(dto.email)) {
+      throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
+    }
 
     // 3. Si el correo NO existe, seguimos el flujo de creación normal
     const nroCliente = `CLI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
