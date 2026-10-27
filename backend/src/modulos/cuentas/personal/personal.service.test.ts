@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PersonalService } from "./personal.service";
-import { CrearPersonalDto } from "./personal.dto";
+import { CrearPersonalDto, ModificarPersonalDto } from "./personal.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn() },
+  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn(), consultarAsignacionesActivas: vi.fn() },
 }));
 vi.mock("./personal.repository", () => ({ PersonalRepository: class { constructor() { return repo; } } }));
 
@@ -11,6 +11,20 @@ describe("PersonalService.modificarPersonal (CU-24)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     repo.buscarPorId.mockResolvedValue({ estado: "ACTIVO", nroPasaporte: "X", guia: { idusuario: 9 } });
+    repo.consultarAsignacionesActivas.mockResolvedValue([]);
+  });
+
+  it("CTA-16: con un permiso Emitido en una salida activa no cambia el pasaporte", async () => {
+    repo.consultarAsignacionesActivas.mockResolvedValue([{ salida: { fechaFin: new Date("2030-01-10"), permisos: [{ estadoTramite: "Emitido" }] } }]);
+    await expect(new PersonalService().modificarPersonal(1, ModificarPersonalDto.create({ nroPasaporte: "NUEVO1" })[1]!))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.modificar).not.toHaveBeenCalled();
+  });
+
+  it("CTA-17: la habilitación tiene que cubrir hasta el fin de las salidas asignadas", async () => {
+    repo.consultarAsignacionesActivas.mockResolvedValue([{ salida: { fechaFin: new Date("2099-01-10"), permisos: [] } }]);
+    await expect(new PersonalService().modificarPersonal(1, ModificarPersonalDto.create({ fechaHabilitacion: "2098-12-31" })[1]!))
+      .rejects.toMatchObject({ statusCode: 409 });
   });
 
   it("al cambiar el nombre de un guía también actualiza nombre y apellido de su usuario (CTA-04)", async () => {
