@@ -4,7 +4,7 @@ import { EstablecerSecuenciaDto } from "./etapa.dto";
 
 const { repo, db } = vi.hoisted(() => ({
   repo: { circuitoTienePaquetesActivos: vi.fn(), reemplazarSecuenciaEtapas: vi.fn(), getByCircuitoId: vi.fn() },
-  db: { circuito: { findUnique: vi.fn() }, avance: { count: vi.fn() } },
+  db: { circuito: { findUnique: vi.fn() }, avance: { count: vi.fn() }, salida: { count: vi.fn() } },
 }));
 vi.mock("./etapa.repository", () => ({ EtapaRepository: class { constructor() { return repo; } } }));
 vi.mock("../../../config/postgresDatabase", () => ({ db }));
@@ -18,9 +18,17 @@ describe("EtapaService (CU-05)", () => {
     db.circuito.findUnique.mockResolvedValue({ idcircuito: 1, estado: "ACTIVO" });
     repo.circuitoTienePaquetesActivos.mockResolvedValue(false);
     db.avance.count.mockResolvedValue(0);
+    db.salida.count.mockResolvedValue(0);
   });
 
   describe("registrarSecuenciaEtapas", () => {
+    it("CAT-28: no reemplaza etapas de un circuito con salidas programadas", async () => {
+      db.salida.count.mockResolvedValue(1);
+
+      await expect(new EtapaService().registrarSecuenciaEtapas(1, secuencia(etapa(1, "A", "B")))).rejects.toThrow("salidas programadas");
+      expect(repo.reemplazarSecuenciaEtapas).not.toHaveBeenCalled();
+    });
+
     it("CAT-18: no reemplaza etapas sobre las que ya hay avances", async () => {
       db.avance.count.mockResolvedValue(2);
 

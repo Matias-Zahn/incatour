@@ -2,6 +2,7 @@ import { CustomError } from "../../../error/CustomError";
 import { EstablecerSecuenciaDto, EtapaIndividualDto } from "./etapa.dto";
 import { EtapaRepository } from "./etapa.repository";
 import { db } from "../../../config/postgresDatabase";
+import { SALIDAS_ACTIVAS } from "../../../shared/constantes";
 
 export class EtapaService {
   private repository = new EtapaRepository();
@@ -28,6 +29,11 @@ export class EtapaService {
     // CAT-18: las etapas con avances informados por un guía no se pueden borrar (FK de Avance)
     if (await db.avance.count({ where: { idcircuito: circuitoId } })) {
       throw CustomError.badRequest("No se pueden modificar las etapas: ya hay avances de salidas registrados sobre este circuito.");
+    }
+
+    // CAT-28: una salida programada conserva su itinerario (RF-07), aunque su paquete ya no esté activo
+    if (await db.salida.count({ where: { paquete: { idcircuito: circuitoId }, estado: { in: SALIDAS_ACTIVAS } } })) {
+      throw CustomError.badRequest("No se pueden modificar las etapas: el circuito tiene salidas programadas.");
     }
 
     // 3. DSS: validarCorrelatividadTemporal(arrayEtapas)
