@@ -240,7 +240,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     it("rechaza un pasaporte que vence antes de terminar el recorrido", async () => {
       const dto = crearDto({ pasajeros: [pasajero(1), pasajero(2, "2030-06-12")] });
 
-      await expect(new ReservaService().crearReserva(dto, 1)).rejects.toThrow("Pasajero 2 vence antes");
+      await expect(new ReservaService().crearReserva(dto, 1)).rejects.toThrow("antes de que termine el recorrido");
       sinEfectos();
     });
 
