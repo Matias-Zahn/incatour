@@ -45,7 +45,7 @@ function InicioGestionPage() {
         { etiqueta: "Salidas programadas", valor: futuras.length, detalle: "Publicadas o cerradas, con fecha futura", cargando: salidasQ.isPending },
         { etiqueta: "Salidas en curso", valor: enCurso, detalle: "En operación hoy", cargando: salidasQ.isPending },
         { etiqueta: "Solicitudes de alojamiento pendientes", valor: solicitudesQ.data?.length, detalle: "Esperan resolución", cargando: solicitudesQ.isPending },
-        { etiqueta: "Salidas con alertas", valor: conAlertas, detalle: "Requieren atención", cargando: salidasQ.isPending },
+        { etiqueta: "Salidas con alertas", valor: conAlertas, detalle: "Por salir con solicitudes o permisos pendientes", cargando: salidasQ.isPending },
     ];
 
     return (
