@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO, ESTADO_SOLICITUD, SALIDAS_ACTIVAS, TipoServicio } from "../../../shared/constantes";
+import { ESTADO, ESTADO_RESERVA, ESTADO_SOLICITUD, SALIDAS_ACTIVAS, TipoServicio } from "../../../shared/constantes";
 import { CrearServicioDto } from "./servicio.dto";
 
 const INCLUDE_COMPLETO = {
@@ -88,43 +88,17 @@ export class ServicioRepository {
     });
   }
 
-  /**
-   * CU-20, flujo alternativo 1: el servicio está en salidas publicadas o en curso, que deben
-   * conservar sus condiciones originales. En vez de pisar el registro se crea una VERSIÓN NUEVA
-   * y la anterior queda INACTIVA (sigue vinculada a las salidas existentes). El paquete y su
-   * garantía pasan a apuntar a la versión nueva, que es la que rige para salidas futuras.
-   */
-  async versionar(
-    original: { idservicio: number; idproveedor: number; nombreServicio: string; descripcion: string | null; costoBase: number; localidad: string },
-    tipo: TipoServicio,
-    base: BaseServicio,
-    especificoCompleto: Dato
-  ) {
-    return db.$transaction(async (tx) => {
-      const nuevo = await tx.servicioBase.create({
-        data: {
-          idproveedor: original.idproveedor,
-          nombreServicio: original.nombreServicio,
-          descripcion: original.descripcion,
-          costoBase: original.costoBase,
-          localidad: original.localidad,
-          ...base,
-          estado: ESTADO.ACTIVO,
-          ...subtipoCrear(tipo, especificoCompleto),
-        },
-        include: INCLUDE_COMPLETO,
-      });
-      await tx.paqueteServicio.updateMany({
-        where: { idservicio: original.idservicio },
-        data: { idservicio: nuevo.idservicio },
-      });
-      await tx.garantiaEstablecimiento.updateMany({
-        where: { idservicio: original.idservicio },
-        data: { idservicio: nuevo.idservicio },
-      });
-      await tx.servicioBase.update({ where: { idservicio: original.idservicio }, data: { estado: ESTADO.INACTIVO } });
-      return nuevo;
+  // CAT-33: mayor cantidad de pasajeros confirmados entre las salidas activas donde el transporte está asignado
+  async maxPasajerosConfirmadosEnSalidasActivas(idservicio: number): Promise<number> {
+    const filas = await db.reserva.groupBy({
+      by: ["idsalida"],
+      where: {
+        estado: ESTADO_RESERVA.CONFIRMADA,
+        salida: { estado: { in: SALIDAS_ACTIVAS }, servicios: { some: { idservicio } } },
+      },
+      _sum: { cantidadPasajeros: true },
     });
+    return Math.max(0, ...filas.map((f) => f._sum.cantidadPasajeros ?? 0));
   }
 
   async updateEstado(id: number, estado: string) {

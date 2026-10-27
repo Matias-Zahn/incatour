@@ -59,11 +59,7 @@ export class ServicioController {
 
       const resultado = await servicioService.modificarServicio(id, dto!);
       return res.json({
-        mensaje: resultado.versionado
-          ? "El servicio está en salidas publicadas o en curso: los cambios se aplicaron en una versión nueva que rige solo para salidas futuras"
-          : "Servicio modificado exitosamente",
-        versionado: resultado.versionado,
-        ...(resultado.versionado && { idservicioAnterior: resultado.idservicioAnterior }),
+        mensaje: "Servicio modificado exitosamente",
         data: resultado.servicio,
       });
     } catch (error) {

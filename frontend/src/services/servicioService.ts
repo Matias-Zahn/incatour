@@ -151,7 +151,6 @@ export type EdicionServicio = {
     camposEditables: string[];
     enUsoEnSalidasActivas: boolean;
     garantizaPaquetesActivos: boolean;
-    aplicaSoloAFuturasSalidas: boolean;
 };
 
 export type Servicio = DatosServicio & {
@@ -171,8 +170,6 @@ export type FiltrosServicio = {
 
 export type ResultadoModificarServicio = {
     mensaje: string;
-    versionado: boolean;
-    idservicioAnterior?: number;
     servicio: Servicio;
 };
 
@@ -195,8 +192,6 @@ type RespuestaDatos<T> = { data: T };
 type RespuestaAccion<T> = { mensaje: string; data: T };
 type RespuestaModificarApi = {
     mensaje: string;
-    versionado?: boolean;
-    idservicioAnterior?: number;
     data: ServicioApi;
 };
 
@@ -280,8 +275,6 @@ export function modificarServicio(
         body: JSON.stringify(cuerpo),
     }).then((respuesta) => ({
         mensaje: respuesta.mensaje,
-        versionado: Boolean(respuesta.versionado),
-        idservicioAnterior: respuesta.idservicioAnterior,
         servicio: normalizarServicio(respuesta.data),
     }));
 }

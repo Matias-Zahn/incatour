@@ -85,7 +85,6 @@ function ServiciosPage() {
     const [servicioBaseEdicion, setServicioBaseEdicion] = useState<Servicio | null>(null);
     const [seleccionado, setSeleccionado] = useState<Servicio | null>(null);
     const [errorFormulario, setErrorFormulario] = useState("");
-    const [avisoVersionado, setAvisoVersionado] = useState("");
 
     // CU-20 paso 1: consulta GET /api/servicios/:id para traer el bloque `edicion` y la disponibilidad actualizada.
     const { data: servicioDetallado, isPending: cargandoDetalleEdicion } = useServicio(
@@ -107,7 +106,6 @@ function ServiciosPage() {
     function abrirAlta() {
         setServicioBaseEdicion(null);
         setErrorFormulario("");
-        setAvisoVersionado("");
         registrar.reset();
         modificar.reset();
         setFormularioAbierto(true);
@@ -116,7 +114,6 @@ function ServiciosPage() {
     function abrirEdicion(servicio: Servicio) {
         setServicioBaseEdicion(servicio);
         setErrorFormulario("");
-        setAvisoVersionado("");
         registrar.reset();
         modificar.reset();
         setFormularioAbierto(true);
@@ -164,12 +161,7 @@ function ServiciosPage() {
             modificar.mutate(
                 { id: servicioEnEdicion.idservicio, datos: cambios },
                 {
-                    onSuccess: (resultado) => {
-                        cerrarFormulario();
-                        if (resultado.versionado) {
-                            setAvisoVersionado(resultado.mensaje);
-                        }
-                    },
+                    onSuccess: cerrarFormulario,
                     onError: (e: Error) => setErrorFormulario(e.message),
                 },
             );
@@ -255,12 +247,6 @@ function ServiciosPage() {
                     titulo="Proveedor dado de baja"
                 >
                     Este proveedor está inactivo: no se pueden registrar nuevos servicios hasta reactivarlo.
-                </Alerta>
-            ) : null}
-
-            {avisoVersionado ? (
-                <Alerta tipo="exito" titulo="Nueva versión de servicio generada">
-                    {avisoVersionado}
                 </Alerta>
             ) : null}
 

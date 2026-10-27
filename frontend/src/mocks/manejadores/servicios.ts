@@ -46,8 +46,6 @@ function construirBloqueEdicion(servicio: Servicio): EdicionServicio {
         ],
         enUsoEnSalidasActivas: enUso,
         garantizaPaquetesActivos: garantiza,
-        aplicaSoloAFuturasSalidas:
-            enUso && (servicio.tipo === "ALOJAMIENTO" || servicio.tipo === "TRANSPORTE"),
     };
 }
 
@@ -315,41 +313,6 @@ export const manejadoresServicios = [
             }
         }
 
-        const camposEstructurales = CAMPOS_MODIFICAR_POR_TIPO[existente.tipo];
-        const cambiaEstructura =
-            (existente.tipo === "ALOJAMIENTO" || existente.tipo === "TRANSPORTE") &&
-            ((datos.localidad !== undefined && datos.localidad !== existente.localidad) ||
-                camposEstructurales.some((campo) => {
-                    const clave = campo as keyof ServicioModificar;
-                    return datos[clave] !== undefined && datos[clave] !== existente[clave];
-                }));
-
-        if (cambiaEstructura && serviciosEnSalidasActivas.has(id)) {
-            const nuevoId =
-                Math.max(0, ...servicios.map((servicio) => servicio.idservicio)) + 1;
-            const versionAnterior: Servicio = { ...existente, estado: "INACTIVO" };
-            const nuevaVersion: Servicio = {
-                ...existente,
-                ...datos,
-                id: nuevoId,
-                idservicio: nuevoId,
-                estado: "ACTIVO",
-            };
-            servicios = [
-                ...servicios.map((servicio) =>
-                    servicio.idservicio === id ? versionAnterior : servicio,
-                ),
-                nuevaVersion,
-            ];
-            return HttpResponse.json({
-                mensaje:
-                    "El servicio está en salidas publicadas o en curso: los cambios se aplicaron en una versión nueva que rige solo para salidas futuras",
-                versionado: true,
-                idservicioAnterior: id,
-                data: respuestaServicio(nuevaVersion),
-            });
-        }
-
         const comprometida = existente.cantidadComprometida ?? 0;
         const actualizado: Servicio = {
             ...existente,
@@ -366,7 +329,6 @@ export const manejadoresServicios = [
         );
         return HttpResponse.json({
             mensaje: "Servicio modificado exitosamente",
-            versionado: false,
             data: respuestaServicio(actualizado),
         });
     }),

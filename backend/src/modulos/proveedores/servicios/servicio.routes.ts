@@ -156,9 +156,10 @@ export class ServicioRoutes {
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** Se envía solo lo que cambia.
      *
-     *       Reglas: (1) un cambio estructural de alojamiento o transporte sobre un servicio asignado a
-     *       salidas publicadas o en curso se guarda como una **versión nueva** (la anterior queda
-     *       INACTIVA y conserva sus salidas); el paquete pasa a usar la versión nueva. (2) En equipamiento se
+     *       Reglas: (1) siempre se edita en el lugar (sin versionar): lo ofrecido en cada salida
+     *       está en su foto del paquete. Un transporte asignado a salidas activas no puede quedar con capacidad
+     *       menor a sus pasajeros confirmados y un alojamiento en salidas activas no puede cambiar localidad,
+     *       categoría, tipo de habitación ni modalidad de confirmación. (2) En equipamiento se
      *       edita `inventarioTotal` (inventario físico real) y no puede quedar por debajo de lo comprometido
      *       en salidas activas. (3) Un alojamiento garantizado por un paquete activo no puede cambiar
      *       localidad, categoría ni tipo de habitación, y debe mantener el bloqueo de plazas.
@@ -178,15 +179,13 @@ export class ServicioRoutes {
      *           schema: { $ref: '#/components/schemas/ServicioModificar' }
      *     responses:
      *       200:
-     *         description: Servicio modificado (o versionado).
+     *         description: Servicio modificado.
      *         content:
      *           application/json:
      *             schema:
      *               type: object
      *               properties:
      *                 mensaje: { type: string }
-     *                 versionado: { type: boolean }
-     *                 idservicioAnterior: { type: integer, description: Solo si versionado es true. }
      *                 data: { $ref: '#/components/schemas/Servicio' }
      *       400:
      *         description: Datos inválidos, campo ajeno al tipo, stock inferior al comprometido o garantía en riesgo.
