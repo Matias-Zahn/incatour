@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
@@ -220,6 +220,7 @@ function CatalogoCompraPage() {
         error,
     } = useCatalogoPublico();
     const mutacionReserva = useCrearReservaPaquete();
+    const errorBannerRef = useRef<HTMLDivElement>(null);
 
     // Filtros del escaparate (CU-26 · RF-27: duración, dificultad y rango de fechas)
     const [busqueda, setBusqueda] = useState("");
@@ -277,6 +278,15 @@ function CatalogoCompraPage() {
             ? "Tu sesión había vencido: recuperamos la salida y los pasajeros. Volvé a cargar la tarjeta para pagar."
             : "",
     );
+
+    useEffect(() => {
+        if (errorCompra && errorBannerRef.current) {
+            errorBannerRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+        }
+    }, [errorCompra]);
 
     // Comprobante de reserva exitosa
     const [reservaConfirmada, setReservaConfirmada] = useState<{
@@ -1048,6 +1058,25 @@ function CatalogoCompraPage() {
                     onSubmit={manejarConfirmarCompra}
                     className="grid items-start gap-6 lg:grid-cols-[1.65fr_1fr]"
                 >
+                    {errorCompra ? (
+                        <div
+                            ref={errorBannerRef}
+                            className="col-span-full rounded-control border border-peligro/40 bg-red-50 p-4 text-peligro shadow-sm"
+                        >
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl leading-none">⚠️</span>
+                                <div>
+                                    <h4 className="font-bold text-sm text-peligro">
+                                        No se pudo completar la compra
+                                    </h4>
+                                    <p className="mt-1 text-xs text-peligro/95 font-medium leading-relaxed">
+                                        {errorCompra}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+
                     <div className="space-y-6">
                         {/* PASO 1: SELECCIONAR SALIDA PROGRAMADA */}
                         <div className="space-y-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
@@ -1726,6 +1755,17 @@ function CatalogoCompraPage() {
                             </div>
                         ) : null}
 
+                        {errorCompra ? (
+                            <div className="rounded-control border border-peligro/40 bg-red-50 p-3 text-xs text-peligro shadow-sm">
+                                <p className="font-bold flex items-center gap-1.5">
+                                    <span>⚠️</span> Error en el pago
+                                </p>
+                                <p className="mt-1 font-medium leading-relaxed text-peligro/95">
+                                    {errorCompra}
+                                </p>
+                            </div>
+                        ) : null}
+
                         <Boton
                             type="submit"
                             className="w-full py-3"
@@ -2162,44 +2202,68 @@ function CatalogoCompraPage() {
                             const etapas = paqueteDetalle.circuito.etapas ?? [];
                             const salidas =
                                 paqueteDetalle.salidasDisponibles ?? [];
+                            const diasTotalesDetalle =
+                                paqueteDetalle.circuito.dias +
+                                paqueteDetalle.nochesAlojamiento.previas +
+                                paqueteDetalle.nochesAlojamiento.posteriores;
+                            const tarifaMinimaDetalle =
+                                paqueteDetalle.precios &&
+                                paqueteDetalle.precios.length > 0
+                                    ? paqueteDetalle.precios.reduce(
+                                          (min, p) =>
+                                              p.precio < min.precio ? p : min,
+                                          paqueteDetalle.precios[0],
+                                      )
+                                    : null;
 
                             return (
                                 <>
                                     <div className="flex items-start justify-between gap-4 border-b border-borde p-6">
                                         <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="rounded bg-marca-activa px-2.5 py-0.5 text-xs font-bold text-marca-oscura">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="flex items-center gap-1 rounded bg-marca px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
+                                                    🏔️ {paqueteDetalle.circuito.nombre}
+                                                </span>
+                                                <span className="rounded border border-borde bg-fondo px-2 py-0.5 font-mono text-[11px] font-semibold text-texto-suave">
                                                     {paqueteDetalle.codigo}
                                                 </span>
                                                 <span className="text-xs font-semibold text-texto-suave">
-                                                    {
-                                                        paqueteDetalle.circuito
-                                                            .nombre
-                                                    }{" "}
-                                                    · Dificultad{" "}
-                                                    {
-                                                        paqueteDetalle.circuito
-                                                            .dificultad
-                                                    }
+                                                    · {diasTotalesDetalle} días totales · Dificultad{" "}
+                                                    {paqueteDetalle.circuito.dificultad}
                                                 </span>
                                             </div>
                                             <h2 className="mt-1.5 text-2xl font-bold text-navegacion">
                                                 {paqueteDetalle.nombre}
                                             </h2>
+                                            <p className="mt-1 text-xs text-texto-suave">
+                                                <strong className="text-texto">Recorrido:</strong>{" "}
+                                                {paqueteDetalle.circuito.recorrido ||
+                                                    "Cusco -> Camino del Inca -> Machu Picchu"}
+                                            </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setPaqueteDetalle(null)
-                                            }
-                                            className="rounded-control border border-borde px-3 py-1.5 text-xs font-semibold text-texto-suave hover:bg-fondo"
-                                        >
-                                            ✕ Cerrar
-                                        </button>
+                                        <div className="flex items-center gap-4">
+                                            {tarifaMinimaDetalle ? (
+                                                <div className="text-right max-sm:hidden">
+                                                    <p className="text-[11px] text-texto-suave">Tarifa desde</p>
+                                                    <p className="text-2xl font-bold text-navegacion">
+                                                        {tarifaMinimaDetalle.moneda} {tarifaMinimaDetalle.precio}
+                                                    </p>
+                                                </div>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setPaqueteDetalle(null)
+                                                }
+                                                className="rounded-control border border-borde px-3 py-1.5 text-xs font-semibold text-texto-suave hover:bg-fondo"
+                                            >
+                                                ✕ Cerrar
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="grid gap-6 p-6 lg:grid-cols-[1.15fr_1fr]">
-                                        <div className="space-y-3">
+                                        <div className="space-y-4">
                                             <div className="relative overflow-hidden rounded-tarjeta border border-borde bg-fondo">
                                                 <img
                                                     src={resolverUrlImagenPaquete(
@@ -2243,6 +2307,27 @@ function CatalogoCompraPage() {
                                                     ))}
                                                 </div>
                                             ) : null}
+
+                                            {/* DURACIÓN Y SALIDAS HABITUALES */}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Duración y salidas programadas
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 text-texto">
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Duración total</p>
+                                                        <p className="font-bold text-navegacion">
+                                                            {diasTotalesDetalle} días ({paqueteDetalle.circuito.dias} de trekking + {paqueteDetalle.nochesAlojamiento.previas + paqueteDetalle.nochesAlojamiento.posteriores} noches hotel)
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Salidas habituales</p>
+                                                        <p className="font-bold text-navegacion">
+                                                            {formatearDiasLegibles(paqueteDetalle.diasDisponibles)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
 
                                             {etapas.length > 0 ? (
                                                 <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
@@ -2289,47 +2374,103 @@ function CatalogoCompraPage() {
                                         </div>
 
                                         <div className="space-y-4">
-                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-1.5">
+                                            {/* SERVICIOS INCLUIDOS Y EQUIPAJE */}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Servicios y equipaje incluidos
+                                                </p>
+                                                {paqueteDetalle.serviciosAdicionales &&
+                                                paqueteDetalle.serviciosAdicionales.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {paqueteDetalle.serviciosAdicionales.map((serv) => (
+                                                            <span
+                                                                key={serv}
+                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-[11px] font-medium text-texto"
+                                                            >
+                                                                ✓ {serv}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-texto-suave">
+                                                        Servicios base de trekking guiado incluidos.
+                                                    </p>
+                                                )}
+                                                {paqueteDetalle.equipajeTransporte ? (
+                                                    <div className="mt-2 rounded-control border border-marca/30 bg-marca-suave/60 p-2.5 text-xs text-marca-oscura">
+                                                        <p className="font-bold">🎒 Franquicia de equipaje:</p>
+                                                        <p className="mt-0.5">
+                                                            Hasta <strong>{paqueteDetalle.equipajeTransporte.pesoEquipajeIncluido} kg</strong> incluidos por pasajero en el transporte. (Excedente: {tarifaMinimaDetalle?.moneda ?? "USD"} {paqueteDetalle.equipajeTransporte.costoPorKgExcedente}/kg).
+                                                        </p>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+
+                                            {/* ALOJAMIENTO Y CONDICIONES */}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
                                                 <p className="font-bold uppercase tracking-wide text-navegacion">
                                                     Alojamiento y condiciones
                                                 </p>
-                                                <p className="text-texto">
-                                                    <strong>Garantía:</strong>{" "}
-                                                    {
-                                                        paqueteDetalle
-                                                            .nochesAlojamiento
-                                                            .garantia
-                                                    }
-                                                </p>
-                                                <p className="text-texto">
-                                                    <strong>Estadia:</strong>{" "}
-                                                    {
-                                                        paqueteDetalle
-                                                            .nochesAlojamiento
-                                                            .previas
-                                                    }{" "}
-                                                    noches previas ·{" "}
-                                                    {
-                                                        paqueteDetalle
-                                                            .nochesAlojamiento
-                                                            .posteriores
-                                                    }{" "}
-                                                    noches posteriores
-                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 text-texto">
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Garantía hotelera</p>
+                                                        <p className="font-semibold text-texto">
+                                                            {paqueteDetalle.nochesAlojamiento.garantia}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Estadía</p>
+                                                        <p className="font-semibold text-texto">
+                                                            {paqueteDetalle.nochesAlojamiento.previas} noches prev. + {paqueteDetalle.nochesAlojamiento.posteriores} post.
+                                                        </p>
+                                                    </div>
+                                                </div>
                                                 {paqueteDetalle.condiciones ? (
-                                                    <p className="text-texto-suave">
-                                                        {
-                                                            paqueteDetalle.condiciones
-                                                        }
+                                                    <p className="pt-1 text-texto-suave">
+                                                        <strong className="text-texto">Políticas y condiciones:</strong> {paqueteDetalle.condiciones}
                                                     </p>
                                                 ) : null}
                                             </div>
 
+                                            {/* MATRIZ DE PRECIOS POR TEMPORADA */}
+                                            {paqueteDetalle.precios && paqueteDetalle.precios.length > 0 ? (
+                                                <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                    <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                        Tarifas vigentes según temporada
+                                                    </p>
+                                                    <div className="space-y-1.5">
+                                                        {paqueteDetalle.precios.map((t) => (
+                                                            <div
+                                                                key={t.idtemporada}
+                                                                className="flex items-center justify-between rounded border border-borde bg-white p-2.5 text-xs"
+                                                            >
+                                                                <div>
+                                                                    <p className="font-bold text-navegacion">{t.temporada}</p>
+                                                                    <p className="text-[11px] text-texto-suave">
+                                                                        {formatearFechaCorta(t.fechaInicio)} al {formatearFechaCorta(t.fechaFin)}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="font-bold text-navegacion">
+                                                                    {t.moneda} {t.precio}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+
+                                            {/* SALIDAS DISPONIBLES */}
                                             <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
-                                                <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
-                                                    Próximas salidas disponibles
-                                                    para comprar
-                                                </p>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
+                                                        Próximas salidas disponibles
+                                                    </p>
+                                                    {salidas.length > 0 ? (
+                                                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-exito">
+                                                            {salidas.length} {salidas.length === 1 ? "salida abierta" : "salidas abiertas"}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                                 {salidas.length === 0 ? (
                                                     <p className="text-xs text-texto-suave">
                                                         Actualmente no hay
@@ -2425,6 +2566,23 @@ function CatalogoCompraPage() {
                                 </>
                             );
                         })()}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* MODAL / LOADER PROMINENTE DURANTE EL PAGO */}
+            {mutacionReserva.isPending ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+                    <div className="mx-4 flex max-w-sm flex-col items-center gap-4 rounded-tarjeta border border-borde bg-white p-6 text-center shadow-modal">
+                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-marca border-t-transparent" />
+                        <div>
+                            <h3 className="text-base font-bold text-navegacion">
+                                Procesando compra y reserva
+                            </h3>
+                            <p className="mt-1 text-xs text-texto-suave">
+                                Estamos registrando tu transacción con la pasarela de pagos y reservando tus cupos oficiales. Por favor no cierres esta ventana.
+                            </p>
+                        </div>
                     </div>
                 </div>
             ) : null}

@@ -16,6 +16,26 @@ type LayoutClienteProps = {
     children: ReactNode;
 };
 
+function IconoMenu() {
+    return (
+        <svg
+            width={20}
+            height={20}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <line x1="4" x2="20" y1="12" y2="12" />
+            <line x1="4" x2="20" y1="6" y2="6" />
+            <line x1="4" x2="20" y1="18" y2="18" />
+        </svg>
+    );
+}
+
 function IconoPaquetes() {
     return (
         <svg
@@ -137,10 +157,32 @@ function IconoSalir() {
     );
 }
 
+function IconoLogin() {
+    return (
+        <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" x2="3" y1="12" y2="12" />
+        </svg>
+    );
+}
+
 function LayoutCliente({ children }: LayoutClienteProps) {
     const navegar = useNavigate();
     const [searchParams] = useSearchParams();
     const [modalSalirAbierto, setModalSalirAbierto] = useState(false);
+    // Por defecto barra lateral más chica con iconos estilo Gmail, expandible
+    const [colapsada, setColapsada] = useState(true);
 
     const esVistaPreviaAdmin = searchParams.get("vista") === "admin";
     const tieneToken = Boolean(obtenerToken());
@@ -154,7 +196,9 @@ function LayoutCliente({ children }: LayoutClienteProps) {
     }
 
     const claseElementoSidebar = ({ isActive }: { isActive: boolean }) =>
-        `flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all max-md:px-2.5 max-md:py-2 ${
+        `flex w-full items-center ${
+            colapsada ? "justify-center px-2 py-3" : "gap-3 px-3.5 py-2.5"
+        } rounded-xl text-sm font-semibold transition-all max-md:px-2.5 max-md:py-2 ${
             isActive
                 ? "bg-[#16d6dc] text-[#075274] shadow-sm"
                 : "text-white/90 hover:bg-white/15 hover:text-white"
@@ -162,32 +206,65 @@ function LayoutCliente({ children }: LayoutClienteProps) {
 
     return (
         <div className="flex min-h-screen flex-col bg-[#f4f7f8] md:flex-row">
-            {/* BARRA LATERAL IZQUIERDA (CONSISTENTE CON PORTAL DEL GUÍA Y GESTIÓN) */}
+            {/* BARRA LATERAL IZQUIERDA (COLAPSABLE ESTILO GMAIL) */}
             <aside
                 aria-label="Navegación principal del cliente"
-                className="flex w-64 shrink-0 flex-col bg-[#1b9fc7] p-5 text-white shadow-md md:sticky md:top-0 md:h-screen max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3"
+                className={`flex shrink-0 flex-col bg-[#1b9fc7] text-white shadow-md transition-all duration-300 md:sticky md:top-0 md:h-screen max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3 ${
+                    colapsada ? "md:w-20 md:p-3.5" : "md:w-64 md:p-5"
+                }`}
             >
-                <Link
-                    to={
-                        esVistaPreviaAdmin
-                            ? "/catalogo?vista=admin"
-                            : "/catalogo"
-                    }
-                    className="flex items-center gap-3 border-b border-white/30 pb-4 max-md:border-none max-md:pb-0"
+                {/* CABECERA CON LOGO Y BOTÓN DE COLAPSAR/EXPANDIR ESTILO GMAIL */}
+                <div
+                    className={`flex items-center border-b border-white/30 pb-4 max-md:border-none max-md:pb-0 ${
+                        colapsada
+                            ? "flex-col justify-center gap-2"
+                            : "justify-between"
+                    }`}
                 >
-                    <div className="grid size-11 place-items-center rounded-xl bg-white text-lg font-bold text-[#07395d] shadow-sm">
-                        IT
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold leading-none text-white">
-                            IncaTour
-                        </h2>
-                        <p className="mt-1 text-xs text-cyan-100 max-sm:hidden">
-                            Portal del Cliente
-                        </p>
-                    </div>
-                </Link>
+                    <Link
+                        to={
+                            esVistaPreviaAdmin
+                                ? "/catalogo?vista=admin"
+                                : "/catalogo"
+                        }
+                        className="flex items-center gap-3"
+                        title="IncaTour - Inicio"
+                    >
+                        <div className="grid size-11 place-items-center rounded-xl bg-white text-lg font-bold text-[#07395d] shadow-sm transition hover:scale-105">
+                            IT
+                        </div>
+                        {!colapsada ? (
+                            <div>
+                                <h2 className="text-xl font-bold leading-none text-white">
+                                    IncaTour
+                                </h2>
+                                <p className="mt-1 text-xs text-cyan-100 max-sm:hidden">
+                                    Portal del Cliente
+                                </p>
+                            </div>
+                        ) : null}
+                    </Link>
 
+                    <button
+                        type="button"
+                        onClick={() => setColapsada(!colapsada)}
+                        className="hidden rounded-lg p-2 text-white/90 transition hover:bg-white/20 hover:text-white md:inline-flex"
+                        title={
+                            colapsada
+                                ? "Expandir menú lateral"
+                                : "Colapsar menú lateral"
+                        }
+                        aria-label={
+                            colapsada
+                                ? "Expandir menú lateral"
+                                : "Colapsar menú lateral"
+                        }
+                    >
+                        <IconoMenu />
+                    </button>
+                </div>
+
+                {/* NAVEGACIÓN */}
                 <nav
                     aria-label="Secciones del portal del cliente"
                     className="mt-6 flex-1 max-md:mt-0 max-md:flex max-md:overflow-x-auto"
@@ -201,55 +278,68 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                         : "/catalogo"
                                 }
                                 className={claseElementoSidebar}
+                                title="Paquetes turísticos"
                             >
                                 <span className="shrink-0">
                                     <IconoPaquetes />
                                 </span>
-                                <span className="max-md:hidden">
-                                    Paquetes turísticos
-                                </span>
+                                {!colapsada ? (
+                                    <span className="max-md:hidden">
+                                        Paquetes turísticos
+                                    </span>
+                                ) : null}
                             </NavLink>
                         </li>
 
-                        {esCliente || !usuario ? (
+                        {/* SOLO SE MUESTRAN CUENTA, RESEÑA Y RESERVAS SI EL USUARIO TIENE SESIÓN INICIADA COMO CLIENTE */}
+                        {usuario && esCliente ? (
                             <>
                                 <li>
                                     <NavLink
                                         to="/mis-reservas"
                                         className={claseElementoSidebar}
+                                        title="Mis reservas"
                                     >
                                         <span className="shrink-0">
                                             <IconoReservas />
                                         </span>
-                                        <span className="max-md:hidden">
-                                            Mis reservas
-                                        </span>
+                                        {!colapsada ? (
+                                            <span className="max-md:hidden">
+                                                Mis reservas
+                                            </span>
+                                        ) : null}
                                     </NavLink>
                                 </li>
                                 <li>
                                     <NavLink
                                         to="/mis-resenias"
                                         className={claseElementoSidebar}
+                                        title="Publicar reseña"
                                     >
                                         <span className="shrink-0">
                                             <IconoResenias />
                                         </span>
-                                        <span className="max-md:hidden">
-                                            Publicar reseña
-                                        </span>
+                                        {!colapsada ? (
+                                            <span className="max-md:hidden">
+                                                Publicar reseña
+                                            </span>
+                                        ) : null}
                                     </NavLink>
                                 </li>
                                 <li>
                                     <NavLink
                                         to="/mi-cuenta"
                                         className={claseElementoSidebar}
+                                        title="Cuenta"
                                     >
                                         <span className="shrink-0">
                                             <IconoCuenta />
                                         </span>
-                                        <span className="max-md:hidden">
-                                            Cuenta
-                                        </span>
+                                        {!colapsada ? (
+                                            <span className="max-md:hidden">
+                                                Cuenta
+                                            </span>
+                                        ) : null}
                                     </NavLink>
                                 </li>
                             </>
@@ -260,58 +350,82 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                 <NavLink
                                     to="/registro"
                                     className={claseElementoSidebar}
+                                    title="Registrarse"
                                 >
                                     <span className="shrink-0">
                                         <IconoRegistro />
                                     </span>
-                                    <span className="max-md:hidden">
-                                        Registrarse
-                                    </span>
+                                    {!colapsada ? (
+                                        <span className="max-md:hidden">
+                                            Registrarse
+                                        </span>
+                                    ) : null}
                                 </NavLink>
                             </li>
                         ) : null}
                     </ul>
                 </nav>
 
+                {/* FOOTER DEL SIDEBAR */}
                 <div className="mt-auto border-t border-white/30 pt-4 max-md:border-none max-md:pt-0">
                     {usuario ? (
                         <>
-                            <div className="mb-3 text-xs max-md:hidden">
-                                <p className="text-cyan-100">
-                                    {usuario.rol === "CLIENTE"
-                                        ? "Cliente registrado"
-                                        : `Perfil ${usuario.rol}`}
-                                </p>
-                                <p className="font-bold text-white">
-                                    {usuario.nombre} {usuario.apellido}
-                                </p>
-                                <p className="truncate text-[11px] text-cyan-100/90">
-                                    {usuario.email}
-                                </p>
-                            </div>
+                            {!colapsada ? (
+                                <div className="mb-3 text-xs max-md:hidden">
+                                    <p className="text-cyan-100">
+                                        {usuario.rol === "CLIENTE"
+                                            ? "Cliente registrado"
+                                            : `Perfil ${usuario.rol}`}
+                                    </p>
+                                    <p className="font-bold text-white">
+                                        {usuario.nombre} {usuario.apellido}
+                                    </p>
+                                    <p className="truncate text-[11px] text-cyan-100/90">
+                                        {usuario.email}
+                                    </p>
+                                </div>
+                            ) : null}
                             <button
                                 type="button"
                                 onClick={() => setModalSalirAbierto(true)}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 max-md:w-auto"
+                                className={`flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 text-xs font-bold text-white transition hover:bg-white/20 max-md:w-auto ${
+                                    colapsada
+                                        ? "w-full py-2.5"
+                                        : "w-full px-3 py-2"
+                                }`}
+                                title={`Cerrar sesión (${usuario.nombre})`}
                             >
                                 <IconoSalir />
-                                <span className="max-md:hidden">Salir</span>
+                                {!colapsada ? (
+                                    <span className="max-md:hidden">Salir</span>
+                                ) : null}
                             </button>
                         </>
                     ) : (
                         <div className="space-y-2">
-                            <div className="text-xs max-md:hidden">
-                                <p className="text-cyan-100">Visitante</p>
-                                <p className="font-bold text-white">
-                                    Sin sesión activa
-                                </p>
-                            </div>
+                            {!colapsada ? (
+                                <div className="text-xs max-md:hidden">
+                                    <p className="text-cyan-100">Visitante</p>
+                                    <p className="font-bold text-white">
+                                        Sin sesión activa
+                                    </p>
+                                </div>
+                            ) : null}
                             <Link
                                 to="/login"
                                 state={{ desde: "/catalogo" }}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white px-3 py-2 text-xs font-bold text-[#07395d] shadow-xs transition hover:bg-cyan-50 max-md:w-auto"
+                                className={`flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white text-xs font-bold text-[#07395d] shadow-xs transition hover:bg-cyan-50 max-md:w-auto ${
+                                    colapsada
+                                        ? "w-full py-2.5"
+                                        : "w-full px-3 py-2"
+                                }`}
+                                title="Iniciar sesión"
                             >
-                                <span>Iniciar sesión</span>
+                                {colapsada ? (
+                                    <IconoLogin />
+                                ) : (
+                                    <span>Iniciar sesión</span>
+                                )}
                             </Link>
                         </div>
                     )}
