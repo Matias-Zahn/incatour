@@ -319,8 +319,9 @@ function CatalogoCompraPage() {
         setPaqueteEnCompraId(paquete.id);
         const primeraSalida =
             idSalidaInicial ??
-            paquete.salidasDisponibles?.find((s) => s.stockLocal > 0)
-                ?.idsalida ??
+            paquete.salidasDisponibles?.find(
+                (s) => s.stockLocal > 0 && s.precioPersona != null,
+            )?.idsalida ??
             paquete.salidasDisponibles?.[0]?.idsalida ??
             null;
         setIdSalidaSeleccionada(primeraSalida);
@@ -422,12 +423,9 @@ function CatalogoCompraPage() {
     }
 
     // Cálculo en tiempo real de tarifa + exceso de equipaje (idéntico a ReservaService.calcularPrecio)
-    const precioUnitario =
-        salidaActiva?.precioPersona ??
-        paqueteEnCompra?.precios[0]?.precio ??
-        0;
-    const monedaActiva =
-        salidaActiva?.moneda ?? paqueteEnCompra?.precios[0]?.moneda ?? "USD";
+    const sinTarifa = salidaActiva?.precioPersona == null;
+    const precioUnitario = salidaActiva?.precioPersona ?? 0;
+    const monedaActiva = salidaActiva?.moneda ?? "USD";
     const subtotalPasajeros = precioUnitario * pasajeros.length;
 
     const infoEquipaje = paqueteEnCompra?.equipajeTransporte ?? null;
@@ -628,7 +626,7 @@ function CatalogoCompraPage() {
             `Salida Programada:       ${salida.nroSalida}`,
             `Inicio del Recorrido:    ${formatearFechaCorta(salida.fechaInicio)}`,
             `Fin del Recorrido:       ${formatearFechaCorta(salida.fechaFin)}`,
-            `Temporada Aplicada:      ${salida.temporadaNombre}`,
+            `Temporada Aplicada:      ${salida.temporadaNombre ?? "Sin especificar"}`,
             "-----------------------------------------------------------------",
             "2. ALOJAMIENTO Y FECHAS DERIVADAS (Paso 6 y 15 CU-30)",
             `Garantía de Alojamiento: ${paquete.nochesAlojamiento.garantia}`,
@@ -1086,7 +1084,10 @@ function CatalogoCompraPage() {
                                         const seleccionada =
                                             salidaActiva?.idsalida ===
                                             salida.idsalida;
-                                        const sinCupo = salida.stockLocal <= 0;
+                                        const sinTarifaSalida = salida.precioPersona == null;
+                                        const sinCupo =
+                                            salida.stockLocal <= 0 ||
+                                            sinTarifaSalida;
                                         return (
                                             <button
                                                 key={salida.idsalida}
@@ -1140,7 +1141,8 @@ function CatalogoCompraPage() {
                                                             salida.fechaFin,
                                                         )}{" "}
                                                         ·{" "}
-                                                        {salida.temporadaNombre}
+                                                        {salida.temporadaNombre ??
+                                                            "Sin temporada"}
                                                     </p>
                                                 </div>
 
@@ -1149,8 +1151,9 @@ function CatalogoCompraPage() {
                                                         Tarifa por pasajero
                                                     </span>
                                                     <span className="text-base font-bold text-navegacion">
-                                                        {salida.moneda}{" "}
-                                                        {salida.precioPersona}
+                                                        {sinTarifaSalida
+                                                            ? "Sin tarifa para esta fecha"
+                                                            : `${salida.moneda} ${salida.precioPersona}`}
                                                     </span>
                                                 </div>
                                             </button>
@@ -1668,11 +1671,12 @@ function CatalogoCompraPage() {
                                     {pasajeros.length === 1
                                         ? "pasajero"
                                         : "pasajeros"}{" "}
-                                    × {monedaActiva} {precioUnitario})
+                                    × {sinTarifa ? "sin tarifa" : `${monedaActiva} ${precioUnitario}`})
                                 </span>
                                 <span className="font-semibold text-texto">
-                                    {monedaActiva}{" "}
-                                    {subtotalPasajeros.toFixed(2)}
+                                    {sinTarifa
+                                        ? "—"
+                                        : `${monedaActiva} ${subtotalPasajeros.toFixed(2)}`}
                                 </span>
                             </div>
 
@@ -1692,7 +1696,9 @@ function CatalogoCompraPage() {
                                     Total a abonar
                                 </span>
                                 <span className="text-2xl font-bold text-navegacion">
-                                    {monedaActiva} {totalPagar.toFixed(2)}
+                                    {sinTarifa
+                                        ? "—"
+                                        : `${monedaActiva} ${totalPagar.toFixed(2)}`}
                                 </span>
                             </div>
                         </div>
@@ -1725,13 +1731,23 @@ function CatalogoCompraPage() {
                             className="w-full py-3"
                             cargando={mutacionReserva.isPending}
                             disabled={
-                                !salidaActiva || salidaActiva.stockLocal <= 0
+                                !salidaActiva ||
+                                salidaActiva.stockLocal <= 0 ||
+                                sinTarifa
                             }
                         >
                             {mutacionReserva.isPending
                                 ? "Procesando pago y cupos..."
-                                : `Confirmar y pagar ${monedaActiva} ${totalPagar.toFixed(2)}`}
+                                : sinTarifa
+                                  ? "Salida sin tarifa vigente"
+                                  : `Confirmar y pagar ${monedaActiva} ${totalPagar.toFixed(2)}`}
                         </Boton>
+                        {salidaActiva && sinTarifa ? (
+                            <p className="text-center text-xs text-peligro">
+                                Esta salida no tiene una tarifa vigente para su
+                                fecha. Elegí otra salida para continuar.
+                            </p>
+                        ) : null}
                     </aside>
                 </form>
             ) : null}
@@ -1891,7 +1907,7 @@ function CatalogoCompraPage() {
                                 );
                                 const salidasConCupo = (
                                     paquete.salidasDisponibles ?? []
-                                ).filter((s) => s.stockLocal > 0);
+                                ).filter((s) => s.stockLocal > 0 && s.precioPersona != null);
                                 const diasTotales =
                                     paquete.circuito.dias +
                                     paquete.nochesAlojamiento.previas +
@@ -2344,19 +2360,19 @@ function CatalogoCompraPage() {
                                                                         cupos
                                                                         disponibles
                                                                         ·{" "}
-                                                                        {
-                                                                            s.moneda
-                                                                        }{" "}
-                                                                        {
-                                                                            s.precioPersona
-                                                                        }
+                                                                        {s.precioPersona ==
+                                                                        null
+                                                                            ? "Sin tarifa para esta fecha"
+                                                                            : `${s.moneda} ${s.precioPersona}`}
                                                                     </p>
                                                                 </div>
                                                                 <Boton
                                                                     className="px-3 py-1.5 text-xs"
                                                                     disabled={
                                                                         s.stockLocal <=
-                                                                        0
+                                                                            0 ||
+                                                                        s.precioPersona ==
+                                                                            null
                                                                     }
                                                                     onClick={() =>
                                                                         iniciarCompraPaquete(

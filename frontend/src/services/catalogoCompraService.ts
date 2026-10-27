@@ -25,9 +25,10 @@ export type SalidaDisponibleCatalogo = {
     fechaFin: string;
     stockLocal: number;
     tamanoMaximo: number;
-    precioPersona: number;
-    moneda: string;
-    temporadaNombre: string;
+    // null cuando ninguna temporada activa cubre la fecha de la salida
+    precioPersona: number | null;
+    moneda: string | null;
+    temporadaNombre: string | null;
 };
 
 export type EquipajeTransporteCatalogo = {
