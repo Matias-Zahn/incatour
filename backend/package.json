@@ -9,7 +9,8 @@
     "docs": "tsx scripts/exportar-openapi.ts",
     "test": "vitest run",
     "test:concurrencia": "tsx scripts/prueba-concurrencia.ts",
-    "test:humo": "tsx scripts/prueba-humo.ts"
+    "test:humo": "tsx scripts/prueba-humo.ts",
+    "test:integral": "tsx scripts/prueba-integral.ts"
   },
   "keywords": [],
   "author": "",
