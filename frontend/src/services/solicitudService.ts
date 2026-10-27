@@ -49,9 +49,9 @@ export interface OpcionesGestionSolicitud {
   reserva: string;
   cliente: string;
   criteriosGarantizados: {
-    localidad: string;
-    categoria: string;
-    tipoHabitacion: string;
+    localidad: string | null;
+    categoria: string | null;
+    tipoHabitacion: string | null;
   };
   opcionesContacto: OpcionContactoHotel[];
 }

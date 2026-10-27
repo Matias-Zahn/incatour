@@ -183,9 +183,10 @@ function FormularioPaquete({
         paqueteEnEdicion?.tipoHabitacionGarantizada ?? "Doble",
     );
 
-    const temporadasPersistidas = new Set(
-        paqueteEnEdicion?.tarifas?.map((t) => t.idtemporada) ?? [],
-    );
+    // Las filas guardadas son las primeras N de la matriz: las nuevas solo se agregan al final
+    const cantidadPersistidas = esEdicion
+        ? (paqueteEnEdicion?.tarifas?.length ?? 0)
+        : 0;
 
     const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
         () => tarifasIniciales(paqueteEnEdicion, temporadas),
@@ -469,7 +470,7 @@ function FormularioPaquete({
 
     function quitarFilaPrecio(indice: number) {
         const fila = matrizPrecios[indice];
-        if (esEdicion && fila && temporadasPersistidas.has(fila.idtemporada)) {
+        if (fila && indice < cantidadPersistidas) {
             return;
         }
         if (matrizPrecios.length <= 1) {
@@ -1106,6 +1107,11 @@ function FormularioPaquete({
                             <p className="text-xs text-texto-suave">
                                 Todo paquete publicado requiere al menos una tarifa vigente asociada a una temporada activa.
                             </p>
+                            {esEdicion ? (
+                                <p className="text-xs text-texto-suave">
+                                    Las tarifas guardadas se modifican; no se quitan.
+                                </p>
+                            ) : null}
                         </div>
                     </div>
 
@@ -1137,8 +1143,7 @@ function FormularioPaquete({
                     <div className="space-y-3">
                         {matrizPrecios.map((fila, indice) => {
                             const esTarifaPersistida =
-                                esEdicion &&
-                                temporadasPersistidas.has(fila.idtemporada);
+                                indice < cantidadPersistidas;
                             return (
                                 <div
                                     key={indice}
@@ -1158,7 +1163,19 @@ function FormularioPaquete({
                                             }
                                             className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
                                         >
-                                            {temporadas.map((temp) => (
+                                            {temporadas
+                                                .filter(
+                                                    (temp) =>
+                                                        temp.idtemporada ===
+                                                            fila.idtemporada ||
+                                                        !matrizPrecios.some(
+                                                            (otra, j) =>
+                                                                j !== indice &&
+                                                                otra.idtemporada ===
+                                                                    temp.idtemporada,
+                                                        ),
+                                                )
+                                                .map((temp) => (
                                                 <option
                                                     key={temp.idtemporada}
                                                     value={temp.idtemporada}

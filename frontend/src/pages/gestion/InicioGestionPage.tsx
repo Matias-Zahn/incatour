@@ -1,106 +1,52 @@
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
+import EstadoListado from "../../components/EstadoListado";
+import {
+    estilosEstadoSalida,
+    fechaLocalHoy,
+    formatearEstadoSalida,
+    formatearFechaSalida,
+    useIncidentes,
+} from "../../services/guiaService";
+import { useSalidas } from "../../services/salidaService";
+import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
-type Metrica = {
-    etiqueta: string;
-    valor: string;
-    detalle: string;
-    tendencia: "positiva" | "neutra" | "alerta";
+const estiloGravedad: Record<string, string> = {
+    CRITICO: "bg-peligro text-white",
+    MEDIO: "bg-amber-50 text-advertencia",
+    BAJO: "bg-marca-activa text-marca-oscura",
 };
 
-type Salida = {
-    circuito: string;
-    fecha: string;
-    cupos: string;
-    estado: "Confirmada" | "Pendiente";
-};
-
-type Actividad = {
-    descripcion: string;
-    detalle: string;
-    estado: "Nueva" | "Confirmada" | "Pendiente";
-};
-
-const metricas: Metrica[] = [
-    {
-        etiqueta: "Reservas del mes",
-        valor: "128",
-        detalle: "+12,5% vs. mes anterior",
-        tendencia: "positiva",
-    },
-    {
-        etiqueta: "Salidas programadas",
-        valor: "24",
-        detalle: "6 durante esta semana",
-        tendencia: "neutra",
-    },
-    {
-        etiqueta: "Ingresos del mes",
-        valor: "S/ 48.620",
-        detalle: "+8,2% vs. mes anterior",
-        tendencia: "positiva",
-    },
-    {
-        etiqueta: "Pendientes de gestión",
-        valor: "7",
-        detalle: "Requieren atención",
-        tendencia: "alerta",
-    },
-];
-
-const proximasSalidas: Salida[] = [
-    {
-        circuito: "Camino Inca clásico",
-        fecha: "12 de octubre · 06:30",
-        cupos: "8 / 16 pasajeros",
-        estado: "Confirmada",
-    },
-    {
-        circuito: "Valle Sagrado",
-        fecha: "14 de octubre · 07:00",
-        cupos: "12 / 20 pasajeros",
-        estado: "Confirmada",
-    },
-    {
-        circuito: "Montaña de 7 colores",
-        fecha: "16 de octubre · 05:00",
-        cupos: "4 / 12 pasajeros",
-        estado: "Pendiente",
-    },
-];
-
-const actividadReciente: Actividad[] = [
-    {
-        descripcion: "Nueva reserva recibida",
-        detalle: "Reserva #1048 · Hace 12 minutos",
-        estado: "Nueva",
-    },
-    {
-        descripcion: "Pago confirmado",
-        detalle: "Reserva #1042 · Hace 1 hora",
-        estado: "Confirmada",
-    },
-    {
-        descripcion: "Proveedor pendiente de revisión",
-        detalle: "Andes Travel · Hace 3 horas",
-        estado: "Pendiente",
-    },
-];
-
-const estiloTendencia: Record<Metrica["tendencia"], string> = {
-    positiva: "text-exito",
-    neutra: "text-texto-suave",
-    alerta: "text-advertencia",
-};
-
-const estiloEstado: Record<Actividad["estado"] | Salida["estado"], string> = {
-    Nueva: "bg-marca-activa text-marca-oscura",
-    Confirmada: "bg-green-50 text-exito",
-    Pendiente: "bg-amber-50 text-advertencia",
-};
+const fechaHoraLocal = (iso: string) =>
+    new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 
 function InicioGestionPage() {
     const navigate = useNavigate();
+    const salidasQ = useSalidas();
+    const solicitudesQ = useQuery({ queryKey: ["solicitudes"], queryFn: listarSolicitudesPendientes });
+    const incidentesQ = useIncidentes();
+
+    const salidas = salidasQ.data ?? [];
+    const hoy = fechaLocalHoy();
+    const futuras = salidas
+        .filter(
+            (s) =>
+                (s.estado === "PUBLICADA" || s.estado === "CERRADA") &&
+                s.fechaInicio.slice(0, 10) > hoy,
+        )
+        .sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
+    const enCurso = salidas.filter((s) => s.estado === "EN_CURSO").length;
+    const conAlertas = salidas.filter((s) => s.alertas?.length > 0).length;
+    const incidentes = (incidentesQ.data ?? []).slice(0, 5);
+
+    const metricas = [
+        { etiqueta: "Salidas programadas", valor: futuras.length, detalle: "Publicadas o cerradas, con fecha futura", cargando: salidasQ.isPending },
+        { etiqueta: "Salidas en curso", valor: enCurso, detalle: "En operación hoy", cargando: salidasQ.isPending },
+        { etiqueta: "Solicitudes de alojamiento pendientes", valor: solicitudesQ.data?.length, detalle: "Esperan resolución", cargando: solicitudesQ.isPending },
+        { etiqueta: "Salidas con alertas", valor: conAlertas, detalle: "Por salir con solicitudes o permisos pendientes", cargando: salidasQ.isPending },
+    ];
 
     return (
         <section className="mx-auto max-w-7xl space-y-8">
@@ -130,21 +76,21 @@ function InicioGestionPage() {
                 </div>
             </header>
 
+            {(salidasQ.isError || solicitudesQ.isError) && (
+                <Alerta tipo="error">No se pudieron cargar algunos indicadores del resumen.</Alerta>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {metricas.map((metrica) => (
                     <article
                         className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta"
                         key={metrica.etiqueta}
                     >
-                        <p className="text-sm font-semibold text-texto-suave">
-                            {metrica.etiqueta}
-                        </p>
+                        <p className="text-sm font-semibold text-texto-suave">{metrica.etiqueta}</p>
                         <p className="mt-3 text-3xl font-bold text-navegacion">
-                            {metrica.valor}
+                            {metrica.cargando ? "…" : (metrica.valor ?? "—")}
                         </p>
-                        <p className={`mt-2 text-xs font-semibold ${estiloTendencia[metrica.tendencia]}`}>
-                            {metrica.detalle}
-                        </p>
+                        <p className="mt-2 text-xs font-semibold text-texto-suave">{metrica.detalle}</p>
                     </article>
                 ))}
             </div>
@@ -155,74 +101,93 @@ function InicioGestionPage() {
                         <div>
                             <h2 className="font-bold text-navegacion">Próximas salidas</h2>
                             <p className="mt-1 text-sm text-texto-suave">
-                                Salidas programadas para los próximos días
+                                Las cinco salidas más cercanas
                             </p>
                         </div>
                         <Boton
                             className="px-3 py-1.5 text-xs"
                             variante="fantasma"
-                            onClick={() => navigate("/gestion/evaluaciones")}
+                            onClick={() => navigate("/gestion/salidas")}
                         >
                             Ver todas
                         </Boton>
                     </div>
 
-                    <div className="divide-y divide-borde">
-                        {proximasSalidas.map((salida) => (
-                            <div
-                                className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
-                                key={`${salida.circuito}-${salida.fecha}`}
-                            >
-                                <div>
-                                    <p className="text-sm font-bold text-texto">{salida.circuito}</p>
-                                    <p className="mt-1 text-xs text-texto-suave">{salida.fecha}</p>
+                    {salidasQ.isPending ? (
+                        <EstadoListado estado="cargando" />
+                    ) : salidasQ.isError ? (
+                        <EstadoListado estado="error" mensaje="No se pudieron cargar las salidas." />
+                    ) : futuras.length === 0 ? (
+                        <EstadoListado estado="vacio" mensaje="No hay salidas próximas programadas." />
+                    ) : (
+                        <div className="divide-y divide-borde">
+                            {futuras.slice(0, 5).map((salida) => (
+                                <div
+                                    className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
+                                    key={salida.idsalida}
+                                >
+                                    <div>
+                                        <p className="text-sm font-bold text-texto">
+                                            {salida.paquete.circuito.nombreCircuito}
+                                        </p>
+                                        <p className="mt-1 text-xs text-texto-suave">
+                                            {salida.paquete.nombrePaquete} · {salida.nroSalida} ·{" "}
+                                            {formatearFechaSalida(salida.fechaInicio)}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span
+                                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${estilosEstadoSalida(salida.estado)}`}
+                                        >
+                                            {formatearEstadoSalida(salida.estado)}
+                                        </span>
+                                        <p className="mt-1 text-xs text-texto-suave">
+                                            {salida.pasajerosConfirmados} / {salida.tamanoMaximo} pasajeros
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <span
-                                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado[salida.estado]}`}
-                                    >
-                                        {salida.estado}
-                                    </span>
-                                    <p className="mt-1 text-xs text-texto-suave">{salida.cupos}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </article>
 
                 <article className="rounded-tarjeta border border-borde bg-white shadow-tarjeta">
-                    <div className="flex items-center justify-between border-b border-borde px-6 py-5">
-                        <div>
-                            <h2 className="font-bold text-navegacion">Actividad reciente</h2>
-                            <p className="mt-1 text-sm text-texto-suave">
-                                Últimos movimientos del panel
-                            </p>
-                        </div>
-                        <span aria-hidden="true" className="text-xl text-marca">
-                            •••
-                        </span>
+                    <div className="border-b border-borde px-6 py-5">
+                        <h2 className="font-bold text-navegacion">Incidentes recientes</h2>
+                        <p className="mt-1 text-sm text-texto-suave">Reportados por los guías</p>
                     </div>
 
-                    <div className="divide-y divide-borde">
-                        {actividadReciente.map((actividad) => (
-                            <div className="flex items-start gap-3 px-6 py-4" key={actividad.descripcion}>
-                                <span aria-hidden="true" className="mt-1 size-2 shrink-0 rounded-full bg-marca" />
-                                <div className="min-w-0">
+                    {incidentesQ.isPending ? (
+                        <EstadoListado estado="cargando" />
+                    ) : incidentesQ.isError ? (
+                        <EstadoListado estado="error" mensaje="No se pudieron cargar los incidentes." />
+                    ) : incidentes.length === 0 ? (
+                        <EstadoListado estado="vacio" mensaje="No hay incidentes reportados" />
+                    ) : (
+                        <div className="divide-y divide-borde">
+                            {incidentes.map((inc) => (
+                                <div className="px-6 py-4" key={inc.idincidente}>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm font-semibold text-texto">
-                                            {actividad.descripcion}
-                                        </p>
                                         <span
-                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estiloEstado[actividad.estado]}`}
+                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
                                         >
-                                            {actividad.estado}
+                                            {inc.nivelGravedad}
                                         </span>
+                                        <p className="text-sm font-semibold text-texto">
+                                            {inc.salida.nroSalida} · {inc.tipoIncidente}
+                                        </p>
                                     </div>
-                                    <p className="mt-1 text-xs text-texto-suave">{actividad.detalle}</p>
+                                    <p className="mt-1 line-clamp-2 text-xs text-texto">{inc.descripcion}</p>
+                                    <p className="mt-1 text-xs text-texto-suave">
+                                        {inc.pasajeros.length > 0
+                                            ? `Afectados: ${inc.pasajeros.map((p) => p.pasajero.nombreCompleto).join(", ")} · `
+                                            : ""}
+                                        {fechaHoraLocal(inc.fechaHoraReporte)}
+                                    </p>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </article>
             </div>
 

@@ -103,8 +103,12 @@ function PaquetesPage() {
     const [errorFormulario, setErrorFormulario] = useState("");
     const [errorBaja, setErrorBaja] = useState("");
 
-    const { data: detalleVistaPrevia } =
+    const { data: detalleVistaPrevia, isError: errorDetalleVistaPrevia } =
         usePaqueteDetalle(paqueteVistaPreviaId);
+    // El listado no trae servicios ni garantías: hasta tener el detalle no se afirma nada sobre ellos
+    const textoSinDetalle = errorDetalleVistaPrevia
+        ? "No se pudo cargar el detalle del paquete. Cerrá y volvé a abrir la vista previa."
+        : "Cargando detalle…";
     const paqueteListaPrevia =
         paquetes.find((p) => p.idpaquete === paqueteVistaPreviaId) ?? null;
     const paqueteVistaPrevia = detalleVistaPrevia ?? paqueteListaPrevia;
@@ -1065,7 +1069,11 @@ function PaquetesPage() {
                                                             : "Por categoría"}
                                                     </span>
                                                 </div>
-                                                {porEst ? (
+                                                {porEst && !detalleVistaPrevia ? (
+                                                    <p className="mt-1.5 text-xs text-texto-suave">
+                                                        {textoSinDetalle}
+                                                    </p>
+                                                ) : porEst ? (
                                                     (() => {
                                                         const servicioGarantizado =
                                                             paqueteVistaPrevia
@@ -1174,12 +1182,16 @@ function PaquetesPage() {
                                             {/* SERVICIOS INCLUIDOS */}
                                             <div className="rounded-control border border-borde bg-fondo/40 p-4">
                                                 <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                                                    Servicios incluidos (
-                                                    {paqueteVistaPrevia
-                                                        .servicios?.length ?? 0}
-                                                    )
+                                                    Servicios incluidos
+                                                    {detalleVistaPrevia
+                                                        ? ` (${detalleVistaPrevia.servicios?.length ?? 0})`
+                                                        : ""}
                                                 </p>
-                                                {paqueteVistaPrevia.servicios &&
+                                                {!detalleVistaPrevia ? (
+                                                    <p className="mt-1 text-xs text-texto-suave">
+                                                        {textoSinDetalle}
+                                                    </p>
+                                                ) : paqueteVistaPrevia.servicios &&
                                                 paqueteVistaPrevia.servicios
                                                     .length > 0 ? (
                                                     <div className="mt-2 flex flex-wrap gap-1.5">

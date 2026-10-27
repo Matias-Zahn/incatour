@@ -1071,6 +1071,13 @@ export const manejadoresCatalogoReservas = [
             }
         }
 
+        if (salida.precioPersona == null || salida.moneda == null) {
+            return HttpResponse.json(
+                { error: "La salida no tiene una tarifa vigente." },
+                { status: 400 },
+            );
+        }
+
         const precioCongelado =
             Math.round(
                 (salida.precioPersona * body.pasajeros.length + extraEquipaje) *
