@@ -41,9 +41,6 @@ export class ServicioService {
         camposEditables: [...CAMPOS_BASE_EDITABLES, ...Object.keys(CAMPOS_MODIFICAR[tipo])],
         enUsoEnSalidasActivas: enUso,
         garantizaPaquetesActivos: garantiza,
-        // Si está en uso, un cambio estructural genera una versión nueva (rige solo para salidas futuras)
-        aplicaSoloAFuturasSalidas:
-          enUso && (tipo === TIPO_SERVICIO.ALOJAMIENTO || tipo === TIPO_SERVICIO.TRANSPORTE),
       },
     };
   }
@@ -112,46 +109,52 @@ export class ServicioService {
       especifico = { ...resto, cantidadDisponible: total - comprometida };
     }
 
-    // 3. Un alojamiento garantizado por un paquete activo no puede quedar fuera de la garantía
-    if (tipo === TIPO_SERVICIO.ALOJAMIENTO && (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0) {
+    // 3. CAT-31/32: se edita en el lugar; lo que ya está en salidas activas no puede quedar inconsistente
+    if (tipo === TIPO_SERVICIO.TRANSPORTE && especifico.capacidadVehiculo !== undefined) {
+      const pasajeros = await this.repository.maxPasajerosConfirmadosEnSalidasActivas(id);
+      if (especifico.capacidadVehiculo < pasajeros) {
+        throw CustomError.badRequest(
+          `La nueva capacidad (${especifico.capacidadVehiculo}) es inferior a los pasajeros confirmados de una salida activa (${pasajeros}).`
+        );
+      }
+    }
+    if (tipo === TIPO_SERVICIO.ALOJAMIENTO) {
+      const garantiza = (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0;
+      const enSalidas = garantiza || (await this.repository.contarSalidasActivas(id)) > 0;
       const cambiaCriterio =
         (dto.base.localidad !== undefined && dto.base.localidad !== servicio.localidad) ||
         (especifico.categoria !== undefined && especifico.categoria !== actual.categoria) ||
         (especifico.tipoHabitacion !== undefined && especifico.tipoHabitacion !== actual.tipoHabitacion);
-      if (cambiaCriterio) {
+      if (garantiza && cambiaCriterio) {
         throw CustomError.badRequest(
           "El servicio es el establecimiento garantizado por un paquete activo: no se pueden cambiar su localidad, categoría ni tipo de habitación. Modificá primero el paquete."
         );
       }
       if (
         especifico.modalidadConfirmacion !== undefined &&
-        especifico.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS
+        especifico.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS &&
+        garantiza
       ) {
         throw CustomError.badRequest(
           "Un establecimiento garantizado por un paquete debe mantener la modalidad de bloqueo de plazas."
         );
       }
-    }
-
-    // 4. Cambio estructural sobre un servicio en uso: rige solo para salidas futuras (versión nueva)
-    const cambiaEstructura =
-      (tipo === TIPO_SERVICIO.ALOJAMIENTO || tipo === TIPO_SERVICIO.TRANSPORTE) &&
-      ((dto.base.localidad !== undefined && dto.base.localidad !== servicio.localidad) ||
-        Object.entries(especifico).some(([campo, valor]) => actual[campo] !== valor));
-
-    if (cambiaEstructura && (await this.repository.contarSalidasActivas(id)) > 0) {
-      const nuevo = await this.repository.versionar(servicio, tipo, dto.base, { ...actual, ...especifico });
-      return {
-        servicio: this.formatear(nuevo, 0),
-        versionado: true,
-        idservicioAnterior: id,
-      };
+      if (
+        !garantiza &&
+        enSalidas &&
+        (cambiaCriterio ||
+          (especifico.modalidadConfirmacion !== undefined && especifico.modalidadConfirmacion !== actual.modalidadConfirmacion))
+      ) {
+        throw CustomError.badRequest(
+          "El alojamiento está en salidas activas: no se pueden cambiar su localidad, categoría, tipo de habitación ni modalidad de confirmación."
+        );
+      }
     }
 
     const actualizado = await this.repository.updateEnSitio(id, tipo, dto.base, especifico);
     const comprometida =
       tipo === TIPO_SERVICIO.EQUIPAMIENTO ? await this.repository.cantidadComprometida(id) : 0;
-    return { servicio: this.formatear(actualizado, comprometida), versionado: false };
+    return { servicio: this.formatear(actualizado, comprometida) };
   }
 
   // CU-21: Baja lógica de servicio

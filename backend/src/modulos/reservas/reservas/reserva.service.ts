@@ -217,10 +217,8 @@ export class ReservaService {
       throw CustomError.badRequest("El paquete no tiene una tarifa vigente para la fecha de la salida.");
     }
 
-    // Transporte de la salida; si todavía no se asignó, el incluido en el paquete
-    const transporte =
-      salida.servicios.map((s) => s.servicio.transporte).find((t) => t !== null) ??
-      definicion.servicios.map((s) => s.transporte).find((t) => t !== null);
+    // CAT-33: la franquicia sale solo de la foto del paquete (el transporte asignado no la redefine)
+    const transporte = definicion.servicios.map((s) => s.transporte).find((t) => t !== null);
 
     let extra = 0;
     if (transporte) {

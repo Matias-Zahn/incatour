@@ -205,17 +205,6 @@ function FormularioServicio({
                 </Alerta>
             ) : null}
 
-            {edicion?.aplicaSoloAFuturasSalidas ? (
-                <Alerta
-                    tipo="advertencia"
-                    titulo="Servicio asignado a salidas publicadas o en curso"
-                >
-                    Un cambio estructural generará una <strong>versión nueva</strong> del
-                    servicio que regirá únicamente para salidas futuras, manteniendo intactas
-                    las salidas y reservas vigentes.
-                </Alerta>
-            ) : null}
-
             {servicioEnEdicion && tipoProveedor === "EQUIPAMIENTO" ? (
                 <div className="rounded-control border border-borde bg-fondo px-4 py-3 text-xs text-texto-suave">
                     <span className="font-semibold text-texto">Disponibilidad actual:</span>{" "}

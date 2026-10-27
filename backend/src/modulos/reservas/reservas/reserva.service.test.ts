@@ -129,7 +129,9 @@ describe("ReservaService.crearReserva (CU-30)", () => {
 
     it("congela el desglose del precio en la reserva (RES-07)", async () => {
       const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
-      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ servicios: [servicioTransporte(15, 10)] }));
+      const s = salida();
+      s.paquete.servicios = [servicioTransporte(15, 10)];
+      repo.obtenerSalidaParaCompra.mockResolvedValue(s);
 
       await new ReservaService().crearReserva(dto, 1);
 
@@ -138,8 +140,10 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       }));
     });
 
-    it("suma el exceso de equipaje según el transporte de la salida", async () => {
-      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ servicios: [servicioTransporte(15, 10)] }));
+    it("CAT-33: la franquicia sale de la foto aunque la salida tenga otro transporte asignado", async () => {
+      const s = salida({ servicios: [servicioTransporte(50, 0)] });
+      s.paquete.servicios = [servicioTransporte(15, 10)];
+      repo.obtenerSalidaParaCompra.mockResolvedValue(s);
       const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
 
       const r = await new ReservaService().crearReserva(dto, 1);
@@ -147,7 +151,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       expect(r.precioCongelado).toBe(1650); // 800*2 + (20-15)*10
     });
 
-    it("sin transporte en la salida, usa el incluido en el paquete", async () => {
+    it("sin transporte asignado, usa el incluido en el paquete", async () => {
       const s = salida();
       s.paquete.servicios = [{ servicio: { transporte: null } }, servicioTransporte(10, 2.5)];
       repo.obtenerSalidaParaCompra.mockResolvedValue(s);
