@@ -1,7 +1,19 @@
 import { hoyUTC } from "../../../shared/fechas";
-import { armarDefinicionPaquete, definicionEfectiva, textoGarantia } from "../../../shared/definicionPaquete";
+import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, textoGarantia } from "../../../shared/definicionPaquete";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
+
+// CAT-29 / CAT-30: lo que se vende en una salida es su foto (CAT-05): garantía, noches, condiciones y franquicia de equipaje
+function definicionDeSalida(d: DefinicionPaquete) {
+  const transporte = d.servicios.find((sv) => sv.transporte)?.transporte ?? null;
+  return {
+    garantia: textoGarantia(d),
+    nochesPrevias: d.nochesPrevias,
+    nochesPosteriores: d.nochesPosteriores,
+    condiciones: d.condiciones,
+    equipajeTransporte: transporte,
+  };
+}
 
 export class CatalogoService {
   private repository = new CatalogoRepository();
@@ -68,7 +80,7 @@ export class CatalogoService {
             precioPersona: tarifaSalida ? tarifaSalida.monto : null,
             moneda: tarifaSalida ? tarifaSalida.moneda : null,
             temporadaNombre: tarifaSalida ? tarifaSalida.temporada.nombre : null,
-            garantia: textoGarantia(definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete })),
+            ...definicionDeSalida(definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete })),
           };
         });
 

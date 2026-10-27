@@ -29,8 +29,12 @@ export type SalidaDisponibleCatalogo = {
     precioPersona: number | null;
     moneda: string | null;
     temporadaNombre: string | null;
-    // CAT-29: garantía de alojamiento de esta salida (la congelada al crearla, CAT-05)
+    // CAT-29 / CAT-30: lo que se vende en esta salida (la foto congelada al crearla, CAT-05)
     garantia?: string;
+    nochesPrevias?: number;
+    nochesPosteriores?: number;
+    condiciones?: string | null;
+    equipajeTransporte?: EquipajeTransporteCatalogo | null;
 };
 
 export type EquipajeTransporteCatalogo = {
@@ -166,4 +170,22 @@ export function useCrearReservaPaquete() {
             });
         },
     });
+}
+
+/**
+ * CAT-30: el paquete tal como se vende en una salida. El catálogo describe el paquete de hoy (rige para salidas nuevas);
+ * una salida ya publicada conserva su foto: garantía, noches, condiciones y franquicia de equipaje.
+ */
+export function paqueteDeSalida(paquete: PaqueteCatalogoPublico, salida: SalidaDisponibleCatalogo): PaqueteCatalogoPublico {
+    return {
+        ...paquete,
+        nochesAlojamiento: {
+            ...paquete.nochesAlojamiento,
+            previas: salida.nochesPrevias ?? paquete.nochesAlojamiento.previas,
+            posteriores: salida.nochesPosteriores ?? paquete.nochesAlojamiento.posteriores,
+            garantia: salida.garantia ?? paquete.nochesAlojamiento.garantia,
+        },
+        condiciones: salida.condiciones !== undefined ? salida.condiciones : paquete.condiciones,
+        equipajeTransporte: salida.equipajeTransporte !== undefined ? salida.equipajeTransporte : paquete.equipajeTransporte,
+    };
 }
