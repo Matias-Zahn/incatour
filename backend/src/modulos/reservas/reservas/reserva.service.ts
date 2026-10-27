@@ -76,21 +76,32 @@ export class ReservaService {
 
       const guardado = mapaGuardados.get(nroPasaporte);
 
-      // FIX RES-15: Si ya existe, validamos que el nombre coincida (previene fraude o errores)
-      if (guardado && normalizar(p.nombreCompleto) !== normalizar(guardado.nombreCompleto)) {
-        throw CustomError.conflict(
-          `El pasaporte ${nroPasaporte} ya está registrado a nombre de otra persona.`
-        );
+      if (guardado) {
+        // FIX RES-15: Si ya existe, validamos que el nombre coincida
+        if (normalizar(p.nombreCompleto) !== normalizar(guardado.nombreCompleto)) {
+          throw CustomError.conflict(
+            `El pasaporte ${nroPasaporte} ya está registrado a nombre de otra persona.`
+          );
+        }
+
+        // FIX RES-20: Permitir renovar el pasaporte si la fecha tipeada es más nueva
+        const fechaTipeada = new Date(p.fechaVencimientoPasaporte);
+        
+        if (fechaTipeada <= guardado.fechaVencimientoPasaporte) {
+          // Si la fecha tipeada es vieja o igual, pisamos el request con la de la BD 
+          // para no corromper el historial por errores de tipeo.
+          p.fechaVencimientoPasaporte = guardado.fechaVencimientoPasaporte.toISOString();
+          p.nacionalidad = guardado.nacionalidad;
+        }
+        // Si fechaTipeada > guardado... lo dejamos intacto para que Prisma lo actualice (Renovación)
       }
 
-      // FIX RES-18: Validamos la fecha guardada (si existe) o la ingresada (si es nuevo)
-      const fechaAEvaluar = guardado 
-        ? guardado.fechaVencimientoPasaporte 
-        : new Date(p.fechaVencimientoPasaporte);
-
-      if (fechaAEvaluar < salida.fechaFin) {
+      // FIX RES-18: Validamos que la fecha definitiva cubra todo el viaje
+      const fechaFinal = new Date(p.fechaVencimientoPasaporte);
+      
+      if (fechaFinal < salida.fechaFin) {
         throw CustomError.badRequest(
-          `El pasaporte de ${p.nombreCompleto} vence el ${fechaAEvaluar.toISOString().split('T')[0]}, ` +
+          `El pasaporte de ${p.nombreCompleto} vence el ${fechaFinal.toISOString().split('T')[0]}, ` +
           `antes de que termine el recorrido (${salida.fechaFin.toISOString().split('T')[0]}). ` +
           `La autoridad rechazará el permiso.`
         );
