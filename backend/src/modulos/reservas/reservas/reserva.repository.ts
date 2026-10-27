@@ -102,22 +102,16 @@ export class ReservaRepository {
  // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
   async confirmarReserva(d: DatosConfirmacionReserva) {
     return db.$transaction(async (tx) => {
-      // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan (y ven) el cierre de la asignación (CU-40)
+      // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan el cierre
       const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
 
       // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida.
-      // Movemos esto ANTES de la inserción de pasajeros para evitar conflictos tempranos
-      const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte);
+      const pasaportesInput = d.pasajeros.map((p) => p.nroPasaporte.trim());
       const ocupado = await tx.reservaPasajero.findFirst({
         where: {
-          reserva: {
-            idsalida: d.idsalida,
-            estado: { not: "CANCELADA" },
-          },
-          pasajero: {
-            nroPasaporte: { in: pasaportesInput },
-          },
+          reserva: { idsalida: d.idsalida, estado: { not: "CANCELADA" } },
+          pasajero: { nroPasaporte: { in: pasaportesInput } },
         },
         select: { pasajero: { select: { nroPasaporte: true } } },
       });
@@ -126,9 +120,26 @@ export class ReservaRepository {
         throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
       }
 
-      // FIX RES-15: connectOrCreate asegura que si el pasaporte ya existe,
-      // reutiliza la fila INTACTA (no modifica ni nombre ni fecha de vencimiento).
-      // Si no existe, lo crea.
+      // FIX P2025: Desacoplamos la creación de pasajeros.
+      // Obtenemos los idpasajero de forma determinística antes de crear la reserva.
+      const idsPasajeros: number[] = [];
+      for (const p of d.pasajeros) {
+        const pasajeroDb = await tx.pasajero.upsert({
+          where: { nroPasaporte: p.nroPasaporte.trim() },
+          // FIX RES-15: Actualizamos el mismo pasaporte solo para bloquear la fila contra concurrencia.
+          // NO pisamos ni el nombreCompleto ni la fechaVencimiento de historiales pasados.
+          update: { nroPasaporte: p.nroPasaporte.trim() },
+          create: {
+            nroPasaporte: p.nroPasaporte.trim(),
+            nombreCompleto: p.nombreCompleto,
+            nacionalidad: p.nacionalidad,
+            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte)
+          }
+        });
+        idsPasajeros.push(pasajeroDb.idpasajero);
+      }
+
+      // Ahora creamos la reserva conectando los IDs directamente
       return tx.reserva.create({
         data: {
           idcliente: d.idcliente,
@@ -144,21 +155,9 @@ export class ReservaRepository {
           condicionesComerciales: d.condicionesComerciales,
           estado: "CONFIRMADA",
           estadoAlojamiento: d.estadoAlojamiento,
-          // Mapeamos los pasajeros usando connectOrCreate en lugar del for loop + upsert manual
+          // Pasamos el array de IDs directamente a la tabla intermedia
           pasajeros: { 
-            create: d.pasajeros.map(p => ({
-              pasajero: {
-                connectOrCreate: {
-                  where: { nroPasaporte: p.nroPasaporte.trim() },
-                  create: {
-                    nroPasaporte: p.nroPasaporte.trim(),
-                    nombreCompleto: p.nombreCompleto,
-                    nacionalidad: p.nacionalidad,
-                    fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte)
-                  }
-                }
-              }
-            })) 
+            create: idsPasajeros.map(idpasajero => ({ idpasajero })) 
           },
           pagos: {
             create: {
