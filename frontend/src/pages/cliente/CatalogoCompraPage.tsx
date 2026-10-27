@@ -629,7 +629,7 @@ function CatalogoCompraPage() {
             `Temporada Aplicada:      ${salida.temporadaNombre ?? "Sin especificar"}`,
             "-----------------------------------------------------------------",
             "2. ALOJAMIENTO Y FECHAS DERIVADAS (Paso 6 y 15 CU-30)",
-            `Garantía de Alojamiento: ${paquete.nochesAlojamiento.garantia}`,
+            `Garantía de Alojamiento: ${salida.garantia ?? paquete.nochesAlojamiento.garantia}`,
             `Estado del Alojamiento:  ${resultado.estadoAlojamiento}`,
             `Estadía Previa:          ${fechasAloj.estadiaPrevia ?? "Sin noches previas incluidas"}`,
             `Estadía Posterior:       ${fechasAloj.estadiaPosterior ?? "Sin noches posteriores incluidas"}`,
@@ -860,10 +860,9 @@ function CatalogoCompraPage() {
                                     </p>
                                     <p className="mt-2 text-xs text-texto">
                                         <strong>Garantía hotelera:</strong>{" "}
-                                        {
+                                        {reservaConfirmada.salida.garantia ??
                                             reservaConfirmada.paquete
-                                                .nochesAlojamiento.garantia
-                                        }
+                                                .nochesAlojamiento.garantia}
                                     </p>
                                     {fechasAlojConfirmadas.estadiaPrevia ? (
                                         <p className="mt-1 text-xs text-texto">
@@ -1609,7 +1608,8 @@ function CatalogoCompraPage() {
                                     Garantía alojamiento:
                                 </span>
                                 <span className="text-right font-semibold text-texto">
-                                    {paqueteEnCompra.nochesAlojamiento.garantia}
+                                    {salidaActiva?.garantia ??
+                                        paqueteEnCompra.nochesAlojamiento.garantia}
                                 </span>
                             </div>
                             {salidaActiva
@@ -2365,6 +2365,17 @@ function CatalogoCompraPage() {
                                                                             ? "Sin tarifa para esta fecha"
                                                                             : `${s.moneda} ${s.precioPersona}`}
                                                                     </p>
+                                                                    {s.garantia &&
+                                                                    s.garantia !==
+                                                                        paqueteDetalle
+                                                                            .nochesAlojamiento
+                                                                            .garantia ? (
+                                                                        // CAT-29: la salida conserva la garantía con la que se publicó
+                                                                        <p className="font-semibold text-advertencia">
+                                                                            Alojamiento de esta salida:{" "}
+                                                                            {s.garantia}
+                                                                        </p>
+                                                                    ) : null}
                                                                 </div>
                                                                 <Boton
                                                                     className="px-3 py-1.5 text-xs"

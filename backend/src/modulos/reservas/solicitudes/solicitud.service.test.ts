@@ -55,9 +55,20 @@ describe("SolicitudService", () => {
 
   describe("consultarPendientes (CU-33)", () => {
     it("devuelve las solicitudes pendientes del repositorio", async () => {
-      repo.findAllPendientes.mockResolvedValue([{ idsolicitud: 1 }, { idsolicitud: 2 }]);
+      repo.findAllPendientes.mockResolvedValue([solicitud({ idsolicitud: 1 }), solicitud({ idsolicitud: 2 })]);
 
       await expect(new SolicitudService().consultarPendientes()).resolves.toHaveLength(2);
+    });
+
+    it("RES-19: informa la garantía vendida (foto de la salida), no la del paquete de hoy", async () => {
+      const s = solicitud({}, { categoriaGarantizada: "4 estrellas", tipoHabitacionGarantizada: "Triple" });
+      (s.reserva.salida as Record<string, unknown>).definicionPaquete = {
+        tipoGarantia: "POR_CATEGORIA", localidadGarantizada: "Cusco", categoriaGarantizada: "3 estrellas", tipoHabitacionGarantizada: "Doble", establecimiento: null,
+      };
+      repo.findAllPendientes.mockResolvedValue([s]);
+
+      const [r] = await new SolicitudService().consultarPendientes();
+      expect(r!.garantia).toEqual({ tipoGarantia: "POR_CATEGORIA", localidad: "Cusco", categoria: "3 estrellas", tipoHabitacion: "Doble", establecimiento: null });
     });
   });
 

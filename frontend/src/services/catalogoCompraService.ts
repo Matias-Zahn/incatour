@@ -29,6 +29,8 @@ export type SalidaDisponibleCatalogo = {
     precioPersona: number | null;
     moneda: string | null;
     temporadaNombre: string | null;
+    // CAT-29: garantía de alojamiento de esta salida (la congelada al crearla, CAT-05)
+    garantia?: string;
 };
 
 export type EquipajeTransporteCatalogo = {

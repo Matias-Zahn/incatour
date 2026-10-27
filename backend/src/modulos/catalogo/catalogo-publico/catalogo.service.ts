@@ -1,4 +1,5 @@
 import { hoyUTC } from "../../../shared/fechas";
+import { armarDefinicionPaquete, definicionEfectiva, textoGarantia } from "../../../shared/definicionPaquete";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 
@@ -40,25 +41,8 @@ export class CatalogoService {
           }
         : null;
 
-      // Determinamos el texto de la garantía (soportando mayúsculas/minúsculas o acentos)
-      const tipoGarantiaNorm = paquete.tipoGarantia.toUpperCase();
-      let garantía = "Sin garantía especificada";
-      if (tipoGarantiaNorm.includes("CATEGORIA") || tipoGarantiaNorm.includes("CATEGORÍA")) {
-        const hab = paquete.tipoHabitacionGarantizada
-          ? ` · Hab. ${paquete.tipoHabitacionGarantizada}`
-          : "";
-        garantía = `${paquete.categoriaGarantizada ?? "Categoría estándar"} en ${paquete.localidadGarantizada ?? "Cusco"}${hab}`;
-      } else if (tipoGarantiaNorm.includes("ESTABLECIMIENTO") && paquete.garantiasEstablecimiento.length > 0) {
-        const est = paquete.garantiasEstablecimiento[0]?.servicio;
-        if (est && est.estado === "ACTIVO") {
-          const hotel = est.nombreServicio;
-          const loc = est.localidad ?? paquete.localidadGarantizada ?? "Cusco";
-          const cat = est.alojamiento?.categoria ? ` (${est.alojamiento.categoria})` : "";
-          garantía = `Hotel ${hotel}${cat} en ${loc}`;
-        } else {
-          garantía = "Alojamiento garantizado por establecimiento";
-        }
-      }
+      // CAT-29: la garantía del paquete (rige para las salidas nuevas); cada salida informa la suya, congelada (CAT-05)
+      const garantía = textoGarantia(armarDefinicionPaquete(paquete));
 
       // 3. Salidas programadas vigentes (PUBLICADA y con fecha posterior a ahora)
       // CAT-07: Si ninguna tarifa cubre la fecha de la salida, se marca sin precio (null)
@@ -84,6 +68,7 @@ export class CatalogoService {
             precioPersona: tarifaSalida ? tarifaSalida.monto : null,
             moneda: tarifaSalida ? tarifaSalida.moneda : null,
             temporadaNombre: tarifaSalida ? tarifaSalida.temporada.nombre : null,
+            garantia: textoGarantia(definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete })),
           };
         });
 

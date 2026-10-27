@@ -11,7 +11,20 @@ export class SolicitudService {
 
   // CU-33
   async consultarPendientes() {
-    return this.repository.findAllPendientes();
+    // RES-19: la garantía que se muestra es la vendida (foto de la salida, CAT-05), no la del paquete de hoy
+    return (await this.repository.findAllPendientes()).map((s) => {
+      const def = definicionEfectiva(s.reserva.salida);
+      return {
+        ...s,
+        garantia: {
+          tipoGarantia: def.tipoGarantia,
+          localidad: def.localidadGarantizada,
+          categoria: def.categoriaGarantizada,
+          tipoHabitacion: def.tipoHabitacionGarantizada,
+          establecimiento: def.establecimiento?.nombreServicio ?? null,
+        },
+      };
+    });
   }
 
   // CU-34 Fase 1: Obtener opciones

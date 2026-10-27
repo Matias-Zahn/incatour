@@ -170,28 +170,28 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
 
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-borde pt-3">
             <span className="text-xs font-medium text-texto-suave">Criterios garantizados:</span>
-            {esGarantiaEstablecimiento(solicitud.reserva.salida.paquete.tipoGarantia) && (
+            {esGarantiaEstablecimiento(solicitud.garantia.tipoGarantia) && (
               <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
                 🏨 Hotel garantizado
-                {opciones?.opcionesContacto[0] ? `: ${opciones.opcionesContacto[0].hotel}` : ""}
+                {solicitud.garantia.establecimiento ? `: ${solicitud.garantia.establecimiento}` : ""}
               </span>
             )}
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               📍 Localidad:{" "}
               {opciones?.criteriosGarantizados.localidad ??
-                solicitud.reserva.salida.paquete.localidadGarantizada ??
+                solicitud.garantia.localidad ??
                 "Sin especificar"}
             </span>
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               ⭐ Categoría:{" "}
               {opciones?.criteriosGarantizados.categoria ??
-                solicitud.reserva.salida.paquete.categoriaGarantizada ??
+                solicitud.garantia.categoria ??
                 "Sin especificar"}
             </span>
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               🛏️ Habitación:{" "}
               {opciones?.criteriosGarantizados.tipoHabitacion ??
-                solicitud.reserva.salida.paquete.tipoHabitacionGarantizada ??
+                solicitud.garantia.tipoHabitacion ??
                 "Sin especificar"}
             </span>
           </div>
@@ -549,24 +549,24 @@ export function SolicitudesPage() {
                 clave: "idservicio",
                 titulo: "Garantía de alojamiento",
                 renderizar: (s) => {
-                  const p = s.reserva.salida.paquete;
-                  if (esGarantiaEstablecimiento(p.tipoGarantia)) {
+                  const g = s.garantia;
+                  if (esGarantiaEstablecimiento(g.tipoGarantia)) {
                     return (
                       <span className="inline-flex rounded-full bg-marca-suave px-2 py-0.5 text-xs font-medium text-primario">
-                        Hotel garantizado
+                        {g.establecimiento ?? "Hotel garantizado"}
                       </span>
                     );
                   }
                   return (
                     <div className="flex flex-wrap gap-1">
                       <span className="inline-flex rounded-full bg-marca-suave px-2 py-0.5 text-xs font-medium text-primario">
-                        {p.localidadGarantizada ?? "Sin especificar"}
+                        {g.localidad ?? "Sin especificar"}
                       </span>
                       <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-texto">
-                        {p.categoriaGarantizada ?? "Sin especificar"}
+                        {g.categoria ?? "Sin especificar"}
                       </span>
                       <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-texto">
-                        Hab. {p.tipoHabitacionGarantizada ?? "Sin especificar"}
+                        Hab. {g.tipoHabitacion ?? "Sin especificar"}
                       </span>
                     </div>
                   );
