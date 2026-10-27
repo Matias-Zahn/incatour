@@ -43,10 +43,12 @@ export class ReservaService {
     }
 
     // 3. Pasajeros: sin pasaportes repetidos y vigentes hasta el final del recorrido
-    const pasaportes = new Set(dto.pasajeros.map((p) => p.nroPasaporte));
+    const pasaportesList = dto.pasajeros.map((p) => p.nroPasaporte.trim());
+    const pasaportes = new Set(pasaportesList);
     if (pasaportes.size !== cantidad) {
       throw CustomError.badRequest("Hay pasajeros con el mismo número de pasaporte.");
     }
+    
     // RES-03: No permitir que el mismo pasaporte ocupe dos lugares en la misma salida
     const reservasPrevias = (salida as any).reservas ?? [];
     const pasaportesExistentes = new Set<string>();
@@ -58,25 +60,40 @@ export class ReservaService {
       }
     }
 
-    for (const p of dto.pasajeros) {
-      if (pasaportesExistentes.has(p.nroPasaporte)) {
-        throw CustomError.badRequest(
-          `El pasaporte ${p.nroPasaporte} ya se encuentra registrado en esta salida.`
-        );
-      }
-      if (new Date(p.fechaVencimientoPasaporte) <= salida.fechaFin) {
-        throw CustomError.badRequest(
-          `El pasaporte de ${p.nombreCompleto} vence antes de finalizar el recorrido.`
-        );
-      }
-    }
-
-    // RES-15: un pasaporte ya registrado se usa tal como está; con otro nombre es de otra persona
+    // Traemos los datos de la BD de los pasajeros que ya viajaron con nosotros
+    const pasajerosGuardados = await this.repository.buscarPasajerosPorPasaporte([...pasaportes]);
+    const mapaGuardados = new Map(pasajerosGuardados.map(p => [p.nroPasaporte, p]));
     const normalizar = (nombre: string) => nombre.trim().toLowerCase();
-    for (const registrado of await this.repository.buscarPasajerosPorPasaporte([...pasaportes])) {
-      const enviado = dto.pasajeros.find((p) => p.nroPasaporte === registrado.nroPasaporte);
-      if (enviado && normalizar(enviado.nombreCompleto) !== normalizar(registrado.nombreCompleto)) {
-        throw CustomError.conflict(`El pasaporte ${registrado.nroPasaporte} ya está registrado a nombre de otra persona.`);
+
+    for (const p of dto.pasajeros) {
+      const nroPasaporte = p.nroPasaporte.trim();
+
+      if (pasaportesExistentes.has(nroPasaporte)) {
+        throw CustomError.badRequest(
+          `El pasaporte ${nroPasaporte} ya se encuentra registrado en esta salida.`
+        );
+      }
+
+      const guardado = mapaGuardados.get(nroPasaporte);
+
+      // FIX RES-15: Si ya existe, validamos que el nombre coincida (previene fraude o errores)
+      if (guardado && normalizar(p.nombreCompleto) !== normalizar(guardado.nombreCompleto)) {
+        throw CustomError.conflict(
+          `El pasaporte ${nroPasaporte} ya está registrado a nombre de otra persona.`
+        );
+      }
+
+      // FIX RES-18: Validamos la fecha guardada (si existe) o la ingresada (si es nuevo)
+      const fechaAEvaluar = guardado 
+        ? guardado.fechaVencimientoPasaporte 
+        : new Date(p.fechaVencimientoPasaporte);
+
+      if (fechaAEvaluar < salida.fechaFin) {
+        throw CustomError.badRequest(
+          `El pasaporte de ${p.nombreCompleto} vence el ${fechaAEvaluar.toISOString().split('T')[0]}, ` +
+          `antes de que termine el recorrido (${salida.fechaFin.toISOString().split('T')[0]}). ` +
+          `La autoridad rechazará el permiso.`
+        );
       }
     }
 
