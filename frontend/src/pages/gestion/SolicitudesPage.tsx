@@ -15,6 +15,10 @@ import Alerta from "../../components/Alerta";
 
 const POR_PAGINA = 6;
 
+function esGarantiaEstablecimiento(tipoGarantia: string): boolean {
+  return tipoGarantia.toUpperCase().includes("ESTABLECIMIENTO");
+}
+
 function formatearFechaCorta(iso: string): string {
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return iso;
@@ -166,23 +170,29 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
 
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-borde pt-3">
             <span className="text-xs font-medium text-texto-suave">Criterios garantizados:</span>
+            {esGarantiaEstablecimiento(solicitud.reserva.salida.paquete.tipoGarantia) && (
+              <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
+                🏨 Hotel garantizado
+                {opciones?.opcionesContacto[0] ? `: ${opciones.opcionesContacto[0].hotel}` : ""}
+              </span>
+            )}
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               📍 Localidad:{" "}
               {opciones?.criteriosGarantizados.localidad ??
                 solicitud.reserva.salida.paquete.localidadGarantizada ??
-                "Cusco"}
+                "Sin especificar"}
             </span>
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               ⭐ Categoría:{" "}
               {opciones?.criteriosGarantizados.categoria ??
                 solicitud.reserva.salida.paquete.categoriaGarantizada ??
-                "3 Estrellas"}
+                "Sin especificar"}
             </span>
             <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
               🛏️ Habitación:{" "}
               {opciones?.criteriosGarantizados.tipoHabitacion ??
                 solicitud.reserva.salida.paquete.tipoHabitacionGarantizada ??
-                "Doble"}
+                "Sin especificar"}
             </span>
           </div>
         </div>
@@ -540,16 +550,23 @@ export function SolicitudesPage() {
                 titulo: "Garantía de alojamiento",
                 renderizar: (s) => {
                   const p = s.reserva.salida.paquete;
+                  if (esGarantiaEstablecimiento(p.tipoGarantia)) {
+                    return (
+                      <span className="inline-flex rounded-full bg-marca-suave px-2 py-0.5 text-xs font-medium text-primario">
+                        Hotel garantizado
+                      </span>
+                    );
+                  }
                   return (
                     <div className="flex flex-wrap gap-1">
                       <span className="inline-flex rounded-full bg-marca-suave px-2 py-0.5 text-xs font-medium text-primario">
-                        {p.localidadGarantizada ?? "Cusco"}
+                        {p.localidadGarantizada ?? "Sin especificar"}
                       </span>
                       <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-texto">
-                        {p.categoriaGarantizada ?? "3 Estrellas"}
+                        {p.categoriaGarantizada ?? "Sin especificar"}
                       </span>
                       <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-texto">
-                        Hab. {p.tipoHabitacionGarantizada ?? "Doble"}
+                        Hab. {p.tipoHabitacionGarantizada ?? "Sin especificar"}
                       </span>
                     </div>
                   );
