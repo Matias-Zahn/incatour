@@ -40,7 +40,7 @@ export class ReservaRepository {
   async buscarPasajerosPorPasaporte(nrosPasaporte: string[]) {
     return db.pasajero.findMany({
       where: { nroPasaporte: { in: nrosPasaporte } },
-      select: { nroPasaporte: true, nombreCompleto: true,fechaVencimientoPasaporte: true },
+      select: { nroPasaporte: true, nombreCompleto: true,fechaVencimientoPasaporte: true, nacionalidad: true},
     });
   }
 
@@ -120,15 +120,17 @@ export class ReservaRepository {
         throw new Error(`El pasaporte ${ocupado.pasajero.nroPasaporte} ya tiene una reserva en esta salida.`);
       }
 
-      // FIX P2025: Desacoplamos la creación de pasajeros.
-      // Obtenemos los idpasajero de forma determinística antes de crear la reserva.
+      // FIX P2025 y RES-20: Desacoplamos la creación de pasajeros.
       const idsPasajeros: number[] = [];
       for (const p of d.pasajeros) {
         const pasajeroDb = await tx.pasajero.upsert({
           where: { nroPasaporte: p.nroPasaporte.trim() },
-          // FIX RES-15: Actualizamos el mismo pasaporte solo para bloquear la fila contra concurrencia.
-          // NO pisamos ni el nombreCompleto ni la fechaVencimiento de historiales pasados.
-          update: { nroPasaporte: p.nroPasaporte.trim() },
+          update: { 
+            // FIX RES-20: Ahora sí actualizamos, porque el servicio ya validó
+            // que estos datos sean más recientes que los que teníamos.
+            nacionalidad: p.nacionalidad,
+            fechaVencimientoPasaporte: new Date(p.fechaVencimientoPasaporte)
+          },
           create: {
             nroPasaporte: p.nroPasaporte.trim(),
             nombreCompleto: p.nombreCompleto,
