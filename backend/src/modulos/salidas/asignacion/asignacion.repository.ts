@@ -40,15 +40,8 @@ export class AsignacionRepository {
         estado: ESTADO.ACTIVO,
         // FIX CTA-18: Si es un guía, debe poseer una cuenta de usuario vinculada y ACTIVA
         OR: [
-          { guia: null }, // Personal no guía (ej: porteadores)
-          {
-            guia: {
-              usuario: {
-                isNot: null,
-                estado: ESTADO.ACTIVO,
-              },
-            },
-          },
+          { guia: { is: null } }, // Personal no guía (ej: porteadores)
+          { guia: { is: { usuario: { is: { estado: ESTADO.ACTIVO } } } } },
         ],
         NOT: {
           asignaciones: {
@@ -77,7 +70,7 @@ export class AsignacionRepository {
   }
 
   async buscarPersonal(ids: number[]) {
-    return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: true } });
+    return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: { include: { usuario: true } } } });
   }
 
   /**

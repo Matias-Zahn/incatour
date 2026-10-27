@@ -27,7 +27,7 @@ const salida = (bloqueo: string, pasajeros = [pasajero(1), pasajero(2), pasajero
 });
 const persona = (id: number, rol: string) => ({
   idpersonal: id, nombreCompleto: `Persona ${id}`, rol, ...pasaporte("2030-01-01"),
-  guia: rol === "Guía" ? { fechaHabilitacion: new Date("2028-12-31") } : null,
+  guia: rol === "Guía" ? { fechaHabilitacion: new Date("2028-12-31"), usuario: { estado: "ACTIVO" } } : null,
 });
 const equipo = [persona(1, "Guía"), persona(2, "Guía"), persona(3, "Porteador"), persona(4, "Porteador")];
 const dto = ConfirmarAsignacionDto.create({ personalIds: [1, 2, 3, 4], idtransporte: 7, itemsCamping: [] })[1]!;
@@ -187,7 +187,7 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
   });
 
   it("FA1: rechaza un guía sin habilitación vigente para las fechas", async () => {
-    const vencido = { ...persona(1, "Guía"), guia: { fechaHabilitacion: new Date("2026-11-21") } };
+    const vencido = { ...persona(1, "Guía"), guia: { fechaHabilitacion: new Date("2026-11-21"), usuario: { estado: "ACTIVO" } } };
     repo.buscarPersonal.mockResolvedValue([vencido, ...equipo.slice(1)]);
 
     await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("habilitación vigente");
@@ -198,6 +198,12 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.buscarPersonal.mockResolvedValue([equipo[0], equipo[2], equipo[3]]);
 
     await expect(new AsignacionService().confirmarAsignacion(2, pocos)).rejects.toThrow("al menos 2 guías");
+  });
+
+  it("CTA-18: un guía sin cuenta activa no se asigna (no podría informar los avances)", async () => {
+    repo.buscarPersonal.mockResolvedValue(equipo.map((p) => (p.guia ? { ...p, guia: { ...p.guia, usuario: null } } : p)));
+
+    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("cuenta de usuario activa");
   });
 
   it("FA5: con alojamientos pendientes responde 409", async () => {

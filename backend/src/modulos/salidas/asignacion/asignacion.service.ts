@@ -1,6 +1,6 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
 import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { LogisticaRepository } from "../logistica/logistica.repository";
@@ -36,7 +36,6 @@ export class AsignacionService {
             (habilitacionVigente(p.guia, salida.fechaFin) && p.guia?.usuario?.estado === ESTADO.ACTIVO)
         )
         .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
-      personalDisponible: personal
       transportesDisponibles: transportes.map((t) => ({
         idservicio: t.idservicio,
         nombreServicio: t.nombreServicio,
