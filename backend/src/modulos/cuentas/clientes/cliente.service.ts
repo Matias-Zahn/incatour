@@ -34,20 +34,15 @@ export class ClienteService {
     const salt = await bcrypt.genSalt(10);
     const contraseniaHasheada = await bcrypt.hash(dto.contrasenia, salt);
 
-    // 2. Si el correo ya existe, evaluamos su estado
-    if (clienteExistente) {
+   if (clienteExistente) {
+      // FIX CTA-19: Si la cuenta está inactiva, bloqueamos el registro para evitar secuestro de cuenta.
       if (clienteExistente.estado === "INACTIVO") {
-        // MODO MÁGICO: La cuenta estaba de baja. La reactivamos con los datos nuevos.
-        return await this.repository.reactivarCliente(
-          clienteExistente.idcliente, 
-          clienteExistente.idusuario, 
-          dto, 
-          contraseniaHasheada
+        throw CustomError.conflict(
+          "El correo electrónico pertenece a una cuenta inactiva. Por favor, comunícate con soporte para reactivar tu cuenta."
         );
-      } else {
-        // FIX CTA-10: La cuenta existe y está ACTIVA. Bloqueamos el registro.
-        throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
       }
+      // Si la cuenta está activa
+      throw CustomError.conflict("Ya existe un usuario registrado con ese correo electrónico.");
     }
 
     // 3. Si el correo NO existe, seguimos el flujo de creación normal
