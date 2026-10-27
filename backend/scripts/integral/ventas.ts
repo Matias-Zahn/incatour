@@ -215,13 +215,27 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Pasaporte que vence en medio del recorrido → 400", "POST", "/reservas",
       f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 1) })] }), cli.token, 400);
     igual("Rechazo por pasaporte: stock sin cambios", await foto(idsalida), antes);
-    await ctx.esperar("Pasaporte que vence el último día del recorrido → 400", "POST", "/reservas",
-      f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 2) })] }), cli.token, 400);
     await ctx.esperar("Pasaporte que ya venció → 400", "POST", "/reservas",
       f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(-30) })] }), cli.token, 400);
     await ctx.esperar("Un pasajero vencido entre varios rechaza toda la compra → 400", "POST", "/reservas",
       f.compra(idsalida, { pasajeros: [f.pasajero(), f.pasajero({ vence: fecha(dias + 1) })] }), cli.token, 400);
     igual("Ninguna reserva ni pasajero creados", await foto(idsalida), antes);
+    // Vigente hasta el último día alcanza: es la misma regla que aplica CU-40 (asignacion.service, vence < fechaFin)
+    await ctx.esperar("Pasaporte que vence el último día del recorrido → 201", "POST", "/reservas",
+      f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 2) })] }), cli.token, 201);
+  });
+
+  await ctx.escenario("Dos compras simultáneas con el mismo pasaporte ya registrado en la misma salida", async () => {
+    // RES-03: el pasaporte ya existe (viajó en otra salida); dos compras a la vez en otra salida no pueden pasar las dos
+    const a = await armar({ tamano: 3 });
+    const b = await armar({ tamano: 3 });
+    const p = f.pasajero();
+    await f.comprar((await f.cliente()).token, a.idsalida, { pasajeros: [p] });
+    const [c1, c2] = [await f.cliente(), await f.cliente()];
+    const r = await Promise.all([c1, c2].map((c) => ctx.back.llamar("POST", "/reservas", f.compra(b.idsalida, { pasajeros: [p] }), c.token)));
+    ctx.controlar("Mismo pasaporte en paralelo: pasa una sola compra", r.filter((x) => x.status === 201).length === 1, `status: ${r.map((x) => x.status).join(", ")}`);
+    const enSalida = await db.reservaPasajero.count({ where: { pasajero: { nroPasaporte: p.nroPasaporte }, reserva: { idsalida: b.idsalida, estado: "CONFIRMADA" } } });
+    ctx.controlar("El pasaporte queda una sola vez en la salida", enSalida === 1, `veces=${enSalida}`);
   });
 
   await ctx.escenario("Compra en salida no disponible", async () => {
