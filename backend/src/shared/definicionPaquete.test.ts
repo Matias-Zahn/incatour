@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armarDefinicionPaquete, definicionEfectiva } from "./definicionPaquete";
+import { armarDefinicionPaquete, definicionEfectiva, textoGarantia } from "./definicionPaquete";
 
 const paquete = {
   condiciones: "Sin reembolso a menos de 30 días",
@@ -56,5 +56,21 @@ describe("definicionEfectiva", () => {
 
   it("salida sin foto (anterior a CAT-05): rige el paquete vivo", () => {
     expect(definicionEfectiva({ definicionPaquete: null, paquete: { ...paquete, condiciones: "Vivas" } }).condiciones).toBe("Vivas");
+  });
+});
+
+describe("textoGarantia (CAT-29)", () => {
+  const base = armarDefinicionPaquete(paquete);
+  it("por categoría arma el texto con lo que hay, sin inventar localidad ni categoría", () => {
+    expect(textoGarantia({ ...base, tipoGarantia: "POR_CATEGORIA", categoriaGarantizada: "3 Estrellas", localidadGarantizada: "Cusco", tipoHabitacionGarantizada: "Doble" }))
+      .toBe("3 Estrellas en Cusco · Hab. Doble");
+    expect(textoGarantia({ ...base, tipoGarantia: "Por Categoría", categoriaGarantizada: null, localidadGarantizada: null, tipoHabitacionGarantizada: null }))
+      .toBe("Categoría sin especificar");
+  });
+
+  it("por establecimiento nombra el hotel de la foto", () => {
+    const est = { idservicio: 9, nombreServicio: "Hotel Montaña", localidad: "Cusco", categoria: "3 Estrellas" };
+    expect(textoGarantia({ ...base, tipoGarantia: "POR_ESTABLECIMIENTO", establecimiento: est })).toBe("Hotel Montaña (3 Estrellas) en Cusco");
+    expect(textoGarantia({ ...base, tipoGarantia: "POR_ESTABLECIMIENTO", establecimiento: null })).toBe("Alojamiento garantizado por establecimiento");
   });
 });

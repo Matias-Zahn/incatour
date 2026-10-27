@@ -80,3 +80,22 @@ export function armarDefinicionPaquete(p: PaqueteParaDefinicion): DefinicionPaqu
 export function definicionEfectiva(salida: { definicionPaquete: unknown; paquete: PaqueteParaDefinicion }): DefinicionPaquete {
   return (salida.definicionPaquete as DefinicionPaquete | null) ?? armarDefinicionPaquete(salida.paquete);
 }
+
+/** CAT-29: texto de la garantía de alojamiento, sin inventar datos que la definición no tiene. */
+export function textoGarantia(d: DefinicionPaquete): string {
+  const tipo = d.tipoGarantia.toUpperCase();
+  if (tipo.includes("ESTABLECIMIENTO")) {
+    const est = d.establecimiento;
+    if (!est) return "Alojamiento garantizado por establecimiento";
+    return `${est.nombreServicio}${est.categoria ? ` (${est.categoria})` : ""} en ${est.localidad}`;
+  }
+  if (tipo.includes("CATEGOR")) {
+    const partes = [
+      d.categoriaGarantizada ?? "Categoría sin especificar",
+      d.localidadGarantizada ? `en ${d.localidadGarantizada}` : null,
+      d.tipoHabitacionGarantizada ? `· Hab. ${d.tipoHabitacionGarantizada}` : null,
+    ];
+    return partes.filter(Boolean).join(" ");
+  }
+  return "Sin garantía especificada";
+}
