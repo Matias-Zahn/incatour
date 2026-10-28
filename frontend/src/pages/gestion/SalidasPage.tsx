@@ -668,23 +668,27 @@ function SalidasPage() {
     const columnas = [
         {
             clave: "nroSalida" as const,
-            titulo: "N° Salida",
+            titulo: "Salida y Paquete",
             renderizar: (fila: Salida) => (
-                <span className="font-semibold text-navegacion whitespace-nowrap">
-                    {fila.nroSalida}
-                </span>
-            ),
-        },
-        {
-            clave: "paquete" as const,
-            titulo: "Paquete",
-            renderizar: (fila: Salida) => (
-                <div className="min-w-[180px] max-w-[280px]">
-                    <p className="font-medium text-texto leading-snug">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-800">
+                            {fila.nroSalida}
+                        </span>
+                        {fila.idbloqueo && (
+                            <span
+                                className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200"
+                                title={`Bloqueo Serfor/Dircetur: ${fila.idbloqueo}`}
+                            >
+                                Bloq: {fila.idbloqueo}
+                            </span>
+                        )}
+                    </div>
+                    <p className="font-semibold text-sm text-texto leading-snug">
                         {fila.paquete?.nombrePaquete ?? "—"}
                     </p>
-                    <p className="text-xs text-texto-suave mt-0.5">
-                        {fila.paquete?.nroPaquete}
+                    <p className="text-xs text-texto-suave">
+                        {fila.paquete?.nroPaquete ?? `Paquete #${fila.idpaquete}`}
                     </p>
                 </div>
             ),
@@ -692,256 +696,281 @@ function SalidasPage() {
         {
             clave: "fechaInicio" as const,
             titulo: "Fechas",
-            renderizar: (fila: Salida) => (
-                <div className="min-w-[130px] whitespace-nowrap text-xs">
-                    <p className="font-medium text-texto">
-                        Inicio: {formatearFechaSalida(fila.fechaInicio)}
-                    </p>
-                    <p className="text-texto-suave mt-0.5">
-                        Fin: {formatearFechaSalida(fila.fechaFin)}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            clave: "estado" as const,
-            titulo: "Estado",
-            renderizar: (fila: Salida) => (
-                <div className="whitespace-nowrap">
-                    <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estilosEstadoSalida(fila.estado)}`}
-                    >
-                        {formatearEstadoSalida(fila.estado)}
-                    </span>
-                </div>
-            ),
+            renderizar: (fila: Salida) => {
+                const hoy = fechaLocalHoy();
+                const inicioStr = fila.fechaInicio.slice(0, 10);
+                const finStr = fila.fechaFin.slice(0, 10);
+                const esFinalizada = fila.estado === "FINALIZADA" || finStr < hoy;
+                const esEnCurso = fila.estado === "EN_CURSO" || (inicioStr <= hoy && finStr >= hoy);
+
+                let badgeTiempo = null;
+                if (esFinalizada) {
+                    badgeTiempo = (
+                        <span className="inline-block text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            Concluida
+                        </span>
+                    );
+                } else if (esEnCurso) {
+                    badgeTiempo = (
+                        <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                            En curso
+                        </span>
+                    );
+                } else if (inicioStr === hoy) {
+                    badgeTiempo = (
+                        <span className="inline-block text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            Sale hoy
+                        </span>
+                    );
+                } else {
+                    const diffMs = new Date(inicioStr).getTime() - new Date(hoy).getTime();
+                    const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    if (dias > 0) {
+                        badgeTiempo = (
+                            <span className="inline-block text-[10px] font-medium text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                                En {dias} {dias === 1 ? "día" : "días"}
+                            </span>
+                        );
+                    }
+                }
+
+                return (
+                    <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-texto whitespace-nowrap">
+                                {formatearFechaSalida(fila.fechaInicio)}
+                            </span>
+                            {badgeTiempo}
+                        </div>
+                        <p className="text-texto-suave whitespace-nowrap">
+                            Hasta: {formatearFechaSalida(fila.fechaFin)}
+                        </p>
+                    </div>
+                );
+            },
         },
         {
             clave: "tamanoMaximo" as const,
-            titulo: "Pasajeros / Cupo",
-            renderizar: (fila: Salida) => (
-                <div className="min-w-[110px] whitespace-nowrap text-xs">
-                    <p className="font-medium text-texto">
-                        Confirmados:{" "}
-                        <span className="font-semibold text-navegacion">
-                            {fila.pasajerosConfirmados}
-                        </span>
-                    </p>
-                    <p className="text-texto-suave mt-0.5">
-                        Máx: {fila.tamanoMaximo} · Disp: {fila.stockLocal}
-                    </p>
-                </div>
-            ),
+            titulo: "Ocupación",
+            renderizar: (fila: Salida) => {
+                const confirmados = fila.pasajerosConfirmados ?? 0;
+                const maximo = fila.tamanoMaximo || 1;
+                const porcentaje = Math.min(100, Math.round((confirmados / maximo) * 100));
+
+                let colorBarra = "bg-sky-500";
+                if (porcentaje >= 100) colorBarra = "bg-rose-500";
+                else if (porcentaje >= 60) colorBarra = "bg-emerald-500";
+                else if (porcentaje > 0) colorBarra = "bg-amber-500";
+
+                return (
+                    <div className="min-w-[130px] space-y-1 text-xs">
+                        <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-bold text-sm text-texto">
+                                {confirmados}{" "}
+                                <span className="font-normal text-xs text-texto-suave">
+                                    / {fila.tamanoMaximo} pax
+                                </span>
+                            </span>
+                            <span className="font-semibold text-[11px] text-texto-suave">
+                                {porcentaje}%
+                            </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div
+                                className={`h-full ${colorBarra} transition-all duration-300`}
+                                style={{ width: `${porcentaje}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-texto-suave">
+                            <span>Disp: {fila.stockLocal}</span>
+                            {confirmados === 0 && (
+                                <span className="text-amber-700 font-medium">Sin ventas</span>
+                            )}
+                            {fila.stockLocal === 0 && (
+                                <span className="text-rose-600 font-semibold">Completo</span>
+                            )}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
-            clave: "personalAsignado" as const,
-            titulo: "Personal",
+            clave: "estado" as const,
+            titulo: "Estado y Avance",
             renderizar: (fila: Salida) => {
-                const dotacion = dotacionDeSalida(fila);
-                const totalPersonal = fila.cantidadPersonal ?? dotacion.total;
-                if (totalPersonal === 0) {
-                    return (
-                        <span className="text-xs text-texto-suave whitespace-nowrap">
-                            Sin personal asignado
-                        </span>
-                    );
-                }
+                const informada = fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
+                const esperada = fila.etapaEsperada;
+                const desfasada = fila.etapaDesfasada;
+
                 return (
-                    <div className="min-w-[140px] text-xs">
-                        <p className="font-medium text-texto whitespace-nowrap">
-                            {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
-                        </p>
-                        {dotacion.total > 0 && (
-                            <p className="text-texto-suave mt-0.5 whitespace-nowrap">
-                                {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
-                                {dotacion.porteadores}{" "}
-                                {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
-                            </p>
+                    <div className="space-y-1.5">
+                        <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estilosEstadoSalida(fila.estado)}`}
+                        >
+                            {formatearEstadoSalida(fila.estado)}
+                        </span>
+
+                        {fila.estado === "EN_CURSO" && (
+                            <div className="text-xs">
+                                {desfasada ? (
+                                    <div className="flex flex-col gap-0.5">
+                                        <span
+                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
+                                            title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
+                                        >
+                                            <span aria-hidden="true">⏱️</span>
+                                            <span>
+                                                {informada !== null ? `Etapa ${informada}` : "Sin informe"}
+                                            </span>
+                                            {esperada !== null && (
+                                                <span className="font-normal text-amber-700">
+                                                    (Esp: {esperada})
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-amber-700">
+                                            Desfasada
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                                            {informada !== null ? `Etapa ${informada}` : "Iniciada"}
+                                            {esperada !== null && (
+                                                <span className="ml-1 text-emerald-600">
+                                                    (Esp: {esperada})
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className="text-[10px] text-emerald-700 font-medium">
+                                            Al día
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
                 );
             },
         },
         {
-            clave: "id" as const,
-            titulo: "Guía/s",
+            clave: "personalAsignado" as const,
+            titulo: "Dotación y Personal",
             renderizar: (fila: Salida) => {
+                const dotacion = dotacionDeSalida(fila);
+                const totalPersonal = fila.cantidadPersonal ?? dotacion.total;
                 const guias =
                     Array.isArray(fila.guias) && fila.guias.length > 0
                         ? fila.guias
                         : nombresGuiasDeSalida(fila);
-                if (guias.length === 0) {
+
+                if (totalPersonal === 0) {
                     return (
-                        <span className="text-xs text-texto-suave whitespace-nowrap">
-                            Sin guías asignados
-                        </span>
+                        <div className="space-y-1 text-xs">
+                            <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                Sin asignar
+                            </span>
+                        </div>
                     );
                 }
+
                 return (
-                    <ul className="min-w-[120px] text-xs text-texto space-y-0.5">
-                        {guias.map((nombre, i) => (
-                            <li key={i} className="font-medium whitespace-nowrap">
-                                {nombre}
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="space-y-1 text-xs">
+                        <div className="font-semibold text-texto">
+                            {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
+                        </div>
+                        {dotacion.total > 0 && (
+                            <p className="text-[11px] text-texto-suave">
+                                {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
+                                {dotacion.porteadores}{" "}
+                                {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
+                            </p>
+                        )}
+                        {guias.length > 0 && (
+                            <div className="pt-0.5">
+                                <p
+                                    className="text-[11px] font-medium text-texto truncate max-w-[170px]"
+                                    title={guias.join(", ")}
+                                >
+                                    <span className="text-texto-suave">Guías: </span>
+                                    {guias.join(", ")}
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 );
             },
         },
         {
             clave: "permisosFaltantes" as const,
-            titulo: "Permisos",
+            titulo: "Permisos y Alertas",
             renderizar: (fila: Salida) => {
                 const faltantes = fila.permisosFaltantes ?? 0;
                 const alertaPermisos = fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
-
-                if (faltantes === 0) {
-                    return (
-                        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 whitespace-nowrap">
-                            Al día (0 faltantes)
-                        </span>
-                    );
-                }
-
-                if (alertaPermisos) {
-                    return (
-                        <div className="whitespace-nowrap">
-                            <span
-                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
-                                title="Alerta operativa: permisos sin emitir dentro de los 7 días previos al inicio"
-                            >
-                                <span aria-hidden="true">⚠️</span>
-                                <span>
-                                    {faltantes}{" "}
-                                    {faltantes === 1 ? "faltante" : "faltantes"}
-                                </span>
-                            </span>
-                        </div>
-                    );
-                }
-
-                return (
-                    <span className="inline-flex items-center rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 whitespace-nowrap">
-                        {faltantes} {faltantes === 1 ? "faltante" : "faltantes"}
-                    </span>
-                );
-            },
-        },
-        {
-            clave: "ultimaEtapaAlcanzada" as const,
-            titulo: "Avance",
-            renderizar: (fila: Salida) => {
-                if (fila.estado === "EN_CURSO") {
-                    const informada = fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
-                    const esperada = fila.etapaEsperada;
-                    const desfasada = fila.etapaDesfasada;
-
-                    const textoInformada =
-                        informada !== null ? `Etapa ${informada}` : "Sin informe";
-                    const textoEsperada =
-                        esperada !== null ? `Esperada: ${esperada}` : null;
-
-                    if (desfasada) {
-                        return (
-                            <div className="whitespace-nowrap flex flex-col gap-0.5">
-                                <span
-                                    className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
-                                    title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
-                                >
-                                    <span aria-hidden="true">⏱️</span>
-                                    <span>{textoInformada}</span>
-                                    {textoEsperada && (
-                                        <span className="font-normal text-amber-700">
-                                            ({textoEsperada})
-                                        </span>
-                                    )}
-                                </span>
-                                <span className="text-[10px] font-semibold text-amber-700">
-                                    Desfasada del cronograma
-                                </span>
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div className="whitespace-nowrap flex flex-col gap-0.5">
-                            <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                                {textoInformada}
-                                {textoEsperada && (
-                                    <span className="ml-1 text-emerald-600">
-                                        ({textoEsperada})
-                                    </span>
-                                )}
-                            </span>
-                            <span className="text-[10px] text-emerald-700 font-medium">
-                                Al día
-                            </span>
-                        </div>
-                    );
-                }
-                return <span className="text-xs text-texto-suave">—</span>;
-            },
-        },
-        {
-            clave: "id" as const,
-            titulo: "Avisos",
-            renderizar: (fila: Salida) => {
-                const tieneAlertas =
-                    Array.isArray(fila.alertas) && fila.alertas.length > 0;
                 const tieneSobrantes = (fila.lugaresPorLiberar ?? 0) > 0;
-                if (!tieneAlertas && !tieneSobrantes) {
-                    return (
-                        <span className="text-xs text-texto-suave whitespace-nowrap">
-                            Sin avisos
-                        </span>
-                    );
-                }
-
+                const alertaSol = fila.alertas?.includes("SOLICITUD_PENDIENTE");
                 const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
 
+                const sinNovedades =
+                    faltantes === 0 && !tieneSobrantes && !alertaSol && !alertaPermisos;
+
+                if (sinNovedades) {
+                    return (
+                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                            <span className="text-emerald-600">✓</span> Al día
+                        </span>
+                    );
+                }
+
                 return (
-                    <div className="whitespace-nowrap flex flex-col gap-1 items-start">
+                    <div className="flex flex-col gap-1 items-start text-xs">
+                        {faltantes > 0 &&
+                            (alertaPermisos ? (
+                                <span
+                                    className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
+                                    title="Alerta operativa: permisos sin emitir dentro de los 7 días previos al inicio"
+                                >
+                                    <span aria-hidden="true">⚠️</span>
+                                    <span>
+                                        {faltantes}{" "}
+                                        {faltantes === 1
+                                            ? "permiso sin emitir"
+                                            : "permisos sin emitir"}
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    {faltantes}{" "}
+                                    {faltantes === 1 ? "permiso faltante" : "permisos faltantes"}
+                                </span>
+                            ))}
+
                         {tieneSobrantes && (
                             <span
-                                title={`Hay ${fila.lugaresPorLiberar} lugares sobrantes del bloqueo pendientes de liberación ante la autoridad`}
-                                className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-900"
+                                title={`Hay ${fila.lugaresPorLiberar} lugares sobrantes del bloqueo pendientes de liberación`}
+                                className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2 py-0.5 text-xs font-semibold text-amber-900"
                             >
                                 <span aria-hidden="true">⚠️</span>
                                 <span>
                                     {fila.lugaresPorLiberar}{" "}
-                                    {fila.lugaresPorLiberar === 1
-                                        ? "sobrante por liberar"
-                                        : "sobrantes por liberar"}
+                                    {fila.lugaresPorLiberar === 1 ? "sobrante" : "sobrantes"}
                                 </span>
                             </span>
                         )}
-                        {fila.alertas?.includes("SOLICITUD_PENDIENTE") && (
+
+                        {alertaSol && (
                             <Link
                                 to="/gestion/solicitudes"
                                 title="Solicitudes de alojamiento pendientes en salida próxima (< 7 días)"
-                                className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-200 transition-colors"
+                                className="inline-flex items-center gap-1 rounded bg-sky-100 border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-900 hover:bg-sky-200 transition-colors"
                             >
-                                <span aria-hidden="true">⚠️</span>
+                                <span aria-hidden="true">🏨</span>
                                 <span>
                                     {cantSolicitudes !== undefined && cantSolicitudes > 0
-                                        ? `${cantSolicitudes} ${cantSolicitudes === 1 ? "solicitud pend." : "solicitudes pend."}`
-                                        : "Solicitud pend."}
+                                        ? `${cantSolicitudes} sol. hotel`
+                                        : "Sol. hotel pend."}
                                 </span>
                             </Link>
-                        )}
-                        {fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR") && (
-                            <span
-                                title="Permisos sin confirmar en salida próxima (< 7 días)"
-                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-xs font-semibold text-rose-900"
-                            >
-                                <span aria-hidden="true">📋</span>
-                                <span>
-                                    {fila.permisosFaltantes}{" "}
-                                    {fila.permisosFaltantes === 1
-                                        ? "perm. faltante"
-                                        : "perm. faltantes"}
-                                </span>
-                            </span>
                         )}
                     </div>
                 );
@@ -960,10 +989,7 @@ function SalidasPage() {
 
                 // CU-40: Una salida admite asignación si está activa (PUBLICADA o CERRADA),
                 // tiene fecha futura y no tiene personal asignado aún.
-                // Si la salida no tiene pasajeros o tiene restricciones de negocio (FA5, bloqueo),
-                // el backend responderá el error correspondiente y el formulario lo informará.
                 const estadoAsignable = fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
-                // Por día calendario, como el back (hoyUTC): la salida de mañana no "ya inició" a las 22 h
                 const fechaFutura = fila.fechaInicio.slice(0, 10) > fechaLocalHoy();
                 const cantPersonal =
                     typeof fila.cantidadPersonal === "number"
@@ -975,21 +1001,25 @@ function SalidasPage() {
                 const tieneAdvertenciaPendiente =
                     resultadoAsignacion?.advertencia !== undefined &&
                     resultadoAsignacion?.idsalida === fila.idsalida;
-                const puedeAsignar =
+
+                // Si cumple las condiciones para ser asignable pero aún no tiene compras (pasajeros === 0),
+                // mostramos el botón deshabilitado con explicación para no confundir al usuario.
+                const baseAsignable =
                     esAdmin &&
                     estadoAsignable &&
                     fechaFutura &&
                     sinPersonal &&
-                    fila.pasajerosConfirmados > 0 &&
                     !tieneAdvertenciaPendiente;
+
+                const puedeAsignar = baseAsignable && fila.pasajerosConfirmados > 0;
+                const requierePasajerosParaAsignar =
+                    baseAsignable && fila.pasajerosConfirmados === 0;
 
                 const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
                 const puedeLiberarSobrantes =
                     esAdmin && fila.estado === "CERRADA" && tieneSobrantesPendientes;
 
                 // CU-38: Reemplazar personal
-                // Solo para salidas activas que todavía no iniciaron (SALIDAS_NO_INICIADAS: PUBLICADA, ABIERTA, CERRADA),
-                // con fecha futura y que ya cuenten con personal asignado.
                 const estadoReemplazable =
                     fila.estado === "PUBLICADA" || fila.estado === "ABIERTA" || fila.estado === "CERRADA";
                 const puedeReemplazarPersonal =
@@ -999,14 +1029,12 @@ function SalidasPage() {
                     !sinPersonal;
 
                 // CU-39: Modificar logística
-                // Únicamente para administradores y salidas en estado CERRADA con fecha de inicio futura.
                 const puedeModificarLogistica =
                     esAdmin &&
                     fila.estado === "CERRADA" &&
                     fechaFutura;
 
                 // CU-37: Cancelar salida
-                // Solo administradores y salidas en estado PUBLICADA, ABIERTA o CERRADA con fecha de inicio futura.
                 const estadoCancelable =
                     fila.estado === "PUBLICADA" ||
                     fila.estado === "ABIERTA" ||
@@ -1023,7 +1051,6 @@ function SalidasPage() {
                     Boolean(fila.idbloqueo);
 
                 // CU-41: Devolver equipamiento
-                // Solo administradores y salidas que hayan concluido (FINALIZADA o fechaFin pasada) y no estén canceladas.
                 const yaConcluyo =
                     esFinalizada || fila.fechaFin.slice(0, 10) <= fechaLocalHoy();
                 const puedeDevolverEquipamiento =
@@ -1035,6 +1062,7 @@ function SalidasPage() {
                     !tieneSolicitudes &&
                     !esFinalizada &&
                     !puedeAsignar &&
+                    !requierePasajerosParaAsignar &&
                     !puedeLiberarSobrantes &&
                     !puedeReemplazarPersonal &&
                     !puedeModificarLogistica &&
@@ -1056,17 +1084,35 @@ function SalidasPage() {
                     cancelarSalidaMutation.isPending;
 
                 return (
-                    <div className="min-w-[110px] whitespace-nowrap flex flex-col gap-1 items-start text-xs font-semibold">
+                    <div className="flex flex-col gap-1.5 items-start text-xs font-semibold">
                         {puedeAsignar && (
                             <button
                                 type="button"
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
-                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-marca text-white font-semibold text-xs shadow-sm hover:bg-marca-oscura transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                             >
-                                Asignar recursos
+                                <span>Asignar recursos</span>
+                                <span aria-hidden="true">→</span>
                             </button>
                         )}
+
+                        {requierePasajerosParaAsignar && (
+                            <div className="flex flex-col items-start gap-0.5">
+                                <button
+                                    type="button"
+                                    disabled
+                                    title="No se pueden asignar recursos ni emitir nómina sin pasajeros confirmados (CU-40)."
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 text-slate-400 font-semibold text-xs cursor-not-allowed border border-slate-200"
+                                >
+                                    <span>Asignar recursos</span>
+                                </button>
+                                <span className="text-[10px] text-amber-700 font-medium">
+                                    ⚠️ Requiere compras
+                                </span>
+                            </div>
+                        )}
+
                         {puedeReemplazarPersonal && (
                             <button
                                 type="button"
@@ -1077,6 +1123,7 @@ function SalidasPage() {
                                 Reemplazar personal
                             </button>
                         )}
+
                         {puedeModificarLogistica && (
                             <button
                                 type="button"
@@ -1087,6 +1134,7 @@ function SalidasPage() {
                                 Modificar logística
                             </button>
                         )}
+
                         {puedeLiberarSobrantes && (
                             <button
                                 type="button"
@@ -1099,6 +1147,7 @@ function SalidasPage() {
                                 {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
                             </button>
                         )}
+
                         {puedeCancelarSalida && (
                             <button
                                 type="button"
@@ -1109,6 +1158,7 @@ function SalidasPage() {
                                 Cancelar salida
                             </button>
                         )}
+
                         {tieneBloqueoCanceladaPendiente && (
                             <button
                                 type="button"
@@ -1124,6 +1174,7 @@ function SalidasPage() {
                                     : "Reintentar liberar cupos"}
                             </button>
                         )}
+
                         {tieneSolicitudes && (
                             <Link
                                 to="/gestion/solicitudes"
@@ -1132,6 +1183,7 @@ function SalidasPage() {
                                 Ver solicitudes
                             </Link>
                         )}
+
                         {esFinalizada && (
                             <Link
                                 to="/gestion/evaluaciones"
@@ -1140,6 +1192,7 @@ function SalidasPage() {
                                 Evaluar
                             </Link>
                         )}
+
                         {puedeDevolverEquipamiento && (
                             <button
                                 type="button"
@@ -2089,7 +2142,7 @@ function SalidasPage() {
             ) : (
                 <div className="space-y-4">
                     <div className="overflow-x-auto rounded-tarjeta">
-                        <div className="min-w-full w-max">
+                        <div className="min-w-full w-full">
                             <Tabla
                                 filas={salidasPaginadas}
                                 columnas={columnas}

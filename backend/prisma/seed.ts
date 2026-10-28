@@ -220,10 +220,79 @@ async function main() {
     },
   });
 
+  const usuarioGuia2 = await db.usuario.create({
+    data: {
+      nombre: "Rosa",
+      apellido: "Huamán",
+      email: "rosa.guia@incatour.com",
+      contrasenia: contraseniaGuia,
+      rol: "GUIA",
+      estado: "ACTIVO",
+    },
+  });
+
+  const personalGuia2 = await db.personal.create({
+    data: {
+      nombreCompleto: "Rosa Huamán",
+      nroPasaporte: "P778899",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia2.idusuario,
+          nroHabilitacion: "HAB-002",
+          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+        },
+      },
+    },
+  });
+
+  const usuarioGuia3 = await db.usuario.create({
+    data: {
+      nombre: "Marcos",
+      apellido: "Flores",
+      email: "marcos.guia@incatour.com",
+      contrasenia: contraseniaGuia,
+      rol: "GUIA",
+      estado: "ACTIVO",
+    },
+  });
+
+  const personalGuia3 = await db.personal.create({
+    data: {
+      nombreCompleto: "Marcos Flores",
+      nroPasaporte: "P334455",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia3.idusuario,
+          nroHabilitacion: "HAB-003",
+          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+        },
+      },
+    },
+  });
+
   const porteador = await db.personal.create({
     data: {
       nombreCompleto: "Luis Quispe",
       nroPasaporte: "P654321",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2029-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Porteador",
+    },
+  });
+
+  const porteador2 = await db.personal.create({
+    data: {
+      nombreCompleto: "Pedro Condori",
+      nroPasaporte: "P998877",
       nacionalidad: "Peruana",
       fechaVencimientoPasaporte: new Date("2029-01-01T00:00:00Z"),
       estado: "ACTIVO",

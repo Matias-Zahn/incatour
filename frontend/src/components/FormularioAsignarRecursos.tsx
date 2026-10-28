@@ -379,21 +379,20 @@ export function FormularioAsignarRecursos({
                     </div>
 
                     {/* Dotación requerida */}
-                    <div className="rounded-control border border-borde bg-slate-50/70 p-3.5">
+                    <div className="rounded-control border border-borde bg-slate-50/70 p-3.5 flex flex-col justify-between">
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-texto-suave">
                             Dotación mínima requerida
                         </span>
-                        <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-texto">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center rounded-md bg-white border border-borde px-2 py-1 text-xs font-bold text-navegacion shadow-xs">
                                 {guiasRequeridos} {guiasRequeridos === 1 ? "Guía" : "Guías"}
                             </span>
-                            <span className="text-xs text-texto-suave">·</span>
-                            <span className="text-lg font-bold text-texto">
+                            <span className="inline-flex items-center rounded-md bg-white border border-borde px-2 py-1 text-xs font-bold text-navegacion shadow-xs">
                                 {porteadoresRequeridos}{" "}
                                 {porteadoresRequeridos === 1 ? "Porteador" : "Porteadores"}
                             </span>
                         </div>
-                        <p className="text-xs text-texto-suave mt-0.5">
+                        <p className="text-[11px] text-texto-suave mt-1.5">
                             Calculada según los parámetros del circuito
                         </p>
                     </div>
@@ -501,9 +500,17 @@ export function FormularioAsignarRecursos({
 
                         {/* Listado de Checkboxes de Guías */}
                         {guiasDisponibles.length === 0 ? (
-                            <p className="py-4 text-center text-xs text-texto-suave">
-                                No se encontraron guías disponibles para las fechas de la salida.
-                            </p>
+                            <div className="py-4 text-center text-xs text-texto-suave space-y-2">
+                                <p>
+                                    No se encontraron guías disponibles con habilitación vigente y cuenta activa para las fechas de la salida.
+                                </p>
+                                <Link
+                                    to="/gestion/personal"
+                                    className="inline-flex items-center gap-1 text-marca font-semibold hover:underline"
+                                >
+                                    Ir a Gestión de Personal para dar de alta o habilitar guías →
+                                </Link>
+                            </div>
                         ) : (
                             <ul className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                                 {guiasDisponibles.map((guia) => {
@@ -586,10 +593,17 @@ export function FormularioAsignarRecursos({
 
                         {/* Listado de Checkboxes de Porteadores */}
                         {porteadoresDisponibles.length === 0 ? (
-                            <p className="py-4 text-center text-xs text-texto-suave">
-                                No se encontraron porteadores disponibles para las fechas de la
-                                salida.
-                            </p>
+                            <div className="py-4 text-center text-xs text-texto-suave space-y-2">
+                                <p>
+                                    No se encontraron porteadores disponibles para las fechas de la salida.
+                                </p>
+                                <Link
+                                    to="/gestion/personal"
+                                    className="inline-flex items-center gap-1 text-marca font-semibold hover:underline"
+                                >
+                                    Ir a Gestión de Personal para dar de alta porteadores →
+                                </Link>
+                            </div>
                         ) : (
                             <ul className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                                 {porteadoresDisponibles.map((porteador) => {
