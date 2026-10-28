@@ -23,7 +23,10 @@ function Tabla<T extends { id: string | number }>({
                 <thead className="bg-slate-800 text-white">
                     <tr>
                         {columnas.map((columna) => (
-                            <th key={String(columna.clave)} className="px-4 py-3">
+                            <th
+                                key={`${String(columna.clave)}-${columna.titulo}`}
+                                className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                            >
                                 {columna.titulo}
                             </th>
                         ))}
@@ -37,7 +40,10 @@ function Tabla<T extends { id: string | number }>({
                             className={`border-t border-borde ${claseFila ? claseFila(fila) ?? "" : ""}`.trimEnd()}
                         >
                             {columnas.map((columna) => (
-                                <td key={String(columna.clave)} className="px-4 py-3 text-texto">
+                                <td
+                                    key={`${String(columna.clave)}-${columna.titulo}`}
+                                    className="px-4 py-3 text-texto align-top"
+                                >
                                     {columna.renderizar
                                         ? columna.renderizar(fila)
                                         : String(fila[columna.clave])}
