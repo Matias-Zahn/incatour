@@ -210,7 +210,7 @@ export function VistaAvances({
 
     if (!salidaActual || idsalida <= 0) {
         return (
-            <section aria-label="Registrar avances y novedades (CU-49)" className="space-y-6">
+            <section aria-label="Registrar avances y novedades" className="space-y-6">
                 <header className="border-b border-borde/60 pb-4">
                     <h1 className="text-2xl font-bold text-navegacion md:text-3xl">
                         Registrar avances y novedades del recorrido
@@ -406,7 +406,7 @@ export function VistaAvances({
     }
 
     return (
-        <section aria-label="Registrar avances y novedades (CU-49)" className="space-y-6">
+        <section aria-label="Registrar avances y novedades" className="space-y-6">
             <header className="border-b border-borde/60 pb-4">
                 <h1 className="text-2xl font-bold text-navegacion md:text-3xl">
                     Registrar avances y novedades del recorrido

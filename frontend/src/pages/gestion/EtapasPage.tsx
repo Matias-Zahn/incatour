@@ -249,7 +249,7 @@ function EtapasPage() {
             <header className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-texto-suave">
-                        Gestión de circuitos · CU-05
+                        Gestión de circuitos
                     </p>
                     <h1 className="text-3xl font-bold text-navegacion">
                         Etapas del circuito
@@ -364,7 +364,7 @@ function EtapasPage() {
                     tipo="informacion"
                     titulo="Circuito inactivo (modo de solo lectura)"
                 >
-                    Este circuito se encuentra dado de baja (`INACTIVO`). Podés consultar su secuencia de etapas, pero no se admiten modificaciones (CU-05).
+                    Este circuito se encuentra dado de baja (`INACTIVO`). Podés consultar su secuencia de etapas, pero no se admiten modificaciones.
                 </Alerta>
             ) : null}
 
@@ -381,7 +381,7 @@ function EtapasPage() {
             {discontinuidades.length > 0 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo="Discontinuidad espacial detectada en la secuencia (CU-05)"
+                    titulo="Discontinuidad espacial detectada en la secuencia"
                 >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <span>

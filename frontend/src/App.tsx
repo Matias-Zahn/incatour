@@ -21,10 +21,12 @@ import PortalGuiaPage from "./pages/guia/PortalGuiaPage";
 import Login from "./pages/Login";
 import RutaProtegida from "./components/RutaProtegida";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import LimiteDeError from "./components/LimiteDeError";
 
 function App() {
   return (
     <BrowserRouter>
+      <LimiteDeError>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -211,6 +213,7 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </LimiteDeError>
     </BrowserRouter>
   );
 }

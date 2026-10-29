@@ -351,7 +351,7 @@ export function FormularioModificarLogistica({
                 <section className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta space-y-4">
                     <header className="border-b border-borde pb-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-39
+                            Administración
                         </span>
                         <h2 className="text-lg font-bold text-texto">
                             Modificar Logística de Salida
@@ -392,7 +392,7 @@ export function FormularioModificarLogistica({
             <header className="border-b border-borde pb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                        Administración · CU-39
+                        Administración
                     </span>
                     <h2 id={`${idSeccion}-titulo`} className="text-xl font-bold text-texto">
                         Modificar Logística · Salida #{nroSalida}

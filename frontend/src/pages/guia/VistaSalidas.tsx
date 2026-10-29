@@ -41,7 +41,7 @@ export function VistaSalidas({
     const personal = detalleSalida?.personal ?? [];
 
     return (
-        <section aria-label="Información de la salida asignada (CU-48)" className="space-y-6">
+        <section aria-label="Información de la salida asignada" className="space-y-6">
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">

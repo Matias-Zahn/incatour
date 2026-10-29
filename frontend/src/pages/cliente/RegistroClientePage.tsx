@@ -90,7 +90,7 @@ function RegistroClientePage() {
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                        Portal del cliente · CU-27
+                        Portal del cliente
                     </p>
                     <h1
                         id="registro-cliente-titulo"

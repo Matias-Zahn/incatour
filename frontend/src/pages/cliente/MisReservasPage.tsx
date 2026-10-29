@@ -241,7 +241,7 @@ function MisReservasPage() {
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                        Portal del cliente · CU-31 y CU-32
+                        Portal del cliente
                     </p>
                     <h1
                         id="bookings-title"
@@ -463,12 +463,14 @@ function MisReservasPage() {
                                                         fila.estado,
                                                     )}
                                                 </span>
-                                                <p className="text-[11px] text-texto-suave">
-                                                    Alojamiento:{" "}
-                                                    <span className="font-semibold text-texto">
-                                                        {fila.estadoAlojamiento}
-                                                    </span>
-                                                </p>
+                                                {fila.estadoAlojamiento ? (
+                                                    <p className="text-[11px] text-texto-suave">
+                                                        Alojamiento:{" "}
+                                                        <span className="font-semibold text-texto">
+                                                            {fila.estadoAlojamiento}
+                                                        </span>
+                                                    </p>
+                                                ) : null}
                                             </div>
                                         ),
                                     },
@@ -654,7 +656,7 @@ function MisReservasPage() {
                         <div className="flex items-start justify-between gap-4 border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                                    Detalle de reserva · CU-31
+                                    Detalle de reserva
                                 </p>
                                 <h2
                                     id="modal-detalle-reserva-titulo"
@@ -1046,7 +1048,7 @@ function MisReservasPage() {
                                         abrirModalCancelacion(id);
                                     }}
                                 >
-                                    Solicitar cancelación (CU-32)
+                                    Solicitar cancelación
                                 </Boton>
                             ) : null}
                             <Boton onClick={() => setIdReservaDetalle(null)}>
@@ -1075,7 +1077,7 @@ function MisReservasPage() {
                     >
                         <div className="border-b border-borde pb-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-peligro">
-                                Cancelar reserva · CU-32
+                                Cancelar reserva
                             </p>
                             <h2
                                 id="modal-liquidacion-titulo"

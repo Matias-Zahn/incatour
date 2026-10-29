@@ -16,6 +16,7 @@ import { VistaInicio } from "./VistaInicio";
 import { VistaRecorridos } from "./VistaRecorridos";
 import { VistaSalidas } from "./VistaSalidas";
 import { useSincronizacionAvances } from "./useSincronizacionAvances";
+import LimiteDeError from "../../components/LimiteDeError";
 
 // Salida elegida a mano, una clave por guía para que sobreviva a la recarga
 const CLAVE_SALIDA_SELECCIONADA = "incatour.guia.salida_seleccionada";
@@ -131,7 +132,7 @@ export default function PortalGuiaPage() {
 
             {/* Área de contenido */}
             <main className="flex-1 overflow-x-hidden p-4 md:p-8">
-                <div className="mx-auto max-w-6xl">
+                <div className="mx-auto max-w-6xl"><LimiteDeError>
                     {errorSalidas ? (
                         <div className="mb-6 rounded-tarjeta border border-peligro/30 bg-peligro/10 p-5 text-sm text-texto">
                             <p className="font-bold text-peligro">
@@ -184,7 +185,7 @@ export default function PortalGuiaPage() {
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
-                </div>
+                </LimiteDeError></div>
             </main>
 
             {/* Modal de confirmación para salir */}

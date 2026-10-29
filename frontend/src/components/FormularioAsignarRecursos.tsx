@@ -215,7 +215,7 @@ export function FormularioAsignarRecursos({
                 <section className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta space-y-4">
                     <header className="border-b border-borde pb-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-40
+                            Administración
                         </span>
                         <h2 className="text-xl font-bold text-navegacion">
                             Asignar recursos a la salida
@@ -232,7 +232,7 @@ export function FormularioAsignarRecursos({
                                     to="/gestion/solicitudes"
                                     className="font-bold underline text-xs text-amber-950 hover:text-amber-900"
                                 >
-                                    Ir a Gestión de Solicitudes para confirmar alojamientos (CU-34) →
+                                    Ir a Gestión de Solicitudes para confirmar alojamientos →
                                 </Link>
                             </div>
                         ) : null}
@@ -277,7 +277,7 @@ export function FormularioAsignarRecursos({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-40
+                            Administración
                         </span>
                         <h2 id={`${idSeccion}-titulo`} className="text-xl font-bold text-navegacion">
                             Asignar recursos a la salida
@@ -312,7 +312,7 @@ export function FormularioAsignarRecursos({
                                     to="/gestion/solicitudes"
                                     className="font-bold underline text-xs text-amber-950 hover:text-amber-900 inline-flex items-center gap-1"
                                 >
-                                    Ir a Gestión de Solicitudes para confirmar alojamientos (CU-34) →
+                                    Ir a Gestión de Solicitudes para confirmar alojamientos →
                                 </Link>
                             </div>
                         ) : null}

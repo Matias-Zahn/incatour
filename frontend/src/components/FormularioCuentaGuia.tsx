@@ -66,7 +66,7 @@ function FormularioCuentaGuia({
             onSubmit={handleSubmit(alCrear)}
         >
             <div className="mb-5">
-                <h2 className="font-bold text-navegacion">Alta de cuenta de acceso para guía (CU-45)</h2>
+                <h2 className="font-bold text-navegacion">Alta de cuenta de acceso para guía</h2>
                 <p className="mt-1 text-sm text-texto-suave">
                     Asigná credenciales de acceso al sistema para un guía registrado previamente en el personal operativo.
                 </p>
