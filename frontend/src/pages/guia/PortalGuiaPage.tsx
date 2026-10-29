@@ -131,7 +131,7 @@ export default function PortalGuiaPage() {
             />
 
             {/* Área de contenido */}
-            <main className="flex-1 overflow-x-hidden p-4 md:p-8">
+            <main className="flex-1 overflow-x-hidden p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8">
                 <div className="mx-auto max-w-6xl"><LimiteDeError>
                     {errorSalidas ? (
                         <div className="mb-6 rounded-tarjeta border border-peligro/30 bg-peligro/10 p-5 text-sm text-texto">

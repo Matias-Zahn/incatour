@@ -299,7 +299,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                         IT
                     </div>
                     {!colapsada && (
-                        <div>
+                        <div className="max-md:hidden">
                             <h2 className="text-xl font-bold leading-none text-white">
                                 IncaTour
                             </h2>
@@ -324,7 +324,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             {/* LISTA DE NAVEGACIÓN */}
             <nav
                 aria-label="Navegación administrativa"
-                className="mt-6 flex-1 max-md:mt-0 max-md:flex max-md:overflow-x-auto"
+                className="mt-6 flex-1 max-md:mt-0 max-md:ml-3 max-md:flex max-md:min-w-0 max-md:overflow-x-auto"
             >
                 <ul className="flex flex-col gap-1.5 max-md:flex-row max-md:gap-1">
                     {elementosNavegacion.map((elemento) => (
@@ -333,6 +333,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                                 to={elemento.ruta}
                                 end={elemento.ruta === "/"}
                                 title={elemento.etiqueta}
+                                aria-label={elemento.etiqueta}
                                 className={({ isActive }) => {
                                     const estaActivo =
                                         isActive || elemento.etiqueta === seccionActiva;
@@ -352,7 +353,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             </nav>
 
             {/* ACCESO A TIENDA COMO CLIENTE */}
-            <div className="mt-auto border-t border-white/30 pt-3 max-md:border-none max-md:pt-0">
+            <div className="mt-auto border-t border-white/30 pt-3 max-md:hidden">
                 <NavLink
                     to="/catalogo?vista=admin"
                     className={`flex items-center ${

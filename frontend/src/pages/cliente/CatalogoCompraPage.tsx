@@ -1785,7 +1785,7 @@ function CatalogoCompraPage() {
                 <>
                     {/* BARRA DE BÚSQUEDA Y FILTROS */}
                     <div className="flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
-                        <div className="relative min-w-64 flex-1">
+                        <div className="relative min-w-0 basis-64 flex-1">
                             <label
                                 htmlFor="buscar-catalogo"
                                 className="sr-only"
@@ -1797,13 +1797,13 @@ function CatalogoCompraPage() {
                                 type="search"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                placeholder="Buscar por nombre, código, circuito o recorrido..."
+                                placeholder="Buscar paquete, circuito o código…"
                                 className="w-full rounded-control border border-borde bg-fondo/50 px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:bg-white focus:ring-2 focus:ring-marca/20"
                             />
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-1.5 text-xs">
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                 <span className="font-semibold text-texto-suave">
                                     Dificultad:
                                 </span>
