@@ -5,6 +5,7 @@ import {
     useNavigate,
     useSearchParams,
 } from "react-router-dom";
+import LimiteDeError from "./LimiteDeError";
 import DialogoConfirmacion from "./DialogoConfirmacion";
 import {
     limpiarSesion,
@@ -460,7 +461,7 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                 ) : null}
 
                 <main className="flex-1 overflow-x-hidden p-4 md:p-8">
-                    <div className="mx-auto max-w-6xl">{children}</div>
+                    <div className="mx-auto max-w-6xl"><LimiteDeError>{children}</LimiteDeError></div>
                 </main>
             </div>
 

@@ -18,7 +18,7 @@ function Tabla<T extends { id: string | number }>({
     claseFila,
 }: TablaProps<T>) {
     return (
-        <div className="overflow-hidden rounded-tarjeta border border-borde bg-white">
+        <div className="overflow-x-auto rounded-tarjeta border border-borde bg-white">
             <table className="w-full text-left">
                 <thead className="bg-slate-800 text-white">
                     <tr>

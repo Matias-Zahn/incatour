@@ -119,7 +119,7 @@ function MiCuentaClientePage() {
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                        Portal del cliente · CU-28 y CU-29
+                        Portal del cliente
                     </p>
                     <h1
                         id="account-title"
@@ -215,7 +215,7 @@ function MiCuentaClientePage() {
                     <article className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                         <div className="mb-5 border-b border-borde/70 pb-3">
                             <h2 className="text-base font-bold text-navegacion">
-                                Datos personales (CU-28)
+                                Datos personales
                             </h2>
                             <p className="mt-1 text-xs text-texto-suave">
                                 Editá tu nombre, apellido y correo electrónico
@@ -348,7 +348,7 @@ function MiCuentaClientePage() {
                     <article className="space-y-4 rounded-tarjeta border border-peligro/40 bg-[#fff7f5] p-6 shadow-tarjeta">
                         <div>
                             <h2 className="text-base font-bold text-[#8f352e]">
-                                Zona de peligro · Baja de cuenta (CU-29)
+                                Zona de peligro · Baja de cuenta
                             </h2>
                             <p className="mt-1 text-xs leading-relaxed text-[#764c48]">
                                 La baja inhabilita tu cuenta de cliente (estado{" "}

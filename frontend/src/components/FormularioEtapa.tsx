@@ -95,7 +95,7 @@ function FormularioEtapa({
                         : `Agregar etapa #${numeroOrdenSugerido} a la secuencia`}
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
-                    Recordá que el punto de inicio de cada etapa debe coincidir con el punto de fin de la etapa anterior (continuidad espacial CU-05).
+                    Recordá que el punto de inicio de cada etapa debe coincidir con el punto de fin de la etapa anterior.
                 </p>
             </div>
 

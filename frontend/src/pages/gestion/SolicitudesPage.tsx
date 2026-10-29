@@ -123,7 +123,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
               )}
             </div>
             <p className="mt-1 text-xs text-texto-suave">
-              CU-34 · Contactá a un establecimiento compatible con la garantía del paquete y
+              Contactá a un establecimiento compatible con la garantía del paquete y
               registrá su confirmación o rechazo.
             </p>
           </div>
@@ -428,7 +428,7 @@ export function SolicitudesPage() {
           <h1 className="text-2xl font-bold text-texto">Solicitudes de Alojamiento</h1>
           <p className="text-sm text-texto-suave">
             Consultá las solicitudes pendientes generadas por reservas a solicitud y confirmá o
-            reintentá su asignación hotelera (CU-33 y CU-34).
+            reintentá su asignación hotelera.
           </p>
         </div>
       </div>

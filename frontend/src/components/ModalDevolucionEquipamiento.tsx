@@ -530,9 +530,6 @@ export function ModalDevolucionEquipamiento({
                         <span className="inline-flex items-center gap-1.5 rounded bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
                             <span aria-hidden="true">📦</span> Inspección e reintegro a stock
                         </span>
-                        <span className="text-xs font-semibold text-texto-suave">
-                            CU-41 · RF-56
-                        </span>
                     </div>
 
                     <h2 id={tituloId} className="mt-2 text-xl font-bold text-texto">

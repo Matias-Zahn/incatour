@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
+import LimiteDeError from "./LimiteDeError";
 
 type LayoutGestionProps = {
     seccion: string;
@@ -13,7 +14,7 @@ function LayoutGestion({ seccion, children }: LayoutGestionProps) {
             <BarraLateral seccionActiva={seccion} />
             <div className="flex min-w-0 flex-1 flex-col">
                 <BarraSuperior seccion={seccion} />
-                <main className="p-8">{children}</main>
+                <main className="p-8"><LimiteDeError>{children}</LimiteDeError></main>
             </div>
         </div>
     );

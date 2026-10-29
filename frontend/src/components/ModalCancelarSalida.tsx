@@ -188,7 +188,7 @@ export function ModalCancelarSalida({
                             <span aria-hidden="true">⚠️</span> Acción irreversible
                         </span>
                         <span className="text-xs font-semibold text-texto-suave">
-                            CU-37 · Cancelación de salida
+                            Cancelación de salida
                         </span>
                     </div>
 

@@ -185,7 +185,7 @@ function MisReseniasPage() {
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                        Portal del cliente · CU-47
+                        Portal del cliente
                     </p>
                     <h1
                         id="resenias-cliente-titulo"
@@ -458,7 +458,7 @@ function MisReseniasPage() {
                     >
                         <div className="border-b border-borde pb-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-marca">
-                                Calificar experiencia · CU-47
+                                Calificar experiencia
                             </p>
                             <h2
                                 id="modal-publicar-resenia-titulo"

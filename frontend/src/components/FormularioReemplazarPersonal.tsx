@@ -116,7 +116,7 @@ export function FormularioReemplazarPersonal({
                 <section className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta space-y-4">
                     <header className="border-b border-borde pb-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-38
+                            Administración
                         </span>
                         <h2 className="text-xl font-bold text-navegacion">
                             Reemplazar personal de la salida
@@ -153,7 +153,7 @@ export function FormularioReemplazarPersonal({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-38
+                            Administración
                         </span>
                         <h2 id={`${idSeccion}-titulo`} className="text-xl font-bold text-navegacion">
                             Reemplazar personal de la salida {salida.nroSalida}

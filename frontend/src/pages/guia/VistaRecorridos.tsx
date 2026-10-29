@@ -132,7 +132,7 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                             <span>Recomendación Operativa</span>
                         </div>
                         <p className="mt-2 text-xs leading-relaxed text-cyan-950">
-                            Mantén el grupo compacto en las bajadas con escalinatas incas de piedra mojada. Ante mal de montaña o traumatismo, utiliza la pantalla de <b>Incidentes (CU-50)</b> para reportar el suceso al equipo de administración.
+                            Mantén el grupo compacto en las bajadas con escalinatas incas de piedra mojada. Ante mal de montaña o traumatismo, utiliza la pantalla de <b>Incidentes</b> para reportar el suceso al equipo de administración.
                         </p>
                     </div>
                 </article>

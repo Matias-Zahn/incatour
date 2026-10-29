@@ -84,7 +84,7 @@ export function VistaIncidentes({
 
     if (!salidaActual || idsalida <= 0) {
         return (
-            <section aria-label="Notificar incidente operativo (CU-50)" className="space-y-6">
+            <section aria-label="Notificar incidente operativo" className="space-y-6">
                 <header className="border-b border-borde/60 pb-4">
                     <h1 className="text-2xl font-bold text-navegacion md:text-3xl">
                         Notificar incidente
@@ -199,7 +199,7 @@ export function VistaIncidentes({
     }
 
     return (
-        <section aria-label="Notificar incidente operativo (CU-50)" className="space-y-6">
+        <section aria-label="Notificar incidente operativo" className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">

@@ -191,6 +191,11 @@ function obtenerImagenesPaqueteCatalogo(
 }
 
 // FE-13: el pasajero inicial arranca vacío; los datos de prueba solo se ofrecen en DEV
+function textoNoches(previas: number, posteriores: number): string {
+    if (previas + posteriores === 0) return "Sin noches de hotel extra";
+    return `${previas} ${previas === 1 ? "noche" : "noches"} antes y ${posteriores} después`;
+}
+
 function crearPasajeroInicial(): PasajeroFormulario {
     return {
         nombreCompleto: "",
@@ -627,7 +632,7 @@ function CatalogoCompraPage() {
 
         const lineas = [
             "=================================================================",
-            "           INCATOUR - COMPROBANTE DE PAGO Y RESERVA (CU-30)      ",
+            "           INCATOUR - COMPROBANTE DE PAGO Y RESERVA      ",
             "=================================================================",
             `Nro. de Reserva:         ${resultado.nroReserva}`,
             `Estado de Reserva:       ${resultado.estado}`,
@@ -642,7 +647,7 @@ function CatalogoCompraPage() {
             `Fin del Recorrido:       ${formatearFechaCorta(salida.fechaFin)}`,
             `Temporada Aplicada:      ${salida.temporadaNombre ?? "Sin especificar"}`,
             "-----------------------------------------------------------------",
-            "2. ALOJAMIENTO Y FECHAS DERIVADAS (Paso 6 y 15 CU-30)",
+            "2. ALOJAMIENTO Y FECHAS DERIVADAS",
             `Garantía de Alojamiento: ${salida.garantia ?? paquete.nochesAlojamiento.garantia}`,
             `Estado del Alojamiento:  ${resultado.estadoAlojamiento}`,
             `Estadía Previa:          ${fechasAloj.estadiaPrevia ?? "Sin noches previas incluidas"}`,
@@ -763,8 +768,8 @@ function CatalogoCompraPage() {
                         <span className="rounded-full bg-marca-activa px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-marca-oscura">
                             {esAdmin
                                 ? paqueteEnCompra || reservaConfirmada
-                                    ? "Compra de Paquete · CU-30"
-                                    : "Catálogo Público · CU-26"
+                                    ? "Compra de Paquete"
+                                    : "Catálogo Público"
                                 : paqueteEnCompra || reservaConfirmada
                                   ? "Reserva de Paquete"
                                   : "Catálogo de Paquetes"}
@@ -814,7 +819,7 @@ function CatalogoCompraPage() {
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wide text-exito">
                                     {esAdmin
-                                        ? "Comprobante oficial de pago y resumen de reserva · CU-30"
+                                        ? "Comprobante oficial de pago y resumen de reserva"
                                         : "Comprobante oficial de pago y reserva"}
                                 </p>
                                 <h2 className="text-2xl font-bold text-navegacion">
@@ -976,7 +981,7 @@ function CatalogoCompraPage() {
                             tipo="informacion"
                             titulo={
                                 esAdmin
-                                    ? "Alojamiento sujeto a confirmación del proveedor (Paso 15.3 · CU-30)"
+                                    ? "Alojamiento sujeto a confirmación del proveedor"
                                     : "Alojamiento sujeto a confirmación hotelera"
                             }
                         >
@@ -991,7 +996,7 @@ function CatalogoCompraPage() {
                                         SOL-{reservaConfirmada.resultado.nroReserva}
                                     </code>
                                     ) con la localidad, categoría y tipo de habitación
-                                    garantizados para su gestión (CU-34).
+                                    garantizados para su gestión.
                                 </>
                             ) : (
                                 <>
@@ -1046,7 +1051,7 @@ function CatalogoCompraPage() {
                                 variante="secundario"
                                 onClick={() => navegar("/gestion/solicitudes")}
                             >
-                                Ver solicitud generada en Gestión (CU-33)
+                                Ver solicitud generada en Gestión
                             </Boton>
                         ) : null}
                         <Boton onClick={volverAlEscaparate}>
@@ -1062,25 +1067,6 @@ function CatalogoCompraPage() {
                     onSubmit={manejarConfirmarCompra}
                     className="grid items-start gap-6 lg:grid-cols-[1.65fr_1fr]"
                 >
-                    {errorCompra ? (
-                        <div
-                            ref={errorBannerRef}
-                            className="col-span-full rounded-control border border-peligro/40 bg-red-50 p-4 text-peligro shadow-sm"
-                        >
-                            <div className="flex items-start gap-3">
-                                <span className="text-xl leading-none">⚠️</span>
-                                <div>
-                                    <h4 className="font-bold text-sm text-peligro">
-                                        No se pudo completar la compra
-                                    </h4>
-                                    <p className="mt-1 text-xs text-peligro/95 font-medium leading-relaxed">
-                                        {errorCompra}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : null}
-
                     <div className="space-y-6">
                         {/* PASO 1: SELECCIONAR SALIDA PROGRAMADA */}
                         <div className="space-y-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
@@ -1093,22 +1079,19 @@ function CatalogoCompraPage() {
                                         Seleccioná la fecha de salida
                                     </h2>
                                     <p className="text-xs text-texto-suave">
-                                        Salidas planificadas en estado PUBLICADA
-                                        con cupos disponibles ante la autoridad.
+                                        Elegí la fecha en que querés viajar.
                                     </p>
                                 </div>
                             </div>
 
                             {salidasDelPaquete.length === 0 ? (
-                                <Alerta
-                                    tipo="error"
-                                    titulo="Este paquete aún no tiene salidas publicadas con fecha futura"
-                                >
-                                    Para poder comprar este paquete, primero
-                                    debe tener al menos una salida planificada
-                                    en estado <strong>PUBLICADA</strong>. Podés
-                                    elegir otro paquete con salidas activas (por
-                                    ejemplo <strong>PAQ-INC-01</strong>).
+                                <Alerta titulo="Este paquete todavía no tiene fechas disponibles">
+                                    Mirá otros paquetes del catálogo.
+                                    <div className="mt-3">
+                                        <Boton type="button" variante="secundario" onClick={volverAlEscaparate}>
+                                            Volver al catálogo
+                                        </Boton>
+                                    </div>
                                 </Alerta>
                             ) : (
                                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1195,6 +1178,8 @@ function CatalogoCompraPage() {
                             )}
                         </div>
 
+                        {/* Sin salidas no hay nada que cargar: se ocultan los pasos 2 y 3 */}
+                        {salidasDelPaquete.length > 0 ? (<>
                         {/* PASO 2: NÓMINA DE PASAJEROS Y EQUIPAJE */}
                         <div className="space-y-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1582,15 +1567,7 @@ function CatalogoCompraPage() {
                                 </label>
                             </div>
                         </div>
-
-                        {errorCompra ? (
-                            <Alerta
-                                tipo="error"
-                                titulo="No se pudo completar la compra"
-                            >
-                                {errorCompra}
-                            </Alerta>
-                        ) : null}
+                        </>) : null}
                     </div>
 
                     {/* COLUMNA LATERAL: RESUMEN DE COMPRA EN TIEMPO REAL */}
@@ -1759,10 +1736,15 @@ function CatalogoCompraPage() {
                             </div>
                         ) : null}
 
+                        {/* Un solo aviso, junto al botón de pago */}
                         {errorCompra ? (
-                            <div className="rounded-control border border-peligro/40 bg-red-50 p-3 text-xs text-peligro shadow-sm">
+                            <div
+                                ref={errorBannerRef}
+                                role="alert"
+                                className="rounded-control border border-peligro/40 bg-red-50 p-3 text-xs text-peligro shadow-sm"
+                            >
                                 <p className="font-bold flex items-center gap-1.5">
-                                    <span>⚠️</span> Error en el pago
+                                    <span>⚠️</span> No se pudo completar la compra
                                 </p>
                                 <p className="mt-1 font-medium leading-relaxed text-peligro/95">
                                     {errorCompra}
@@ -1782,8 +1764,10 @@ function CatalogoCompraPage() {
                         >
                             {mutacionReserva.isPending
                                 ? "Procesando pago y cupos..."
-                                : sinTarifa
-                                  ? "Salida sin tarifa vigente"
+                                : !salidaActiva
+                                  ? "Elegí una salida"
+                                  : sinTarifa
+                                    ? "Salida sin tarifa vigente"
                                   : `Confirmar y pagar ${monedaActiva} ${totalPagar.toFixed(2)}`}
                         </Boton>
                         {salidaActiva && sinTarifa ? (
@@ -2066,24 +2050,16 @@ function CatalogoCompraPage() {
                                                     </div>
                                                     <div>
                                                         <p className="text-texto-suave">
-                                                            Noches / Salidas
+                                                            Noches de hotel
                                                         </p>
                                                         <p className="font-semibold text-texto">
-                                                            {
-                                                                paquete
-                                                                    .nochesAlojamiento
-                                                                    .previas
-                                                            }{" "}
-                                                            prev. +{" "}
-                                                            {
-                                                                paquete
-                                                                    .nochesAlojamiento
-                                                                    .posteriores
-                                                            }{" "}
-                                                            post. ·{" "}
-                                                            {formatearDiasLegibles(
-                                                                paquete.diasDisponibles,
+                                                            {textoNoches(
+                                                                paquete.nochesAlojamiento.previas,
+                                                                paquete.nochesAlojamiento.posteriores,
                                                             )}
+                                                            {paquete.diasDisponibles
+                                                                ? ` · ${formatearDiasLegibles(paquete.diasDisponibles)}`
+                                                                : ""}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -2165,13 +2141,16 @@ function CatalogoCompraPage() {
                                                     </Boton>
                                                     <Boton
                                                         className="flex-1"
+                                                        disabled={salidasConCupo.length === 0}
                                                         onClick={() =>
                                                             iniciarCompraPaquete(
                                                                 paquete,
                                                             )
                                                         }
                                                     >
-                                                        Comprar paquete
+                                                        {salidasConCupo.length === 0
+                                                            ? "Sin salidas disponibles"
+                                                            : "Comprar paquete"}
                                                     </Boton>
                                                 </div>
                                             </div>
@@ -2324,12 +2303,14 @@ function CatalogoCompraPage() {
                                                             {diasTotalesDetalle} días ({paqueteDetalle.circuito.dias} de trekking + {paqueteDetalle.nochesAlojamiento.previas + paqueteDetalle.nochesAlojamiento.posteriores} noches hotel)
                                                         </p>
                                                     </div>
-                                                    <div className="rounded border border-borde bg-white p-2.5">
-                                                        <p className="text-texto-suave">Salidas habituales</p>
-                                                        <p className="font-bold text-navegacion">
-                                                            {formatearDiasLegibles(paqueteDetalle.diasDisponibles)}
-                                                        </p>
-                                                    </div>
+                                                    {paqueteDetalle.diasDisponibles ? (
+                                                        <div className="rounded border border-borde bg-white p-2.5">
+                                                            <p className="text-texto-suave">Salidas habituales</p>
+                                                            <p className="font-bold text-navegacion">
+                                                                {formatearDiasLegibles(paqueteDetalle.diasDisponibles)}
+                                                            </p>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                             </div>
 
@@ -2425,7 +2406,7 @@ function CatalogoCompraPage() {
                                                     <div className="rounded border border-borde bg-white p-2.5">
                                                         <p className="text-texto-suave">Estadía</p>
                                                         <p className="font-semibold text-texto">
-                                                            {paqueteDetalle.nochesAlojamiento.previas} noches prev. + {paqueteDetalle.nochesAlojamiento.posteriores} post.
+                                                            {textoNoches(paqueteDetalle.nochesAlojamiento.previas, paqueteDetalle.nochesAlojamiento.posteriores)}
                                                         </p>
                                                     </div>
                                                 </div>

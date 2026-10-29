@@ -232,7 +232,7 @@ function FormularioCrearSalida({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
-                            Administración · CU-36
+                            Administración
                         </span>
                         <h2 className="text-xl font-bold text-navegacion">
                             Crear salida planificada
@@ -693,7 +693,7 @@ function FormularioCrearSalida({
                                     <p className="text-texto-suave">
                                         La salida puede crearse y publicarse <strong>sin alojamiento asignado</strong>.
                                         Cada reserva que compren los pasajeros generará su respectiva solicitud individual
-                                        de alojamiento a tramitar ante los prestadores correspondientes (CU-34).
+                                        de alojamiento a tramitar ante los prestadores correspondientes.
                                     </p>
                                 </div>
                             </Alerta>

@@ -281,8 +281,8 @@ export function EvaluacionesPage() {
         <div>
           <h1 className="text-2xl font-bold text-texto">Reseñas y Evaluaciones</h1>
           <p className="text-sm text-texto-suave">
-            Consultá las reseñas de clientes y evaluaciones históricas (CU-43) o calificá al
-            personal y proveedores de salidas finalizadas (CU-42).
+            Consultá las reseñas de clientes y evaluaciones históricas o calificá al
+            personal y proveedores de salidas finalizadas.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-borde bg-white p-1">
@@ -295,7 +295,7 @@ export function EvaluacionesPage() {
                 : "text-texto-suave hover:bg-slate-100 hover:text-texto"
             }`}
           >
-            📊 Consultar reseñas y evaluaciones (CU-43)
+            📊 Consultar reseñas y evaluaciones
           </button>
           <button
             type="button"
@@ -306,7 +306,7 @@ export function EvaluacionesPage() {
                 : "text-texto-suave hover:bg-slate-100 hover:text-texto"
             }`}
           >
-            ⭐ Evaluar salida finalizada (CU-42)
+            ⭐ Evaluar salida finalizada
           </button>
         </div>
       </div>
@@ -550,7 +550,7 @@ export function EvaluacionesPage() {
                 <div className="flex items-center justify-between border-b border-borde pb-3">
                   <div>
                     <h2 className="text-base font-semibold text-texto">
-                      Evaluaciones internas del administrador (CU-42)
+                      Evaluaciones internas del administrador
                     </h2>
                     <p className="text-xs text-texto-suave">
                       Desempeño de guías, porteadores y proveedores en salidas finalizadas
@@ -650,7 +650,7 @@ export function EvaluacionesPage() {
             {salidasFinalizadas.length === 0 ? (
               <div className="rounded-lg border border-borde bg-slate-50 p-4 text-xs text-texto-suave">
                 No hay salidas en estado <strong>FINALIZADA</strong> en este momento. Recordá que
-                según la regla de negocio del CU-42, solo se puede calificar el desempeño una vez
+                solo se puede calificar el desempeño una vez
                 que la salida ha concluido.
               </div>
             ) : (
