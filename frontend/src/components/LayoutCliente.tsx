@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import LimiteDeError from "./LimiteDeError";
 import DialogoConfirmacion from "./DialogoConfirmacion";
+import logoIncaTour from "../assets/logo-incatour.jpg";
 import {
     limpiarSesion,
     obtenerToken,
@@ -231,8 +232,12 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                         className="flex items-center gap-3"
                         title="IncaTour - Inicio"
                     >
-                        <div className="grid size-11 place-items-center rounded-xl bg-white text-lg font-bold text-[#07395d] shadow-sm transition hover:scale-105">
-                            IT
+                        <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm transition hover:scale-105">
+                            <img
+                                src={logoIncaTour}
+                                alt="Logo IncaTour"
+                                className="size-full object-contain"
+                            />
                         </div>
                         {!colapsada ? (
                             <div>
