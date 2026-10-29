@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import logoIncaTour from "../../assets/logo-incatour.jpg";
 import {
     IconoCalendario,
     IconoCampana,
@@ -51,8 +52,12 @@ export function BarraLateralGuia({
             className="flex w-64 shrink-0 flex-col bg-[#1b9fc7] p-5 text-white shadow-md max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3"
         >
             <div className="flex items-center gap-3 border-b border-white/30 pb-4 max-md:border-none max-md:pb-0">
-                <div className="grid size-11 place-items-center rounded-xl bg-white text-lg font-bold text-[#07395d] shadow-sm">
-                    IT
+                <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
+                    <img
+                        src={logoIncaTour}
+                        alt="Logo IncaTour"
+                        className="size-full object-contain"
+                    />
                 </div>
                 <div>
                     <h2 className="text-xl font-bold leading-none text-white">IncaTour</h2>

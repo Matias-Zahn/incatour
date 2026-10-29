@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
+import logoIncaTour from "../assets/logo-incatour.jpg";
 import { obtenerUsuario } from "../services/sesionService";
 
 function IconoMenu() {
@@ -295,8 +296,12 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                     className="flex items-center gap-3"
                     title="IncaTour - Inicio de gestión"
                 >
-                    <div className="grid size-11 place-items-center rounded-xl bg-white text-lg font-bold text-[#07395d] shadow-sm transition hover:scale-105">
-                        IT
+                    <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm transition hover:scale-105">
+                        <img
+                            src={logoIncaTour}
+                            alt="Logo IncaTour"
+                            className="size-full object-contain"
+                        />
                     </div>
                     {!colapsada && (
                         <div className="max-md:hidden">
