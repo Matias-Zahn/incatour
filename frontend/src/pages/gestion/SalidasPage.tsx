@@ -1084,7 +1084,7 @@ function SalidasPage() {
                     cancelarSalidaMutation.isPending;
 
                 return (
-                    <div className="flex flex-col gap-1.5 items-start whitespace-nowrap text-xs font-semibold">
+                    <div className="flex flex-col gap-1.5 items-start text-xs font-semibold">
                         {puedeAsignar && (
                             <button
                                 type="button"
@@ -1975,7 +1975,7 @@ function SalidasPage() {
             ) : null}
 
             {/* Panel de Filtros */}
-            <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
                 <label
                     htmlFor="filtro-circuito"
                     className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"

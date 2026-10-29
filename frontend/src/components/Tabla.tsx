@@ -26,7 +26,7 @@ function Tabla<T extends { id: string | number }>({
                         {columnas.map((columna) => (
                             <th
                                 key={`${String(columna.clave)}-${columna.titulo}`}
-                                className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                                className="px-4 py-3 text-xs font-bold uppercase tracking-wider"
                             >
                                 {columna.titulo}
                             </th>

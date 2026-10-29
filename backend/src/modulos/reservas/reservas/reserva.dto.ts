@@ -1,3 +1,5 @@
+import { PESO_MAXIMO_DECLARADO_KG } from "../../../shared/constantes";
+
 export interface PasajeroInput {
   nombreCompleto: string;
   nroPasaporte: string;
@@ -60,8 +62,8 @@ export class CrearReservaDto {
       if (typeof e.pesoDeclarado !== "number" || e.pesoDeclarado < 0) {
         return ["pesoDeclarado debe ser un número mayor o igual a 0."];
       }
-      if ( e.pesoDeclarado > 20 ){
-        return["pesoDeclarado no debe superar los 20 kg."]
+      if (e.pesoDeclarado > PESO_MAXIMO_DECLARADO_KG) {
+        return [`El equipaje declarado no puede superar los ${PESO_MAXIMO_DECLARADO_KG} kg por pasajero.`];
       }
     }
 
