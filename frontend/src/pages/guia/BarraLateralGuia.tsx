@@ -26,15 +26,17 @@ type BarraLateralGuiaProps = {
 type ElementoNav = {
     clave: SeccionGuia;
     etiqueta: string;
+    // Etiqueta de la barra inferior en celular
+    corta: string;
     icono: ReactNode;
 };
 
 const elementos: ElementoNav[] = [
-    { clave: "inicio", etiqueta: "Inicio", icono: <IconoInicio /> },
-    { clave: "salidas", etiqueta: "Mis salidas", icono: <IconoCalendario /> },
-    { clave: "recorridos", etiqueta: "Recorridos", icono: <IconoMapa /> },
-    { clave: "novedades", etiqueta: "Novedades", icono: <IconoCampana /> },
-    { clave: "incidentes", etiqueta: "Incidentes", icono: <IconoEscudoAlerta /> },
+    { clave: "inicio", etiqueta: "Inicio", corta: "Inicio", icono: <IconoInicio /> },
+    { clave: "salidas", etiqueta: "Mis salidas", corta: "Salidas", icono: <IconoCalendario /> },
+    { clave: "recorridos", etiqueta: "Recorridos", corta: "Recorrido", icono: <IconoMapa /> },
+    { clave: "novedades", etiqueta: "Novedades", corta: "Novedades", icono: <IconoCampana /> },
+    { clave: "incidentes", etiqueta: "Incidentes", corta: "Incidentes", icono: <IconoEscudoAlerta /> },
 ];
 
 export function BarraLateralGuia({
@@ -60,26 +62,31 @@ export function BarraLateralGuia({
                 </div>
             </div>
 
+            {/* En celular la navegación pasa a una barra fija abajo, como en una app */}
             <nav
                 aria-label="Secciones del portal"
-                className="mt-6 flex-1 max-md:mt-0 max-md:flex max-md:overflow-x-auto"
+                className="mt-6 flex-1 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:mt-0 max-md:bg-[#1b9fc7] max-md:px-1 max-md:pt-1 max-md:pb-[max(0.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-2px_8px_rgba(0,0,0,0.15)]"
             >
-                <ul className="flex flex-col gap-1.5 max-md:flex-row max-md:gap-1">
+                <ul className="flex flex-col gap-1.5 max-md:flex-row max-md:gap-0">
                     {elementos.map((item) => {
                         const estaActivo = seccionActiva === item.clave;
                         return (
-                            <li key={item.clave}>
+                            <li key={item.clave} className="max-md:flex-1">
                                 <button
                                     type="button"
                                     onClick={() => onCambiarSeccion(item.clave)}
-                                    className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all max-md:px-2.5 max-md:py-2 ${
+                                    aria-current={estaActivo ? "page" : undefined}
+                                    className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all max-md:min-h-12 max-md:flex-col max-md:justify-center max-md:gap-0.5 max-md:px-0.5 max-md:py-1.5 ${
                                         estaActivo
                                             ? "bg-[#16d6dc] text-[#075274] shadow-sm"
                                             : "text-white/90 hover:bg-white/15 hover:text-white"
                                     }`}
                                 >
                                     <span className="shrink-0">{item.icono}</span>
-                                    <span className="max-md:hidden">{item.etiqueta}</span>
+                                    <span className="max-md:text-xs max-md:leading-tight">
+                                        <span className="md:hidden">{item.corta}</span>
+                                        <span className="max-md:hidden">{item.etiqueta}</span>
+                                    </span>
                                 </button>
                             </li>
                         );
@@ -97,7 +104,8 @@ export function BarraLateralGuia({
                 <button
                     type="button"
                     onClick={onAbrirSalir}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 max-md:w-auto"
+                    aria-label="Salir del portal"
+                    className="flex min-h-11 min-w-11 w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 max-md:w-auto"
                 >
                     <IconoSalir tamano={16} />
                     <span className="max-md:hidden">Salir</span>
