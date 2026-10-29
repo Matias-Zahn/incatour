@@ -60,6 +60,9 @@ export class CrearReservaDto {
       if (typeof e.pesoDeclarado !== "number" || e.pesoDeclarado < 0) {
         return ["pesoDeclarado debe ser un número mayor o igual a 0."];
       }
+      if ( e.pesoDeclarado > 20 ){
+        return["pesoDeclarado no debe superar los 20 kg."]
+      }
     }
 
     if (
