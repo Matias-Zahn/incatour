@@ -19,6 +19,9 @@ import {
 import { ErrorApi } from "../../services/clienteApi";
 import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
 
+// Mismo tope que PESO_MAXIMO_DECLARADO_KG del back (backend/src/shared/constantes.ts)
+const PESO_MAXIMO_DECLARADO_KG = 20;
+
 // FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
 const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
 type CompraGuardada = {
@@ -543,6 +546,12 @@ function CatalogoCompraPage() {
             ) {
                 setErrorCompra(
                     `El peso de equipaje declarado para ${p.nombreCompleto} debe ser mayor o igual a 0 kg.`,
+                );
+                return;
+            }
+            if (Number(p.pesoDeclarado) > PESO_MAXIMO_DECLARADO_KG) {
+                setErrorCompra(
+                    `El equipaje declarado de ${p.nombreCompleto} no puede superar los ${PESO_MAXIMO_DECLARADO_KG} kg.`,
                 );
                 return;
             }
@@ -1397,7 +1406,9 @@ function CatalogoCompraPage() {
                                                     <input
                                                         type="number"
                                                         min={0}
+                                                        max={PESO_MAXIMO_DECLARADO_KG}
                                                         step={0.5}
+                                                        aria-describedby={`maximo-equipaje-${idx}`}
                                                         value={
                                                             pasajero.pesoDeclarado
                                                         }
@@ -1434,6 +1445,12 @@ function CatalogoCompraPage() {
                                                             Dentro de franquicia
                                                         </span>
                                                     )}
+                                                    <span
+                                                        id={`maximo-equipaje-${idx}`}
+                                                        className="text-[11px] font-normal text-texto-suave"
+                                                    >
+                                                        Máximo {PESO_MAXIMO_DECLARADO_KG} kg por pasajero
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>

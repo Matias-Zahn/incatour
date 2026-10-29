@@ -32,6 +32,9 @@ export const SALIDAS_ACTIVAS = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "ABIERTA", "CERRADA"];
 
+/** Tope de equipaje que puede declarar cada pasajero al comprar (RES, PR #138). */
+export const PESO_MAXIMO_DECLARADO_KG = 20;
+
 export const TIPO_SERVICIO = {
   ALOJAMIENTO: "ALOJAMIENTO",
   TRANSPORTE: "TRANSPORTE",

@@ -41,6 +41,7 @@ describe("CrearReservaDto (CU-30)", () => {
     [{ equipaje: { pesoDeclarado: 1 } }, "equipaje debe ser un arreglo."],
     [{ equipaje: [{ pesoDeclarado: 1 }, { pesoDeclarado: 2 }] }, "equipaje debe tener un elemento por cada pasajero."],
     [{ equipaje: [{ pesoDeclarado: -1 }] }, "pesoDeclarado debe ser un número mayor o igual a 0."],
+    [{ equipaje: [{ pesoDeclarado: 20.5 }] }, "El equipaje declarado no puede superar los 20 kg por pasajero."],
     [{ tarjeta: { ...tarjeta, cvv: "" } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
     [{ tarjeta: undefined }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
     [{ tarjeta: { ...tarjeta, numero: 4111222233334444 } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
