@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { formatearEstadoSalida, formatearFechaHora, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
 
@@ -6,6 +7,7 @@ type VistaRecorridosProps = {
 };
 
 export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
+    const navegar = useNavigate();
     const itinerario = detalleSalida?.itinerario ?? [];
 
     return (
@@ -88,6 +90,23 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                                             <p className="mt-1 text-[11px] text-emerald-700 font-medium">
                                                 Llegada registrada: {formatearFechaHora(etapa.fechaHoraLlegada)}
                                             </p>
+                                        ) : null}
+
+                                        {etapa.estadoTramo !== "COMPLETADO" ? (
+                                            <div className="mt-3 flex items-center justify-between border-t border-borde/50 pt-2.5">
+                                                <span className="text-[11px] text-texto-suave">
+                                                    {etapa.estadoTramo === "DEMORADO"
+                                                        ? "Tramo informado con demora"
+                                                        : "Tramo pendiente de registrar"}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navegar("/guia/novedades")}
+                                                    className="inline-flex items-center gap-1.5 rounded-control bg-[#1b9fc7] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#148ba8]"
+                                                >
+                                                    Registrar avance en este tramo →
+                                                </button>
+                                            </div>
                                         ) : null}
                                     </div>
                                 </div>

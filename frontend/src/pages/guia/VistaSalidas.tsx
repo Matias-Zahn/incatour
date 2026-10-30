@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Modal from "../../components/Modal";
+import { useNavigate } from "react-router-dom";
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
@@ -34,6 +35,8 @@ export function VistaSalidas({
     onSeleccionarSalida,
     cargando,
 }: VistaSalidasProps) {
+    const navegar = useNavigate();
+    const [vistaModo, setVistaModo] = useState<"lista" | "detalle">("lista");
     const [modalNominaAbierto, setModalNominaAbierto] = useState(false);
 
     const salidaInfo = detalleSalida?.salida ?? salidaActual;
@@ -43,49 +46,183 @@ export function VistaSalidas({
 
     return (
         <section aria-label="Información de la salida asignada" className="space-y-6">
-            <header className="flex flex-wrap items-start justify-between gap-4 border-b border-borde/60 pb-4">
+            <header className="flex flex-wrap items-center justify-between gap-4 border-b border-borde/60 pb-4">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-marca">
                         Portal del guía
                     </p>
                     <h1 className="mt-1 text-2xl font-bold text-navegacion md:text-3xl">
-                        Información de salida
+                        Mis salidas asignadas
                     </h1>
                     <p className="text-sm text-texto-suave">
-                        Consulta detalles de tu salida asignada, pasajeros y equipamiento
+                        Consulta y gestiona las salidas en las que estás designado como guía
                     </p>
                 </div>
 
-                {salidas.length > 1 ? (
-                    <div className="flex items-center gap-2">
-                        <label
-                            htmlFor="selector-salida"
-                            className="text-xs font-semibold text-texto-suave"
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setVistaModo("lista")}
+                        className={`rounded-control px-3.5 py-1.5 text-xs font-bold transition ${
+                            vistaModo === "lista"
+                                ? "bg-navegacion text-white shadow-xs"
+                                : "border border-borde bg-white text-texto hover:bg-slate-50"
+                        }`}
+                    >
+                        Listado de salidas ({salidas.length})
+                    </button>
+                    {salidaActual ? (
+                        <button
+                            type="button"
+                            onClick={() => setVistaModo("detalle")}
+                            className={`rounded-control px-3.5 py-1.5 text-xs font-bold transition ${
+                                vistaModo === "detalle"
+                                    ? "bg-navegacion text-white shadow-xs"
+                                    : "border border-borde bg-white text-texto hover:bg-slate-50"
+                            }`}
                         >
-                            Cambiar salida:
-                        </label>
-                        <select
-                            id="selector-salida"
-                            value={salidaActual?.idsalida ?? ""}
-                            onChange={(e) => onSeleccionarSalida(Number(e.target.value))}
-                            className="rounded-control border border-borde bg-white px-3 py-1.5 text-xs font-medium text-texto outline-none focus:border-marca"
-                        >
-                            {salidas.map((s) => (
-                                <option key={s.idsalida} value={s.idsalida}>
-                                    {s.nroSalida} ({s.circuito})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                ) : null}
+                            Detalle ({salidaActual.nroSalida})
+                        </button>
+                    ) : null}
+                </div>
             </header>
 
             {cargando ? (
                 <div className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave shadow-tarjeta">
-                    Cargando información de la salida...
+                    Cargando información de las salidas asignadas...
+                </div>
+            ) : salidas.length === 0 ? (
+                <div className="rounded-tarjeta border border-borde bg-white p-8 text-center shadow-tarjeta">
+                    <p className="text-base font-bold text-navegacion">No tienes salidas asignadas</p>
+                    <p className="mt-1 text-xs text-texto-suave">
+                        Cuando el administrador te asigne a un grupo o salida programada, aparecerá listada en esta sección.
+                    </p>
+                </div>
+            ) : vistaModo === "lista" ? (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs text-texto-suave">
+                        <span>Tienes <b>{salidas.length}</b> salida(s) asignada(s) en tu perfil:</span>
+                        <span>Selecciona una para consultar su detalle u operar</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        {salidas.map((s) => {
+                            const esActiva = s.idsalida === salidaActual?.idsalida;
+                            return (
+                                <article
+                                    key={s.idsalida}
+                                    className={`flex flex-col justify-between rounded-tarjeta border bg-white p-5 shadow-tarjeta transition ${
+                                        esActiva
+                                            ? "border-l-4 border-l-[#16d6dc] border-y border-r ring-2 ring-marca/20"
+                                            : "border-borde hover:border-marca/50"
+                                    }`}
+                                >
+                                    <div>
+                                        <div className="flex items-center justify-between gap-2 border-b border-borde/60 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-base font-bold text-navegacion">
+                                                    {s.nroSalida}
+                                                </span>
+                                                {esActiva ? (
+                                                    <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
+                                                        Salida activa
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <span
+                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${estilosEstadoSalida(
+                                                    s.estado,
+                                                )}`}
+                                            >
+                                                {formatearEstadoSalida(s.estado)}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-4 space-y-2.5 text-xs text-texto">
+                                            <div>
+                                                <p className="text-sm font-bold text-navegacion">
+                                                    {s.circuito}
+                                                </p>
+                                                <p className="text-[11px] text-texto-suave">
+                                                    Paquete: {s.paquete}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 pt-1 text-texto-suave">
+                                                <IconoCalendario tamano={15} />
+                                                <span>
+                                                    <b>Inicio:</b> {formatearFechaSalida(s.fechaInicio)} — <b>Fin:</b> {formatearFechaSalida(s.fechaFin)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 text-texto-suave">
+                                                <IconoMontana tamano={15} />
+                                                <span>
+                                                    Pasajeros confirmados: <b>{s.pasajeros}</b>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-borde/50 pt-3">
+                                        <Boton
+                                            variante="principal"
+                                            className="flex-1 text-xs py-1.5"
+                                            onClick={() => {
+                                                onSeleccionarSalida(s.idsalida);
+                                                setVistaModo("detalle");
+                                            }}
+                                        >
+                                            Consultar detalle
+                                        </Boton>
+                                        <Boton
+                                            variante="secundario"
+                                            className="text-xs py-1.5"
+                                            onClick={() => {
+                                                onSeleccionarSalida(s.idsalida);
+                                                navegar("/guia/novedades");
+                                            }}
+                                        >
+                                            Avances
+                                        </Boton>
+                                        <Boton
+                                            variante="secundario"
+                                            className="text-xs py-1.5"
+                                            onClick={() => {
+                                                onSeleccionarSalida(s.idsalida);
+                                                navegar("/guia/incidentes");
+                                            }}
+                                        >
+                                            Incidentes
+                                        </Boton>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : salidaInfo ? (
                 <>
+                    {/* Botón Volver al Listado */}
+                    <div className="flex items-center justify-between gap-4">
+                        <button
+                            type="button"
+                            onClick={() => setVistaModo("lista")}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-marca hover:underline"
+                        >
+                            ← Volver al listado de salidas
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <Boton
+                                variante="secundario"
+                                className="text-xs py-1"
+                                onClick={() => navegar("/guia/novedades")}
+                            >
+                                Registrar avances de esta salida →
+                            </Boton>
+                        </div>
+                    </div>
+
                     {/* Banner de Salida Actual */}
                     <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-l-4 border-l-[#16d6dc] border-y border-r border-borde bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
                         <div className="grid size-12 place-items-center rounded-xl bg-[#1b9fc7] text-white">

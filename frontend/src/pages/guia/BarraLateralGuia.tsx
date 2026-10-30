@@ -36,7 +36,7 @@ const elementos: ElementoNav[] = [
     { clave: "inicio", etiqueta: "Inicio", corta: "Inicio", icono: <IconoInicio /> },
     { clave: "salidas", etiqueta: "Mis salidas", corta: "Salidas", icono: <IconoCalendario /> },
     { clave: "recorridos", etiqueta: "Recorridos", corta: "Recorrido", icono: <IconoMapa /> },
-    { clave: "novedades", etiqueta: "Novedades", corta: "Novedades", icono: <IconoCampana /> },
+    { clave: "novedades", etiqueta: "Avances y novedades", corta: "Novedades", icono: <IconoCampana /> },
     { clave: "incidentes", etiqueta: "Incidentes", corta: "Incidentes", icono: <IconoEscudoAlerta /> },
 ];
 
