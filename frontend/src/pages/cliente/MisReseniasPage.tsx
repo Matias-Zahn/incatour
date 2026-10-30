@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Modal from "../../components/Modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
@@ -442,20 +443,12 @@ function MisReseniasPage() {
 
             {/* MODAL PARA PUBLICAR RESEÑA (CU-47 PASO 2: POST /api/resenias) */}
             {itemSeleccionado ? (
-                <div
-                    className="fixed inset-0 z-40 grid place-items-center bg-slate-950/40 p-4"
-                    onMouseDown={(e) => {
-                        if (e.target === e.currentTarget) {
-                            cerrarFormularioResenia();
-                        }
-                    }}
+                <Modal
+                    onCerrar={cerrarFormularioResenia}
+                    etiquetaId="modal-publicar-resenia-titulo"
+                    tamano="sm"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="modal-publicar-resenia-titulo"
-                        className="w-full max-w-lg rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="border-b border-borde pb-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-marca">
                                 Calificar experiencia
@@ -602,8 +595,7 @@ function MisReseniasPage() {
                                 </Boton>
                             </div>
                         </form>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
         </section>
     );

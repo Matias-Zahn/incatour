@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
+import Modal from "./Modal";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
 import { ErrorApi } from "../services/clienteApi";
@@ -71,22 +72,6 @@ export function ModalCancelarSalida({
         onCerrar,
         salida?.nroSalida,
     ]);
-
-    // Cierre con tecla Escape
-    useEffect(() => {
-        if (!abierto) return;
-
-        function manejarTecla(evento: KeyboardEvent) {
-            if (evento.key === "Escape" && !cancelarMutation.isPending) {
-                manejarCerrar();
-            }
-        }
-
-        document.addEventListener("keydown", manejarTecla);
-        return () => {
-            document.removeEventListener("keydown", manejarTecla);
-        };
-    }, [abierto, cancelarMutation.isPending, manejarCerrar]);
 
     if (!abierto || !salida) {
         return null;
@@ -166,21 +151,14 @@ export function ModalCancelarSalida({
     }
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4 overflow-y-auto"
-            onMouseDown={(evento) => {
-                if (evento.target === evento.currentTarget && !cancelarMutation.isPending) {
-                    manejarCerrar();
-                }
-            }}
+        <Modal
+            onCerrar={manejarCerrar}
+            bloqueado={cancelarMutation.isPending}
+            rol="alertdialog"
+            etiquetaId={tituloId}
+            descripcionId={descripcionId}
+            className="space-y-5 p-6"
         >
-            <section
-                role="alertdialog"
-                aria-modal="true"
-                aria-labelledby={tituloId}
-                aria-describedby={descripcionId}
-                className="w-full max-w-2xl rounded-tarjeta bg-white p-6 shadow-tarjeta max-h-[92vh] overflow-y-auto space-y-5"
-            >
                 {/* Cabecera de la salida */}
                 <div className="border-b border-borde pb-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -461,8 +439,7 @@ export function ModalCancelarSalida({
                         )}
                     </div>
                 )}
-            </section>
-        </div>
+        </Modal>
     );
 }
 

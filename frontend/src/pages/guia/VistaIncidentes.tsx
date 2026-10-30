@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Modal from "../../components/Modal";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
@@ -553,18 +554,11 @@ export function VistaIncidentes({
 
             {/* Modal Selección Completa de Pasajeros Afectados */}
             {modalMasPasajerosAbierto ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setModalMasPasajerosAbierto(false);
-                    }}
+                <Modal
+                    onCerrar={() => setModalMasPasajerosAbierto(false)}
+                    etiqueta="Seleccionar pasajeros afectados"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Seleccionar pasajeros afectados"
-                        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
@@ -580,6 +574,7 @@ export function VistaIncidentes({
                             <button
                                 type="button"
                                 onClick={() => setModalMasPasajerosAbierto(false)}
+                                aria-label="Cerrar"
                                 className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
                             >
                                 <IconoCerrar tamano={20} />
@@ -646,24 +641,16 @@ export function VistaIncidentes({
                                 Listo
                             </Boton>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
 
             {/* Modal Historial Completo de Incidentes */}
             {modalHistorialAbierto ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setModalHistorialAbierto(false);
-                    }}
+                <Modal
+                    onCerrar={() => setModalHistorialAbierto(false)}
+                    etiqueta="Historial de incidentes de la salida"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Historial de incidentes de la salida"
-                        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
@@ -676,6 +663,7 @@ export function VistaIncidentes({
                             <button
                                 type="button"
                                 onClick={() => setModalHistorialAbierto(false)}
+                                aria-label="Cerrar"
                                 className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
                             >
                                 <IconoCerrar tamano={20} />
@@ -722,8 +710,7 @@ export function VistaIncidentes({
                                 Cerrar
                             </Boton>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
         </section>
     );

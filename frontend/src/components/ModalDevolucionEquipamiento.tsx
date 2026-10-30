@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
+import Modal from "./Modal";
 import { useIsMutating } from "@tanstack/react-query";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
@@ -483,22 +484,6 @@ export function ModalDevolucionEquipamiento({
         onCerrar();
     }, [onCerrar, registrando]);
 
-    // Cierre con Escape
-    useEffect(() => {
-        if (!abierto) return;
-
-        function manejarTecla(evento: KeyboardEvent) {
-            if (evento.key === "Escape") {
-                manejarCerrar();
-            }
-        }
-
-        document.addEventListener("keydown", manejarTecla);
-        return () => {
-            document.removeEventListener("keydown", manejarTecla);
-        };
-    }, [abierto, manejarCerrar]);
-
     if (!abierto || !salida) {
         return null;
     }
@@ -509,21 +494,14 @@ export function ModalDevolucionEquipamiento({
         (datosEquipamiento?.equipamientos?.length ?? 0) === 0;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4 overflow-y-auto"
-            onMouseDown={(evento) => {
-                if (evento.target === evento.currentTarget) {
-                    manejarCerrar();
-                }
-            }}
+        <Modal
+            onCerrar={manejarCerrar}
+            bloqueado={registrando}
+            etiquetaId={tituloId}
+            descripcionId={descripcionId}
+            tamano="xl"
+            className="space-y-5 p-6"
         >
-            <section
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={tituloId}
-                aria-describedby={descripcionId}
-                className="w-full max-w-4xl rounded-tarjeta bg-white p-6 shadow-tarjeta max-h-[92vh] overflow-y-auto space-y-5"
-            >
                 {/* Cabecera */}
                 <div className="border-b border-borde pb-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -619,8 +597,7 @@ export function ModalDevolucionEquipamiento({
                             onDevolucionExitosa={onDevolucionExitosa}
                         />
                     )}
-            </section>
-        </div>
+        </Modal>
     );
 }
 

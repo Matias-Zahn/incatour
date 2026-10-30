@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Modal from "../../components/Modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -639,20 +640,12 @@ function MisReservasPage() {
 
             {/* MODAL DE DETALLE COMPLETO DE RESERVA (CU-31: GET /api/reservas/:idreserva) */}
             {idReservaDetalle !== null ? (
-                <div
-                    className="fixed inset-0 z-40 grid place-items-center bg-slate-950/40 p-4"
-                    onMouseDown={(e) => {
-                        if (e.target === e.currentTarget) {
-                            setIdReservaDetalle(null);
-                        }
-                    }}
+                <Modal
+                    onCerrar={() => setIdReservaDetalle(null)}
+                    etiquetaId="modal-detalle-reserva-titulo"
+                    tamano="lg"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="modal-detalle-reserva-titulo"
-                        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="flex items-start justify-between gap-4 border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
@@ -1055,26 +1048,16 @@ function MisReservasPage() {
                                 Entendido
                             </Boton>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
 
             {/* MODAL DE LIQUIDACIÓN PREVIA A CANCELAR (CU-32 PASO 1: GET /api/reservas/:idreserva/cancelacion) */}
             {idReservaACancelar !== null && !confirmacionFinalAbierta ? (
-                <div
-                    className="fixed inset-0 z-40 grid place-items-center bg-slate-950/40 p-4"
-                    onMouseDown={(e) => {
-                        if (e.target === e.currentTarget) {
-                            cerrarModalCancelacion();
-                        }
-                    }}
+                <Modal
+                    onCerrar={cerrarModalCancelacion}
+                    etiquetaId="modal-liquidacion-titulo"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="modal-liquidacion-titulo"
-                        className="w-full max-w-xl rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="border-b border-borde pb-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-peligro">
                                 Cancelar reserva
@@ -1237,8 +1220,7 @@ function MisReservasPage() {
                                 </Boton>
                             ) : null}
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
 
             {/* DIÁLOGO DE CONFIRMACIÓN FINAL REUTILIZANDO DialogoConfirmacion.tsx (CU-32 PASO 2) */}
