@@ -15,6 +15,10 @@ const leerCola = (idsalida: number): AvanceOffline[] => (idsalida > 0 ? obtenerA
 let ultimoOrden = 0;
 export const siguienteOrdenAviso = () => ++ultimoOrden;
 
+// 4xx = rechazo definitivo del back. 401/408/409/429 (409: otro avance se registró al mismo tiempo), red y 5xx se reintentan
+export const esRechazoDefinitivo = (error: unknown): error is ErrorApi =>
+    error instanceof ErrorApi && error.estado >= 400 && error.estado < 500 && ![401, 408, 409, 429].includes(error.estado);
+
 export type MensajeSincronizacion = { tipo: "exito" | "error"; texto: string; orden: number };
 
 export type SincronizacionAvances = {
@@ -78,15 +82,9 @@ export function useSincronizacionAvances(idsalida: number): SincronizacionAvance
                     exitoCount += 1;
                     continue;
                 }
-                // 4xx = rechazo definitivo del back: se descarta SOLO ese avance y se corta, porque los
-                // siguientes dependen del orden de etapas y se rechazarían en cadena.
-                // 401/408/409/429 (409: otro avance se registró al mismo tiempo), red y 5xx se reintentan después.
-                if (
-                    error instanceof ErrorApi &&
-                    error.estado >= 400 &&
-                    error.estado < 500 &&
-                    ![401, 408, 409, 429].includes(error.estado)
-                ) {
+                // Se descarta SOLO ese avance y se corta, porque los siguientes dependen del orden de etapas
+                // y se rechazarían en cadena.
+                if (esRechazoDefinitivo(error)) {
                     eliminarAvanceOffline(idsalida, item.idLocal);
                     eliminarHistorialLocalAvance(idsalida, item.idLocal);
                     rechazo = `${item.etapaNombre}: ${error.message}`;

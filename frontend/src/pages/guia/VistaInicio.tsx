@@ -1,6 +1,7 @@
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
+    formatearFechaHora,
     formatearFechaSalida,
     type DetalleSalidaGuia,
     type SalidaGuiaResumen,
@@ -11,6 +12,7 @@ type VistaInicioProps = {
     salidaActual: SalidaGuiaResumen | null;
     proximaSalida: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
+    nombreGuia?: string;
     cargando: boolean;
 };
 
@@ -18,6 +20,7 @@ export function VistaInicio({
     salidaActual,
     proximaSalida,
     detalleSalida,
+    nombreGuia,
     cargando,
 }: VistaInicioProps) {
     const etapasTotales = detalleSalida?.itinerario?.length ?? 0;
@@ -39,11 +42,14 @@ export function VistaInicio({
             titulo: `Etapa ${e.numeroOrden}: ${formatearEstadoSalida(e.estadoTramo)}`,
             subtitulo: `${e.puntoInicio} → ${e.puntoFin}${
                 e.fechaHoraLlegada
-                    ? ` · Llegada: ${new Date(e.fechaHoraLlegada).toLocaleString("es-ES")}`
+                    ? ` · Llegada: ${formatearFechaHora(e.fechaHoraLlegada)}`
                     : ""
             }`,
             demorado: e.estadoTramo === "DEMORADO",
         }));
+
+    const proximoTramo = detalleSalida?.itinerario?.find((e) => e.estadoTramo !== "COMPLETADO");
+    const sinSalidas = !cargando && !salidaActual && !proximaSalida;
 
     return (
         <section aria-label="Inicio del Portal del Guía" className="space-y-6">
@@ -52,7 +58,7 @@ export function VistaInicio({
                     Portal del guía
                 </p>
                 <h1 className="mt-1 text-2xl font-bold text-navegacion md:text-3xl">
-                    Bienvenido al portal de inicio
+                    {nombreGuia ? `Hola, ${nombreGuia}` : "Hola"}
                 </h1>
                 <p className="text-sm text-texto-suave">
                     Resumen operativo y próximas actividades
@@ -62,6 +68,10 @@ export function VistaInicio({
             {cargando ? (
                 <div className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave shadow-tarjeta">
                     Cargando información operativa...
+                </div>
+            ) : sinSalidas ? (
+                <div className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave shadow-tarjeta">
+                    Todavía no tenés salidas asignadas. Cuando el administrador te asigne una, vas a ver acá el recorrido, los pasajeros y las novedades.
                 </div>
             ) : salidaActual ? (
                 <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-l-4 border-l-[#16d6dc] border-y border-r border-borde bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
@@ -127,6 +137,7 @@ export function VistaInicio({
                 </div>
             )}
 
+            {sinSalidas ? null : <>
             <div>
                 <h2 className="mb-3 text-base font-bold text-navegacion">
                     Panel de actividad rápida
@@ -182,50 +193,27 @@ export function VistaInicio({
                         )}
                     </article>
 
-                    {/* Ruta estilizada SVG */}
-                    <article className="rounded-tarjeta border border-borde bg-[#f9fcfc] p-4 shadow-tarjeta">
-                        <h3 className="mb-2 text-xs font-bold text-navegacion">
-                            Ruta del Camino Inca
+                    {/* Recorrido real de la salida */}
+                    <article className="rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
+                        <h3 className="text-sm font-bold text-navegacion">
+                            Recorrido
                         </h3>
-                        <svg
-                            viewBox="0 0 280 100"
-                            role="img"
-                            aria-label="Ruta estilizada del Camino Inca"
-                            className="h-24 w-full"
-                        >
-                            <path
-                                d="M18 70 C45 30,75 82,106 47 S160 66,190 30 S234 55,263 20"
-                                fill="none"
-                                stroke="#1b91ba"
-                                strokeWidth="5"
-                                strokeLinecap="round"
-                            />
-                            <path
-                                d="M18 70 C45 30,75 82,106 47 S160 66,190 30 S234 55,263 20"
-                                fill="none"
-                                stroke="#2dcbd0"
-                                strokeWidth="2"
-                                strokeDasharray="3 7"
-                            />
-                            <circle cx="18" cy="70" r="6" fill="#f2ab3d" />
-                            <circle cx="106" cy="47" r="6" fill="#f2ab3d" />
-                            <circle cx="190" cy="30" r="6" fill="#1b9fc7" />
-                            <circle cx="263" cy="20" r="7" fill="#07395d" />
-                            <text
-                                x="5"
-                                y="93"
-                                className="fill-texto-suave text-[9px] font-bold"
-                            >
-                                Camino Inca
-                            </text>
-                            <text
-                                x="200"
-                                y="13"
-                                className="fill-texto-suave text-[9px] font-bold"
-                            >
-                                Machu Picchu
-                            </text>
-                        </svg>
+                        {etapasTotales > 0 ? (
+                            <>
+                                <p className="mt-1 text-xs text-texto-suave">
+                                    {etapasCompletadas} de {etapasTotales} etapas completadas
+                                </p>
+                                <p className="mt-2 text-xs font-semibold text-texto">
+                                    {proximoTramo
+                                        ? `Próximo tramo: ${proximoTramo.puntoInicio} → ${proximoTramo.puntoFin}`
+                                        : "Recorrido completado"}
+                                </p>
+                            </>
+                        ) : (
+                            <p className="mt-2 text-xs text-texto-suave">
+                                Sin tramos para mostrar
+                            </p>
+                        )}
                     </article>
                 </div>
             </div>
@@ -313,6 +301,7 @@ export function VistaInicio({
                     </div>
                 </article>
             </div>
+            </>}
         </section>
     );
 }
