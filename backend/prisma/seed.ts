@@ -278,27 +278,116 @@ async function main() {
     },
   });
 
-  const porteador = await db.personal.create({
+  const usuarioGuia4 = await db.usuario.create({
     data: {
-      nombreCompleto: "Luis Quispe",
-      nroPasaporte: "P654321",
-      nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2029-01-01T00:00:00Z"),
+      nombre: "Elena",
+      apellido: "Morales",
+      email: "elena.guia@incatour.com",
+      contrasenia: contraseniaGuia,
+      rol: "GUIA",
       estado: "ACTIVO",
-      rol: "Porteador",
     },
   });
 
-  const porteador2 = await db.personal.create({
+  const personalGuia4 = await db.personal.create({
     data: {
-      nombreCompleto: "Pedro Condori",
-      nroPasaporte: "P998877",
+      nombreCompleto: "Elena Morales",
+      nroPasaporte: "P881122",
       nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2029-01-01T00:00:00Z"),
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
       estado: "ACTIVO",
-      rol: "Porteador",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia4.idusuario,
+          nroHabilitacion: "HAB-004",
+          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+        },
+      },
     },
   });
+
+  const usuarioGuia5 = await db.usuario.create({
+    data: {
+      nombre: "Raúl",
+      apellido: "Mendoza",
+      email: "raul.guia@incatour.com",
+      contrasenia: contraseniaGuia,
+      rol: "GUIA",
+      estado: "ACTIVO",
+    },
+  });
+
+  const personalGuia5 = await db.personal.create({
+    data: {
+      nombreCompleto: "Raúl Mendoza",
+      nroPasaporte: "P882233",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia5.idusuario,
+          nroHabilitacion: "HAB-005",
+          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+        },
+      },
+    },
+  });
+
+  const usuarioGuia6 = await db.usuario.create({
+    data: {
+      nombre: "Sofía",
+      apellido: "Cárdenas",
+      email: "sofia.guia@incatour.com",
+      contrasenia: contraseniaGuia,
+      rol: "GUIA",
+      estado: "ACTIVO",
+    },
+  });
+
+  const personalGuia6 = await db.personal.create({
+    data: {
+      nombreCompleto: "Sofía Cárdenas",
+      nroPasaporte: "P883344",
+      nacionalidad: "Peruana",
+      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+      estado: "ACTIVO",
+      rol: "Guía",
+      guia: {
+        create: {
+          idusuario: usuarioGuia6.idusuario,
+          nroHabilitacion: "HAB-006",
+          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+        },
+      },
+    },
+  });
+
+  const porteadoresData = [
+    { nombreCompleto: "Luis Quispe", nroPasaporte: "P654321" },
+    { nombreCompleto: "Pedro Condori", nroPasaporte: "P998877" },
+    { nombreCompleto: "Juan Carlos Yupanqui", nroPasaporte: "P500001" },
+    { nombreCompleto: "Mario Ttito", nroPasaporte: "P500002" },
+    { nombreCompleto: "Walter Champi", nroPasaporte: "P500003" },
+    { nombreCompleto: "Esteban Paucar", nroPasaporte: "P500004" },
+    { nombreCompleto: "Jaime Huillca", nroPasaporte: "P500005" },
+    { nombreCompleto: "Nilton Mayta", nroPasaporte: "P500006" },
+  ];
+
+  for (const p of porteadoresData) {
+    await db.personal.create({
+      data: {
+        nombreCompleto: p.nombreCompleto,
+        nroPasaporte: p.nroPasaporte,
+        nacionalidad: "Peruana",
+        fechaVencimientoPasaporte: new Date("2029-01-01T00:00:00Z"),
+        estado: "ACTIVO",
+        rol: "Porteador",
+      },
+    });
+  }
 
   // 4. Circuito con Etapas
   const circuito = await db.circuito.create({
