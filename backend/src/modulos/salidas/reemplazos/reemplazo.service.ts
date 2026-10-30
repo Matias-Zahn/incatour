@@ -133,7 +133,7 @@ export class ReemplazoService {
     } catch (error) {
       // Compensación: la base falló después de emitir, así que el permiso nuevo se da de baja
       if (permisoNuevo) {
-        // ponytail: si la base sigue caída el update falla y solo queda el log; reparar a mano
+        // Limitación: si la base sigue caída el update falla y solo queda el log; reparar a mano
         await autoridad
           .darDeBajaPermiso(salida.idbloqueo!, permisoNuevo.nroPermiso)
           // El lugar ante la autoridad ahora lo ocupa el nuevo (dado de baja): el reintento lo reemplaza a ese

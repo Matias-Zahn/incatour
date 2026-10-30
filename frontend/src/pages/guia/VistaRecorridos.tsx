@@ -9,6 +9,8 @@ type VistaRecorridosProps = {
 export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
     const navegar = useNavigate();
     const itinerario = detalleSalida?.itinerario ?? [];
+    // Las etapas se informan en orden: solo la primera sin completar se puede registrar ahora
+    const ordenSiguiente = itinerario.find((e) => e.estadoTramo !== "COMPLETADO")?.numeroOrden;
 
     return (
         <section aria-label="Recorridos y orientación en terreno" className="space-y-6">
@@ -99,13 +101,15 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                                                         ? "Tramo informado con demora"
                                                         : "Tramo pendiente de registrar"}
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navegar("/guia/novedades")}
-                                                    className="inline-flex items-center gap-1.5 rounded-control bg-[#1b9fc7] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#148ba8]"
-                                                >
-                                                    Registrar avance en este tramo →
-                                                </button>
+                                                {etapa.numeroOrden === ordenSiguiente ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => navegar("/guia/novedades")}
+                                                        className="inline-flex items-center gap-1.5 rounded-control bg-[#1b9fc7] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#148ba8]"
+                                                    >
+                                                        Registrar avance en este tramo →
+                                                    </button>
+                                                ) : null}
                                             </div>
                                         ) : null}
                                     </div>

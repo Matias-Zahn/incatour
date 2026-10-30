@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
 import LimiteDeError from "./LimiteDeError";
@@ -9,6 +9,10 @@ type LayoutGestionProps = {
 };
 
 function LayoutGestion({ seccion, children }: LayoutGestionProps) {
+    useEffect(() => {
+        document.title = `${seccion} · Gestión IncaTour`;
+    }, [seccion]);
+
     return (
         <div className="flex min-h-screen flex-col bg-fondo md:flex-row">
             <BarraLateral seccionActiva={seccion} />

@@ -434,14 +434,9 @@ export function VistaAvances({
                     <IconoMontana tamano={24} />
                 </div>
                 <div>
-                    <div className="flex items-center gap-2">
-                        <h2 className="font-mono text-base font-bold text-navegacion md:text-lg">
-                            Salida {salidaActual.nroSalida}
-                        </h2>
-                        <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
-                            En operación
-                        </span>
-                    </div>
+                    <h2 className="font-mono text-base font-bold text-navegacion md:text-lg">
+                        Salida {salidaActual.nroSalida}
+                    </h2>
                     <p className="text-xs font-medium text-texto">
                         {salidaActual.circuito} · <span className="text-texto-suave">{salidaActual.paquete}</span>
                     </p>

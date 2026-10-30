@@ -14,7 +14,8 @@ export function crearEsquemaCompra(fechaFin: string, cupo: number, fechaFinTexto
         fechaVencimientoPasaporte: z
             .string()
             .min(1, "Indicá el vencimiento del pasaporte.")
-            .refine((f) => new Date(f) > new Date(fechaFin), `Tiene que vencer después del ${fechaFinTexto}.`),
+            // Igual que el back: alcanza con que siga vigente el último día del recorrido (se comparan solo las fechas)
+            .refine((f) => f >= fechaFin.slice(0, 10), `No puede vencer antes del ${fechaFinTexto}.`),
         pesoDeclarado: z
             .number({ error: "Indicá el peso del equipaje." })
             .min(0, "No puede ser negativo.")

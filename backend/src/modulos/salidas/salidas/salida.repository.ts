@@ -107,7 +107,7 @@ export class SalidaRepository {
         if (plazas.count === 0) throw CustomError.badRequest("El alojamiento ya no tiene plazas suficientes");
       }
 
-      // ponytail: número correlativo por año; dos altas simultáneas chocan con el @unique y una falla (se compensa)
+      // Limitación: número correlativo por año; dos altas simultáneas chocan con el @unique y una falla (se compensa)
       const anio = d.fechaInicio.getUTCFullYear();
       const delAnio = await tx.salida.count({ where: { nroSalida: { startsWith: `SAL-${anio}-` } } });
       const nroSalida = `SAL-${anio}-${String(delAnio + 1).padStart(3, "0")}`;

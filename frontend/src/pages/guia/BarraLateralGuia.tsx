@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import logoIncaTour from "../../assets/logo-incatour.jpg";
+import logoIncaTour from "../../assets/logo-incatour.png";
 import {
     IconoCalendario,
     IconoCampana,

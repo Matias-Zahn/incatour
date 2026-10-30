@@ -688,7 +688,7 @@ async function main() {
     },
   });
 
-  // Salida 3: CONFIRMADA para Camino a Diadema, asignada a Guía Carlos y Guía Rosa (visible en Portal Guía)
+  // Salida 3: CERRADA (el estado que deja la asignación de CU-40) para Camino a Diadema, asignada a Guía Carlos y Guía Rosa (visible en Portal Guía)
   const salidaDiademaActiva = await db.salida.create({
     data: {
       definicionPaquete: armarDefinicionPaquete(paqueteDiademaCompleto),
@@ -698,7 +698,7 @@ async function main() {
       tamanoMaximo: 10,
       fechaInicio: new Date("2026-11-05T08:00:00Z"),
       fechaFin: new Date("2026-11-08T18:00:00Z"),
-      estado: "CONFIRMADA",
+      estado: "CERRADA",
       personalAsignado: {
         create: [
           { idpersonal: personalGuia.idpersonal },

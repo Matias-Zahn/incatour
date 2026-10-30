@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import LimiteDeError from "./LimiteDeError";
 import DialogoConfirmacion from "./DialogoConfirmacion";
-import logoIncaTour from "../assets/logo-incatour.jpg";
+import logoIncaTour from "../assets/logo-incatour.png";
 import {
     limpiarSesion,
     obtenerToken,

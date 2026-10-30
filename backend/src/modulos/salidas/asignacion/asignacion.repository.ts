@@ -91,7 +91,7 @@ export class AsignacionRepository {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
       // Lock de la salida: una compra que confirma en paralelo espera (o ya cerró la salida) y se detecta acá
-      // ponytail: la compra en curso al cerrar se cobra y cae en el camino "pago aprobado sin reserva" (la rama fix/martin-externos lo convierte en reembolso)
+      // Limitación: la compra en curso al cerrar se cobra y cae en el camino "pago aprobado sin reserva" (la rama fix/martin-externos lo convierte en reembolso)
       const [fila] = await tx.$queryRaw<{ estado: string; stockLocalAlojamiento: number | null }[]>`
         SELECT estado, "stockLocalAlojamiento" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
       const vendidos = p.salida.reservas.reduce((t, r) => t + r.pasajeros.length, 0);
