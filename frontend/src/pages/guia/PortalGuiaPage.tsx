@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import {
@@ -68,6 +68,18 @@ export default function PortalGuiaPage() {
     // Elegida en esta sesión (sí puede ser FINALIZADA) vs. recuperada de localStorage
     const [eligioEnSesion, setEligioEnSesion] = useState(false);
 
+    // Hay un incidente a medio cargar: cambiar de salida lo descarta, así que se pide confirmación
+    const incidenteEnEdicion = useRef(false);
+    const avisarEdicionIncidente = useCallback((enCurso: boolean) => {
+        incidenteEnEdicion.current = enCurso;
+    }, []);
+    const [salidaPorConfirmar, setSalidaPorConfirmar] = useState<number | null>(null);
+
+    function cambiarSalidaGlobal(id: number) {
+        if (incidenteEnEdicion.current) setSalidaPorConfirmar(id);
+        else seleccionarSalida(id);
+    }
+
     function seleccionarSalida(id: number) {
         setIdsalidaSeleccionada(id);
         setEligioEnSesion(true);
@@ -120,9 +132,15 @@ export default function PortalGuiaPage() {
         document.title = "Portal Guía · IncaTour";
     }, []);
 
+    // Los avisos son de la sección donde aparecieron, se llegue a la siguiente por el menú o por un botón
+    const { limpiarMensaje: limpiarAvisoAvances } = sincronizacion;
+    const { limpiarMensaje: limpiarAvisoIncidentes } = sincronizacionIncidentes;
+    useEffect(() => {
+        limpiarAvisoAvances();
+        limpiarAvisoIncidentes();
+    }, [seccionActiva, limpiarAvisoAvances, limpiarAvisoIncidentes]);
+
     function manejarCambioSeccion(seccion: SeccionGuia) {
-        sincronizacion.limpiarMensaje();
-        sincronizacionIncidentes.limpiarMensaje();
         navegar(`/guia/${seccion}`, { replace: true });
     }
 
@@ -143,19 +161,18 @@ export default function PortalGuiaPage() {
             />
 
             {/* Área de contenido */}
-            {/* Área de contenido */}
             <main className="flex-1 overflow-x-hidden p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8">
                 <div className="mx-auto max-w-6xl"><LimiteDeError>
                     {/* Barra Superior / Contexto Global de Salida Operativa */}
                     <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
-                        <div className="flex items-center gap-3">
-                            <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-[#1b9fc7] to-[#16d6dc] text-white shadow-sm">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1b9fc7] to-[#16d6dc] text-white shadow-sm">
                                 <IconoMontana tamano={22} />
                             </div>
                             <div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
-                                        Salida en operación
+                                        Salida seleccionada
                                     </span>
                                     {salidaActual ? (
                                         <span
@@ -185,18 +202,18 @@ export default function PortalGuiaPage() {
                         </div>
 
                         {salidas.length > 1 ? (
-                            <div className="flex items-center gap-2 rounded-xl border border-borde/70 bg-[#f8fafb] px-3 py-2">
+                            <div className="flex w-full min-w-0 flex-col gap-1 rounded-xl border border-borde/70 bg-[#f8fafb] px-3 py-2 md:w-auto md:flex-row md:items-center md:gap-2">
                                 <label
                                     htmlFor="selector-salida-global"
-                                    className="text-xs font-bold text-texto-suave whitespace-nowrap"
+                                    className="text-xs font-bold text-texto-suave md:whitespace-nowrap"
                                 >
                                     Cambiar salida activa:
                                 </label>
                                 <select
                                     id="selector-salida-global"
                                     value={salidaActual?.idsalida ?? ""}
-                                    onChange={(e) => seleccionarSalida(Number(e.target.value))}
-                                    className="rounded-control border border-borde bg-white px-3 py-1.5 text-xs font-bold text-texto outline-none focus:border-marca"
+                                    onChange={(e) => cambiarSalidaGlobal(Number(e.target.value))}
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-1.5 text-base font-bold text-texto outline-none focus:border-marca md:max-w-xs md:text-xs"
                                 >
                                     {salidas.map((s) => (
                                         <option key={s.idsalida} value={s.idsalida}>
@@ -257,7 +274,7 @@ export default function PortalGuiaPage() {
                     )}
 
                     {seccionActiva === "recorridos" && (
-                        <VistaRecorridos detalleSalida={detalleSalida} />
+                        <VistaRecorridos detalleSalida={detalleSalida} avancesPendientes={sincronizacion.pendientes} />
                     )}
 
                     {seccionActiva === "novedades" && (
@@ -276,11 +293,25 @@ export default function PortalGuiaPage() {
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
                             sincronizacion={sincronizacionIncidentes}
+                            onCambioEdicion={avisarEdicionIncidente}
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
                 </LimiteDeError></div>
             </main>
+
+            <DialogoConfirmacion
+                abierto={salidaPorConfirmar !== null}
+                titulo="¿Cambiar de salida?"
+                descripcion="El incidente que estás cargando todavía no se envió y se va a descartar."
+                textoConfirmar="Sí, cambiar"
+                textoCancelar="Seguir cargando"
+                onConfirmar={() => {
+                    if (salidaPorConfirmar !== null) seleccionarSalida(salidaPorConfirmar);
+                    setSalidaPorConfirmar(null);
+                }}
+                onCancelar={() => setSalidaPorConfirmar(null)}
+            />
 
             {/* Modal de confirmación para salir */}
             <DialogoConfirmacion
