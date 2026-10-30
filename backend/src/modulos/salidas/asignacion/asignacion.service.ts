@@ -196,7 +196,7 @@ export class AsignacionService {
       return true;
     } catch (e) {
       console.error(`No se pudieron liberar ${n} lugares del bloqueo ${idbloqueo}`, e);
-      // ponytail: si la base también falla acá, la cantidad se pierde y solo queda el log
+      // Limitación: si la base también falla acá, la cantidad se pierde y solo queda el log
       await this.repository.devolverSobrantes(idsalida, n).catch((e2) => console.error("No se pudo volver a marcar los sobrantes pendientes", e2));
       return false;
     }
@@ -230,7 +230,7 @@ export class AsignacionService {
     const estimada = calcularDotacion(circuito.minimoGuias, circuito.parametrosPorteadores, salida.tamanoMaximo);
     if (!dotacion || !estimada) throw CustomError.badRequest("El circuito no tiene cargados sus parámetros de dotación");
 
-    // ponytail: el bloqueo inicial se recalcula con los parámetros actuales del circuito, porque la salida
+    // Limitación: el bloqueo inicial se recalcula con los parámetros actuales del circuito, porque la salida
     // no guarda la dotación estimada; si el circuito cambió desde el CU-36, guardar ese número en Salida.
     const bloqueoInicial = salida.tamanoMaximo + estimada.guias + estimada.porteadores;
     const sobrantes = bloqueoInicial - vendidos - dotacion.guias - dotacion.porteadores;

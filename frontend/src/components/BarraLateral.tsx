@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
-import logoIncaTour from "../assets/logo-incatour.jpg";
+import logoIncaTour from "../assets/logo-incatour.png";
 import { obtenerUsuario } from "../services/sesionService";
 
 function IconoMenu() {
