@@ -179,7 +179,7 @@ export function VistaSalidas({
                                             className="text-xs py-1.5"
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
-                                                navegar("/guia/novedades");
+                                                navegar("/guia/novedades", { replace: true });
                                             }}
                                         >
                                             Avances
@@ -189,7 +189,7 @@ export function VistaSalidas({
                                             className="text-xs py-1.5"
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
-                                                navegar("/guia/incidentes");
+                                                navegar("/guia/incidentes", { replace: true });
                                             }}
                                         >
                                             Incidentes
@@ -215,7 +215,7 @@ export function VistaSalidas({
                             <Boton
                                 variante="secundario"
                                 className="text-xs py-1"
-                                onClick={() => navegar("/guia/novedades")}
+                                onClick={() => navegar("/guia/novedades", { replace: true })}
                             >
                                 Registrar avances de esta salida →
                             </Boton>
