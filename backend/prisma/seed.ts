@@ -104,6 +104,17 @@ async function main() {
     },
   });
 
+  const proveedorComodoro = await db.proveedor.create({
+    data: {
+      tipoProveedor: "ALOJAMIENTO",
+      razonSocial: "Patagonia Austral Servicios",
+      localidad: "Comodoro Rivadavia",
+      datosContacto: "reservas@patagoniacomodoro.com · +54 297 4559876",
+      canalComunicacion: "Correo electrónico",
+      estado: "ACTIVO",
+    },
+  });
+
   const servAloj = await db.servicioBase.create({
     data: {
       idproveedor: proveedor.idproveedor,
@@ -185,6 +196,41 @@ async function main() {
         create: {
           tipoEquipamiento: "Carpa 4 Estaciones",
           cantidadDisponible: 50,
+        },
+      },
+    },
+  });
+
+  const servAlojComodoro = await db.servicioBase.create({
+    data: {
+      idproveedor: proveedorComodoro.idproveedor,
+      nombreServicio: "Hostería Histórica Diadema & Centro",
+      costoBase: 90.0,
+      estado: "ACTIVO",
+      localidad: "Comodoro Rivadavia",
+      alojamiento: {
+        create: {
+          categoria: "3 Estrellas",
+          tipoHabitacion: "Doble",
+          capacidadDisponible: 20,
+          modalidadConfirmacion: "BLOQUEO_PLAZAS",
+        },
+      },
+    },
+  });
+
+  const servTransComodoro = await db.servicioBase.create({
+    data: {
+      idproveedor: proveedorTransporte.idproveedor,
+      nombreServicio: "Transfer Patagonia Bus",
+      costoBase: 40.0,
+      estado: "ACTIVO",
+      localidad: "Comodoro Rivadavia",
+      transporte: {
+        create: {
+          capacidadVehiculo: 20,
+          pesoEquipajeIncluido: 15.0,
+          costoPorKgExcedente: 2.0,
         },
       },
     },
@@ -416,6 +462,65 @@ async function main() {
     },
   });
 
+  // 4b. Circuitos de Comodoro Rivadavia (para entender circuitos y etapas locales)
+  const circuitoDiadema = await db.circuito.create({
+    data: {
+      nombreCircuito: "Circuito Histórico Camino a Diadema",
+      duracionDias: 3,
+      dificultad: "Media",
+      minimoGuias: 2,
+      parametrosPorteadores: "1 por cada 3 pasajeros",
+      etapas: {
+        create: [
+          {
+            numeroOrden: 1,
+            puntoInicio: "Km 3 (Barrio General Mosconi - Museo del Petróleo)",
+            puntoFin: "Km 8 (Barrio Don Bosco)",
+            campamentoPrevisto: "Campamento Base Km 8 (Don Bosco)",
+          },
+          {
+            numeroOrden: 2,
+            puntoInicio: "Km 8 (Barrio Don Bosco)",
+            puntoFin: "Barrio Laprida (Plaza Catita)",
+            campamentoPrevisto: "Refugio Cañadón de Laprida",
+          },
+          {
+            numeroOrden: 3,
+            puntoInicio: "Barrio Laprida",
+            puntoFin: "Diadema Argentina (Glorieta Central)",
+            campamentoPrevisto: "Hostería Histórica Diadema Argentina",
+          },
+        ],
+      },
+    },
+  });
+
+  const circuitoCostero = await db.circuito.create({
+    data: {
+      nombreCircuito: "Travesía Costera Chenque a Caleta Córdova",
+      duracionDias: 2,
+      dificultad: "Baja",
+      minimoGuias: 2,
+      parametrosPorteadores: "1 por cada 3 pasajeros",
+      etapas: {
+        create: [
+          {
+            numeroOrden: 1,
+            puntoInicio: "Centro de Comodoro (Pie del Cerro Chenque)",
+            puntoFin: "Barrio Presidente Ortiz (Km 5)",
+            campamentoPrevisto: "Campamento Histórico Ferroviario (Km 5)",
+          },
+          {
+            numeroOrden: 2,
+            puntoInicio: "Barrio Presidente Ortiz (Km 5)",
+            puntoFin: "Caleta Córdova (Muelle y Puerto)",
+            campamentoPrevisto: "Refugio Marino Caleta Córdova",
+          },
+        ],
+      },
+    },
+  });
+
   // 5. Paquete Comercial
   const paquete = await db.paquete.create({
     data: {
@@ -460,6 +565,51 @@ async function main() {
     },
   });
 
+  // Paquetes Comerciales de Comodoro Rivadavia
+  const paqueteDiadema = await db.paquete.create({
+    data: {
+      idcircuito: circuitoDiadema.idcircuito,
+      nroPaquete: "PAQ-CRD-01",
+      nombrePaquete: "Camino a Diadema Clásico",
+      condiciones: "Trekking patrimonial por los barrios históricos de la zona norte de Comodoro Rivadavia. Recorrido por el campamento pionero de Km 3, el Cañadón de Laprida y finalización en el histórico pueblo petrolero de estilo holandés Diadema Argentina.",
+      estado: "ACTIVO",
+      tipoGarantia: "Por Categoría",
+      categoriaGarantizada: "3 Estrellas",
+      localidadGarantizada: "Comodoro Rivadavia",
+      tipoHabitacionGarantizada: "Doble",
+      diasMinimosReintegro: 10,
+      tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 380, moneda: "USD" }] },
+      servicios: {
+        create: [
+          { idservicio: servAlojComodoro.idservicio },
+          { idservicio: servTransComodoro.idservicio },
+        ],
+      },
+    },
+  });
+
+  const paqueteCostero = await db.paquete.create({
+    data: {
+      idcircuito: circuitoCostero.idcircuito,
+      nroPaquete: "PAQ-CRD-02",
+      nombrePaquete: "Travesía Chenque a Caleta Córdova",
+      condiciones: "Caminata costera sobre los acantilados del Golfo San Jorge con vistas panorámicas. Desde la falda del Cerro Chenque y los galpones ferroviarios de Km 5 hasta el puerto artesanal y polo gastronómico de Caleta Córdova.",
+      estado: "ACTIVO",
+      tipoGarantia: "Por Categoría",
+      categoriaGarantizada: "3 Estrellas",
+      localidadGarantizada: "Comodoro Rivadavia",
+      tipoHabitacionGarantizada: "Doble",
+      diasMinimosReintegro: 7,
+      tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 260, moneda: "USD" }] },
+      servicios: {
+        create: [
+          { idservicio: servAlojComodoro.idservicio },
+          { idservicio: servTransComodoro.idservicio },
+        ],
+      },
+    },
+  });
+
   // 5b. Autoridad simulada: el bloqueo de SAL-2026-001 (16 pasajeros + 2 guías + 8 porteadores)
   await db.autoridadCupoDiario.create({ data: { fecha: "2026-11-15", ocupados: 26 } });
   await db.autoridadBloqueo.create({
@@ -490,6 +640,112 @@ async function main() {
       fechaInicio: new Date("2026-11-15T00:00:00Z"),
       fechaFin: new Date("2026-11-18T00:00:00Z"),
       estado: "PUBLICADA",
+    },
+  });
+
+  // 6b. Salidas de Comodoro Rivadavia
+  const paqueteDiademaCompleto = await db.paquete.findUniqueOrThrow({
+    where: { idpaquete: paqueteDiadema.idpaquete },
+    include: {
+      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+      servicios: { include: { servicio: { include: { transporte: true } } } },
+    },
+  });
+
+  const paqueteCosteroCompleto = await db.paquete.findUniqueOrThrow({
+    where: { idpaquete: paqueteCostero.idpaquete },
+    include: {
+      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+      servicios: { include: { servicio: { include: { transporte: true } } } },
+    },
+  });
+
+  // Salida 1: PUBLICADA para que el cliente pueda comprar Camino a Diadema en el catálogo
+  await db.salida.create({
+    data: {
+      definicionPaquete: armarDefinicionPaquete(paqueteDiademaCompleto),
+      idpaquete: paqueteDiadema.idpaquete,
+      nroSalida: "SAL-CRD-001",
+      stockLocal: 12,
+      tamanoMaximo: 12,
+      fechaInicio: new Date("2026-11-20T08:00:00Z"),
+      fechaFin: new Date("2026-11-23T18:00:00Z"),
+      estado: "PUBLICADA",
+    },
+  });
+
+  // Salida 2: PUBLICADA para la Travesía Costera Chenque - Caleta Córdova
+  await db.salida.create({
+    data: {
+      definicionPaquete: armarDefinicionPaquete(paqueteCosteroCompleto),
+      idpaquete: paqueteCostero.idpaquete,
+      nroSalida: "SAL-CRD-002",
+      stockLocal: 10,
+      tamanoMaximo: 10,
+      fechaInicio: new Date("2026-11-26T08:00:00Z"),
+      fechaFin: new Date("2026-11-28T18:00:00Z"),
+      estado: "PUBLICADA",
+    },
+  });
+
+  // Salida 3: CONFIRMADA para Camino a Diadema, asignada a Guía Carlos y Guía Rosa (visible en Portal Guía)
+  const salidaDiademaActiva = await db.salida.create({
+    data: {
+      definicionPaquete: armarDefinicionPaquete(paqueteDiademaCompleto),
+      idpaquete: paqueteDiadema.idpaquete,
+      nroSalida: "SAL-CRD-003",
+      stockLocal: 8,
+      tamanoMaximo: 10,
+      fechaInicio: new Date("2026-11-05T08:00:00Z"),
+      fechaFin: new Date("2026-11-08T18:00:00Z"),
+      estado: "CONFIRMADA",
+      personalAsignado: {
+        create: [
+          { idpersonal: personalGuia.idpersonal },
+          { idpersonal: personalGuia2.idpersonal },
+        ],
+      },
+    },
+  });
+
+  // Pasajeros y Reserva para SAL-CRD-003 (para ver nómina de turistas en el Portal del Guía)
+  const pasajeroCrd1 = await db.pasajero.create({
+    data: {
+      nombreCompleto: "Martín Rivas",
+      nroPasaporte: "PAS-ARG-112233",
+      nacionalidad: "Argentina",
+      fechaVencimientoPasaporte: new Date("2032-08-15T00:00:00Z"),
+    },
+  });
+
+  const pasajeroCrd2 = await db.pasajero.create({
+    data: {
+      nombreCompleto: "Camila Gómez",
+      nroPasaporte: "PAS-ARG-445566",
+      nacionalidad: "Argentina",
+      fechaVencimientoPasaporte: new Date("2031-11-20T00:00:00Z"),
+    },
+  });
+
+  await db.reserva.create({
+    data: {
+      idcliente: cliente.idcliente,
+      idsalida: salidaDiademaActiva.idsalida,
+      nroReserva: "RES-CRD-0001",
+      cantidadPasajeros: 2,
+      precioCongelado: 760.0,
+      temporadaAplicada: "Alta 2026",
+      precioPaquetePorPersona: 380,
+      adicionalesEquipaje: 0,
+      moneda: "USD",
+      diasMinimosReintegro: 10,
+      estado: "CONFIRMADA",
+      pasajeros: {
+        create: [
+          { idpasajero: pasajeroCrd1.idpasajero },
+          { idpasajero: pasajeroCrd2.idpasajero },
+        ],
+      },
     },
   });
 
