@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "../../components/Modal";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,8 @@ type VistaIncidentesProps = {
     salidaActual: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
     sincronizacion: SincronizacionIncidentes;
+    /** Avisa si hay un incidente a medio cargar, que se perdería al cambiar de salida */
+    onCambioEdicion: (enCurso: boolean) => void;
     cargando?: boolean;
 };
 
@@ -45,6 +47,7 @@ export function VistaIncidentes({
     salidaActual,
     detalleSalida,
     sincronizacion,
+    onCambioEdicion,
     cargando = false,
 }: VistaIncidentesProps) {
     const idsalida = salidaActual?.idsalida ?? 0;
@@ -73,7 +76,7 @@ export function VistaIncidentes({
         handleSubmit,
         control,
         reset,
-        formState: { errors },
+        formState: { errors, isDirty },
     } = useForm<DatosIncidenteForm>({
         resolver: zodResolver(esquemaIncidente),
         defaultValues: {
@@ -87,6 +90,12 @@ export function VistaIncidentes({
     });
 
     const textoDescripcion = useWatch({ control, name: "descripcion" }) ?? "";
+
+    const enEdicion = isDirty || pasajerosSeleccionados.length > 0;
+    useEffect(() => {
+        onCambioEdicion(enEdicion);
+        return () => onCambioEdicion(false);
+    }, [enEdicion, onCambioEdicion]);
 
     if (!salidaActual || idsalida <= 0) {
         return (
