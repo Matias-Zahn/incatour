@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
@@ -18,9 +20,13 @@ import {
 } from "../../services/paqueteService";
 import { ErrorApi } from "../../services/clienteApi";
 import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
-
-// Mismo tope que PESO_MAXIMO_DECLARADO_KG del back (backend/src/shared/constantes.ts)
-const PESO_MAXIMO_DECLARADO_KG = 20;
+import {
+    crearEsquemaCompra,
+    PESO_MAXIMO_DECLARADO_KG,
+    TARJETA_VACIA,
+    type DatosCompra,
+    type FormularioCompra,
+} from "./esquemaCompra";
 
 // FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
 const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
@@ -210,8 +216,42 @@ function crearPasajeroInicial(): PasajeroFormulario {
 }
 
 
+type CampoCompraProps = ComponentProps<"input"> & {
+    etiqueta: string;
+    error?: string;
+    // Texto de ayuda debajo del campo
+    ayuda?: ReactNode;
+};
+
+// Un campo del formulario de compra: el error va debajo, marcado para los lectores de pantalla (PR 4.2)
+function CampoCompra({ etiqueta, error, ayuda, id, className = "", ...input }: CampoCompraProps) {
+    return (
+        <label className="grid min-w-0 grid-cols-1 gap-1 text-xs font-semibold text-texto">
+            {etiqueta}
+            <input
+                id={id}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? `${id}-error` : undefined}
+                {...input}
+                className={`min-h-11 w-full min-w-0 rounded-control border bg-white px-3 py-2 text-base font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 md:text-sm ${error ? "border-peligro" : "border-borde"} ${className}`}
+            />
+            {error ? (
+                <span id={`${id}-error`} className="font-normal text-peligro">
+                    {error}
+                </span>
+            ) : null}
+            {ayuda}
+        </label>
+    );
+}
+
 // Sufijo de dos dígitos para los pasaportes de prueba (solo en el autocompletado de desarrollo)
 const sufijoAleatorio = () => Math.floor(10 + Math.random() * 89);
+
+function pasajeroDePrueba(indice: number): PasajeroFormulario {
+    const { nroPasaporteBase, ...plantilla } = PASAJEROS_PRUEBA[indice % PASAJEROS_PRUEBA.length];
+    return { ...plantilla, nroPasaporte: `${nroPasaporteBase}${sufijoAleatorio()}` };
+}
 
 function CatalogoCompraPage() {
     const navegar = useNavigate();
@@ -275,13 +315,6 @@ function CatalogoCompraPage() {
     const [idSalidaSeleccionada, setIdSalidaSeleccionada] = useState<
         number | null
     >(compraGuardada?.idSalidaSeleccionada ?? null);
-    const [pasajeros, setPasajeros] = useState<PasajeroFormulario[]>(
-        () => compraGuardada?.pasajeros ?? [crearPasajeroInicial()],
-    );
-    const [numeroTarjeta, setNumeroTarjeta] = useState("");
-    const [titularTarjeta, setTitularTarjeta] = useState("");
-    const [vencimientoTarjeta, setVencimientoTarjeta] = useState("");
-    const [cvvTarjeta, setCvvTarjeta] = useState("");
     const [errorCompra, setErrorCompra] = useState(() =>
         compraGuardada
             ? "Tu sesión había vencido: recuperamos la salida y los pasajeros. Volvé a cargar la tarjeta para pagar."
@@ -317,6 +350,35 @@ function CatalogoCompraPage() {
     const paqueteVendido =
         paqueteEnCompra && salidaActiva ? paqueteDeSalida(paqueteEnCompra, salidaActiva) : paqueteEnCompra;
 
+    const cupoMaximo = salidaActiva?.stockLocal ?? 10;
+    const {
+        register,
+        handleSubmit,
+        control,
+        reset,
+        setValue,
+        clearErrors,
+        formState: { errors },
+    } = useForm<FormularioCompra, unknown, DatosCompra>({
+        // El esquema depende de la salida elegida: se arma en cada validación
+        resolver: (valores, contexto, opciones) =>
+            zodResolver(
+                crearEsquemaCompra(
+                    salidaActiva?.fechaFin ?? "",
+                    cupoMaximo,
+                    salidaActiva ? formatearFechaCorta(salidaActiva.fechaFin) : "fin del recorrido",
+                ),
+            )(valores, contexto, opciones),
+        defaultValues: {
+            pasajeros: compraGuardada?.pasajeros ?? [crearPasajeroInicial()],
+            tarjeta: TARJETA_VACIA,
+        },
+    });
+    const { fields: camposPasajeros, append, remove } = useFieldArray({ control, name: "pasajeros" });
+    const pasajeros = useWatch({ control, name: "pasajeros" });
+    const tarjetaCargada = useWatch({ control, name: "tarjeta" });
+    const errorNomina = errors.pasajeros?.root?.message ?? errors.pasajeros?.message;
+
     function abrirDetallePaquete(paquete: PaqueteCatalogoPublico) {
         setPaqueteDetalle(paquete);
         setIndiceFotoDetalle(0);
@@ -324,10 +386,8 @@ function CatalogoCompraPage() {
 
     // FE-46: los datos de la tarjeta no quedan cargados de una compra a otra
     function vaciarTarjeta() {
-        setNumeroTarjeta("");
-        setTitularTarjeta("");
-        setVencimientoTarjeta("");
-        setCvvTarjeta("");
+        setValue("tarjeta", TARJETA_VACIA);
+        clearErrors("tarjeta");
     }
 
     function iniciarCompraPaquete(
@@ -347,7 +407,7 @@ function CatalogoCompraPage() {
             paquete.salidasDisponibles?.[0]?.idsalida ??
             null;
         setIdSalidaSeleccionada(primeraSalida);
-        setPasajeros([crearPasajeroInicial()]);
+        reset({ pasajeros: [crearPasajeroInicial()], tarjeta: TARJETA_VACIA });
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -362,86 +422,30 @@ function CatalogoCompraPage() {
 
     function agregarPasajero(autocompletar = false) {
         setErrorCompra("");
-        const cupoMaximo = salidaActiva?.stockLocal ?? 10;
-        if (pasajeros.length >= cupoMaximo) {
-            setErrorCompra(
-                `Esta salida tiene ${cupoMaximo} ${cupoMaximo === 1 ? "lugar disponible" : "lugares disponibles"} como máximo.`,
-            );
-            return;
-        }
-        const idx = pasajeros.length;
-        if (autocompletar) {
-            const plantilla = PASAJEROS_PRUEBA[idx % PASAJEROS_PRUEBA.length];
-            const sufijo = sufijoAleatorio();
-            setPasajeros((prev) => [
-                ...prev,
-                {
-                    nombreCompleto: plantilla.nombreCompleto,
-                    nroPasaporte: `${plantilla.nroPasaporteBase}${sufijo}`,
-                    nacionalidad: plantilla.nacionalidad,
-                    fechaVencimientoPasaporte:
-                        plantilla.fechaVencimientoPasaporte,
-                    pesoDeclarado: plantilla.pesoDeclarado,
-                },
-            ]);
-        } else {
-            setPasajeros((prev) => [
-                ...prev,
-                {
-                    nombreCompleto: "",
-                    nroPasaporte: "",
-                    nacionalidad: "Argentina",
-                    fechaVencimientoPasaporte: "",
-                    pesoDeclarado: 12,
-                },
-            ]);
-        }
+        if (pasajeros.length >= cupoMaximo) return;
+        append(
+            autocompletar ? pasajeroDePrueba(pasajeros.length) : crearPasajeroInicial(),
+            { shouldFocus: false },
+        );
     }
 
     function autocompletarPasajeroExistente(indice: number) {
         setErrorCompra("");
-        const plantilla = PASAJEROS_PRUEBA[indice % PASAJEROS_PRUEBA.length];
-        const sufijo = sufijoAleatorio();
-        setPasajeros((prev) =>
-            prev.map((item, idx) =>
-                idx === indice
-                    ? {
-                          nombreCompleto: plantilla.nombreCompleto,
-                          nroPasaporte: `${plantilla.nroPasaporteBase}${sufijo}`,
-                          nacionalidad: plantilla.nacionalidad,
-                          fechaVencimientoPasaporte:
-                              plantilla.fechaVencimientoPasaporte,
-                          pesoDeclarado: plantilla.pesoDeclarado,
-                      }
-                    : item,
-            ),
-        );
-    }
-
-    function actualizarPasajero(
-        indice: number,
-        cambios: Partial<PasajeroFormulario>,
-    ) {
-        setErrorCompra("");
-        setPasajeros((prev) =>
-            prev.map((item, idx) =>
-                idx === indice ? { ...item, ...cambios } : item,
-            ),
-        );
+        setValue(`pasajeros.${indice}`, pasajeroDePrueba(indice));
+        clearErrors(`pasajeros.${indice}`);
     }
 
     function quitarPasajero(indice: number) {
         if (pasajeros.length <= 1) return;
         setErrorCompra("");
-        setPasajeros((prev) => prev.filter((_, idx) => idx !== indice));
+        remove(indice);
     }
 
     function aplicarTarjetaPrueba(tarjeta: (typeof TARJETAS_PRUEBA)[number]) {
         setErrorCompra("");
-        setNumeroTarjeta(tarjeta.numero);
-        setTitularTarjeta(tarjeta.titular);
-        setVencimientoTarjeta(tarjeta.vencimiento);
-        setCvvTarjeta(tarjeta.cvv);
+        const { numero, titular, vencimiento, cvv } = tarjeta;
+        setValue("tarjeta", { numero, titular, vencimiento, cvv });
+        clearErrors("tarjeta");
     }
 
     // Cálculo en tiempo real de tarifa + exceso de equipaje (idéntico a ReservaService.calcularPrecio)
@@ -465,10 +469,8 @@ function CatalogoCompraPage() {
     const totalPagar =
         Math.round((subtotalPasajeros + recargoEquipajeTotal) * 100) / 100;
 
-    async function manejarConfirmarCompra(evento: React.FormEvent) {
-        evento.preventDefault();
-        setErrorCompra("");
-
+    // Las reglas de cada campo están en esquemaCompra.ts: acá solo llegan datos válidos
+    async function confirmarCompra(datos: DatosCompra) {
         if (!obtenerToken() || obtenerUsuario()?.rol !== "CLIENTE") {
             setErrorCompra(
                 "Para confirmar la compra debés iniciar sesión con una cuenta de perfil CLIENTE.",
@@ -483,126 +485,27 @@ function CatalogoCompraPage() {
             return;
         }
 
-        if (pasajeros.length === 0) {
-            setErrorCompra("Debés registrar al menos un pasajero.");
-            return;
-        }
-
-        if (pasajeros.length > salidaActiva.stockLocal) {
-            setErrorCompra(
-                `Solo quedan ${salidaActiva.stockLocal} lugares disponibles en la salida ${salidaActiva.nroSalida}.`,
-            );
-            return;
-        }
-
-        const pasaportesVistos = new Set<string>();
-        for (let i = 0; i < pasajeros.length; i++) {
-            const p = pasajeros[i];
-            if (!p.nombreCompleto.trim()) {
-                setErrorCompra(
-                    `Completá el nombre completo del pasajero #${i + 1}.`,
-                );
-                return;
-            }
-            if (!p.nroPasaporte.trim()) {
-                setErrorCompra(
-                    `Completá el número de pasaporte del pasajero #${i + 1}.`,
-                );
-                return;
-            }
-            const pasaporteNorm = p.nroPasaporte.trim().toUpperCase();
-            if (pasaportesVistos.has(pasaporteNorm)) {
-                setErrorCompra(
-                    `El número de pasaporte "${p.nroPasaporte}" está repetido en la nómina.`,
-                );
-                return;
-            }
-            pasaportesVistos.add(pasaporteNorm);
-
-            if (!p.nacionalidad.trim()) {
-                setErrorCompra(
-                    `Completá la nacionalidad del pasajero #${i + 1}.`,
-                );
-                return;
-            }
-            if (!p.fechaVencimientoPasaporte) {
-                setErrorCompra(
-                    `Indicá la fecha de vencimiento del pasaporte de ${p.nombreCompleto}.`,
-                );
-                return;
-            }
-            if (
-                new Date(p.fechaVencimientoPasaporte) <=
-                new Date(salidaActiva.fechaFin)
-            ) {
-                setErrorCompra(
-                    `El pasaporte de ${p.nombreCompleto} vence antes de finalizar el recorrido (${formatearFechaCorta(salidaActiva.fechaFin)}).`,
-                );
-                return;
-            }
-            if (
-                !Number.isFinite(p.pesoDeclarado) ||
-                Number(p.pesoDeclarado) < 0
-            ) {
-                setErrorCompra(
-                    `El peso de equipaje declarado para ${p.nombreCompleto} debe ser mayor o igual a 0 kg.`,
-                );
-                return;
-            }
-            if (Number(p.pesoDeclarado) > PESO_MAXIMO_DECLARADO_KG) {
-                setErrorCompra(
-                    `El equipaje declarado de ${p.nombreCompleto} no puede superar los ${PESO_MAXIMO_DECLARADO_KG} kg.`,
-                );
-                return;
-            }
-        }
-
-        const numLimpio = numeroTarjeta.replace(/\s+/g, "");
-        if (numLimpio.length < 12) {
-            setErrorCompra("Ingresá un número de tarjeta válido.");
-            return;
-        }
-        if (!titularTarjeta.trim()) {
-            setErrorCompra("Ingresá el nombre del titular de la tarjeta.");
-            return;
-        }
-        if (!/^\d{2}\/\d{2}$/.test(vencimientoTarjeta.trim())) {
-            setErrorCompra(
-                "El vencimiento de la tarjeta debe tener el formato MM/AA (ej. 11/29).",
-            );
-            return;
-        }
-        if (!cvvTarjeta.trim() || cvvTarjeta.trim().length < 3) {
-            setErrorCompra("Ingresá el código de seguridad (CVV).");
-            return;
-        }
-
         // FE-48: si el token venció, clienteApi recarga en /login; la compra se retoma al volver
         guardarCompra({
             idusuario: usuarioSesion?.idusuario,
             paqueteEnCompraId,
             idSalidaSeleccionada,
-            pasajeros,
+            pasajeros: datos.pasajeros,
         });
         try {
             const respuesta = await mutacionReserva.mutateAsync({
                 idsalida: salidaActiva.idsalida,
                 medioPago: "TARJETA",
-                pasajeros: pasajeros.map((p) => ({
-                    nombreCompleto: p.nombreCompleto.trim(),
-                    nroPasaporte: p.nroPasaporte.trim(),
-                    nacionalidad: p.nacionalidad.trim(),
+                pasajeros: datos.pasajeros.map((p) => ({
+                    nombreCompleto: p.nombreCompleto,
+                    nroPasaporte: p.nroPasaporte,
+                    nacionalidad: p.nacionalidad,
                     fechaVencimientoPasaporte: p.fechaVencimientoPasaporte,
                 })),
-                equipaje: pasajeros.map((p) => ({
-                    pesoDeclarado: Number(p.pesoDeclarado) || 0,
+                equipaje: datos.pasajeros.map((p) => ({
+                    pesoDeclarado: p.pesoDeclarado,
                 })),
-                tarjeta: {
-                    numero: numLimpio,
-                    titular: titularTarjeta.trim(),
-                    vencimiento: vencimientoTarjeta.trim(),
-                    cvv: cvvTarjeta.trim(),
-                },
+                tarjeta: datos.tarjeta,
             });
 
             vaciarTarjeta();
@@ -611,7 +514,7 @@ function CatalogoCompraPage() {
                 resultado: respuesta.reserva,
                 paquete: paqueteDeSalida(paqueteEnCompra, salidaActiva),
                 salida: salidaActiva,
-                pasajeros: [...pasajeros],
+                pasajeros: datos.pasajeros,
             });
             window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (err) {
@@ -1073,8 +976,13 @@ function CatalogoCompraPage() {
             {/* VISTA B: CHECKOUT / COMPRA DE PAQUETE (CU-30) */}
             {!reservaConfirmada && paqueteEnCompra ? (
                 <form
-                    onSubmit={manejarConfirmarCompra}
-                    className="grid items-start gap-6 lg:grid-cols-[1.65fr_1fr]"
+                    onSubmit={(evento) => {
+                        setErrorCompra("");
+                        void handleSubmit(confirmarCompra)(evento);
+                    }}
+                    onChange={() => setErrorCompra("")}
+                    noValidate
+                    className="grid items-start gap-6 max-md:pb-24 lg:grid-cols-[1.65fr_1fr]"
                 >
                     <div className="space-y-6">
                         {/* PASO 1: SELECCIONAR SALIDA PROGRAMADA */}
@@ -1220,6 +1128,7 @@ function CatalogoCompraPage() {
                                             type="button"
                                             variante="secundario"
                                             className="px-3 py-1.5 text-xs"
+                                            disabled={pasajeros.length >= cupoMaximo}
                                             onClick={() => agregarPasajero(true)}
                                         >
                                             + Agregar pasajero de prueba
@@ -1229,6 +1138,7 @@ function CatalogoCompraPage() {
                                         type="button"
                                         variante="fantasma"
                                         className="px-3 py-1.5 text-xs"
+                                        disabled={pasajeros.length >= cupoMaximo}
                                         onClick={() => agregarPasajero(false)}
                                     >
                                         + Agregar pasajero vacío
@@ -1255,8 +1165,16 @@ function CatalogoCompraPage() {
                                 </div>
                             ) : null}
 
+                            {errorNomina ? (
+                                <p role="alert" className="text-xs text-peligro">
+                                    {errorNomina}
+                                </p>
+                            ) : null}
+
                             <div className="space-y-4">
-                                {pasajeros.map((pasajero, idx) => {
+                                {camposPasajeros.map((campo, idx) => {
+                                    const pasajero = pasajeros[idx] ?? campo;
+                                    const errorPasajero = errors.pasajeros?.[idx];
                                     const excesoKg = infoEquipaje
                                         ? Math.max(
                                               0,
@@ -1272,7 +1190,7 @@ function CatalogoCompraPage() {
 
                                     return (
                                         <div
-                                            key={idx}
+                                            key={campo.id}
                                             className="space-y-3 rounded-control border border-borde bg-fondo/40 p-4"
                                         >
                                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1309,149 +1227,68 @@ function CatalogoCompraPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                                    Nombre y apellido completo *
-                                                    <input
-                                                        type="text"
-                                                        value={
-                                                            pasajero.nombreCompleto
-                                                        }
-                                                        onChange={(e) =>
-                                                            actualizarPasajero(
-                                                                idx,
-                                                                {
-                                                                    nombreCompleto:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                        placeholder="Ej. Juan Ignacio Pérez"
-                                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                                    />
-                                                </label>
-
-                                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                                    Número de pasaporte *
-                                                    <input
-                                                        type="text"
-                                                        value={
-                                                            pasajero.nroPasaporte
-                                                        }
-                                                        onChange={(e) =>
-                                                            actualizarPasajero(
-                                                                idx,
-                                                                {
-                                                                    nroPasaporte:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                        placeholder="Ej. ARG-40129845"
-                                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                                    />
-                                                </label>
-                                            </div>
-
-                                            <div className="grid gap-3 sm:grid-cols-3">
-                                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                                    Nacionalidad *
-                                                    <input
-                                                        type="text"
-                                                        value={
-                                                            pasajero.nacionalidad
-                                                        }
-                                                        onChange={(e) =>
-                                                            actualizarPasajero(
-                                                                idx,
-                                                                {
-                                                                    nacionalidad:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                        placeholder="Ej. Argentina"
-                                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                                    />
-                                                </label>
-
-                                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                                    Vencimiento pasaporte *
-                                                    <input
-                                                        type="date"
-                                                        value={
-                                                            pasajero.fechaVencimientoPasaporte
-                                                        }
-                                                        onChange={(e) =>
-                                                            actualizarPasajero(
-                                                                idx,
-                                                                {
-                                                                    fechaVencimientoPasaporte:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                                    />
-                                                </label>
-
-                                                <div className="grid gap-1 text-xs font-semibold text-texto">
-                                                    <span>
-                                                        Equipaje declarado (kg)
-                                                    </span>
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        max={PESO_MAXIMO_DECLARADO_KG}
-                                                        step={0.5}
-                                                        aria-describedby={`maximo-equipaje-${idx}`}
-                                                        value={
-                                                            pasajero.pesoDeclarado
-                                                        }
-                                                        onChange={(e) =>
-                                                            actualizarPasajero(
-                                                                idx,
-                                                                {
-                                                                    pesoDeclarado:
-                                                                        Math.max(
-                                                                            0,
-                                                                            Number(
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            ) ||
-                                                                                0,
-                                                                        ),
-                                                                },
-                                                            )
-                                                        }
-                                                        className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                                    />
-                                                    {excesoKg > 0 ? (
-                                                        <span className="text-[11px] font-semibold text-advertencia">
-                                                            +{excesoKg} kg extra
-                                                            ({monedaActiva}{" "}
-                                                            {costoExceso.toFixed(
-                                                                2,
+                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                <CampoCompra
+                                                    etiqueta="Nombre y apellido completo *"
+                                                    id={`pasajero-${idx}-nombre`}
+                                                    type="text"
+                                                    autoComplete="off"
+                                                    placeholder="Ej. Juan Ignacio Pérez"
+                                                    error={errorPasajero?.nombreCompleto?.message}
+                                                    {...register(`pasajeros.${idx}.nombreCompleto`)}
+                                                />
+                                                <CampoCompra
+                                                    etiqueta="Número de pasaporte *"
+                                                    id={`pasajero-${idx}-pasaporte`}
+                                                    type="text"
+                                                    autoComplete="off"
+                                                    placeholder="Ej. ARG-40129845"
+                                                    error={errorPasajero?.nroPasaporte?.message}
+                                                    {...register(`pasajeros.${idx}.nroPasaporte`)}
+                                                />
+                                                <CampoCompra
+                                                    etiqueta="Nacionalidad *"
+                                                    id={`pasajero-${idx}-nacionalidad`}
+                                                    type="text"
+                                                    placeholder="Ej. Argentina"
+                                                    error={errorPasajero?.nacionalidad?.message}
+                                                    {...register(`pasajeros.${idx}.nacionalidad`)}
+                                                />
+                                                <CampoCompra
+                                                    etiqueta="Vencimiento pasaporte *"
+                                                    id={`pasajero-${idx}-vencimiento`}
+                                                    type="date"
+                                                    error={errorPasajero?.fechaVencimientoPasaporte?.message}
+                                                    {...register(`pasajeros.${idx}.fechaVencimientoPasaporte`)}
+                                                />
+                                                <CampoCompra
+                                                    etiqueta="Equipaje declarado (kg)"
+                                                    id={`pasajero-${idx}-equipaje`}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min={0}
+                                                    max={PESO_MAXIMO_DECLARADO_KG}
+                                                    step={0.5}
+                                                    error={errorPasajero?.pesoDeclarado?.message}
+                                                    {...register(`pasajeros.${idx}.pesoDeclarado`, { valueAsNumber: true })}
+                                                    ayuda={
+                                                        <>
+                                                            {excesoKg > 0 ? (
+                                                                <span className="text-[11px] font-semibold text-advertencia">
+                                                                    +{excesoKg} kg extra ({monedaActiva}{" "}
+                                                                    {costoExceso.toFixed(2)})
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[11px] font-normal text-exito">
+                                                                    Dentro de franquicia
+                                                                </span>
                                                             )}
-                                                            )
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[11px] font-normal text-exito">
-                                                            Dentro de franquicia
-                                                        </span>
-                                                    )}
-                                                    <span
-                                                        id={`maximo-equipaje-${idx}`}
-                                                        className="text-[11px] font-normal text-texto-suave"
-                                                    >
-                                                        Máximo {PESO_MAXIMO_DECLARADO_KG} kg por pasajero
-                                                    </span>
-                                                </div>
+                                                            <span className="text-[11px] font-normal text-texto-suave">
+                                                                Máximo {PESO_MAXIMO_DECLARADO_KG} kg por pasajero
+                                                            </span>
+                                                        </>
+                                                    }
+                                                />
                                             </div>
                                         </div>
                                     );
@@ -1494,8 +1331,8 @@ function CatalogoCompraPage() {
                                                 aplicarTarjetaPrueba(t)
                                             }
                                             className={`rounded-control border p-2.5 text-left text-xs transition ${
-                                                numeroTarjeta === t.numero &&
-                                                cvvTarjeta === t.cvv
+                                                tarjetaCargada.numero === t.numero &&
+                                                tarjetaCargada.cvv === t.cvv
                                                     ? "border-marca bg-white ring-2 ring-marca/25"
                                                     : "border-borde bg-white/80 hover:bg-white"
                                             }`}
@@ -1518,70 +1355,52 @@ function CatalogoCompraPage() {
                             </div>
                             ) : null}
 
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Número de tarjeta *
-                                    <input
-                                        type="text"
-                                        value={numeroTarjeta}
-                                        onChange={(e) => {
-                                            setErrorCompra("");
-                                            setNumeroTarjeta(e.target.value);
-                                        }}
-                                        placeholder="4532 8910 2234 8899"
-                                        className="rounded-control border border-borde px-3 py-2 font-mono text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
-
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Titular de la tarjeta *
-                                    <input
-                                        type="text"
-                                        value={titularTarjeta}
-                                        onChange={(e) => {
-                                            setErrorCompra("");
-                                            setTitularTarjeta(
-                                                e.target.value.toUpperCase(),
-                                            );
-                                        }}
-                                        placeholder="JUAN I PEREZ"
-                                        className="rounded-control border border-borde px-3 py-2 text-sm font-normal uppercase outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Vencimiento (MM/AA) *
-                                    <input
-                                        type="text"
-                                        value={vencimientoTarjeta}
-                                        onChange={(e) => {
-                                            setErrorCompra("");
-                                            setVencimientoTarjeta(
-                                                e.target.value,
-                                            );
-                                        }}
-                                        placeholder="11/29"
-                                        maxLength={5}
-                                        className="rounded-control border border-borde px-3 py-2 font-mono text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
-
-                                <label className="grid gap-1 text-xs font-semibold text-texto">
-                                    Código de seguridad (CVV) *
-                                    <input
-                                        type="text"
-                                        value={cvvTarjeta}
-                                        onChange={(e) => {
-                                            setErrorCompra("");
-                                            setCvvTarjeta(e.target.value);
-                                        }}
-                                        placeholder="482"
-                                        maxLength={4}
-                                        className="rounded-control border border-borde px-3 py-2 font-mono text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                    />
-                                </label>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <CampoCompra
+                                    etiqueta="Número de tarjeta *"
+                                    id="tarjeta-numero"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="cc-number"
+                                    placeholder="4532 8910 2234 8899"
+                                    className="font-mono"
+                                    error={errors.tarjeta?.numero?.message}
+                                    {...register("tarjeta.numero")}
+                                />
+                                <CampoCompra
+                                    etiqueta="Titular de la tarjeta *"
+                                    id="tarjeta-titular"
+                                    type="text"
+                                    autoComplete="cc-name"
+                                    placeholder="JUAN I PEREZ"
+                                    className="uppercase"
+                                    error={errors.tarjeta?.titular?.message}
+                                    {...register("tarjeta.titular")}
+                                />
+                                <CampoCompra
+                                    etiqueta="Vencimiento (MM/AA) *"
+                                    id="tarjeta-vencimiento"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="cc-exp"
+                                    placeholder="11/29"
+                                    maxLength={5}
+                                    className="font-mono"
+                                    error={errors.tarjeta?.vencimiento?.message}
+                                    {...register("tarjeta.vencimiento")}
+                                />
+                                <CampoCompra
+                                    etiqueta="Código de seguridad (CVV) *"
+                                    id="tarjeta-cvv"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="cc-csc"
+                                    placeholder="482"
+                                    maxLength={4}
+                                    className="font-mono"
+                                    error={errors.tarjeta?.cvv?.message}
+                                    {...register("tarjeta.cvv")}
+                                />
                             </div>
                         </div>
                         </>) : null}
@@ -1794,6 +1613,26 @@ function CatalogoCompraPage() {
                             </p>
                         ) : null}
                     </aside>
+
+                    {/* En celular el total y el pago quedan siempre a la vista */}
+                    {salidasDelPaquete.length > 0 ? (
+                        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-borde bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.1)] md:hidden">
+                            <div className="min-w-0">
+                                <p className="text-xs text-texto-suave">Total</p>
+                                <p className="truncate text-lg font-bold text-navegacion">
+                                    {sinTarifa ? "—" : `${monedaActiva} ${totalPagar.toFixed(2)}`}
+                                </p>
+                            </div>
+                            <Boton
+                                type="submit"
+                                className="min-h-11 shrink-0 px-6"
+                                cargando={mutacionReserva.isPending}
+                                disabled={!salidaActiva || salidaActiva.stockLocal <= 0 || sinTarifa}
+                            >
+                                Pagar
+                            </Boton>
+                        </div>
+                    ) : null}
                 </form>
             ) : null}
 
