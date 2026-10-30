@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import Modal from "../../components/Modal";
 import { useNavigate } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
@@ -555,7 +556,7 @@ function PaquetesPage() {
                                                     abrirVistaPrevia(paquete)
                                                 }
                                                 title="Ver vista previa y galería del paquete"
-                                                className="group relative shrink-0 overflow-hidden rounded-control border border-borde bg-fondo focus:ring-2 focus:ring-marca focus:outline-none"
+                                                className="group relative shrink-0 overflow-hidden rounded-control border border-borde bg-fondo"
                                             >
                                                 <img
                                                     src={urlPortada}
@@ -776,17 +777,11 @@ function PaquetesPage() {
 
             {/* MODAL DE VISTA PREVIA Y CONTEXTO DEL PAQUETE */}
             {paqueteVistaPrevia ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-navegacion/60 p-4 backdrop-blur-xs"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="titulo-vista-previa-paquete"
-                    onClick={cerrarVistaPrevia}
+                <Modal
+                    onCerrar={cerrarVistaPrevia}
+                    etiquetaId="titulo-vista-previa-paquete"
+                    tamano="xl"
                 >
-                    <div
-                        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-tarjeta border border-borde bg-white shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
                         {(() => {
                             const galeria =
                                 obtenerGaleriaPaquete(paqueteVistaPrevia);
@@ -1272,8 +1267,7 @@ function PaquetesPage() {
                                 </>
                             );
                         })()}
-                    </div>
-                </div>
+                </Modal>
             ) : null}
 
             <DialogoConfirmacion

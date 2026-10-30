@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import Modal from "../../components/Modal";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -2021,16 +2022,11 @@ function CatalogoCompraPage() {
 
             {/* MODAL DE DETALLE COMPLETO E ITINERARIO DEL PAQUETE (CU-26) */}
             {paqueteDetalle ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-navegacion/60 p-4 backdrop-blur-xs"
-                    role="dialog"
-                    aria-modal="true"
-                    onClick={() => setPaqueteDetalle(null)}
+                <Modal
+                    onCerrar={() => setPaqueteDetalle(null)}
+                    etiqueta={paqueteDetalle.nombre}
+                    tamano="xl"
                 >
-                    <div
-                        className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-tarjeta border border-borde bg-white shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
                         {(() => {
                             const galeria =
                                 obtenerImagenesPaqueteCatalogo(paqueteDetalle);
@@ -2407,14 +2403,18 @@ function CatalogoCompraPage() {
                                 </>
                             );
                         })()}
-                    </div>
-                </div>
+                </Modal>
             ) : null}
 
             {/* MODAL / LOADER PROMINENTE DURANTE EL PAGO */}
             {mutacionReserva.isPending ? (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
-                    <div className="mx-4 flex max-w-sm flex-col items-center gap-4 rounded-tarjeta border border-borde bg-white p-6 text-center shadow-modal">
+                <Modal
+                    onCerrar={() => {}}
+                    bloqueado
+                    etiqueta="Procesando compra y reserva"
+                    tamano="sm"
+                    className="flex flex-col items-center gap-4 p-6 text-center"
+                >
                         <div className="h-12 w-12 animate-spin rounded-full border-4 border-marca border-t-transparent" />
                         <div>
                             <h3 className="text-base font-bold text-navegacion">
@@ -2424,8 +2424,7 @@ function CatalogoCompraPage() {
                                 Estamos registrando tu transacción con la pasarela de pagos y reservando tus cupos oficiales. Por favor no cierres esta ventana.
                             </p>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
         </section>
     );

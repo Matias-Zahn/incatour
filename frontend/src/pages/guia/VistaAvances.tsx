@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import Modal from "../../components/Modal";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
@@ -485,9 +486,6 @@ export function VistaAvances({
                     <h2 className="border-b border-borde/70 pb-3 text-base font-bold text-navegacion">
                         Registrar avance o novedad para {salidaActual.nroSalida}
                     </h2>
-                    <p className="mt-1 text-xs text-texto-suave">
-                        Estás informando etapas de la salida <b>{salidaActual.nroSalida}</b> ({salidaActual.circuito}).
-                    </p>
 
                     <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5 space-y-4">
                         {aviso ? (
@@ -663,18 +661,12 @@ export function VistaAvances({
 
             {/* Modal Historial Completo de Avances */}
             {modalHistorialAbierto ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setModalHistorialAbierto(false);
-                    }}
+                <Modal
+                    onCerrar={() => setModalHistorialAbierto(false)}
+                    etiqueta="Historial de avances y novedades"
+                    tamano="sm"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Historial de avances y novedades"
-                        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
@@ -687,6 +679,7 @@ export function VistaAvances({
                             <button
                                 type="button"
                                 onClick={() => setModalHistorialAbierto(false)}
+                                aria-label="Cerrar"
                                 className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
                             >
                                 <IconoCerrar tamano={20} />
@@ -733,8 +726,7 @@ export function VistaAvances({
                                 Cerrar
                             </Boton>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
         </section>
     );

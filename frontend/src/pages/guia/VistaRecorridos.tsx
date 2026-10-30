@@ -1,16 +1,29 @@
 import { useNavigate } from "react-router-dom";
-import { formatearEstadoSalida, formatearFechaHora, type DetalleSalidaGuia } from "../../services/guiaService";
+import { formatearEstadoSalida, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
 
 type VistaRecorridosProps = {
     detalleSalida: DetalleSalidaGuia | null;
+    avancesPendientes: AvanceOffline[];
 };
 
-export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
+// El back solo acepta avances en estas salidas y con el recorrido ya iniciado
+const ESTADOS_CON_AVANCES = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
+
+export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecorridosProps) {
     const navegar = useNavigate();
-    const itinerario = detalleSalida?.itinerario ?? [];
-    // Las etapas se informan en orden: solo la primera sin completar se puede registrar ahora
-    const ordenSiguiente = itinerario.find((e) => e.estadoTramo !== "COMPLETADO")?.numeroOrden;
+    // Vale el pendiente más reciente de cada etapa, como en Novedades
+    const itinerario = (detalleSalida?.itinerario ?? []).map((etapa) => {
+        const pendiente = [...avancesPendientes].reverse().find((p) => p.numeroOrden === etapa.numeroOrden);
+        return pendiente ? { ...etapa, estadoTramo: pendiente.estadoTramo } : etapa;
+    });
+    const salida = detalleSalida?.salida;
+    const admiteAvances =
+        !!salida?.fechaInicio &&
+        ESTADOS_CON_AVANCES.includes(salida.estado) &&
+        new Date(salida.fechaInicio) <= new Date();
+    // Las etapas se informan en orden: solo la siguiente se puede registrar
+    const siguienteEtapa = itinerario.find((e) => e.estadoTramo !== "COMPLETADO")?.numeroOrden;
 
     return (
         <section aria-label="Recorridos y orientación en terreno" className="space-y-6">
@@ -94,22 +107,20 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                                             </p>
                                         ) : null}
 
-                                        {etapa.estadoTramo !== "COMPLETADO" ? (
-                                            <div className="mt-3 flex items-center justify-between border-t border-borde/50 pt-2.5">
+                                        {admiteAvances && etapa.numeroOrden === siguienteEtapa ? (
+                                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-2.5">
                                                 <span className="text-[11px] text-texto-suave">
                                                     {etapa.estadoTramo === "DEMORADO"
                                                         ? "Tramo informado con demora"
                                                         : "Tramo pendiente de registrar"}
                                                 </span>
-                                                {etapa.numeroOrden === ordenSiguiente ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => navegar("/guia/novedades")}
-                                                        className="inline-flex items-center gap-1.5 rounded-control bg-[#1b9fc7] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#148ba8]"
-                                                    >
-                                                        Registrar avance en este tramo →
-                                                    </button>
-                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navegar("/guia/novedades", { replace: true })}
+                                                    className="inline-flex items-center gap-1.5 rounded-control bg-[#1b9fc7] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#148ba8]"
+                                                >
+                                                    Registrar avance en este tramo →
+                                                </button>
                                             </div>
                                         ) : null}
                                     </div>

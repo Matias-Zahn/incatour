@@ -324,92 +324,41 @@ async function main() {
     },
   });
 
-  const usuarioGuia4 = await db.usuario.create({
-    data: {
-      nombre: "Elena",
-      apellido: "Morales",
-      email: "elena.guia@incatour.com",
-      contrasenia: contraseniaGuia,
-      rol: "GUIA",
-      estado: "ACTIVO",
-    },
-  });
+  const guiasPresentacion = [
+    { nombre: "Elena", apellido: "Morales", email: "elena.guia@incatour.com", nroPasaporte: "P881122", nroHabilitacion: "HAB-004" },
+    { nombre: "Raúl", apellido: "Mendoza", email: "raul.guia@incatour.com", nroPasaporte: "P882233", nroHabilitacion: "HAB-005" },
+    { nombre: "Sofía", apellido: "Cárdenas", email: "sofia.guia@incatour.com", nroPasaporte: "P883344", nroHabilitacion: "HAB-006" },
+  ];
 
-  const personalGuia4 = await db.personal.create({
-    data: {
-      nombreCompleto: "Elena Morales",
-      nroPasaporte: "P881122",
-      nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
-      estado: "ACTIVO",
-      rol: "Guía",
-      guia: {
-        create: {
-          idusuario: usuarioGuia4.idusuario,
-          nroHabilitacion: "HAB-004",
-          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+  for (const g of guiasPresentacion) {
+    const usuario = await db.usuario.create({
+      data: {
+        nombre: g.nombre,
+        apellido: g.apellido,
+        email: g.email,
+        contrasenia: contraseniaGuia,
+        rol: "GUIA",
+        estado: "ACTIVO",
+      },
+    });
+    await db.personal.create({
+      data: {
+        nombreCompleto: `${g.nombre} ${g.apellido}`,
+        nroPasaporte: g.nroPasaporte,
+        nacionalidad: "Peruana",
+        fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
+        estado: "ACTIVO",
+        rol: "Guía",
+        guia: {
+          create: {
+            idusuario: usuario.idusuario,
+            nroHabilitacion: g.nroHabilitacion,
+            fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
+          },
         },
       },
-    },
-  });
-
-  const usuarioGuia5 = await db.usuario.create({
-    data: {
-      nombre: "Raúl",
-      apellido: "Mendoza",
-      email: "raul.guia@incatour.com",
-      contrasenia: contraseniaGuia,
-      rol: "GUIA",
-      estado: "ACTIVO",
-    },
-  });
-
-  const personalGuia5 = await db.personal.create({
-    data: {
-      nombreCompleto: "Raúl Mendoza",
-      nroPasaporte: "P882233",
-      nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
-      estado: "ACTIVO",
-      rol: "Guía",
-      guia: {
-        create: {
-          idusuario: usuarioGuia5.idusuario,
-          nroHabilitacion: "HAB-005",
-          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
-        },
-      },
-    },
-  });
-
-  const usuarioGuia6 = await db.usuario.create({
-    data: {
-      nombre: "Sofía",
-      apellido: "Cárdenas",
-      email: "sofia.guia@incatour.com",
-      contrasenia: contraseniaGuia,
-      rol: "GUIA",
-      estado: "ACTIVO",
-    },
-  });
-
-  const personalGuia6 = await db.personal.create({
-    data: {
-      nombreCompleto: "Sofía Cárdenas",
-      nroPasaporte: "P883344",
-      nacionalidad: "Peruana",
-      fechaVencimientoPasaporte: new Date("2030-01-01T00:00:00Z"),
-      estado: "ACTIVO",
-      rol: "Guía",
-      guia: {
-        create: {
-          idusuario: usuarioGuia6.idusuario,
-          nroHabilitacion: "HAB-006",
-          fechaHabilitacion: new Date("2029-12-31T00:00:00Z"),
-        },
-      },
-    },
-  });
+    });
+  }
 
   const porteadoresData = [
     { nombreCompleto: "Luis Quispe", nroPasaporte: "P654321" },
@@ -644,21 +593,37 @@ async function main() {
   });
 
   // 6b. Salidas de Comodoro Rivadavia
-  const paqueteDiademaCompleto = await db.paquete.findUniqueOrThrow({
-    where: { idpaquete: paqueteDiadema.idpaquete },
-    include: {
-      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
-      servicios: { include: { servicio: { include: { transporte: true } } } },
-    },
-  });
+  const buscarPaqueteCompleto = (idpaquete: number) =>
+    db.paquete.findUniqueOrThrow({
+      where: { idpaquete },
+      include: {
+        garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+        servicios: { include: { servicio: { include: { transporte: true } } } },
+      },
+    });
+  const paqueteDiademaCompleto = await buscarPaqueteCompleto(paqueteDiadema.idpaquete);
+  const paqueteCosteroCompleto = await buscarPaqueteCompleto(paqueteCostero.idpaquete);
 
-  const paqueteCosteroCompleto = await db.paquete.findUniqueOrThrow({
-    where: { idpaquete: paqueteCostero.idpaquete },
-    include: {
-      garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
-      servicios: { include: { servicio: { include: { transporte: true } } } },
-    },
-  });
+  // Cada salida necesita su bloqueo ante la autoridad para poder consolidarse (CU-40).
+  // Lugares: pasajeros + 2 guías + 1 porteador por cada 3 pasajeros
+  const bloquearCupo = async (idBloqueo: string, fecha: Date, lugares: number) => {
+    const dia = fecha.toISOString().slice(0, 10);
+    await db.autoridadCupoDiario.upsert({
+      where: { fecha: dia },
+      create: { fecha: dia, ocupados: lugares },
+      update: { ocupados: { increment: lugares } },
+    });
+    await db.autoridadBloqueo.create({ data: { idBloqueo, fecha: dia, lugares } });
+  };
+
+  // SAL-CRD-003 está en curso el día en que se corre el seed, para poder informar avances
+  const DIA = 24 * 60 * 60 * 1000;
+  const inicioDiadema = new Date(Date.now() - DIA);
+  const finDiadema = new Date(Date.now() + 2 * DIA);
+
+  await bloquearCupo("BLQ-SEED-CRD-001", new Date("2026-11-20T08:00:00Z"), 18);
+  await bloquearCupo("BLQ-SEED-CRD-002", new Date("2026-11-26T08:00:00Z"), 16);
+  await bloquearCupo("BLQ-SEED-CRD-003", inicioDiadema, 16);
 
   // Salida 1: PUBLICADA para que el cliente pueda comprar Camino a Diadema en el catálogo
   await db.salida.create({
@@ -666,6 +631,7 @@ async function main() {
       definicionPaquete: armarDefinicionPaquete(paqueteDiademaCompleto),
       idpaquete: paqueteDiadema.idpaquete,
       nroSalida: "SAL-CRD-001",
+      idbloqueo: "BLQ-SEED-CRD-001",
       stockLocal: 12,
       tamanoMaximo: 12,
       fechaInicio: new Date("2026-11-20T08:00:00Z"),
@@ -680,6 +646,7 @@ async function main() {
       definicionPaquete: armarDefinicionPaquete(paqueteCosteroCompleto),
       idpaquete: paqueteCostero.idpaquete,
       nroSalida: "SAL-CRD-002",
+      idbloqueo: "BLQ-SEED-CRD-002",
       stockLocal: 10,
       tamanoMaximo: 10,
       fechaInicio: new Date("2026-11-26T08:00:00Z"),
@@ -688,17 +655,18 @@ async function main() {
     },
   });
 
-  // Salida 3: CERRADA (el estado que deja la asignación de CU-40) para Camino a Diadema, asignada a Guía Carlos y Guía Rosa (visible en Portal Guía)
+  // Salida 3: EN_CURSO para Camino a Diadema, asignada a Guía Carlos y Guía Rosa (visible en Portal Guía)
   const salidaDiademaActiva = await db.salida.create({
     data: {
       definicionPaquete: armarDefinicionPaquete(paqueteDiademaCompleto),
       idpaquete: paqueteDiadema.idpaquete,
       nroSalida: "SAL-CRD-003",
+      idbloqueo: "BLQ-SEED-CRD-003",
       stockLocal: 8,
       tamanoMaximo: 10,
-      fechaInicio: new Date("2026-11-05T08:00:00Z"),
-      fechaFin: new Date("2026-11-08T18:00:00Z"),
-      estado: "CERRADA",
+      fechaInicio: inicioDiadema,
+      fechaFin: finDiadema,
+      estado: "EN_CURSO",
       personalAsignado: {
         create: [
           { idpersonal: personalGuia.idpersonal },

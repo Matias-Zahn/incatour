@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Modal from "../../components/Modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   consultarReseniasYEvaluaciones,
@@ -84,13 +85,13 @@ function ModalCalificarEvaluado({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-modal-evaluar"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    <Modal
+      onCerrar={onCerrar}
+      bloqueado={mutacion.isPending}
+      etiquetaId="titulo-modal-evaluar"
+      tamano="sm"
+      className="p-6"
     >
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-2">
           <div>
             <span className="inline-flex rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
@@ -196,8 +197,7 @@ function ModalCalificarEvaluado({
             </Boton>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Modal from "../../components/Modal";
 import { useNavigate } from "react-router-dom";
 import {
     estilosEstadoSalida,
@@ -179,7 +180,7 @@ export function VistaSalidas({
                                             className="text-xs py-1.5"
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
-                                                navegar("/guia/novedades");
+                                                navegar("/guia/novedades", { replace: true });
                                             }}
                                         >
                                             Avances
@@ -189,7 +190,7 @@ export function VistaSalidas({
                                             className="text-xs py-1.5"
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
-                                                navegar("/guia/incidentes");
+                                                navegar("/guia/incidentes", { replace: true });
                                             }}
                                         >
                                             Incidentes
@@ -215,7 +216,7 @@ export function VistaSalidas({
                             <Boton
                                 variante="secundario"
                                 className="text-xs py-1"
-                                onClick={() => navegar("/guia/novedades")}
+                                onClick={() => navegar("/guia/novedades", { replace: true })}
                             >
                                 Registrar avances de esta salida →
                             </Boton>
@@ -470,18 +471,11 @@ export function VistaSalidas({
 
             {/* Modal Nómina Completa de Pasajeros */}
             {modalNominaAbierto ? (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setModalNominaAbierto(false);
-                    }}
+                <Modal
+                    onCerrar={() => setModalNominaAbierto(false)}
+                    etiqueta="Nómina completa de pasajeros"
+                    className="p-6"
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Nómina completa de pasajeros"
-                        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-tarjeta bg-white p-6 shadow-tarjeta"
-                    >
                         <div className="flex items-start justify-between border-b border-borde pb-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-marca">
@@ -494,6 +488,7 @@ export function VistaSalidas({
                             <button
                                 type="button"
                                 onClick={() => setModalNominaAbierto(false)}
+                                aria-label="Cerrar"
                                 className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
                             >
                                 <IconoCerrar tamano={20} />
@@ -548,8 +543,7 @@ export function VistaSalidas({
                                 Cerrar
                             </Boton>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             ) : null}
         </section>
     );
