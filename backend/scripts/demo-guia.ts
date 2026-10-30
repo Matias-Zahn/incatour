@@ -62,7 +62,7 @@ async function main() {
       const porteadores: number[] = [];
       for (let i = 0; i < panel.dotacionRequerida.porteadores; i++) {
         const idpersonal = await f.porteador();
-        await db.personal.update({ where: { idpersonal }, data: { nombreCompleto: PORTEADORES[i % PORTEADORES.length] } });
+        await db.personal.update({ where: { idpersonal }, data: { nombreCompleto: PORTEADORES[i % PORTEADORES.length]! } });
         porteadores.push(idpersonal);
       }
       const transporte = await f.transporte(pq.localidad);
