@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import Modal from "../../components/Modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listarSolicitudesPendientes,
@@ -103,13 +104,12 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
   const esReintento = solicitud.nroSolicitud.endsWith("-R");
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-modal-solicitud"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
+    <Modal
+      onCerrar={onCerrar}
+      bloqueado={mutacionResolver.isPending}
+      etiquetaId="titulo-modal-solicitud"
+      className="p-6"
     >
-      <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl my-8">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -379,8 +379,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
