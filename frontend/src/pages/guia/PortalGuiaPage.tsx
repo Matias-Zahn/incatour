@@ -6,9 +6,13 @@ import {
     obtenerUsuario,
 } from "../../services/sesionService";
 import {
+    estilosEstadoSalida,
+    formatearEstadoSalida,
+    formatearFechaSalida,
     useDetalleSalidaGuia,
     useSalidasGuia,
 } from "../../services/guiaService";
+import { IconoMontana } from "./IconosGuia";
 import { BarraLateralGuia, type SeccionGuia } from "./BarraLateralGuia";
 import { VistaAvances } from "./VistaAvances";
 import { VistaIncidentes } from "./VistaIncidentes";
@@ -139,8 +143,70 @@ export default function PortalGuiaPage() {
             />
 
             {/* Área de contenido */}
+            {/* Área de contenido */}
             <main className="flex-1 overflow-x-hidden p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8">
                 <div className="mx-auto max-w-6xl"><LimiteDeError>
+                    {/* Barra Superior / Contexto Global de Salida Operativa */}
+                    <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
+                        <div className="flex items-center gap-3">
+                            <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-[#1b9fc7] to-[#16d6dc] text-white shadow-sm">
+                                <IconoMontana tamano={22} />
+                            </div>
+                            <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                                        Salida en operación
+                                    </span>
+                                    {salidaActual ? (
+                                        <span
+                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${estilosEstadoSalida(
+                                                salidaActual.estado,
+                                            )}`}
+                                        >
+                                            {formatearEstadoSalida(salidaActual.estado)}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {salidaActual ? (
+                                    <p className="text-sm font-bold text-navegacion md:text-base">
+                                        <span className="text-marca">{salidaActual.nroSalida}</span>
+                                        {" · "}
+                                        <span>{salidaActual.circuito}</span>
+                                        <span className="ml-2 text-xs font-normal text-texto-suave">
+                                            ({formatearFechaSalida(salidaActual.fechaInicio)} al {formatearFechaSalida(salidaActual.fechaFin)})
+                                        </span>
+                                    </p>
+                                ) : (
+                                    <p className="text-sm font-medium text-texto-suave">
+                                        {cargandoSalidas ? "Cargando salidas asignadas..." : "Sin salidas asignadas"}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {salidas.length > 1 ? (
+                            <div className="flex items-center gap-2 rounded-xl border border-borde/70 bg-[#f8fafb] px-3 py-2">
+                                <label
+                                    htmlFor="selector-salida-global"
+                                    className="text-xs font-bold text-texto-suave whitespace-nowrap"
+                                >
+                                    Cambiar salida activa:
+                                </label>
+                                <select
+                                    id="selector-salida-global"
+                                    value={salidaActual?.idsalida ?? ""}
+                                    onChange={(e) => seleccionarSalida(Number(e.target.value))}
+                                    className="rounded-control border border-borde bg-white px-3 py-1.5 text-xs font-bold text-texto outline-none focus:border-marca"
+                                >
+                                    {salidas.map((s) => (
+                                        <option key={s.idsalida} value={s.idsalida}>
+                                            {s.nroSalida} ({formatearEstadoSalida(s.estado)}) · {s.circuito}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : null}
+                    </header>
                     {errorSalidas ? (
                         <div className="mb-6 rounded-tarjeta border border-peligro/30 bg-peligro/10 p-5 text-sm text-texto">
                             <p className="font-bold text-peligro">

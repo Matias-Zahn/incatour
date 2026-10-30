@@ -11,6 +11,7 @@ import {
     estilosEstadoSalida,
     formatearEstadoSalida,
     formatearFechaHora,
+    formatearFechaSalida,
     guardarAvanceOffline,
     guardarBorradorAvance,
     limpiarBorradorAvance,
@@ -433,11 +434,19 @@ export function VistaAvances({
                     <IconoMontana tamano={24} />
                 </div>
                 <div>
-                    <h2 className="text-base font-bold text-navegacion">
-                        {salidaActual.circuito}
-                    </h2>
-                    <p className="text-xs text-texto-suave">
-                        {salidaActual.nroSalida} · {salidaActual.paquete}
+                    <div className="flex items-center gap-2">
+                        <h2 className="font-mono text-base font-bold text-navegacion md:text-lg">
+                            Salida {salidaActual.nroSalida}
+                        </h2>
+                        <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
+                            En operación
+                        </span>
+                    </div>
+                    <p className="text-xs font-medium text-texto">
+                        {salidaActual.circuito} · <span className="text-texto-suave">{salidaActual.paquete}</span>
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-texto-suave">
+                        Inicio: <b>{formatearFechaSalida(salidaActual.fechaInicio)}</b> — Fin: <b>{formatearFechaSalida(salidaActual.fechaFin)}</b>
                     </p>
                 </div>
                 <div>
@@ -479,8 +488,11 @@ export function VistaAvances({
                 {/* Columna Izquierda: Formulario */}
                 <article className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                     <h2 className="border-b border-borde/70 pb-3 text-base font-bold text-navegacion">
-                        Registrar avance o novedad
+                        Registrar avance o novedad para {salidaActual.nroSalida}
                     </h2>
+                    <p className="mt-1 text-xs text-texto-suave">
+                        Estás informando etapas de la salida <b>{salidaActual.nroSalida}</b> ({salidaActual.circuito}).
+                    </p>
 
                     <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5 space-y-4">
                         {aviso ? (
