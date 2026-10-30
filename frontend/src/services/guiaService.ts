@@ -29,7 +29,21 @@ export const etiquetasEstadoSalida: Record<string, string> = {
     CERRADA: "Cerrada",
     PROGRAMADA: "Programada",
     ABIERTA: "Abierta",
+    COMPLETADO: "Completado",
+    DEMORADO: "Demorado",
 };
+
+/** Fecha y hora del portal del guía, sin segundos */
+export function formatearFechaHora(iso: string): string {
+    return new Date(iso).toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
+}
 
 export function formatearEstadoSalida(estado?: string | null): string {
     if (!estado) return "Sin estado";
@@ -376,6 +390,8 @@ export function useRegistrarAvance() {
             idsalida: number;
             payload: RegistrarAvancePayload;
         }) => registrarAvance(idsalida, payload),
+        // Sin señal falla enseguida y va a la cola: pausada, quedaba en "Procesando..."
+        networkMode: "always",
         onSuccess: (_data, variables) => {
             clienteConsultas.invalidateQueries({
                 queryKey: clavesGuia.detalleSalida(variables.idsalida),
@@ -397,6 +413,7 @@ export function useRegistrarIncidente() {
             idsalida: number;
             payload: RegistrarIncidentePayload;
         }) => registrarIncidente(idsalida, payload),
+        networkMode: "always",
         onSuccess: (_data, variables) => {
             clienteConsultas.invalidateQueries({
                 queryKey: clavesGuia.detalleSalida(variables.idsalida),
@@ -411,6 +428,7 @@ export function useRegistrarIncidente() {
 
 const CLAVE_BORRADOR_AVANCE = "incatour.guia.borrador_avance";
 const CLAVE_AVANCES_OFFLINE = "incatour.guia.avances_offline";
+const CLAVE_INCIDENTES_OFFLINE = "incatour.guia.incidentes_offline";
 const CLAVE_HISTORIAL_LOCAL_AVANCES = "incatour.guia.historial_avances";
 const CLAVE_HISTORIAL_LOCAL_INCIDENTES = "incatour.guia.historial_incidentes";
 
@@ -552,6 +570,59 @@ export function eliminarHistorialLocalAvance(idsalida: number, id: string): void
         );
     } catch (e) {
         console.warn("No se pudo actualizar historial local de avances", e);
+    }
+}
+
+export type IncidenteOffline = {
+    idLocal: string;
+    payload: RegistrarIncidentePayload;
+};
+
+export function obtenerIncidentesOffline(idsalida: number): IncidenteOffline[] {
+    if (!Number.isInteger(idsalida) || idsalida <= 0) return [];
+    try {
+        const guardado = localStorage.getItem(`${CLAVE_INCIDENTES_OFFLINE}_${idsalida}`);
+        return guardado ? (JSON.parse(guardado) as IncidenteOffline[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+export function guardarIncidenteOffline(idsalida: number, payload: RegistrarIncidentePayload): IncidenteOffline {
+    const nuevo: IncidenteOffline = {
+        idLocal: `off_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        payload,
+    };
+    try {
+        localStorage.setItem(
+            `${CLAVE_INCIDENTES_OFFLINE}_${idsalida}`,
+            JSON.stringify([...obtenerIncidentesOffline(idsalida), nuevo]),
+        );
+    } catch (e) {
+        console.warn("No se pudo guardar incidente offline", e);
+    }
+    return nuevo;
+}
+
+export function eliminarIncidenteOffline(idsalida: number, idLocal: string): void {
+    try {
+        localStorage.setItem(
+            `${CLAVE_INCIDENTES_OFFLINE}_${idsalida}`,
+            JSON.stringify(obtenerIncidentesOffline(idsalida).filter((i) => i.idLocal !== idLocal)),
+        );
+    } catch (e) {
+        console.warn("No se pudo eliminar incidente offline", e);
+    }
+}
+
+export function eliminarHistorialLocalIncidente(idsalida: number, id: string): void {
+    try {
+        localStorage.setItem(
+            `${CLAVE_HISTORIAL_LOCAL_INCIDENTES}_${idsalida}`,
+            JSON.stringify(obtenerHistorialLocalIncidentes(idsalida).filter((x) => x.id !== id)),
+        );
+    } catch (e) {
+        console.warn("No se pudo actualizar historial local de incidentes", e);
     }
 }
 

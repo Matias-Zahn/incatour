@@ -16,6 +16,8 @@ import { VistaInicio } from "./VistaInicio";
 import { VistaRecorridos } from "./VistaRecorridos";
 import { VistaSalidas } from "./VistaSalidas";
 import { useSincronizacionAvances } from "./useSincronizacionAvances";
+import { useSincronizacionIncidentes } from "./useSincronizacionIncidentes";
+import Alerta from "../../components/Alerta";
 import LimiteDeError from "../../components/LimiteDeError";
 
 // Salida elegida a mano, una clave por guía para que sobreviva a la recarga
@@ -90,6 +92,10 @@ export default function PortalGuiaPage() {
 
     // FE-38: la cola de avances se sincroniza al entrar al portal y al volver la señal, en cualquier vista
     const sincronizacion = useSincronizacionAvances(salidaActual?.idsalida ?? 0);
+    const sincronizacionIncidentes = useSincronizacionIncidentes(salidaActual?.idsalida ?? 0);
+    const pendientesDeEnvio = sincronizacion.pendientes.length + sincronizacionIncidentes.pendientes.length;
+    // Novedades ya muestra los avances pendientes y su aviso
+    const enNovedades = seccionActiva === "novedades";
 
     // Consultar detalle completo de la salida actual (CU-48)
     const {
@@ -111,6 +117,8 @@ export default function PortalGuiaPage() {
     }, []);
 
     function manejarCambioSeccion(seccion: SeccionGuia) {
+        sincronizacion.limpiarMensaje();
+        sincronizacionIncidentes.limpiarMensaje();
         navegar(`/guia/${seccion}`, { replace: true });
     }
 
@@ -144,11 +152,30 @@ export default function PortalGuiaPage() {
                         </div>
                     ) : null}
 
+                    {pendientesDeEnvio > 0 && !enNovedades ? (
+                        <div className="mb-4">
+                            <Alerta tipo="advertencia">
+                                Tenés {pendientesDeEnvio} registro(s) sin enviar. Se envían solos cuando vuelva la señal.
+                            </Alerta>
+                        </div>
+                    ) : null}
+                    {sincronizacion.mensaje && !enNovedades ? (
+                        <div className="mb-4">
+                            <Alerta tipo={sincronizacion.mensaje.tipo}>{sincronizacion.mensaje.texto}</Alerta>
+                        </div>
+                    ) : null}
+                    {sincronizacionIncidentes.mensaje ? (
+                        <div className="mb-4">
+                            <Alerta tipo={sincronizacionIncidentes.mensaje.tipo}>{sincronizacionIncidentes.mensaje.texto}</Alerta>
+                        </div>
+                    ) : null}
+
                     {seccionActiva === "inicio" && (
                         <VistaInicio
                             salidaActual={salidaActual}
                             proximaSalida={proximaSalida}
                             detalleSalida={detalleSalida}
+                            nombreGuia={usuario?.nombre}
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}
@@ -182,6 +209,7 @@ export default function PortalGuiaPage() {
                             key={salidaActual?.idsalida ?? "sin_salida"}
                             salidaActual={salidaActual}
                             detalleSalida={detalleSalida}
+                            sincronizacion={sincronizacionIncidentes}
                             cargando={cargandoSalidas || cargandoDetalle}
                         />
                     )}

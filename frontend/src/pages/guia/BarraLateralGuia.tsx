@@ -80,6 +80,7 @@ export function BarraLateralGuia({
                                 <button
                                     type="button"
                                     onClick={() => onCambiarSeccion(item.clave)}
+                                    aria-label={item.etiqueta}
                                     aria-current={estaActivo ? "page" : undefined}
                                     className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all max-md:min-h-12 max-md:flex-col max-md:justify-center max-md:gap-0.5 max-md:px-0.5 max-md:py-1.5 ${
                                         estaActivo

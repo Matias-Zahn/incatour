@@ -10,6 +10,7 @@ import {
     fechaLocalHoy,
     estilosEstadoSalida,
     formatearEstadoSalida,
+    formatearFechaHora,
     guardarAvanceOffline,
     guardarBorradorAvance,
     limpiarBorradorAvance,
@@ -54,7 +55,7 @@ function construirListaHistorial(
             etapa: `Etapa ${e.numeroOrden}: ${e.puntoInicio} → ${e.puntoFin}`,
             estadoTramo: (e.estadoTramo as EstadoTramo) ?? "COMPLETADO",
             fechaHora: e.fechaHoraLlegada
-                ? new Date(e.fechaHoraLlegada).toLocaleString("es-ES")
+                ? formatearFechaHora(e.fechaHoraLlegada)
                 : "Completado previamente",
             offline: false,
         }));
@@ -67,7 +68,7 @@ function construirListaHistorial(
             etapa: item.etapaNombre,
             estadoTramo: item.estadoTramo,
             // FE-41: en hora local, como los del servidor (el ISO está en UTC)
-            fechaHora: `${new Date(item.fechaHoraLlegada).toLocaleString("es-ES")} (Offline)`,
+            fechaHora: `${formatearFechaHora(item.fechaHoraLlegada)} (Offline)`,
             offline: true,
         }));
     const idsPendientes = new Set(pendientes.map((p) => p.id));
@@ -232,6 +233,16 @@ export function VistaAvances({
         setMensajeFeedback(null);
         sincronizacion.limpiarMensaje();
 
+        // Sin señal el back no puede avisar del salto: se aceptaba y se descartaba al sincronizar
+        if (sugerida !== undefined && Number(datos.numeroOrden) > sugerida) {
+            setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
+                tipo: "error",
+                texto: `Antes hay que informar la etapa ${sugerida}.`,
+            });
+            return;
+        }
+
         // Construir ISO Date Time
         const fechaHoraCombinada = `${datos.fechaLlegada}T${datos.horaLlegada}:00`;
         const fechaHoraIso = new Date(fechaHoraCombinada).toISOString();
@@ -260,7 +271,7 @@ export function VistaAvances({
                 id: guardado.idLocal,
                 etapa: etapaNombre,
                 estadoTramo: datos.estadoTramo,
-                fechaHora: `${datos.fechaLlegada} ${datos.horaLlegada} (Offline)`,
+                fechaHora: `${formatearFechaHora(fechaHoraIso)} (Offline)`,
                 offline: true,
             };
 
@@ -313,7 +324,7 @@ export function VistaAvances({
                 id: `reg_${idAvanceGenerado}`,
                 etapa: etapaNombre,
                 estadoTramo: datos.estadoTramo,
-                fechaHora: `${datos.fechaLlegada} ${datos.horaLlegada}`,
+                fechaHora: formatearFechaHora(fechaHoraIso),
                 offline: false,
             };
 
@@ -366,7 +377,7 @@ export function VistaAvances({
                     id: guardado.idLocal,
                     etapa: etapaNombre,
                     estadoTramo: datos.estadoTramo,
-                    fechaHora: `${datos.fechaLlegada} ${datos.horaLlegada} (Offline)`,
+                    fechaHora: `${formatearFechaHora(fechaHoraIso)} (Offline)`,
                     offline: true,
                 };
 
@@ -480,21 +491,21 @@ export function VistaAvances({
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {/* Etapa */}
-                            <label className="col-span-full grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="col-span-full grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Etapa (el tramo del circuito) *</span>
                                 <select
                                     {...register("numeroOrden", { valueAsNumber: true })}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
                                     <option value="">Selecciona una etapa</option>
-                                    {etapasDisponibles.map((etapa) => {
+                                    {etapasConPendientes.map((etapa) => {
                                         const estaCompletada = etapa.estadoTramo === "COMPLETADO";
                                         const esSugerida = etapa.numeroOrden === siguienteEtapa?.numeroOrden;
                                         return (
                                             <option
                                                 key={etapa.numeroOrden}
                                                 value={etapa.numeroOrden}
-                                                disabled={estaCompletada}
+                                                disabled={estaCompletada || etapa.numeroOrden > (sugerida ?? 0)}
                                             >
                                                 Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin}
                                                 {etapa.estadoTramo ? ` (${formatearEstadoSalida(etapa.estadoTramo)})` : ""}
@@ -511,12 +522,12 @@ export function VistaAvances({
                             </label>
 
                             {/* Fecha de llegada */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Fecha de llegada *</span>
                                 <input
                                     type="date"
                                     {...register("fechaLlegada")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 />
                                 {errors.fechaLlegada ? (
                                     <span className="text-xs font-normal text-peligro">
@@ -526,12 +537,12 @@ export function VistaAvances({
                             </label>
 
                             {/* Hora de llegada */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Hora de llegada *</span>
                                 <input
                                     type="time"
                                     {...register("horaLlegada")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 />
                                 {errors.horaLlegada ? (
                                     <span className="text-xs font-normal text-peligro">
@@ -541,11 +552,11 @@ export function VistaAvances({
                             </label>
 
                             {/* Estado del tramo */}
-                            <label className="col-span-full grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="col-span-full grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Estado del Tramo *</span>
                                 <select
                                     {...register("estadoTramo")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
                                     <option value="COMPLETADO">Completado</option>
                                     <option value="DEMORADO">Atrasado / Demorado</option>

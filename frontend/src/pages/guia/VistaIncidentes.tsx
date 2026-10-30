@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
+import { ErrorApi } from "../../services/clienteApi";
 import {
     agregarHistorialLocalIncidente,
     esquemaIncidente,
@@ -12,6 +13,8 @@ import {
     etiquetasTipoIncidente,
     fechaLocalHoy,
     formatearEstadoSalida,
+    formatearFechaHora,
+    guardarIncidenteOffline,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
     tiposIncidente,
@@ -28,16 +31,19 @@ import {
     IconoInfo,
     IconoMontana,
 } from "./IconosGuia";
+import type { SincronizacionIncidentes } from "./useSincronizacionIncidentes";
 
 type VistaIncidentesProps = {
     salidaActual: SalidaGuiaResumen | null;
     detalleSalida: DetalleSalidaGuia | null;
+    sincronizacion: SincronizacionIncidentes;
     cargando?: boolean;
 };
 
 export function VistaIncidentes({
     salidaActual,
     detalleSalida,
+    sincronizacion,
     cargando = false,
 }: VistaIncidentesProps) {
     const idsalida = salidaActual?.idsalida ?? 0;
@@ -48,16 +54,15 @@ export function VistaIncidentes({
     const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
     const [modalMasPasajerosAbierto, setModalMasPasajerosAbierto] = useState(false);
     const [mensajeFeedback, setMensajeFeedback] = useState<{
-        tipo: "exito" | "error";
+        tipo: "exito" | "error" | "advertencia";
         texto: string;
     } | null>(null);
 
     const [pasajerosSeleccionados, setPasajerosSeleccionados] = useState<number[]>([]);
 
-    // Carga perezosa de historial de incidentes real sin datos inventados
-    const [historialIncidentes, setHistorialIncidentes] = useState<
-        RegistroHistorialIncidente[]
-    >(() => (idsalida > 0 ? obtenerHistorialLocalIncidentes(idsalida) : []));
+    // Se lee en cada render: la sincronización puede sacar un incidente rechazado
+    const historialIncidentes = obtenerHistorialLocalIncidentes(idsalida);
+    const idsPendientes = new Set(sincronizacion.pendientes.map((p) => p.idLocal));
 
     const fechaHoy = fechaLocalHoy();
     const horaActual = new Date().toTimeString().slice(0, 5);
@@ -129,55 +134,64 @@ export function VistaIncidentes({
 
         const fechaHoraCombinada = `${datos.fechaOcurrencia}T${datos.horaOcurrencia}:00`;
         const fechaHoraIso = new Date(fechaHoraCombinada).toISOString();
+        const payload = {
+            tipoIncidente: datos.tipoIncidente,
+            descripcion: datos.descripcion.trim(),
+            nivelGravedad: datos.nivelGravedad,
+            fechaHoraOcurrencia: fechaHoraIso,
+            pasajerosAfectados:
+                pasajerosSeleccionados.length > 0 ? pasajerosSeleccionados : undefined,
+        };
+
+        function registrarEnHistorial(id: string) {
+            const item: RegistroHistorialIncidente = {
+                id,
+                tipoIncidente: datos.tipoIncidente,
+                nivelGravedad: datos.nivelGravedad,
+                descripcion: datos.descripcion.trim(),
+                fechaHora: formatearFechaHora(fechaHoraIso),
+            };
+            agregarHistorialLocalIncidente(idsalida, item);
+            // Primero limpiar el formulario (resetea el feedback) y después mostrar el resultado
+            descartarFormulario();
+        }
+
+        function guardarSinSenal() {
+            registrarEnHistorial(guardarIncidenteOffline(idsalida, payload).idLocal);
+            sincronizacion.refrescar();
+            setMensajeFeedback({
+                tipo: "advertencia",
+                texto: "Sin conexión: el incidente quedó guardado en tu dispositivo y se enviará cuando recuperes señal.",
+            });
+        }
+
+        if (!navigator.onLine) {
+            guardarSinSenal();
+            return;
+        }
 
         try {
-            const respuesta = await registrarIncidenteMutation.mutateAsync({
-                idsalida,
-                payload: {
-                    tipoIncidente: datos.tipoIncidente,
-                    descripcion: datos.descripcion.trim(),
-                    nivelGravedad: datos.nivelGravedad,
-                    fechaHoraOcurrencia: fechaHoraIso,
-                    pasajerosAfectados:
-                        pasajerosSeleccionados.length > 0
-                            ? pasajerosSeleccionados
-                            : undefined,
-                },
-            });
+            const respuesta = await registrarIncidenteMutation.mutateAsync({ idsalida, payload });
 
             const idGenerado = String(
                 (respuesta.data as { idincidente?: number } | undefined)?.idincidente ??
                     historialIncidentes.length + 1,
             );
-
-            const nuevoItem: RegistroHistorialIncidente = {
-                id: `inc_${idGenerado}`,
-                tipoIncidente: datos.tipoIncidente,
-                nivelGravedad: datos.nivelGravedad,
-                descripcion: datos.descripcion.trim(),
-                fechaHora: `${datos.fechaOcurrencia} ${datos.horaOcurrencia}`,
-            };
-
-            agregarHistorialLocalIncidente(idsalida, nuevoItem);
-            setHistorialIncidentes((prev) => [nuevoItem, ...prev]);
-
-            // Primero limpiar el formulario (resetea el feedback) y después mostrar el éxito
-            descartarFormulario();
+            registrarEnHistorial(`inc_${idGenerado}`);
 
             setMensajeFeedback({
                 tipo: "exito",
                 texto: "Notificación de incidente enviada exitosamente al equipo de administración.",
             });
         } catch (error: unknown) {
-            const mensaje =
-                error instanceof Error
-                    ? error.message
-                    : typeof error === "string"
-                      ? error
-                      : "Ocurrió un error al intentar notificar el incidente.";
+            // Todo error que no es una respuesta del servidor es de red
+            if (!(error instanceof ErrorApi)) {
+                guardarSinSenal();
+                return;
+            }
             setMensajeFeedback({
                 tipo: "error",
-                texto: mensaje,
+                texto: error.message || "Ocurrió un error al intentar notificar el incidente.",
             });
         }
     }
@@ -261,14 +275,14 @@ export function VistaIncidentes({
                         ) : null}
 
                         {/* Descripción */}
-                        <label className="grid gap-1.5 text-xs font-bold text-texto">
+                        <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                             <span>Descripción del incidente *</span>
                             <textarea
                                 rows={4}
                                 maxLength={1000}
                                 placeholder="Describa lo ocurrido en detalle (mínimo 5 caracteres)..."
                                 {...register("descripcion")}
-                                className="rounded-control border border-borde bg-white p-3 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                className="w-full min-w-0 rounded-control border border-borde bg-white p-3 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                             />
                             <div className="flex justify-between text-[11px] text-texto-suave">
                                 <span>
@@ -286,12 +300,12 @@ export function VistaIncidentes({
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {/* Fecha */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Fecha del incidente *</span>
                                 <input
                                     type="date"
                                     {...register("fechaOcurrencia")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 />
                                 {errors.fechaOcurrencia ? (
                                     <span className="text-xs font-normal text-peligro">
@@ -301,12 +315,12 @@ export function VistaIncidentes({
                             </label>
 
                             {/* Hora */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Hora del incidente *</span>
                                 <input
                                     type="time"
                                     {...register("horaOcurrencia")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 />
                                 {errors.horaOcurrencia ? (
                                     <span className="text-xs font-normal text-peligro">
@@ -316,11 +330,11 @@ export function VistaIncidentes({
                             </label>
 
                             {/* Tipo de Incidente */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Tipo de incidente *</span>
                                 <select
                                     {...register("tipoIncidente")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
                                     {tiposIncidente.map((t) => (
                                         <option key={t} value={t}>
@@ -336,11 +350,11 @@ export function VistaIncidentes({
                             </label>
 
                             {/* Nivel de Gravedad */}
-                            <label className="grid gap-1.5 text-xs font-bold text-texto">
+                            <label className="grid min-w-0 grid-cols-1 gap-1.5 text-xs font-bold text-texto">
                                 <span>Nivel de gravedad *</span>
                                 <select
                                     {...register("nivelGravedad")}
-                                    className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
                                     {nivelesGravedad.map((g) => (
                                         <option key={g} value={g}>
@@ -396,7 +410,7 @@ export function VistaIncidentes({
                             <table className="w-full text-left text-xs" aria-label="Pasajeros de la salida">
                                 <thead>
                                     <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
-                                        <th className="w-8 py-2"></th>
+                                        <th className="w-9 py-2"></th>
                                         <th className="py-2">ID/Pasaporte</th>
                                         <th className="py-2">Nombre completo</th>
                                     </tr>
@@ -409,16 +423,18 @@ export function VistaIncidentes({
                                         return (
                                             <tr
                                                 key={p.idpasajero}
-                                                className={`transition-colors ${
+                                                className={`cursor-pointer transition-colors ${
                                                     seleccionado ? "bg-cyan-50/60" : ""
                                                 }`}
+                                                onClick={() => alternarPasajero(p.idpasajero)}
                                             >
-                                                <td className="py-2">
+                                                <td className="py-3">
                                                     <input
                                                         type="checkbox"
                                                         checked={seleccionado}
-                                                        onChange={() => alternarPasajero(p.idpasajero)}
-                                                        className="size-4 rounded border-borde text-marca focus:ring-marca"
+                                                        onChange={() => {}}
+                                                        aria-label={`Afectado: ${p.nombreCompleto}`}
+                                                        className="size-6 rounded border-borde text-marca focus:ring-marca"
                                                     />
                                                 </td>
                                                 <td className="py-2 font-medium text-texto">
@@ -496,6 +512,11 @@ export function VistaIncidentes({
                                     </p>
                                     <p className="mt-1 text-[10px] text-texto-suave">
                                         {item.fechaHora}
+                                        {idsPendientes.has(item.id) ? (
+                                            <span className="ml-2 font-semibold text-amber-700">
+                                                (Pendiente de envío)
+                                            </span>
+                                        ) : null}
                                     </p>
                                 </div>
                             ))}
@@ -560,7 +581,7 @@ export function VistaIncidentes({
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
-                                        <th className="w-8 py-2"></th>
+                                        <th className="w-9 py-2"></th>
                                         <th className="py-2">ID/Pasaporte</th>
                                         <th className="py-2">Nombre completo</th>
                                     </tr>
@@ -581,7 +602,8 @@ export function VistaIncidentes({
                                                         type="checkbox"
                                                         checked={marcado}
                                                         onChange={() => {}}
-                                                        className="size-4 rounded border-borde text-marca focus:ring-marca"
+                                                        aria-label={`Afectado: ${p.nombreCompleto}`}
+                                                        className="size-6 rounded border-borde text-marca focus:ring-marca"
                                                     />
                                                 </td>
                                                 <td className="py-2.5 font-medium text-texto">
@@ -671,6 +693,7 @@ export function VistaIncidentes({
                                     </p>
                                     <p className="mt-1 text-[11px] font-semibold text-slate-500">
                                         Ocurrido: {item.fechaHora}
+                                        {idsPendientes.has(item.id) ? " (Pendiente de envío)" : ""}
                                     </p>
                                 </div>
                             ))}

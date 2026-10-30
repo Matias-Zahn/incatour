@@ -1,4 +1,4 @@
-import type { DetalleSalidaGuia } from "../../services/guiaService";
+import { formatearEstadoSalida, formatearFechaHora, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
 
 type VistaRecorridosProps = {
@@ -15,10 +15,10 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                     Orientación en terreno
                 </p>
                 <h1 className="mt-1 text-2xl font-bold text-navegacion md:text-3xl">
-                    Recorridos y Cartografía Operativa
+                    Recorrido de la salida
                 </h1>
                 <p className="text-sm text-texto-suave">
-                    Visualiza información clave de las rutas hacia Machu Picchu, puntos de encuentro y tramos operativos.
+                    Tramos, campamentos previstos y estado de cada etapa.
                 </p>
             </header>
 
@@ -26,17 +26,17 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
             <article className="overflow-hidden rounded-tarjeta bg-gradient-to-r from-[#07395d] to-[#148ba8] p-7 text-white shadow-tarjeta">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-2">
-                        <span className="inline-block rounded-full bg-cyan-400/20 px-3 py-1 text-xs font-semibold text-cyan-200">
-                            Ruta activa: {detalleSalida?.salida.circuito ?? "Camino del Inca Clásico"}
-                        </span>
+                        {detalleSalida ? (
+                            <span className="inline-block rounded-full bg-cyan-400/20 px-3 py-1 text-xs font-semibold text-cyan-200">
+                                Ruta activa: {detalleSalida.salida.circuito}
+                            </span>
+                        ) : null}
                         <h2 className="text-2xl font-bold text-white">
                             Itinerario de Montaña
                         </h2>
                         <p className="max-w-xl text-xs leading-relaxed text-cyan-100">
-                            Supervisa los puntos de control, altimetría estimada y campamentos previstos.
-                            Recuerda que en los tramos de altura entre Pacaymayo y Phuyupatamarca la cobertura
-                            celular es nula: registra los avances para que queden guardados en tu dispositivo
-                            y se sincronicen automáticamente al retomar señal.
+                            Si te quedás sin señal, registra igual los avances y los incidentes: quedan guardados
+                            en tu dispositivo y se envían solos al recuperarla.
                         </p>
                     </div>
 
@@ -76,7 +76,7 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                                                           : "bg-slate-200 text-slate-700"
                                                 }`}
                                             >
-                                                {etapa.estadoTramo ?? "Pendiente"}
+                                                {etapa.estadoTramo ? formatearEstadoSalida(etapa.estadoTramo) : "Pendiente"}
                                             </span>
                                         </div>
                                         {etapa.campamentoPrevisto ? (
@@ -86,7 +86,7 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                                         ) : null}
                                         {etapa.fechaHoraLlegada ? (
                                             <p className="mt-1 text-[11px] text-emerald-700 font-medium">
-                                                Llegada registrada: {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES")}
+                                                Llegada registrada: {formatearFechaHora(etapa.fechaHoraLlegada)}
                                             </p>
                                         ) : null}
                                     </div>
@@ -100,39 +100,15 @@ export function VistaRecorridos({ detalleSalida }: VistaRecorridosProps) {
                     </div>
                 </article>
 
-                {/* Protocolo de seguridad y radiofrecuencia */}
+                {/* Recomendación */}
                 <article className="space-y-4">
-                    <div className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta">
-                        <h3 className="border-b border-borde/70 pb-3 text-sm font-bold text-navegacion">
-                            Puntos de Control & Rescate
-                        </h3>
-                        <ul className="mt-3 space-y-2.5 text-xs text-texto">
-                            <li className="flex items-start gap-2">
-                                <span className="font-bold text-marca">•</span>
-                                <span><b>Km 82 (Piscacucho):</b> Registro oficial del SERNANP y control de pasaportes.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="font-bold text-marca">•</span>
-                                <span><b>Wayllabamba:</b> Último poblado con suministro y primeros auxilios básicos.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="font-bold text-marca">•</span>
-                                <span><b>Paso Warmiwañusqa (4.215 msnm):</b> Punto crítico de aclimatación.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="font-bold text-marca">•</span>
-                                <span><b>Wiñay Wayna:</b> Puesto de guardaparques con radio UHF de emergencia.</span>
-                            </li>
-                        </ul>
-                    </div>
-
                     <div className="rounded-tarjeta border border-cyan-200 bg-cyan-50/70 p-5 shadow-xs">
                         <div className="flex items-center gap-2 text-cyan-900 font-bold text-xs">
                             <IconoMapa tamano={18} />
                             <span>Recomendación Operativa</span>
                         </div>
                         <p className="mt-2 text-xs leading-relaxed text-cyan-950">
-                            Mantén el grupo compacto en las bajadas con escalinatas incas de piedra mojada. Ante mal de montaña o traumatismo, utiliza la pantalla de <b>Incidentes</b> para reportar el suceso al equipo de administración.
+                            Mantén el grupo compacto en los tramos difíciles. Ante mal de montaña o traumatismo, utiliza la pantalla de <b>Incidentes</b> para reportar el suceso al equipo de administración.
                         </p>
                     </div>
                 </article>
