@@ -12,7 +12,7 @@ vi.mock("../../../integraciones/notificador/notificador.mock", () => ({ Notifica
 const salida = {
   idsalida: 2, nroSalida: "SAL-2026-002", estado: "CERRADA", fechaInicio: new Date(), fechaFin: new Date(),
   paquete: { nombrePaquete: "Inca", circuito: { nombreCircuito: "Camino", duracionDias: 4, etapas: [] } },
-  avances: [], servicios: [], equipamientos: [], reservas: [],
+  avances: [], incidentes: [], servicios: [], equipamientos: [], reservas: [],
   personalAsignado: [{ idpersonal: 7, personal: { idpersonal: 7, nombreCompleto: "Rosa", rol: "Guía" } }],
 };
 
@@ -20,6 +20,19 @@ describe("GuiaService.consultarDetalleSalida (CU-48)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     repo.detalleSalida.mockResolvedValue(salida);
+  });
+
+  it("el detalle trae los incidentes de la salida", async () => {
+    const reporte = new Date();
+    repo.idPersonalDelUsuario.mockResolvedValue(7);
+    repo.detalleSalida.mockResolvedValue({
+      ...salida,
+      incidentes: [{ idincidente: 9, tipoIncidente: "SALUD", nivelGravedad: "MEDIO", descripcion: "Mal de altura", fechaHoraReporte: reporte, idsalida: 2 }],
+    });
+
+    const r = await new GuiaService().consultarDetalleSalida(1, 2);
+
+    expect(r.incidentes).toEqual([{ idincidente: 9, tipoIncidente: "SALUD", nivelGravedad: "MEDIO", descripcion: "Mal de altura", fechaHoraReporte: reporte }]);
   });
 
   it("el guía asignado ve el detalle de su salida", async () => {

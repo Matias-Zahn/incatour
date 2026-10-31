@@ -66,7 +66,19 @@ export function VistaIncidentes({
     const [pasajerosSeleccionados, setPasajerosSeleccionados] = useState<number[]>([]);
 
     // Se lee en cada render: la sincronización puede sacar un incidente rechazado
-    const historialIncidentes = obtenerHistorialLocalIncidentes(idsalida);
+    // Lo del servidor se ve desde cualquier celular; de lo local queda solo lo que el servidor todavía no tiene
+    const delServidor: RegistroHistorialIncidente[] = (detalleSalida?.incidentes ?? []).map((i) => ({
+        id: `inc_${i.idincidente}`,
+        tipoIncidente: i.tipoIncidente,
+        nivelGravedad: i.nivelGravedad,
+        descripcion: i.descripcion,
+        fechaHora: formatearFechaHora(i.fechaHoraReporte),
+    }));
+    const idsDelServidor = new Set(delServidor.map((i) => i.id));
+    const historialIncidentes = [
+        ...obtenerHistorialLocalIncidentes(idsalida).filter((i) => !idsDelServidor.has(i.id)),
+        ...delServidor,
+    ];
     const idsPendientes = new Set(sincronizacion.pendientes.map((p) => p.idLocal));
 
     const fechaHoy = fechaLocalHoy();
@@ -542,7 +554,7 @@ export function VistaIncidentes({
 
                             {historialIncidentes.length === 0 ? (
                                 <p className="py-6 text-center text-xs text-texto-suave">
-                                    No hay incidentes reportados desde este dispositivo
+                                    No hay incidentes reportados en esta salida
                                 </p>
                             ) : null}
                         </div>

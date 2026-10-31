@@ -47,8 +47,8 @@ export class GestionReservaService {
 
   // Administrador: todas, con filtros
   async consultarReservas(filtros: FiltrosReservaDto) {
-    const reservas = await this.repository.findConFiltros(filtros);
-    return reservas.map((r) => ({ ...this.resumir(r), titular: r.cliente.usuario }));
+    const { reservas, total } = await this.repository.findConFiltros(filtros);
+    return { total, reservas: reservas.map((r) => ({ ...this.resumir(r), titular: r.cliente.usuario })) };
   }
 
   async obtenerReserva(idreserva: number, usuario: UsuarioAutenticado) {

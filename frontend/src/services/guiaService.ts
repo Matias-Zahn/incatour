@@ -158,6 +158,13 @@ export type DetalleSalidaGuia = {
     };
     itinerario: ItinerarioEtapa[];
     nomina: PasajeroGuia[];
+    incidentes?: {
+        idincidente: number;
+        tipoIncidente: TipoIncidente;
+        nivelGravedad: NivelGravedad;
+        descripcion: string;
+        fechaHoraReporte: string;
+    }[];
     personal: PersonalSalida[];
     servicios: ServicioSalida[];
     equipamiento: EquipamientoSalida[];

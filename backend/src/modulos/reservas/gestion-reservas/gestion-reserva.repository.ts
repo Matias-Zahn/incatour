@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
@@ -34,10 +35,9 @@ export class GestionReservaRepository {
     });
   }
 
-  // CU-31 (administrador)
+  // CU-31 (administrador): una página y el total, para que el listado no corte en silencio
   async findConFiltros(f: FiltrosReservaDto) {
-    return db.reserva.findMany({
-      where: {
+    const where = {
         ...(f.estado && { estado: f.estado }),
         ...(f.titular && {
           cliente: {
@@ -70,11 +70,19 @@ export class GestionReservaRepository {
             }),
           },
         }),
-      },
-      include: INCLUDE_RESUMEN,
-      orderBy: { fechaRealizacion: "desc" },
-      take: f.limite,
-    });
+    } satisfies Prisma.ReservaWhereInput;
+
+    const [reservas, total] = await Promise.all([
+      db.reserva.findMany({
+        where,
+        include: INCLUDE_RESUMEN,
+        orderBy: { fechaRealizacion: "desc" },
+        skip: (f.pagina - 1) * f.limite,
+        take: f.limite,
+      }),
+      db.reserva.count({ where }),
+    ]);
+    return { reservas, total };
   }
 
   // CU-31: detalle con itinerario, pasajeros y situación de pago

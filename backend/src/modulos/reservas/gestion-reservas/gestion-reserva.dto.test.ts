@@ -38,4 +38,11 @@ describe("CU-31: Filtros de reservas", () => {
     expect(dto?.titular).toBe("Perez");
     expect(dto?.limite).toBe(25);
   });
+
+  it("pagina el listado de admin: arranca en la 1 y rechaza valores inválidos", () => {
+    expect(FiltrosReservaDto.create({})[1]?.pagina).toBe(1);
+    expect(FiltrosReservaDto.create({ pagina: "3" })[1]?.pagina).toBe(3);
+    expect(FiltrosReservaDto.create({ pagina: "0" })[0]).toMatch("pagina");
+    expect(FiltrosReservaDto.create({ pagina: "x" })[0]).toMatch("pagina");
+  });
 });

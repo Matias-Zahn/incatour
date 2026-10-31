@@ -81,14 +81,20 @@ export class GestionReservaRoutes {
      *       - in: query
      *         name: limite
      *         schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+     *       - in: query
+     *         name: pagina
+     *         schema: { type: integer, minimum: 1, default: 1 }
      *     responses:
      *       200:
-     *         description: Reservas que cumplen el filtro.
+     *         description: Una página de las reservas que cumplen el filtro.
      *         content:
      *           application/json:
      *             schema:
      *               type: object
      *               properties:
+     *                 total: { type: integer, description: Reservas que cumplen el filtro entre todas las páginas. }
+     *                 pagina: { type: integer }
+     *                 limite: { type: integer }
      *                 data:
      *                   type: array
      *                   items:

@@ -33,7 +33,8 @@ export class FiltrosReservaDto {
     public fechaDesde?: Date,
     public fechaHasta?: Date,
     public estado?: string,
-    public limite: number = 50
+    public limite: number = 50,
+    public pagina: number = 1
   ) {}
 
   public static create(query: { [key: string]: any }): [string | undefined, FiltrosReservaDto?] {
@@ -59,10 +60,16 @@ export class FiltrosReservaDto {
       if (isNaN(limite) || limite < 1 || limite > 200) return ["limite debe estar entre 1 y 200."];
     }
 
+    let pagina = 1;
+    if (query.pagina !== undefined) {
+      pagina = parseInt(query.pagina);
+      if (isNaN(pagina) || pagina < 1) return ["pagina debe ser un entero positivo."];
+    }
+
     return [
       undefined,
       new FiltrosReservaDto(
-        textoOpcional(query.titular), textoOpcional(query.pasajero), idpaquete, fechaDesde, fechaHasta, query.estado, limite
+        textoOpcional(query.titular), textoOpcional(query.pasajero), idpaquete, fechaDesde, fechaHasta, query.estado, limite, pagina
       ),
     ];
   }

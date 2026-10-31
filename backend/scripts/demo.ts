@@ -161,7 +161,7 @@ async function main() {
       });
     }
 
-    const correo = (texto: string) => texto.normalize("NFD").replace(/[^a-zA-Z]+/g, ".").toLowerCase();
+    const correo = (texto: string) => texto.normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-zA-Z]+/g, ".").toLowerCase();
     const hoteles: Record<string, { idservicio: number; idproveedor: number; rechazo: number }[]> = {};
     for (const [clave, z] of Object.entries(ZONAS)) {
       hoteles[clave] = [];
