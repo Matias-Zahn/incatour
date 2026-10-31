@@ -29,10 +29,10 @@ export function crearEntorno(nombreDb: string) {
   if (/\/incatour_db(\?|$)/.test(DB_URL)) throw new Error("La prueba no puede correr sobre incatour_db");
   const env = { ...process.env, DATABASE_URL: DB_URL, DB_NAME: nombreDb };
 
-  function resetear() {
-    console.log(`Reseteando ${nombreDb} (migraciones + seed)...`);
+  function resetear({ seed = true } = {}) {
+    console.log(`Reseteando ${nombreDb} (migraciones${seed ? " + seed" : ""})...`);
     execSync("npx prisma migrate reset --force --skip-generate --skip-seed", { env, stdio: "ignore" });
-    execSync("npx tsx prisma/seed.ts", { env, stdio: "ignore" });
+    if (seed) execSync("npx tsx prisma/seed.ts", { env, stdio: "ignore" });
   }
 
   // Levanta un back sobre la base de la prueba. extraEnv permite, por ejemplo, AUTORIDAD_CAIDA=true

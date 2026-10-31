@@ -9,6 +9,7 @@ import { manejadoresIncidentes } from "./manejadores/incidentes";
 import { manejadoresPaquetes } from "./manejadores/paquetes";
 import { manejadoresPersonal } from "./manejadores/personal";
 import { manejadoresProveedores } from "./manejadores/proveedores";
+import { manejadoresReportes } from "./manejadores/reportes";
 import { manejadoresSalidas } from "./manejadores/salidas";
 import { manejadoresServicios } from "./manejadores/servicios";
 import { manejadoresSolicitudes } from "./manejadores/solicitudes";
@@ -30,6 +31,7 @@ export const manejadores = [
     ...manejadoresCatalogoReservas,
     ...manejadoresGuia,
     ...manejadoresIncidentes,
+    ...manejadoresReportes,
 ];
 
 export const trabajadorMocks = setupWorker(...manejadores);

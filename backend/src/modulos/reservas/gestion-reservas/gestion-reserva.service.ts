@@ -69,6 +69,7 @@ export class GestionReservaService {
       titular: reserva.cliente.usuario,
       paquete: reserva.salida.paquete.nombrePaquete,
       salida: { nroSalida: reserva.salida.nroSalida, fechaInicio: reserva.salida.fechaInicio, fechaFin: reserva.salida.fechaFin },
+      estadoAlojamiento: reserva.estadoAlojamiento,
       pasajeros: reserva.pasajeros.map((p) => p.pasajero.nombreCompleto),
       precioCongelado: reserva.precioCongelado,
       ...this.calcularDesglose(reserva),

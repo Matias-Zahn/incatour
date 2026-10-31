@@ -13,6 +13,7 @@ import InicioGestionPage from "./pages/gestion/InicioGestionPage";
 import PaquetesPage from "./pages/gestion/PaquetesPage";
 import PersonalPage from "./pages/gestion/PersonalPage";
 import ProveedoresPage from "./pages/gestion/ProveedoresPage";
+import ReportesPage from "./pages/gestion/ReportesPage";
 import SalidasPage from "./pages/gestion/SalidasPage";
 import ServiciosPage from "./pages/gestion/ServiciosPage";
 import SolicitudesPage from "./pages/gestion/SolicitudesPage";
@@ -183,6 +184,14 @@ function App() {
             element={
               <LayoutGestion seccion="Reservas y pagos">
                 <SolicitudesPage />
+              </LayoutGestion>
+            }
+          />
+          <Route
+            path="/gestion/reportes"
+            element={
+              <LayoutGestion seccion="Reportes">
+                <ReportesPage />
               </LayoutGestion>
             }
           />

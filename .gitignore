@@ -24,3 +24,6 @@ postgres_data/
 # Archivos subidos dinámicamente
 backend/public/imagenes/paquetes/
 backend/.env.local
+
+# Cobertura de tests
+coverage/

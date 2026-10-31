@@ -18,7 +18,6 @@ import {
     formatearFechaUtcCorta,
     formatearMontoUsd,
     formatearRangoFechasUtc,
-    generarTextoComprobanteDescargable,
     obtenerComprobanteMiReserva,
     reservaAdmiteCancelacion,
     useConfirmarCancelacionReserva,
@@ -30,6 +29,7 @@ import {
     type ReservaClienteResumen,
     type ResultadoCancelacionReserva,
 } from "../../services/clientePortalService";
+import { descargarComprobantePdf } from "../../services/pdf";
 
 type FilaReservaTabla = ReservaClienteResumen & {
     id: number;
@@ -167,17 +167,7 @@ function MisReservasPage() {
             const comprobante = await obtenerComprobanteMiReserva(
                 reserva.idreserva,
             );
-            const contenidoTxt =
-                generarTextoComprobanteDescargable(comprobante);
-            const blob = new Blob([contenidoTxt], {
-                type: "text/plain;charset=utf-8",
-            });
-            const url = URL.createObjectURL(blob);
-            const enlace = document.createElement("a");
-            enlace.href = url;
-            enlace.download = `comprobante-${comprobante.nroReserva}.txt`;
-            enlace.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            await descargarComprobantePdf(comprobante);
             setAvisoExito(
                 `Se descargó el comprobante de la reserva ${comprobante.nroReserva}.`,
             );
@@ -684,7 +674,7 @@ function MisReservasPage() {
                             ) : (
                                 <>
                                     {/* RESUMEN GENERAL */}
-                                    <div className="grid gap-3 rounded-control border border-borde bg-fondo/50 p-4 sm:grid-cols-4">
+                                    <div className="grid gap-3 rounded-control border border-borde bg-fondo/50 p-4 sm:grid-cols-5">
                                         <div>
                                             <p className="text-[11px] font-semibold uppercase text-texto-suave">
                                                 Estado reserva
@@ -707,6 +697,14 @@ function MisReservasPage() {
                                                 {
                                                     detalleReserva.estadoAlojamiento
                                                 }
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold uppercase text-texto-suave">
+                                                Pasajeros
+                                            </p>
+                                            <p className="mt-1 text-sm font-bold text-navegacion">
+                                                {detalleReserva.cantidadPasajeros}
                                             </p>
                                         </div>
                                         <div>

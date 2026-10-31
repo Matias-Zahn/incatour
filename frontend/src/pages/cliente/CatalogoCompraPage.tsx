@@ -20,6 +20,8 @@ import {
     resolverUrlImagenPaquete,
 } from "../../services/paqueteService";
 import { ErrorApi } from "../../services/clienteApi";
+import { obtenerComprobanteMiReserva } from "../../services/clientePortalService";
+import { descargarComprobantePdf } from "../../services/pdf";
 import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
 import {
     crearEsquemaCompra,
@@ -332,6 +334,8 @@ function CatalogoCompraPage() {
     }, [errorCompra]);
 
     // Comprobante de reserva exitosa
+    const [errorComprobante, setErrorComprobante] = useState("");
+    const [descargandoComprobante, setDescargandoComprobante] = useState(false);
     const [reservaConfirmada, setReservaConfirmada] = useState<{
         resultado: ResultadoReservaConfirmada;
         paquete: PaqueteCatalogoPublico;
@@ -529,73 +533,23 @@ function CatalogoCompraPage() {
         }
     }
 
-    function descargarComprobanteReserva() {
+    async function descargarComprobanteReserva() {
         if (!reservaConfirmada) return;
-        const { resultado, paquete, salida, pasajeros: nomina } =
-            reservaConfirmada;
-        const fechasAloj = derivarFechasAlojamiento(
-            salida.fechaInicio,
-            salida.fechaFin,
-            paquete.nochesAlojamiento.previas,
-            paquete.nochesAlojamiento.posteriores,
-        );
-        const titularTexto = usuarioSesion
-            ? `${usuarioSesion.nombre} ${usuarioSesion.apellido} (${usuarioSesion.email})`
-            : "Cliente titular autenticado";
-
-        const lineas = [
-            "=================================================================",
-            "           INCATOUR - COMPROBANTE DE PAGO Y RESERVA      ",
-            "=================================================================",
-            `Nro. de Reserva:         ${resultado.nroReserva}`,
-            `Estado de Reserva:       ${resultado.estado}`,
-            `Fecha de Emisión:        ${new Date().toLocaleString("es-AR")}`,
-            `Titular de la Reserva:   ${titularTexto}`,
-            "-----------------------------------------------------------------",
-            "1. PAQUETE Y SALIDA CONTRATADA",
-            `Paquete:                 ${paquete.nombre} (${paquete.codigo})`,
-            `Circuito:                ${paquete.circuito.nombre} (${paquete.circuito.dias} días · Dificultad ${paquete.circuito.dificultad})`,
-            `Salida Programada:       ${salida.nroSalida}`,
-            `Inicio del Recorrido:    ${formatearFechaCorta(salida.fechaInicio)}`,
-            `Fin del Recorrido:       ${formatearFechaCorta(salida.fechaFin)}`,
-            `Temporada Aplicada:      ${salida.temporadaNombre ?? "Sin especificar"}`,
-            "-----------------------------------------------------------------",
-            "2. ALOJAMIENTO Y FECHAS DERIVADAS",
-            `Garantía de Alojamiento: ${salida.garantia ?? paquete.nochesAlojamiento.garantia}`,
-            `Estado del Alojamiento:  ${resultado.estadoAlojamiento}`,
-            `Estadía Previa:          ${fechasAloj.estadiaPrevia ?? "Sin noches previas incluidas"}`,
-            `Estadía Posterior:       ${fechasAloj.estadiaPosterior ?? "Sin noches posteriores incluidas"}`,
-            ...(resultado.estadoAlojamiento === "PENDIENTE"
-                ? [
-                      `Nota de Alojamiento:     Las noches quedan sujetas a la confirmación del proveedor antes de la salida (Solicitud SOL-${resultado.nroReserva}).`,
-                  ]
-                : []),
-            "-----------------------------------------------------------------",
-            `3. NÓMINA DE PASAJEROS (${resultado.cantidadPasajeros})`,
-            ...nomina.map(
-                (p, i) =>
-                    `  ${i + 1}. ${p.nombreCompleto} | Pasaporte: ${p.nroPasaporte} (${p.nacionalidad}) | Vence: ${p.fechaVencimientoPasaporte} | Equipaje: ${p.pesoDeclarado} kg`,
-            ),
-            "-----------------------------------------------------------------",
-            "4. LIQUIDACIÓN, PAGO Y CONDICIONES COMERCIALES CONGELADAS",
-            `Total Abonado Congelado: ${resultado.moneda} ${resultado.precioCongelado.toFixed(2)}`,
-            `Medio de Pago:           TARJETA (Estado: APROBADA)`,
-            `Transacción Pasarela:    ${resultado.transaccionPasarela}`,
-            `Condiciones Vigentes:    ${paquete.condiciones || "Tarifa y condiciones comerciales congeladas al momento de la confirmación."}`,
-            "=================================================================",
-        ];
-
-        const blob = new Blob([lineas.join("\n")], {
-            type: "text/plain;charset=utf-8",
-        });
-        const url = URL.createObjectURL(blob);
-        const enlace = document.createElement("a");
-        enlace.href = url;
-        enlace.download = `Comprobante-${resultado.nroReserva}.txt`;
-        document.body.appendChild(enlace);
-        enlace.click();
-        document.body.removeChild(enlace);
-        URL.revokeObjectURL(url);
+        try {
+            setErrorComprobante("");
+            setDescargandoComprobante(true);
+            await descargarComprobantePdf(
+                await obtenerComprobanteMiReserva(reservaConfirmada.resultado.idreserva),
+            );
+        } catch (err) {
+            setErrorComprobante(
+                err instanceof Error
+                    ? err.message
+                    : "No se pudo descargar el comprobante de la reserva.",
+            );
+        } finally {
+            setDescargandoComprobante(false);
+        }
     }
 
     // Filtrado del catálogo (RF-27: duración, dificultad y rango de fechas)
@@ -950,12 +904,15 @@ function CatalogoCompraPage() {
                         </div>
                     </div>
 
+                    {errorComprobante ? <Alerta tipo="error">{errorComprobante}</Alerta> : null}
+
                     <div className="flex flex-wrap justify-end gap-3 border-t border-borde pt-4">
                         <Boton
                             variante="secundario"
                             onClick={descargarComprobanteReserva}
+                            cargando={descargandoComprobante}
                         >
-                            ⬇ Descargar comprobante y resumen (.txt)
+                            ⬇ Descargar comprobante (PDF)
                         </Boton>
                         {esAdmin &&
                         reservaConfirmada.resultado.estadoAlojamiento ===
