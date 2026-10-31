@@ -1,14 +1,18 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
+import ListaPaginada from "../../components/ListaPaginada";
+import Modal from "../../components/Modal";
 import {
     estilosEstadoSalida,
     fechaLocalHoy,
     formatearEstadoSalida,
     formatearFechaSalida,
     useIncidentes,
+    type IncidenteAdmin,
 } from "../../services/guiaService";
 import { useSalidas } from "../../services/salidaService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
@@ -22,8 +26,35 @@ const estiloGravedad: Record<string, string> = {
 const fechaHoraLocal = (iso: string) =>
     new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 
+const INCIDENTES_EN_RESUMEN = 5;
+
+function FilaIncidente({ incidente: inc }: { incidente: IncidenteAdmin }) {
+    return (
+        <div className="px-6 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
+                >
+                    {inc.nivelGravedad}
+                </span>
+                <p className="text-sm font-semibold text-texto">
+                    {inc.salida.nroSalida} · {inc.tipoIncidente}
+                </p>
+            </div>
+            <p className="mt-1 line-clamp-2 text-xs text-texto">{inc.descripcion}</p>
+            <p className="mt-1 text-xs text-texto-suave">
+                {inc.pasajeros.length > 0
+                    ? `Afectados: ${inc.pasajeros.map((p) => p.pasajero.nombreCompleto).join(", ")} · `
+                    : ""}
+                {fechaHoraLocal(inc.fechaHoraReporte)}
+            </p>
+        </div>
+    );
+}
+
 function InicioGestionPage() {
     const navigate = useNavigate();
+    const [verIncidentes, setVerIncidentes] = useState(false);
     const salidasQ = useSalidas();
     const solicitudesQ = useQuery({ queryKey: ["solicitudes"], queryFn: listarSolicitudesPendientes });
     const incidentesQ = useIncidentes();
@@ -39,7 +70,11 @@ function InicioGestionPage() {
         .sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
     const enCurso = salidas.filter((s) => s.estado === "EN_CURSO").length;
     const conAlertas = salidas.filter((s) => s.alertas?.length > 0).length;
-    const incidentes = (incidentesQ.data ?? []).slice(0, 5);
+    const incidentes = incidentesQ.data ?? [];
+    // El listado completo arranca por lo grave; el resumen de arriba, por lo reciente
+    const incidentesPorGravedad = [...incidentes].sort(
+        (a, b) => Number(b.nivelGravedad === "CRITICO") - Number(a.nivelGravedad === "CRITICO"),
+    );
 
     const metricas = [
         { etiqueta: "Salidas programadas", valor: futuras.length, detalle: "Publicadas o cerradas, con fecha futura", cargando: salidasQ.isPending },
@@ -152,9 +187,24 @@ function InicioGestionPage() {
                 </article>
 
                 <article className="rounded-tarjeta border border-borde bg-white shadow-tarjeta">
-                    <div className="border-b border-borde px-6 py-5">
-                        <h2 className="font-bold text-navegacion">Incidentes recientes</h2>
-                        <p className="mt-1 text-sm text-texto-suave">Reportados por los guías</p>
+                    <div className="flex items-center justify-between border-b border-borde px-6 py-5">
+                        <div>
+                            <h2 className="font-bold text-navegacion">Incidentes recientes</h2>
+                            <p className="mt-1 text-sm text-texto-suave">
+                                {incidentes.length > INCIDENTES_EN_RESUMEN
+                                    ? `Los últimos ${INCIDENTES_EN_RESUMEN} de ${incidentes.length}`
+                                    : "Reportados por los guías"}
+                            </p>
+                        </div>
+                        {incidentes.length > INCIDENTES_EN_RESUMEN ? (
+                            <Boton
+                                className="px-3 py-1.5 text-xs"
+                                variante="fantasma"
+                                onClick={() => setVerIncidentes(true)}
+                            >
+                                Ver todos
+                            </Boton>
+                        ) : null}
                     </div>
 
                     {incidentesQ.isPending ? (
@@ -165,31 +215,32 @@ function InicioGestionPage() {
                         <EstadoListado estado="vacio" mensaje="No hay incidentes reportados" />
                     ) : (
                         <div className="divide-y divide-borde">
-                            {incidentes.map((inc) => (
-                                <div className="px-6 py-4" key={inc.idincidente}>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span
-                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
-                                        >
-                                            {inc.nivelGravedad}
-                                        </span>
-                                        <p className="text-sm font-semibold text-texto">
-                                            {inc.salida.nroSalida} · {inc.tipoIncidente}
-                                        </p>
-                                    </div>
-                                    <p className="mt-1 line-clamp-2 text-xs text-texto">{inc.descripcion}</p>
-                                    <p className="mt-1 text-xs text-texto-suave">
-                                        {inc.pasajeros.length > 0
-                                            ? `Afectados: ${inc.pasajeros.map((p) => p.pasajero.nombreCompleto).join(", ")} · `
-                                            : ""}
-                                        {fechaHoraLocal(inc.fechaHoraReporte)}
-                                    </p>
-                                </div>
+                            {incidentes.slice(0, INCIDENTES_EN_RESUMEN).map((inc) => (
+                                <FilaIncidente key={inc.idincidente} incidente={inc} />
                             ))}
                         </div>
                     )}
                 </article>
             </div>
+
+            {verIncidentes ? (
+                <Modal onCerrar={() => setVerIncidentes(false)} etiquetaId="titulo-incidentes" tamano="lg" className="p-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h2 id="titulo-incidentes" className="text-lg font-bold text-navegacion">
+                            Incidentes ({incidentes.length})
+                        </h2>
+                        <Boton variante="secundario" className="px-3 py-1.5 text-xs" onClick={() => setVerIncidentes(false)}>
+                            Cerrar
+                        </Boton>
+                    </div>
+                    <ListaPaginada
+                        items={incidentesPorGravedad}
+                        porPagina={8}
+                        className="divide-y divide-borde"
+                        renderizar={(inc) => <FilaIncidente key={inc.idincidente} incidente={inc} />}
+                    />
+                </Modal>
+            ) : null}
 
             <article className="rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                 <div className="mb-4">

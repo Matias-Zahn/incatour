@@ -70,11 +70,6 @@ function PaquetesPage() {
     const { data: circuitos = [] } = useCircuitos({ estado: "TODOS" });
     const circuitosActivos = circuitos.filter((c) => c.estado === "ACTIVO");
     const { data: temporadas = [] } = useTemporadas();
-    const {
-        data: serviciosDisponibles = [],
-        isError: errorServiciosCatalogo,
-        error: detalleErrorServiciosCatalogo,
-    } = useServiciosDisponiblesCatalogo();
 
     const registrar = useRegistrarPaquete();
     const modificar = useModificarPaquete();
@@ -92,6 +87,11 @@ function PaquetesPage() {
     const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
     const [formularioAbierto, setFormularioAbierto] = useState(false);
+    const {
+        data: serviciosDisponibles = [],
+        isError: errorServiciosCatalogo,
+        error: detalleErrorServiciosCatalogo,
+    } = useServiciosDisponiblesCatalogo(formularioAbierto);
     const [paqueteEnEdicion, setPaqueteEnEdicion] = useState<Paquete | null>(
         null,
     );

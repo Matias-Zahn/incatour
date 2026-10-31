@@ -182,7 +182,7 @@ function App() {
           <Route
             path="/gestion/solicitudes"
             element={
-              <LayoutGestion seccion="Reservas y pagos">
+              <LayoutGestion seccion="Solicitudes de alojamiento">
                 <SolicitudesPage />
               </LayoutGestion>
             }

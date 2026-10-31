@@ -56,6 +56,19 @@ import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
+const ESTADOS_HISTORIAL = ["FINALIZADA", "CANCELADA"];
+
+/** Lo que está en curso va arriba y después lo más cercano; en el historial, lo más reciente primero */
+function ordenarSalidas(salidas: Salida[], vista: "vigentes" | "historial") {
+    return [...salidas].sort((a, b) => {
+        if (vista === "historial") return b.fechaInicio.localeCompare(a.fechaInicio);
+        return (
+            Number(b.estado === "EN_CURSO") - Number(a.estado === "EN_CURSO") ||
+            a.fechaInicio.localeCompare(b.fechaInicio)
+        );
+    });
+}
+
 const ESTADOS_SALIDA = [
     { valor: "PUBLICADA", etiqueta: "Publicada" },
     { valor: "CERRADA", etiqueta: "Cerrada" },
@@ -591,6 +604,8 @@ function SalidasPage() {
     const [filtroDesde, setFiltroDesde] = useState<string>("");
     const [filtroHasta, setFiltroHasta] = useState<string>("");
     const [filtroGuia, setFiltroGuia] = useState<number | "">("");
+    const [vista, setVista] = useState<"vigentes" | "historial">("vigentes");
+    const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
 
     // Opciones para los selectores de filtros
@@ -644,7 +659,8 @@ function SalidasPage() {
         Boolean(filtroEstado) ||
         Boolean(filtroDesde) ||
         Boolean(filtroHasta) ||
-        filtroGuia !== "";
+        filtroGuia !== "" ||
+        Boolean(busqueda);
 
     function limpiarFiltros() {
         setFiltroCircuito("");
@@ -653,17 +669,30 @@ function SalidasPage() {
         setFiltroDesde("");
         setFiltroHasta("");
         setFiltroGuia("");
+        setBusqueda("");
         setPaginaActual(1);
     }
 
+    // El filtro de estado y la búsqueda piden algo puntual: miran todas las salidas, no solo las de la vista
+    const buscaEnTodas = Boolean(filtroEstado) || Boolean(busqueda.trim());
+    const salidasVisibles = useMemo(() => {
+        const termino = busqueda.trim().toLowerCase();
+        const elegidas = salidas.filter((s) =>
+            buscaEnTodas
+                ? s.nroSalida.toLowerCase().includes(termino)
+                : ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial"),
+        );
+        return ordenarSalidas(elegidas, vista);
+    }, [salidas, vista, busqueda, buscaEnTodas]);
+
     const estadoListado = isPending ? "cargando" : isError ? "error" : "exito";
-    const totalPaginas = Math.max(1, Math.ceil(salidas.length / ELEMENTOS_POR_PAGINA));
+    const totalPaginas = Math.max(1, Math.ceil(salidasVisibles.length / ELEMENTOS_POR_PAGINA));
     const paginaValida = Math.min(paginaActual, totalPaginas);
-    const salidasPaginadas = salidas.slice(
+    const salidasPaginadas = salidasVisibles.slice(
         (paginaValida - 1) * ELEMENTOS_POR_PAGINA,
         paginaValida * ELEMENTOS_POR_PAGINA,
     );
-    const sinResultados = estadoListado === "exito" && salidas.length === 0;
+    const sinResultados = estadoListado === "exito" && salidasVisibles.length === 0;
 
     const columnas = [
         {
@@ -1974,6 +2003,48 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div role="tablist" aria-label="Vista de salidas" className="flex gap-2">
+                    {(["vigentes", "historial"] as const).map((opcion) => (
+                        <button
+                            key={opcion}
+                            type="button"
+                            role="tab"
+                            aria-selected={!buscaEnTodas && vista === opcion}
+                            disabled={buscaEnTodas}
+                            onClick={() => {
+                                setVista(opcion);
+                                setPaginaActual(1);
+                            }}
+                            className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
+                                !buscaEnTodas && vista === opcion
+                                    ? "border-primario bg-primario text-white"
+                                    : "border-borde bg-white text-texto-suave hover:bg-slate-100"
+                            }`}
+                        >
+                            {opcion === "vigentes" ? "Vigentes" : "Historial"}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="w-full max-w-sm">
+                    <label htmlFor="buscar-salida" className="sr-only">
+                        Buscar por número de salida
+                    </label>
+                    <input
+                        id="buscar-salida"
+                        type="search"
+                        value={busqueda}
+                        onChange={(evento) => {
+                            setBusqueda(evento.target.value);
+                            setPaginaActual(1);
+                        }}
+                        placeholder="Buscar por número de salida..."
+                        className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                    />
+                </div>
+            </div>
+
             {/* Panel de Filtros */}
             <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
                 <label
@@ -2136,7 +2207,9 @@ function SalidasPage() {
                     mensaje={
                         hayFiltrosActivos
                             ? "No se encontraron salidas que coincidan con los filtros seleccionados."
-                            : "Todavía no hay salidas registradas."
+                            : salidas.length > 0
+                              ? `No hay salidas en ${vista === "vigentes" ? "vigentes" : "el historial"}.`
+                              : "Todavía no hay salidas registradas."
                     }
                 />
             ) : (
@@ -2162,6 +2235,7 @@ function SalidasPage() {
                     <Paginacion
                         paginaActual={paginaValida}
                         totalPaginas={totalPaginas}
+                        total={salidasVisibles.length}
                         onCambiarPagina={(nuevaPagina) => setPaginaActual(nuevaPagina)}
                     />
                 </div>

@@ -251,7 +251,7 @@ const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Paquetes turísticos", icono: <IconoPaquetes />, ruta: "/gestion/paquetes" },
     { etiqueta: "Proveedores", icono: <IconoProveedores />, ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: <IconoSalidas />, ruta: "/gestion/salidas" },
-    { etiqueta: "Reservas y pagos", icono: <IconoReservas />, ruta: "/gestion/solicitudes" },
+    { etiqueta: "Solicitudes de alojamiento", icono: <IconoReservas />, ruta: "/gestion/solicitudes" },
     { etiqueta: "Reportes", icono: <IconoReportes />, ruta: "/gestion/reportes" },
     { etiqueta: "Personal", icono: <IconoPersonal />, ruta: "/gestion/personal" },
     { etiqueta: "Reseñas y evaluaciones", icono: <IconoResenias />, ruta: "/gestion/evaluaciones" },

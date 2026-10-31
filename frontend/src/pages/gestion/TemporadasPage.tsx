@@ -7,6 +7,7 @@ import EstadoListado from "../../components/EstadoListado";
 import FormularioTemporada from "../../components/FormularioTemporada";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
+import { fechaLocalHoy } from "../../services/guiaService";
 import {
     useDarDeBajaTemporada,
     useModificarTemporada,
@@ -46,6 +47,7 @@ function TemporadasPage() {
     const guardando = registrar.isPending || modificar.isPending;
 
     const [busqueda, setBusqueda] = useState("");
+    const [verVencidas, setVerVencidas] = useState(false);
     const [paginaActual, setPaginaActual] = useState(1);
     const [formularioAbierto, setFormularioAbierto] = useState(false);
     const [temporadaEnEdicion, setTemporadaEnEdicion] =
@@ -115,15 +117,25 @@ function TemporadasPage() {
         });
     }
 
+    const hoy = fechaLocalHoy();
     const terminoLimpio = busqueda.trim().toLowerCase();
-    const temporadasFiltradas = temporadas.filter((temporada) => {
-        if (!terminoLimpio) return true;
-        return (
-            temporada.nombre.toLowerCase().includes(terminoLimpio) ||
-            formatearFecha(temporada.fechaInicio).includes(terminoLimpio) ||
-            formatearFecha(temporada.fechaFin).includes(terminoLimpio)
+    // La búsqueda mira todas las temporadas; sin búsqueda, solo las de la vista elegida
+    const temporadasFiltradas = temporadas
+        .filter((temporada) => {
+            if (!terminoLimpio) {
+                return (temporada.fechaFin.slice(0, 10) < hoy) === verVencidas;
+            }
+            return (
+                temporada.nombre.toLowerCase().includes(terminoLimpio) ||
+                formatearFecha(temporada.fechaInicio).includes(terminoLimpio) ||
+                formatearFecha(temporada.fechaFin).includes(terminoLimpio)
+            );
+        })
+        .sort((a, b) =>
+            verVencidas
+                ? b.fechaInicio.localeCompare(a.fechaInicio)
+                : a.fechaInicio.localeCompare(b.fechaInicio),
         );
-    });
 
     const totalPaginas = Math.max(
         1,
@@ -223,7 +235,19 @@ function TemporadasPage() {
                         >
                             Limpiar búsqueda
                         </Boton>
-                    ) : null}
+                    ) : (
+                        <label className="flex items-center gap-2 text-sm text-texto-suave">
+                            <input
+                                type="checkbox"
+                                checked={verVencidas}
+                                onChange={(evento) => {
+                                    setVerVencidas(evento.target.checked);
+                                    setPaginaActual(1);
+                                }}
+                            />
+                            Ver temporadas vencidas
+                        </label>
+                    )}
                 </div>
             ) : null}
 
@@ -240,7 +264,13 @@ function TemporadasPage() {
             ) : sinResultadosBusqueda ? (
                 <EstadoListado
                     estado="vacio"
-                    mensaje={`No se encontraron temporadas que coincidan con "${busqueda.trim()}".`}
+                    mensaje={
+                        terminoLimpio
+                            ? `No se encontraron temporadas que coincidan con "${busqueda.trim()}".`
+                            : verVencidas
+                              ? "No hay temporadas vencidas."
+                              : "No hay temporadas vigentes ni futuras."
+                    }
                 />
             ) : (
                 <div className="overflow-x-auto">
@@ -322,6 +352,7 @@ function TemporadasPage() {
                 <Paginacion
                     paginaActual={paginaActual}
                     totalPaginas={totalPaginas}
+                    total={temporadasFiltradas.length}
                     onCambiarPagina={setPaginaActual}
                 />
             ) : null}

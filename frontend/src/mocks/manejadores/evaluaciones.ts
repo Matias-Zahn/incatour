@@ -22,6 +22,19 @@ const evaluacionesPersonal = structuredClone(evaluacionesPersonalIniciales);
 const evaluacionesProveedores = structuredClone(evaluacionesProveedoresIniciales);
 
 export const manejadoresEvaluaciones = [
+  // GET /api/salidas/evaluaciones-pendientes (CU-42)
+  http.get("*/api/salidas/evaluaciones-pendientes", async () => {
+    await delay(150);
+    const data = salidas
+      .filter((s) => s.estado === "FINALIZADA")
+      .map(({ idsalida }) => {
+        const evaluables = evaluablesPorSalida[idsalida];
+        const faltan = [...(evaluables?.personal ?? []), ...(evaluables?.proveedores ?? [])].filter((e) => !e.evaluacion);
+        return { idsalida, pendientes: faltan.length };
+      });
+    return HttpResponse.json({ data });
+  }),
+
   // GET /api/salidas/:idsalida/evaluaciones (CU-42)
   http.get("*/api/salidas/:idsalida/evaluaciones", async ({ params }) => {
     await delay(150);

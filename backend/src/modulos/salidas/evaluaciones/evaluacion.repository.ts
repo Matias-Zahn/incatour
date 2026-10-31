@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
+import { ESTADO_SALIDA } from "../../../shared/constantes";
 import { finDelDiaLocal, inicioDelDiaLocal } from "../../../shared/fechas";
 
 // Filtros que comparte con la consulta de reseñas (CU-43)
@@ -12,20 +13,23 @@ export interface FiltrosEvaluacion {
   fechaHasta?: Date | undefined;
 }
 
+const EVALUABLES = {
+  personalAsignado: { include: { personal: { select: { idpersonal: true, nombreCompleto: true, rol: true } } } },
+  // Proveedores que dieron servicio en la salida: alojamiento, transporte, tren o equipamiento
+  servicios: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
+  equipamientos: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
+  evaluacionesPersonal: true,
+  evaluacionesProveedores: true,
+} satisfies Prisma.SalidaInclude;
+
 export class EvaluacionRepository {
   // CU-42: la salida con quiénes participaron y lo que ya se evaluó
   async buscarSalida(idsalida: number) {
-    return db.salida.findUnique({
-      where: { idsalida },
-      include: {
-        personalAsignado: { include: { personal: { select: { idpersonal: true, nombreCompleto: true, rol: true } } } },
-        // Proveedores que dieron servicio en la salida: alojamiento, transporte, tren o equipamiento
-        servicios: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
-        equipamientos: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
-        evaluacionesPersonal: true,
-        evaluacionesProveedores: true,
-      },
-    });
+    return db.salida.findUnique({ where: { idsalida }, include: EVALUABLES });
+  }
+
+  async salidasFinalizadas() {
+    return db.salida.findMany({ where: { estado: ESTADO_SALIDA.FINALIZADA }, include: EVALUABLES });
   }
 
   async evaluarPersonal(idsalida: number, idpersonal: number, puntaje: number, comentario: string | null) {
