@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
@@ -597,6 +597,17 @@ function SalidasPage() {
             },
         });
     }
+
+    // Estos paneles se abren arriba del listado: sin esto, quien tocó el botón más abajo no ve que se abrieron
+    const anclaPaneles = useRef<HTMLDivElement>(null);
+    const idPanelAbierto =
+        salidaParaAsignar?.idsalida ??
+        salidaParaReemplazar?.idsalida ??
+        salidaParaModificarLogistica?.idsalida;
+    const tipoPanelAbierto = salidaParaAsignar ? "asignar" : salidaParaReemplazar ? "reemplazar" : "logistica";
+    useEffect(() => {
+        if (idPanelAbierto !== undefined) anclaPaneles.current?.scrollIntoView();
+    }, [idPanelAbierto, tipoPanelAbierto]);
 
     const [filtroCircuito, setFiltroCircuito] = useState<number | "">("");
     const [filtroPaquete, setFiltroPaquete] = useState<number | "">("");
@@ -1688,6 +1699,8 @@ function SalidasPage() {
                     </div>
                 </Alerta>
             ) : null}
+
+            <div ref={anclaPaneles} className="scroll-mt-24" />
 
             {salidaParaAsignar ? (
                 <FormularioAsignarRecursos
