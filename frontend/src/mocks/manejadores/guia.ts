@@ -193,6 +193,7 @@ export const manejadoresGuia = [
             }
 
             contadorIncidente += 1;
+            detalle.incidentes = [{ idincidente: contadorIncidente, tipoIncidente, nivelGravedad, descripcion, fechaHoraReporte: new Date().toISOString() }, ...(detalle.incidentes ?? [])];
             return HttpResponse.json(
                 {
                     mensaje: "Incidente registrado y visible en el panel del administrador.",

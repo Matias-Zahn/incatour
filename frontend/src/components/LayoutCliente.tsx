@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
+import EstadoListado from "./EstadoListado";
 import {
     Link,
     NavLink,
@@ -466,7 +467,7 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                 ) : null}
 
                 <main className="flex-1 overflow-x-hidden p-4 md:p-8">
-                    <div className="mx-auto max-w-6xl"><LimiteDeError>{children}</LimiteDeError></div>
+                    <div className="mx-auto max-w-6xl"><LimiteDeError><Suspense fallback={<EstadoListado estado="cargando" />}>{children}</Suspense></LimiteDeError></div>
                 </main>
             </div>
 

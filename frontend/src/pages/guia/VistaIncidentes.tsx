@@ -75,11 +75,14 @@ export function VistaIncidentes({
         fechaHora: formatearFechaHora(i.fechaHoraReporte),
     }));
     const idsDelServidor = new Set(delServidor.map((i) => i.id));
+    const idsPendientes = new Set(sincronizacion.pendientes.map((p) => p.idLocal));
+    // Un id temporal que ya no está en la cola es una copia de algo que ya se envió
     const historialIncidentes = [
-        ...obtenerHistorialLocalIncidentes(idsalida).filter((i) => !idsDelServidor.has(i.id)),
+        ...obtenerHistorialLocalIncidentes(idsalida).filter(
+            (i) => !idsDelServidor.has(i.id) && (!i.id.startsWith("off_") || idsPendientes.has(i.id)),
+        ),
         ...delServidor,
     ];
-    const idsPendientes = new Set(sincronizacion.pendientes.map((p) => p.idLocal));
 
     const fechaHoy = fechaLocalHoy();
     const horaActual = new Date().toTimeString().slice(0, 5);

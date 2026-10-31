@@ -48,6 +48,8 @@ export function useSincronizacionIncidentes(idsalida: number): SincronizacionInc
             try {
                 await registrarIncidente({ idsalida, payload: item.payload });
                 eliminarIncidenteOffline(idsalida, item.idLocal);
+                // Desde ahora lo trae el servidor: si quedara la copia local, con su id temporal, se vería dos veces
+                eliminarHistorialLocalIncidente(idsalida, item.idLocal);
                 enviados += 1;
             } catch (error) {
                 if (esRechazoDefinitivo(error)) {

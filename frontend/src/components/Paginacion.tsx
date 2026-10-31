@@ -40,7 +40,7 @@ function Paginacion({
                 {total === undefined ? "" : ` · ${total} en total`}
             </span>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 {conExtremos ? (
                     <Boton
                         variante="secundario"
