@@ -434,10 +434,12 @@ export function usePaqueteDetalle(id: number | null) {
     });
 }
 
-export function useServiciosDisponiblesCatalogo() {
+// Pide una consulta por proveedor: solo vale la pena cuando se abre el formulario
+export function useServiciosDisponiblesCatalogo(habilitado: boolean) {
     return useQuery({
         queryKey: clavesPaquetes.serviciosCatalogo,
         queryFn: listarServiciosDisponiblesCatalogo,
+        enabled: habilitado,
     });
 }
 

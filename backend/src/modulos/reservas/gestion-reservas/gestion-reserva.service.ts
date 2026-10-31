@@ -47,8 +47,8 @@ export class GestionReservaService {
 
   // Administrador: todas, con filtros
   async consultarReservas(filtros: FiltrosReservaDto) {
-    const reservas = await this.repository.findConFiltros(filtros);
-    return reservas.map((r) => ({ ...this.resumir(r), titular: r.cliente.usuario }));
+    const { reservas, total } = await this.repository.findConFiltros(filtros);
+    return { total, reservas: reservas.map((r) => ({ ...this.resumir(r), titular: r.cliente.usuario })) };
   }
 
   async obtenerReserva(idreserva: number, usuario: UsuarioAutenticado) {
@@ -69,6 +69,7 @@ export class GestionReservaService {
       titular: reserva.cliente.usuario,
       paquete: reserva.salida.paquete.nombrePaquete,
       salida: { nroSalida: reserva.salida.nroSalida, fechaInicio: reserva.salida.fechaInicio, fechaFin: reserva.salida.fechaFin },
+      estadoAlojamiento: reserva.estadoAlojamiento,
       pasajeros: reserva.pasajeros.map((p) => p.pasajero.nombreCompleto),
       precioCongelado: reserva.precioCongelado,
       ...this.calcularDesglose(reserva),

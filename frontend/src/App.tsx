@@ -1,32 +1,39 @@
+import { lazy, Suspense } from "react";
 import LayoutCliente from "./components/LayoutCliente";
 import LayoutGestion from "./components/LayoutGestion";
-import CatalogoCompraPage from "./pages/cliente/CatalogoCompraPage";
-import MiCuentaClientePage from "./pages/cliente/MiCuentaClientePage";
-import MisReseniasPage from "./pages/cliente/MisReseniasPage";
-import MisReservasPage from "./pages/cliente/MisReservasPage";
-import RegistroClientePage from "./pages/cliente/RegistroClientePage";
-import CircuitosPage from "./pages/gestion/CircuitosPage";
-import CuentasGuiaPage from "./pages/gestion/CuentasGuiaPage";
-import EtapasPage from "./pages/gestion/EtapasPage";
-import EvaluacionesPage from "./pages/gestion/EvaluacionesPage";
-import InicioGestionPage from "./pages/gestion/InicioGestionPage";
-import PaquetesPage from "./pages/gestion/PaquetesPage";
-import PersonalPage from "./pages/gestion/PersonalPage";
-import ProveedoresPage from "./pages/gestion/ProveedoresPage";
-import SalidasPage from "./pages/gestion/SalidasPage";
-import ServiciosPage from "./pages/gestion/ServiciosPage";
-import SolicitudesPage from "./pages/gestion/SolicitudesPage";
-import TemporadasPage from "./pages/gestion/TemporadasPage";
-import PortalGuiaPage from "./pages/guia/PortalGuiaPage";
 import Login from "./pages/Login";
 import RutaProtegida from "./components/RutaProtegida";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import EstadoListado from "./components/EstadoListado";
 import LimiteDeError from "./components/LimiteDeError";
+
+// Cada pantalla se baja recién cuando se entra: un cliente no descarga el panel de gestión ni el portal del guía
+const CatalogoCompraPage = lazy(() => import("./pages/cliente/CatalogoCompraPage"));
+const MiCuentaClientePage = lazy(() => import("./pages/cliente/MiCuentaClientePage"));
+const MisReseniasPage = lazy(() => import("./pages/cliente/MisReseniasPage"));
+const MisReservasPage = lazy(() => import("./pages/cliente/MisReservasPage"));
+const RegistroClientePage = lazy(() => import("./pages/cliente/RegistroClientePage"));
+const CircuitosPage = lazy(() => import("./pages/gestion/CircuitosPage"));
+const CuentasGuiaPage = lazy(() => import("./pages/gestion/CuentasGuiaPage"));
+const EtapasPage = lazy(() => import("./pages/gestion/EtapasPage"));
+const EvaluacionesPage = lazy(() => import("./pages/gestion/EvaluacionesPage"));
+const InicioGestionPage = lazy(() => import("./pages/gestion/InicioGestionPage"));
+const PaquetesPage = lazy(() => import("./pages/gestion/PaquetesPage"));
+const PersonalPage = lazy(() => import("./pages/gestion/PersonalPage"));
+const ProveedoresPage = lazy(() => import("./pages/gestion/ProveedoresPage"));
+const ReportesPage = lazy(() => import("./pages/gestion/ReportesPage"));
+const ReservasGestionPage = lazy(() => import("./pages/gestion/ReservasGestionPage"));
+const SalidasPage = lazy(() => import("./pages/gestion/SalidasPage"));
+const ServiciosPage = lazy(() => import("./pages/gestion/ServiciosPage"));
+const SolicitudesPage = lazy(() => import("./pages/gestion/SolicitudesPage"));
+const TemporadasPage = lazy(() => import("./pages/gestion/TemporadasPage"));
+const PortalGuiaPage = lazy(() => import("./pages/guia/PortalGuiaPage"));
 
 function App() {
   return (
     <BrowserRouter>
       <LimiteDeError>
+      <Suspense fallback={<EstadoListado estado="cargando" />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -181,8 +188,24 @@ function App() {
           <Route
             path="/gestion/solicitudes"
             element={
-              <LayoutGestion seccion="Reservas y pagos">
+              <LayoutGestion seccion="Solicitudes de alojamiento">
                 <SolicitudesPage />
+              </LayoutGestion>
+            }
+          />
+          <Route
+            path="/gestion/reservas"
+            element={
+              <LayoutGestion seccion="Reservas y pagos">
+                <ReservasGestionPage />
+              </LayoutGestion>
+            }
+          />
+          <Route
+            path="/gestion/reportes"
+            element={
+              <LayoutGestion seccion="Reportes">
+                <ReportesPage />
               </LayoutGestion>
             }
           />
@@ -213,6 +236,7 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       </LimiteDeError>
     </BrowserRouter>
   );

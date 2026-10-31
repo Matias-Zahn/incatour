@@ -9,6 +9,25 @@ export class EvaluacionRoutes {
 
     /**
      * @swagger
+     * /api/salidas/evaluaciones-pendientes:
+     *   get:
+     *     summary: Evaluaciones que le faltan a cada salida finalizada (CU-42)
+     *     description: "**RESTRINGIDO A ADMINISTRADOR.** Cuenta el personal y los proveedores sin evaluar de cada salida FINALIZADA."
+     *     tags: [Salidas]
+     *     security:
+     *       - BearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Pendientes por salida.
+     *         content:
+     *           application/json:
+     *             example:
+     *               data: [{ idsalida: 1, pendientes: 3 }]
+     */
+    router.get("/evaluaciones-pendientes", autenticar, requierePerfil("ADMIN"), controller.consultarPendientes);
+
+    /**
+     * @swagger
      * /api/salidas/{idsalida}/evaluaciones:
      *   get:
      *     summary: Personal y proveedores evaluables de una salida (CU-42)

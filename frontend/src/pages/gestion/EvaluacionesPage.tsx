@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   consultarReseniasYEvaluaciones,
   consultarEvaluablesSalida,
+  consultarEvaluacionesPendientes,
   registrarEvaluacionSalida,
   listarSalidasParaEvaluacion,
   ETIQUETAS_PUNTAJE,
@@ -13,6 +14,7 @@ import {
 import { usePaquetes } from "../../services/paqueteService";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
+import ListaPaginada from "../../components/ListaPaginada";
 import Alerta from "../../components/Alerta";
 
 // FE-50: las fechas sin hora (inicio y fin de la salida) van en UTC; los instantes (envío, evaluación), en hora local
@@ -27,6 +29,16 @@ function formatearFechaCorta(iso?: string, enUtc = true): string {
     ...(enUtc && { timeZone: "UTC" }),
   });
 }
+
+const FILTROS_PUNTAJE: { label: string; min?: number; max?: number }[] = [
+  { label: "Todos" },
+  { label: "2 o menos ★", max: 2 },
+  { label: "3+ ★", min: 3 },
+  { label: "4+ ★", min: 4 },
+  { label: "Solo 5 ★", min: 5 },
+];
+
+const SALIDAS_POR_PAGINA = 9;
 
 function EstrellasPuntaje({ valor }: { valor: number }) {
   return (
@@ -209,7 +221,10 @@ export function EvaluacionesPage() {
   // Filtros de CU-43
   const [idPaqueteFiltro, setIdPaqueteFiltro] = useState<number | undefined>(undefined);
   const [idSalidaFiltro, setIdSalidaFiltro] = useState<number | undefined>(undefined);
-  const [valoracionMin, setValoracionMin] = useState<number | undefined>(undefined);
+  const [textoSalida, setTextoSalida] = useState<string>("");
+  const [puntaje, setPuntaje] = useState(FILTROS_PUNTAJE[0]!);
+  const [pestana, setPestana] = useState<"resenias" | "personal" | "proveedores">("resenias");
+  const [soloPendientes, setSoloPendientes] = useState(true);
   const [fechaDesde, setFechaDesde] = useState<string>("");
   const [fechaHasta, setFechaHasta] = useState<string>("");
 
@@ -229,14 +244,26 @@ export function EvaluacionesPage() {
     queryFn: listarSalidasParaEvaluacion,
   });
 
-  const salidasFinalizadas = salidas.filter((s) => s.estado === "FINALIZADA");
+  const { data: pendientesPorSalida } = useQuery({
+    queryKey: ["salidas", "evaluaciones-pendientes"],
+    queryFn: consultarEvaluacionesPendientes,
+    enabled: modoVista === "evaluar",
+  });
+
+  const salidasFinalizadas = salidas
+    .filter((s) => s.estado === "FINALIZADA")
+    .sort((a, b) => b.fechaFin.localeCompare(a.fechaFin));
+  const salidasAEvaluar = soloPendientes
+    ? salidasFinalizadas.filter((s) => (pendientesPorSalida?.get(s.idsalida) ?? 0) > 0)
+    : salidasFinalizadas;
   const idSalidaEvaluarEfectiva =
-    idSalidaEvaluar ?? salidasFinalizadas[0]?.idsalida ?? null;
+    idSalidaEvaluar ?? salidasAEvaluar[0]?.idsalida ?? null;
 
   const filtrosActivos: FiltrosConsultaResenias = {
     ...(idPaqueteFiltro ? { idpaquete: idPaqueteFiltro } : {}),
     ...(idSalidaFiltro ? { idsalida: idSalidaFiltro } : {}),
-    ...(valoracionMin ? { valoracionMin } : {}),
+    ...(puntaje.min ? { valoracionMin: puntaje.min } : {}),
+    ...(puntaje.max ? { valoracionMax: puntaje.max } : {}),
     ...(fechaDesde ? { fechaDesde } : {}),
     ...(fechaHasta ? { fechaHasta } : {}),
   };
@@ -265,10 +292,23 @@ export function EvaluacionesPage() {
   const limpiarFiltros = () => {
     setIdPaqueteFiltro(undefined);
     setIdSalidaFiltro(undefined);
-    setValoracionMin(undefined);
+    setTextoSalida("");
+    setPuntaje(FILTROS_PUNTAJE[0]!);
     setFechaDesde("");
     setFechaHasta("");
   };
+
+  function cambiarTextoSalida(texto: string) {
+    setTextoSalida(texto);
+    setIdSalidaFiltro(salidasFinalizadas.find((s) => s.nroSalida === texto.trim().toUpperCase())?.idsalida);
+  }
+
+  const pestanas = [
+    { id: "resenias", titulo: "Reseñas de clientes", cantidad: consulta?.resenias.length ?? 0 },
+    { id: "personal", titulo: "Personal", cantidad: consulta?.evaluaciones.personal.length ?? 0 },
+    { id: "proveedores", titulo: "Proveedores", cantidad: consulta?.evaluaciones.proveedores.length ?? 0 },
+  ] as const;
+  const claveLista = `${pestana}-${JSON.stringify(filtrosActivos)}`;
 
   const totalEvaluacionesInternas =
     (consulta?.evaluaciones.personal.length ?? 0) +
@@ -367,7 +407,7 @@ export function EvaluacionesPage() {
               <span className="text-xs font-semibold uppercase tracking-wide text-texto-suave">
                 Filtros combinados (aplican a reseñas y evaluaciones)
               </span>
-              {(idPaqueteFiltro || idSalidaFiltro || valoracionMin || fechaDesde || fechaHasta) && (
+              {(idPaqueteFiltro || textoSalida || puntaje.min || puntaje.max || fechaDesde || fechaHasta) && (
                 <button
                   type="button"
                   onClick={limpiarFiltros}
@@ -404,21 +444,21 @@ export function EvaluacionesPage() {
                 <label htmlFor="filtro-salida" className="mb-1 block text-xs font-medium text-texto">
                   Salida específica
                 </label>
-                <select
+                <input
                   id="filtro-salida"
-                  value={idSalidaFiltro ?? ""}
-                  onChange={(e) =>
-                    setIdSalidaFiltro(e.target.value ? Number(e.target.value) : undefined)
-                  }
+                  list="salidas-finalizadas"
+                  value={textoSalida}
+                  onChange={(e) => cambiarTextoSalida(e.target.value)}
+                  placeholder="Todas las salidas"
                   className="w-full rounded-lg border border-borde bg-white px-3 py-1.5 text-sm"
-                >
-                  <option value="">Todas las salidas</option>
-                  {salidas.map((s) => (
-                    <option key={s.idsalida} value={s.idsalida}>
-                      {s.nroSalida} ({s.estado})
+                />
+                <datalist id="salidas-finalizadas">
+                  {salidasFinalizadas.map((s) => (
+                    <option key={s.idsalida} value={s.nroSalida}>
+                      {s.paquete?.nombrePaquete}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div>
@@ -449,19 +489,14 @@ export function EvaluacionesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="text-xs font-medium text-texto-suave">Puntaje mínimo:</span>
-              {[
-                { label: "Todos", val: undefined },
-                { label: "3+ ★", val: 3 },
-                { label: "4+ ★", val: 4 },
-                { label: "Solo 5 ★", val: 5 },
-              ].map((op) => {
-                const activo = valoracionMin === op.val;
+              <span className="text-xs font-medium text-texto-suave">Puntaje:</span>
+              {FILTROS_PUNTAJE.map((op) => {
+                const activo = puntaje === op;
                 return (
                   <button
                     key={op.label}
                     type="button"
-                    onClick={() => setValoracionMin(op.val)}
+                    onClick={() => setPuntaje(op)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                       activo
                         ? "border-primario bg-primario text-white"
@@ -492,80 +527,30 @@ export function EvaluacionesPage() {
               mensaje="No se encontraron reseñas ni evaluaciones con los filtros seleccionados."
             />
           ) : (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Columna 1: Reseñas de Clientes */}
-              <div className="rounded-xl border border-borde bg-white p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-borde pb-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-texto">
-                      Reseñas publicadas por clientes
-                    </h2>
-                    <p className="text-xs text-texto-suave">
-                      Valoraciones de pasajeros que completaron su experiencia
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-primario">
-                    {consulta?.resenias.length ?? 0}
-                  </span>
-                </div>
-
-                {consulta?.resenias.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-texto-suave">
-                    No hay reseñas de clientes para este filtro.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {consulta?.resenias.map((r) => (
-                      <div
-                        key={`${r.idcliente}-${r.idsalida}`}
-                        className="rounded-lg border border-borde bg-slate-50 p-3.5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <span className="text-sm font-semibold text-texto">
-                              {r.cliente.usuario.nombre} {r.cliente.usuario.apellido}
-                            </span>
-                            <span className="ml-2 text-xs text-texto-suave">
-                              · {r.salida.nroSalida} ({r.salida.paquete.nombrePaquete})
-                            </span>
-                          </div>
-                          <EstrellasPuntaje valor={r.valoracion} />
-                        </div>
-                        {r.comentario && (
-                          <p className="mt-2 text-xs text-texto leading-relaxed">
-                            “{r.comentario}”
-                          </p>
-                        )}
-                        <div className="mt-2 text-[11px] text-texto-suave">
-                          Enviada el {formatearFechaCorta(r.fechaEnvio, false)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            <div className="rounded-xl border border-borde bg-white p-5 space-y-4">
+              <div role="tablist" aria-label="Tipo de registro" className="flex flex-wrap gap-2 border-b border-borde pb-3">
+                {pestanas.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={pestana === p.id}
+                    onClick={() => setPestana(p.id)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      pestana === p.id
+                        ? "border-primario bg-primario text-white"
+                        : "border-borde bg-white text-texto-suave hover:bg-slate-100 hover:text-texto"
+                    }`}
+                  >
+                    {p.titulo} ({p.cantidad})
+                  </button>
+                ))}
               </div>
 
-              {/* Columna 2: Evaluaciones Internas (Personal y Proveedores) */}
-              <div className="rounded-xl border border-borde bg-white p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-borde pb-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-texto">
-                      Evaluaciones internas del administrador
-                    </h2>
-                    <p className="text-xs text-texto-suave">
-                      Desempeño de guías, porteadores y proveedores en salidas finalizadas
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-primario">
-                    {totalEvaluacionesInternas}
-                  </span>
-                </div>
-
-                {totalEvaluacionesInternas === 0 ? (
-                  <div className="py-6 text-center space-y-2">
-                    <p className="text-xs text-texto-suave">
-                      Aún no hay evaluaciones registradas para este filtro.
-                    </p>
+              {pestanas.find((p) => p.id === pestana)?.cantidad === 0 ? (
+                <div className="py-6 text-center space-y-2">
+                  <p className="text-xs text-texto-suave">No hay registros para este filtro.</p>
+                  {pestana !== "resenias" && (
                     <Boton
                       variante="secundario"
                       className="text-xs px-3 py-1.5"
@@ -573,67 +558,104 @@ export function EvaluacionesPage() {
                     >
                       Ir a evaluar salida finalizada
                     </Boton>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {consulta?.evaluaciones.personal.map((ev) => (
-                      <div
-                        key={`pers-${ev.idsalida}-${ev.idpersonal}`}
-                        className="rounded-lg border border-borde bg-slate-50 p-3.5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-marca-suave px-2 py-0.5 text-[10px] font-semibold text-primario">
-                              {ev.personal.rol}
-                            </span>
-                            <span className="text-sm font-semibold text-texto">
-                              {ev.personal.nombreCompleto}
-                            </span>
-                            <span className="text-xs text-texto-suave">
-                              · {ev.salida.nroSalida}
-                            </span>
-                          </div>
-                          <EstrellasPuntaje valor={ev.puntaje} />
+                  )}
+                </div>
+              ) : pestana === "resenias" ? (
+                <ListaPaginada
+                  key={claveLista}
+                  items={consulta?.resenias ?? []}
+                  renderizar={(r) => (
+                    <div
+                      key={`${r.idcliente}-${r.idsalida}`}
+                      className="rounded-lg border border-borde bg-slate-50 p-3.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-sm font-semibold text-texto">
+                            {r.cliente.usuario.nombre} {r.cliente.usuario.apellido}
+                          </span>
+                          <span className="ml-2 text-xs text-texto-suave">
+                            · {r.salida.nroSalida} ({r.salida.paquete.nombrePaquete})
+                          </span>
                         </div>
-                        {ev.comentario && (
-                          <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
-                        )}
-                        <div className="mt-1.5 text-[11px] text-texto-suave">
-                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
-                        </div>
+                        <EstrellasPuntaje valor={r.valoracion} />
                       </div>
-                    ))}
-
-                    {consulta?.evaluaciones.proveedores.map((ev) => (
-                      <div
-                        key={`prov-${ev.idsalida}-${ev.idproveedor}`}
-                        className="rounded-lg border border-borde bg-slate-50 p-3.5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
-                              Proveedor
-                            </span>
-                            <span className="text-sm font-semibold text-texto">
-                              {ev.proveedor.razonSocial}
-                            </span>
-                            <span className="text-xs text-texto-suave">
-                              · {ev.salida.nroSalida}
-                            </span>
-                          </div>
-                          <EstrellasPuntaje valor={ev.puntaje} />
-                        </div>
-                        {ev.comentario && (
-                          <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
-                        )}
-                        <div className="mt-1.5 text-[11px] text-texto-suave">
-                          Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
-                        </div>
+                      {r.comentario && (
+                        <p className="mt-2 text-xs text-texto leading-relaxed">
+                          “{r.comentario}”
+                        </p>
+                      )}
+                      <div className="mt-2 text-[11px] text-texto-suave">
+                        Enviada el {formatearFechaCorta(r.fechaEnvio, false)}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                />
+              ) : pestana === "personal" ? (
+                <ListaPaginada
+                  key={claveLista}
+                  items={consulta?.evaluaciones.personal ?? []}
+                  renderizar={(ev) => (
+                    <div
+                      key={`pers-${ev.idsalida}-${ev.idpersonal}`}
+                      className="rounded-lg border border-borde bg-slate-50 p-3.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-marca-suave px-2 py-0.5 text-[10px] font-semibold text-primario">
+                            {ev.personal.rol}
+                          </span>
+                          <span className="text-sm font-semibold text-texto">
+                            {ev.personal.nombreCompleto}
+                          </span>
+                          <span className="text-xs text-texto-suave">
+                            · {ev.salida.nroSalida}
+                          </span>
+                        </div>
+                        <EstrellasPuntaje valor={ev.puntaje} />
+                      </div>
+                      {ev.comentario && (
+                        <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
+                      )}
+                      <div className="mt-1.5 text-[11px] text-texto-suave">
+                        Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
+                      </div>
+                    </div>
+                  )}
+                />
+              ) : (
+                <ListaPaginada
+                  key={claveLista}
+                  items={consulta?.evaluaciones.proveedores ?? []}
+                  renderizar={(ev) => (
+                    <div
+                      key={`prov-${ev.idsalida}-${ev.idproveedor}`}
+                      className="rounded-lg border border-borde bg-slate-50 p-3.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
+                            Proveedor
+                          </span>
+                          <span className="text-sm font-semibold text-texto">
+                            {ev.proveedor.razonSocial}
+                          </span>
+                          <span className="text-xs text-texto-suave">
+                            · {ev.salida.nroSalida}
+                          </span>
+                        </div>
+                        <EstrellasPuntaje valor={ev.puntaje} />
+                      </div>
+                      {ev.comentario && (
+                        <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
+                      )}
+                      <div className="mt-1.5 text-[11px] text-texto-suave">
+                        Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
+                      </div>
+                    </div>
+                  )}
+                />
+              )}
             </div>
           )}
         </div>
@@ -644,19 +666,38 @@ export function EvaluacionesPage() {
         <div className="space-y-6">
           {/* Selector visual de salidas finalizadas */}
           <div className="rounded-xl border border-borde bg-white p-4 space-y-3">
-            <label className="block text-sm font-semibold text-texto">
-              1. Seleccioná una salida finalizada para calificar su equipo y proveedores
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-texto">
+                1. Seleccioná una salida finalizada para calificar su equipo y proveedores
+              </p>
+              <label className="flex items-center gap-2 text-xs font-medium text-texto-suave">
+                <input
+                  type="checkbox"
+                  checked={soloPendientes}
+                  onChange={(e) => setSoloPendientes(e.target.checked)}
+                />
+                Solo con evaluaciones pendientes
+              </label>
+            </div>
             {salidasFinalizadas.length === 0 ? (
               <div className="rounded-lg border border-borde bg-slate-50 p-4 text-xs text-texto-suave">
                 No hay salidas en estado <strong>FINALIZADA</strong> en este momento. Recordá que
                 solo se puede calificar el desempeño una vez
                 que la salida ha concluido.
               </div>
+            ) : salidasAEvaluar.length === 0 ? (
+              <div className="rounded-lg border border-borde bg-slate-50 p-4 text-xs text-texto-suave">
+                No quedan salidas con evaluaciones pendientes.
+              </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {salidasFinalizadas.map((s) => {
+              <ListaPaginada
+                key={String(soloPendientes)}
+                items={salidasAEvaluar}
+                porPagina={SALIDAS_POR_PAGINA}
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                renderizar={(s) => {
                   const activa = idSalidaEvaluarEfectiva === s.idsalida;
+                  const pendientes = pendientesPorSalida?.get(s.idsalida);
                   return (
                     <button
                       key={s.idsalida}
@@ -672,9 +713,15 @@ export function EvaluacionesPage() {
                         <span className="font-mono text-xs font-bold text-primario">
                           {s.nroSalida}
                         </span>
-                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
-                          FINALIZADA
-                        </span>
+                        {pendientes === undefined ? null : pendientes > 0 ? (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-advertencia">
+                            {pendientes} pendiente{pendientes === 1 ? "" : "s"}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
+                            ✓ Completa
+                          </span>
+                        )}
                       </div>
                       <div className="mt-1 text-sm font-semibold text-texto">
                         {s.paquete?.nombrePaquete ?? `Paquete #${s.idpaquete}`}
@@ -684,8 +731,8 @@ export function EvaluacionesPage() {
                       </div>
                     </button>
                   );
-                })}
-              </div>
+                }}
+              />
             )}
           </div>
 
@@ -877,6 +924,7 @@ export function EvaluacionesPage() {
             queryClient.invalidateQueries({
               queryKey: ["salidas", evaluablesSalida.salida.idsalida, "evaluaciones"],
             });
+            queryClient.invalidateQueries({ queryKey: ["salidas", "evaluaciones-pendientes"] });
             queryClient.invalidateQueries({ queryKey: ["resenias"] });
           }}
         />

@@ -18,6 +18,7 @@ import {
     guardarIncidenteOffline,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
+    ESTADOS_CON_AVANCES,
     tiposIncidente,
     usePasajerosSalida,
     useRegistrarIncidente,
@@ -65,8 +66,23 @@ export function VistaIncidentes({
     const [pasajerosSeleccionados, setPasajerosSeleccionados] = useState<number[]>([]);
 
     // Se lee en cada render: la sincronización puede sacar un incidente rechazado
-    const historialIncidentes = obtenerHistorialLocalIncidentes(idsalida);
+    // Lo del servidor se ve desde cualquier celular; de lo local queda solo lo que el servidor todavía no tiene
+    const delServidor: RegistroHistorialIncidente[] = (detalleSalida?.incidentes ?? []).map((i) => ({
+        id: `inc_${i.idincidente}`,
+        tipoIncidente: i.tipoIncidente,
+        nivelGravedad: i.nivelGravedad,
+        descripcion: i.descripcion,
+        fechaHora: formatearFechaHora(i.fechaHoraReporte),
+    }));
+    const idsDelServidor = new Set(delServidor.map((i) => i.id));
     const idsPendientes = new Set(sincronizacion.pendientes.map((p) => p.idLocal));
+    // Un id temporal que ya no está en la cola es una copia de algo que ya se envió
+    const historialIncidentes = [
+        ...obtenerHistorialLocalIncidentes(idsalida).filter(
+            (i) => !idsDelServidor.has(i.id) && (!i.id.startsWith("off_") || idsPendientes.has(i.id)),
+        ),
+        ...delServidor,
+    ];
 
     const fechaHoy = fechaLocalHoy();
     const horaActual = new Date().toTimeString().slice(0, 5);
@@ -277,7 +293,14 @@ export function VistaIncidentes({
                         Datos del incidente
                     </h2>
 
-                    <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5 space-y-4">
+                    {ESTADOS_CON_AVANCES.includes(salidaActual.estado) ? null : (
+                        <div className="mt-5">
+                            <Alerta tipo="informacion">Esta salida ya terminó: no admite incidentes nuevos.</Alerta>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5">
+                    <fieldset disabled={!ESTADOS_CON_AVANCES.includes(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
                         {mensajeFeedback ? (
                             <Alerta tipo={mensajeFeedback.tipo}>
                                 {mensajeFeedback.texto}
@@ -402,11 +425,12 @@ export function VistaIncidentes({
                                 Enviar Notificación
                             </Boton>
                         </div>
+                    </fieldset>
                     </form>
                 </article>
 
                 {/* Columna Derecha: Selección de Pasajeros e Historial */}
-                <div className="space-y-6">
+                <div className="space-y-6 max-lg:order-first">
                     {/* Pasajeros afectados */}
                     <article className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta">
                         <h2 className="text-sm font-bold text-navegacion">

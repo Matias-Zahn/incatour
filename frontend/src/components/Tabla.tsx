@@ -4,6 +4,10 @@ type Columna<T> = {
     clave: keyof T;
     titulo: string;
     renderizar?: (fila: T) => ReactNode;
+    /** Dato que ya está en el detalle: en celular no vale el alto que ocupa */
+    ocultarEnCelular?: boolean;
+    /** Sin el título al costado, por ejemplo para los botones de acción */
+    sinTituloEnCelular?: boolean;
 };
 
 type TablaProps<T extends { id: string | number }> = {
@@ -44,9 +48,9 @@ function Tabla<T extends { id: string | number }>({
                                 <td
                                     key={`${String(columna.clave)}-${columna.titulo}`}
                                     data-titulo={columna.titulo}
-                                    className="px-4 py-3 text-texto align-top max-md:flex max-md:gap-3 max-md:px-1 max-md:py-1.5 max-md:before:w-24 max-md:before:shrink-0 max-md:before:pt-0.5 max-md:before:text-xs max-md:before:font-bold max-md:before:uppercase max-md:before:text-texto-suave max-md:before:content-[attr(data-titulo)]"
+                                    className={`px-4 py-3 text-texto align-top max-md:flex max-md:gap-3 max-md:px-1 max-md:py-1.5 ${columna.sinTituloEnCelular ? "" : "max-md:before:w-24 max-md:before:shrink-0 max-md:before:pt-0.5 max-md:before:text-xs max-md:before:font-bold max-md:before:uppercase max-md:before:text-texto-suave max-md:before:content-[attr(data-titulo)]"} ${columna.ocultarEnCelular ? "max-md:hidden" : ""}`}
                                 >
-                                    <div className="min-w-0 flex-1 max-md:[&_*]:whitespace-normal max-md:[&_*]:flex-wrap">
+                                    <div className="min-w-0 flex-1 max-md:[overflow-wrap:anywhere] max-md:[&_*]:whitespace-normal max-md:[&_*]:flex-wrap">
                                         {columna.renderizar
                                             ? columna.renderizar(fila)
                                             : String(fila[columna.clave])}

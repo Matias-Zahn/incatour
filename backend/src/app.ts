@@ -130,6 +130,9 @@ app.use("/api/guia", GuiaRoutes.getRoutes);
 import { IncidenteRoutes } from "./modulos/campo/guia/incidentes.routes";
 app.use("/api/incidentes", IncidenteRoutes.getRoutes);
 
+import { ReporteRoutes } from "./modulos/reportes/reporte.routes";
+app.use("/api/reportes", ReporteRoutes.getRoutes);
+
 //ACA IRIAN las demas
 
 app.use(rutaNoEncontrada);

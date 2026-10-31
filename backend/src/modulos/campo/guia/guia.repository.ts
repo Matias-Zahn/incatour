@@ -32,6 +32,7 @@ export class GuiaRepository {
       include: {
         paquete: { include: { circuito: { include: { etapas: { orderBy: { numeroOrden: "asc" } } } } } },
         avances: { orderBy: { fechaHoraReporte: "desc" } },
+        incidentes: { orderBy: { fechaHoraReporte: "desc" } },
         personalAsignado: { include: { personal: { select: { idpersonal: true, nombreCompleto: true, rol: true } } } },
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },

@@ -3,7 +3,7 @@ import { EvaluacionService } from "./evaluacion.service";
 import { EvaluarDto } from "./evaluacion.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { buscarSalida: vi.fn(), evaluarPersonal: vi.fn(), evaluarProveedor: vi.fn(), listar: vi.fn() },
+  repo: { buscarSalida: vi.fn(), salidasFinalizadas: vi.fn(), evaluarPersonal: vi.fn(), evaluarProveedor: vi.fn(), listar: vi.fn() },
 }));
 vi.mock("./evaluacion.repository", () => ({ EvaluacionRepository: class { constructor() { return repo; } } }));
 
@@ -32,6 +32,20 @@ describe("EvaluacionService (CU-42)", () => {
 
     expect(r.personal).toHaveLength(1);
     expect(r.proveedores).toEqual([{ ...proveedor, evaluacion: null }]);
+  });
+
+  it("cuenta lo que falta evaluar: cada persona y cada proveedor una sola vez", async () => {
+    repo.salidasFinalizadas.mockResolvedValue([
+      salida(),
+      salida({ idsalida: 2, evaluacionesPersonal: [{ idpersonal: 1 }] }),
+      salida({ idsalida: 3, evaluacionesPersonal: [{ idpersonal: 1 }], evaluacionesProveedores: [{ idproveedor: 4 }] }),
+    ]);
+
+    expect(await new EvaluacionService().pendientes()).toEqual([
+      { idsalida: 1, pendientes: 2 },
+      { idsalida: 2, pendientes: 1 },
+      { idsalida: 3, pendientes: 0 },
+    ]);
   });
 
   it("evalúa a una persona y a un proveedor que participaron", async () => {

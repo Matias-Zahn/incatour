@@ -1,10 +1,13 @@
 import { useState } from "react";
+import ListaPaginada from "../../components/ListaPaginada";
 import Modal from "../../components/Modal";
+import Tabla from "../../components/Tabla";
 import { useNavigate } from "react-router-dom";
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
     formatearFechaSalida,
+    ordenarSalidasGuia,
     type DetalleSalidaGuia,
     type SalidaGuiaResumen,
 } from "../../services/guiaService";
@@ -38,6 +41,10 @@ export function VistaSalidas({
     const navegar = useNavigate();
     const [vistaModo, setVistaModo] = useState<"lista" | "detalle">("lista");
     const [modalNominaAbierto, setModalNominaAbierto] = useState(false);
+    const [grupo, setGrupo] = useState<"pendientes" | "historial" | null>(null);
+    const grupos = ordenarSalidasGuia(salidas);
+    // Quien solo tiene salidas terminadas arranca en el historial, no en una lista vacía
+    const grupoVisible = grupo ?? (grupos.pendientes.length > 0 ? "pendientes" : "historial");
 
     const salidaInfo = detalleSalida?.salida ?? salidaActual;
     const nomina = detalleSalida?.nomina ?? [];
@@ -105,8 +112,36 @@ export function VistaSalidas({
                         <span>Selecciona una para consultar su detalle u operar</span>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        {salidas.map((s) => {
+                    <div role="tablist" aria-label="Salidas" className="flex gap-2">
+                        {(["pendientes", "historial"] as const).map((opcion) => (
+                            <button
+                                key={opcion}
+                                type="button"
+                                role="tab"
+                                aria-selected={grupoVisible === opcion}
+                                onClick={() => setGrupo(opcion)}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                                    grupoVisible === opcion
+                                        ? "border-navegacion bg-navegacion text-white"
+                                        : "border-borde bg-white text-texto"
+                                }`}
+                            >
+                                {opcion === "pendientes" ? "Próximas" : "Historial"} ({grupos[opcion].length})
+                            </button>
+                        ))}
+                    </div>
+
+                    {grupos[grupoVisible].length === 0 ? (
+                        <p className="rounded-tarjeta border border-borde bg-white p-6 text-center text-sm text-texto-suave">
+                            No tenés salidas próximas asignadas.
+                        </p>
+                    ) : (
+                    <ListaPaginada
+                        key={grupoVisible}
+                        items={grupos[grupoVisible]}
+                        porPagina={6}
+                        className="grid grid-cols-1 gap-5 md:grid-cols-2"
+                        renderizar={(s) => {
                             const esActiva = s.idsalida === salidaActual?.idsalida;
                             return (
                                 <article
@@ -198,8 +233,9 @@ export function VistaSalidas({
                                     </div>
                                 </article>
                             );
-                        })}
-                    </div>
+                        }}
+                    />
+                    )}
                 </div>
             ) : salidaInfo ? (
                 <>
@@ -495,44 +531,29 @@ export function VistaSalidas({
                             </button>
                         </div>
 
-                        <div className="mt-4 overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
-                                        <th className="py-2.5">ID/Pasaporte</th>
-                                        <th className="py-2.5">Nombre completo</th>
-                                        <th className="py-2.5">Nacionalidad</th>
-                                        <th className="py-2.5">Contacto de emergencia (Titular)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-borde/50">
-                                    {nomina.map((p) => (
-                                        <tr key={p.idpasajero}>
-                                            <td className="py-2.5 font-medium text-texto">
-                                                {p.nroPasaporte}
-                                            </td>
-                                            <td className="py-2.5 text-texto">
-                                                {p.nombreCompleto}
-                                            </td>
-                                            <td className="py-2.5 text-texto-suave">
-                                                {p.nacionalidad ?? "No especificada"}
-                                            </td>
-                                            <td className="py-2.5 text-texto-suave">
-                                                {p.contacto
-                                                    ? `${p.contacto.titular} (${p.contacto.email})`
-                                                    : "—"}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {nomina.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="py-6 text-center text-xs text-texto-suave">
-                                                No hay pasajeros registrados
-                                            </td>
-                                        </tr>
-                                    ) : null}
-                                </tbody>
-                            </table>
+                        <div className="mt-4">
+                            {nomina.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-texto-suave">No hay pasajeros registrados</p>
+                            ) : (
+                                <Tabla
+                                    filas={nomina.map((p) => ({ ...p, id: p.idpasajero }))}
+                                    columnas={[
+                                        { clave: "nroPasaporte", titulo: "ID/Pasaporte" },
+                                        { clave: "nombreCompleto", titulo: "Nombre completo" },
+                                        {
+                                            clave: "nacionalidad",
+                                            titulo: "Nacionalidad",
+                                            renderizar: (p) => p.nacionalidad ?? "No especificada",
+                                        },
+                                        {
+                                            clave: "contacto",
+                                            titulo: "Contacto de emergencia (Titular)",
+                                            renderizar: (p) =>
+                                                p.contacto ? `${p.contacto.titular} (${p.contacto.email})` : "—",
+                                        },
+                                    ]}
+                                />
+                            )}
                         </div>
 
                         <div className="mt-6 flex justify-end">

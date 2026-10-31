@@ -218,6 +218,27 @@ function IconoOjo() {
     );
 }
 
+function IconoReportes() {
+    return (
+        <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <path d="M3 3v18h18" />
+            <path d="M8 17v-6" />
+            <path d="M13 17V7" />
+            <path d="M18 17v-3" />
+        </svg>
+    );
+}
+
 type ElementoNavegacion = {
     etiqueta: string;
     icono: ReactNode;
@@ -230,7 +251,9 @@ const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Paquetes turísticos", icono: <IconoPaquetes />, ruta: "/gestion/paquetes" },
     { etiqueta: "Proveedores", icono: <IconoProveedores />, ruta: "/gestion/proveedores" },
     { etiqueta: "Salidas", icono: <IconoSalidas />, ruta: "/gestion/salidas" },
-    { etiqueta: "Reservas y pagos", icono: <IconoReservas />, ruta: "/gestion/solicitudes" },
+    { etiqueta: "Reservas y pagos", icono: <IconoReservas />, ruta: "/gestion/reservas" },
+    { etiqueta: "Solicitudes de alojamiento", icono: <IconoProveedores />, ruta: "/gestion/solicitudes" },
+    { etiqueta: "Reportes", icono: <IconoReportes />, ruta: "/gestion/reportes" },
     { etiqueta: "Personal", icono: <IconoPersonal />, ruta: "/gestion/personal" },
     { etiqueta: "Reseñas y evaluaciones", icono: <IconoResenias />, ruta: "/gestion/evaluaciones" },
 ];

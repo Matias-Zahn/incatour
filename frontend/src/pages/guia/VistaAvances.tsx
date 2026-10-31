@@ -17,6 +17,7 @@ import {
     guardarBorradorAvance,
     limpiarBorradorAvance,
     obtenerBorradorAvance,
+    ESTADOS_CON_AVANCES,
     obtenerHistorialLocalAvances,
     useRegistrarAvance,
     type AvanceOffline,
@@ -487,7 +488,14 @@ export function VistaAvances({
                         Registrar avance o novedad para {salidaActual.nroSalida}
                     </h2>
 
-                    <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5 space-y-4">
+                    {ESTADOS_CON_AVANCES.includes(salidaActual.estado) ? null : (
+                        <div className="mt-5">
+                            <Alerta tipo="informacion">Esta salida ya terminó: no admite avances nuevos.</Alerta>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5">
+                    <fieldset disabled={!ESTADOS_CON_AVANCES.includes(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
                         {aviso ? (
                             <Alerta tipo={aviso.tipo}>
                                 {aviso.texto}
@@ -587,6 +595,7 @@ export function VistaAvances({
                                 Registrar Avance
                             </Boton>
                         </div>
+                    </fieldset>
                     </form>
                 </article>
 

@@ -23,7 +23,7 @@ import {
     type DatosModificarPaquete,
     type Paquete,
 } from "../../services/paqueteService";
-import { useTemporadas } from "../../services/temporadaService";
+import { temporadaVencida, useTemporadas } from "../../services/temporadaService";
 
 const ELEMENTOS_POR_PAGINA = 5;
 const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
@@ -50,6 +50,14 @@ function obtenerGaleriaPaquete(paquete: Paquete): string[] {
     return ["/imagenes/catalogo/machu-picchu.jpg"];
 }
 
+const TARIFAS_EN_LISTADO = 2;
+
+function tarifasVigentes(paquete: Paquete) {
+    return (paquete.tarifas ?? [])
+        .filter((t) => !t.temporada || !temporadaVencida(t.temporada))
+        .sort((a, b) => (a.temporada?.fechaInicio ?? "").localeCompare(b.temporada?.fechaInicio ?? ""));
+}
+
 function PaquetesPage() {
     const navegar = useNavigate();
     const [filtroEstado, setFiltroEstado] = useState<
@@ -70,11 +78,6 @@ function PaquetesPage() {
     const { data: circuitos = [] } = useCircuitos({ estado: "TODOS" });
     const circuitosActivos = circuitos.filter((c) => c.estado === "ACTIVO");
     const { data: temporadas = [] } = useTemporadas();
-    const {
-        data: serviciosDisponibles = [],
-        isError: errorServiciosCatalogo,
-        error: detalleErrorServiciosCatalogo,
-    } = useServiciosDisponiblesCatalogo();
 
     const registrar = useRegistrarPaquete();
     const modificar = useModificarPaquete();
@@ -92,6 +95,11 @@ function PaquetesPage() {
     const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
     const [formularioAbierto, setFormularioAbierto] = useState(false);
+    const {
+        data: serviciosDisponibles = [],
+        isError: errorServiciosCatalogo,
+        error: detalleErrorServiciosCatalogo,
+    } = useServiciosDisponiblesCatalogo(formularioAbierto);
     const [paqueteEnEdicion, setPaqueteEnEdicion] = useState<Paquete | null>(
         null,
     );
@@ -497,7 +505,7 @@ function PaquetesPage() {
                             className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         >
                             <option value={0}>Todas las temporadas</option>
-                            {temporadas.map((t) => (
+                            {temporadas.filter((t) => !temporadaVencida(t)).map((t) => (
                                 <option
                                     key={t.idtemporada}
                                     value={t.idtemporada}
@@ -663,9 +671,8 @@ function PaquetesPage() {
                                 titulo: "Tarifas vigentes",
                                 renderizar: (paquete) => (
                                     <div className="flex flex-wrap gap-1.5">
-                                        {paquete.tarifas &&
-                                        paquete.tarifas.length > 0 ? (
-                                            paquete.tarifas.map((tarifa) => (
+                                        {tarifasVigentes(paquete).length > 0 ? (
+                                            tarifasVigentes(paquete).slice(0, TARIFAS_EN_LISTADO).map((tarifa) => (
                                                 <span
                                                     key={tarifa.idtemporada}
                                                     className="inline-flex items-center rounded-control border border-borde bg-fondo px-2.5 py-1 text-xs font-semibold text-texto"
@@ -681,9 +688,14 @@ function PaquetesPage() {
                                             ))
                                         ) : (
                                             <span className="text-xs text-texto-suave">
-                                                Sin tarifas
+                                                Sin tarifas vigentes
                                             </span>
                                         )}
+                                        {tarifasVigentes(paquete).length > TARIFAS_EN_LISTADO ? (
+                                            <span className="inline-flex items-center px-1 py-1 text-xs font-semibold text-texto-suave">
+                                                +{tarifasVigentes(paquete).length - TARIFAS_EN_LISTADO}
+                                            </span>
+                                        ) : null}
                                     </div>
                                 ),
                             },
@@ -1137,11 +1149,9 @@ function PaquetesPage() {
                                                 <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
                                                     Matriz de tarifas vigentes
                                                 </p>
-                                                {paqueteVistaPrevia.tarifas &&
-                                                paqueteVistaPrevia.tarifas
-                                                    .length > 0 ? (
+                                                {tarifasVigentes(paqueteVistaPrevia).length > 0 ? (
                                                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                                        {paqueteVistaPrevia.tarifas.map(
+                                                        {tarifasVigentes(paqueteVistaPrevia).map(
                                                             (tarifa) => (
                                                                 <div
                                                                     key={
@@ -1169,7 +1179,7 @@ function PaquetesPage() {
                                                     </div>
                                                 ) : (
                                                     <p className="mt-1 text-xs text-texto-suave">
-                                                        Sin tarifas registradas.
+                                                        Sin tarifas vigentes.
                                                     </p>
                                                 )}
                                             </div>

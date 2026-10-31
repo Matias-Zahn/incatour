@@ -89,15 +89,16 @@ function MisReseniasPage() {
     // Si viene ?idsalida=... en la URL y esa salida es reseñable, abre el formulario automáticamente
     useEffect(() => {
         if (!idSalidaPreseleccionada || historial.length === 0) return;
-        const candidato = historial.find(
-            (item) =>
-                item.salida.idsalida === idSalidaPreseleccionada &&
-                item.puedeResenar,
+        const itemsSalida = historial.filter(
+            (item) => item.salida.idsalida === idSalidaPreseleccionada,
         );
+        const candidato = itemsSalida.find((item) => item.puedeResenar);
         if (candidato) {
             abrirFormularioResenia(candidato);
-            setSearchParams({}, { replace: true });
+        } else if (itemsSalida.some((item) => item.resenia)) {
+            setMensajeExito("Ya reseñaste esta salida.");
         }
+        setSearchParams({}, { replace: true });
     }, [idSalidaPreseleccionada, historial, setSearchParams]);
 
     function abrirFormularioResenia(item: ItemHistorialResenia) {
@@ -157,7 +158,9 @@ function MisReseniasPage() {
 
     const filasPaginadas: FilaHistorialTabla[] = useMemo(() => {
         const inicio = (paginaSegura - 1) * FILAS_POR_PAGINA;
-        return historial
+        // Lo que falta reseñar primero: si no, queda repartido entre las páginas
+        return [...historial]
+            .sort((a, b) => Number(b.puedeResenar) - Number(a.puedeResenar))
             .slice(inicio, inicio + FILAS_POR_PAGINA)
             .map((item) => ({
                 ...item,
@@ -394,6 +397,7 @@ function MisReseniasPage() {
                                     {
                                         clave: "acciones",
                                         titulo: "Acciones",
+                                        sinTituloEnCelular: true,
                                         renderizar: (fila) => {
                                             if (fila.resenia) {
                                                 return (

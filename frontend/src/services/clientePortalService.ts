@@ -354,6 +354,7 @@ export type ComprobanteReserva = {
         fechaInicio: string;
         fechaFin: string;
     };
+    estadoAlojamiento?: string | null;
     pasajeros: string[];
     precioCongelado: number;
     condicionesComerciales: string | null;
@@ -728,6 +729,10 @@ export function etiquetaEstadoSalidaCliente(estado?: string | null): string {
     switch (estado?.trim().toUpperCase()) {
         case "PUBLICADA":
             return "Publicada";
+        case "ABIERTA":
+            return "Abierta";
+        case "CERRADA":
+            return "Cerrada";
         case "EN_CURSO":
             return "En curso";
         case "FINALIZADA":
@@ -750,61 +755,4 @@ export function reservaAdmiteCancelacion(reserva: {
     }
     // FE-47: por día calendario local, igual que hoyUTC() en el back (la fecha de inicio viene a las 00:00Z)
     return reserva.salida.fechaInicio.slice(0, 10) > fechaLocalHoy();
-}
-
-export function generarTextoComprobanteDescargable(
-    comprobante: ComprobanteReserva,
-): string {
-    const lineas: string[] = [
-        "============================================================",
-        "               INCATOUR - COMPROBANTE DE RESERVA            ",
-        "============================================================",
-        `N° Reserva:          ${comprobante.nroReserva}`,
-        `Estado:              ${etiquetaEstadoReserva(comprobante.estado)}`,
-        `Fecha de emisión:    ${formatearFechaLocalCorta(comprobante.fechaRealizacion)}`,
-        "",
-        "--- TITULAR DE LA RESERVA ---",
-        `Nombre:              ${comprobante.titular.nombre} ${comprobante.titular.apellido}`,
-        `Correo electrónico:  ${comprobante.titular.email}`,
-        "",
-        "--- RECORRIDO Y SALIDA ---",
-        `Paquete turístico:   ${comprobante.paquete}`,
-        `N° de Salida:        ${comprobante.salida.nroSalida}`,
-        `Fecha de inicio:     ${formatearFechaUtcCorta(comprobante.salida.fechaInicio)}`,
-        `Fecha de fin:        ${formatearFechaUtcCorta(comprobante.salida.fechaFin)}`,
-    ];
-
-    if (comprobante.condicionesComerciales) {
-        lineas.push(`Condiciones:         ${comprobante.condicionesComerciales}`);
-    }
-
-    lineas.push(
-        "",
-        `--- PASAJEROS (${comprobante.pasajeros.length}) ---`,
-        ...(comprobante.pasajeros.length > 0
-            ? comprobante.pasajeros.map((nombre, i) => `  ${i + 1}. ${nombre}`)
-            : ["  Sin pasajeros detallados"]),
-        "",
-        "--- SITUACIÓN DE PAGO ---",
-        `Precio congelado:    ${formatearMontoUsd(comprobante.precioCongelado)}`,
-        `Total abonado:       ${formatearMontoUsd(comprobante.totalPagado)}`,
-    );
-
-    if (comprobante.reintegro !== null) {
-        lineas.push(
-            `Reintegro registrado:${formatearMontoUsd(comprobante.reintegro)}`,
-        );
-    }
-
-    if (comprobante.pagos.length > 0) {
-        lineas.push("", "--- DETALLE DE TRANSACCIONES ---");
-        for (const p of comprobante.pagos) {
-            lineas.push(
-                `  • ${p.nroTransaccion} | ${p.medioPago} | ${formatearMontoUsd(p.monto)} | ${formatearFechaUtcCorta(p.fechahora)}`,
-            );
-        }
-    }
-
-    lineas.push("============================================================");
-    return lineas.join("\n");
 }

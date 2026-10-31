@@ -31,8 +31,8 @@ export class GestionReservaController {
       const [error, filtros] = FiltrosReservaDto.create(req.query);
       if (error) throw CustomError.badRequest(error);
 
-      const reservas = await service.consultarReservas(filtros!);
-      return res.json({ data: reservas });
+      const { reservas, total } = await service.consultarReservas(filtros!);
+      return res.json({ data: reservas, total, pagina: filtros!.pagina, limite: filtros!.limite });
     } catch (err) {
       next(err);
     }

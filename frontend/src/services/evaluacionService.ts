@@ -144,6 +144,14 @@ export async function listarSalidasParaEvaluacion(): Promise<SalidaResumenAdmin[
   return res.data ?? [];
 }
 
+// CU-42: Cuántas evaluaciones le faltan a cada salida finalizada
+export async function consultarEvaluacionesPendientes(): Promise<Map<number, number>> {
+  const res = await solicitarApi<{ data: { idsalida: number; pendientes: number }[] }>(
+    "/salidas/evaluaciones-pendientes",
+  );
+  return new Map((res.data ?? []).map((s) => [s.idsalida, s.pendientes]));
+}
+
 // CU-42: Consultar personal y proveedores evaluables de una salida finalizada
 export async function consultarEvaluablesSalida(
   idSalida: number,

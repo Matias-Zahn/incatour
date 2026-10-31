@@ -11,6 +11,15 @@ const leerIdSalida = (valor: unknown) => {
 };
 
 export class EvaluacionController {
+  // CU-42: GET /api/salidas/evaluaciones-pendientes
+  consultarPendientes = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      return res.json({ data: await service.pendientes() });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // CU-42: GET /api/salidas/:idsalida/evaluaciones
   consultarEvaluables = async (req: Request, res: Response, next: NextFunction) => {
     try {

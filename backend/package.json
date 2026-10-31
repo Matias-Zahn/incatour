@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/app.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "demo": "tsx scripts/demo.ts",
     "docs": "tsx scripts/exportar-openapi.ts",
     "test": "vitest run",
+    "test:caja-blanca": "vitest run src/modulos/reservas/gestion-reservas --coverage --coverage.reporter=text --coverage.include=src/modulos/reservas/gestion-reservas/reintegro.ts --coverage.include=src/modulos/reservas/gestion-reservas/gestion-reserva.service.ts --coverage.include=src/modulos/reservas/gestion-reservas/gestion-reserva.repository.ts",
     "test:concurrencia": "tsx scripts/prueba-concurrencia.ts",
     "test:humo": "tsx scripts/prueba-humo.ts",
     "test:integral": "tsx scripts/prueba-integral.ts"
@@ -37,6 +39,7 @@
     "@types/node": "^26.2.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@vitest/coverage-v8": "^5.0.5",
     "prisma": "^5.22.0",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",

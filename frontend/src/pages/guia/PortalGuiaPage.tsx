@@ -7,10 +7,12 @@ import {
 } from "../../services/sesionService";
 import {
     estilosEstadoSalida,
+    fechaLocalHoy,
     formatearEstadoSalida,
     formatearFechaSalida,
     useDetalleSalidaGuia,
     useSalidasGuia,
+    ordenarSalidasGuia,
 } from "../../services/guiaService";
 import { IconoMontana } from "./IconosGuia";
 import { BarraLateralGuia, type SeccionGuia } from "./BarraLateralGuia";
@@ -90,6 +92,8 @@ export default function PortalGuiaPage() {
         }
     }
 
+    const { pendientes, historial } = ordenarSalidasGuia(salidas);
+
     // Salida actual activa
     // La guardada de una sesión anterior se ignora si ya no existe o está FINALIZADA
     const salidaActual =
@@ -98,13 +102,13 @@ export default function PortalGuiaPage() {
                 s.idsalida === idsalidaSeleccionada &&
                 (eligioEnSesion || s.estado !== "FINALIZADA"),
         ) ??
-        salidas.find((s) => s.estado !== "FINALIZADA") ??
-        salidas[0] ??
+        salidas.find((s) => s.estado === "EN_CURSO") ??
+        pendientes[0] ??
+        historial[0] ??
         null;
 
-    // La lista viene ordenada por fechaInicio: la próxima es la que sigue a la actual
-    const indiceActual = salidaActual ? salidas.indexOf(salidaActual) : -1;
-    const proximaSalida = indiceActual >= 0 ? (salidas[indiceActual + 1] ?? null) : null;
+    const proximaSalida =
+        pendientes.find((s) => s !== salidaActual && s.estado !== "EN_CURSO" && s.fechaInicio.slice(0, 10) >= fechaLocalHoy()) ?? null;
 
     // FE-38: la cola de avances se sincroniza al entrar al portal y al volver la señal, en cualquier vista
     const sincronizacion = useSincronizacionAvances(salidaActual?.idsalida ?? 0);
@@ -215,9 +219,9 @@ export default function PortalGuiaPage() {
                                     onChange={(e) => cambiarSalidaGlobal(Number(e.target.value))}
                                     className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-1.5 text-base font-bold text-texto outline-none focus:border-marca md:max-w-xs md:text-xs"
                                 >
-                                    {salidas.map((s) => (
+                                    {[...pendientes, ...historial].map((s) => (
                                         <option key={s.idsalida} value={s.idsalida}>
-                                            {s.nroSalida} ({formatearEstadoSalida(s.estado)}) · {s.circuito}
+                                            {s.nroSalida} · {formatearFechaSalida(s.fechaInicio)} ({formatearEstadoSalida(s.estado)}) · {s.circuito}
                                         </option>
                                     ))}
                                 </select>

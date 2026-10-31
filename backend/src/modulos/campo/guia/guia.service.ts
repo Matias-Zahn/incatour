@@ -67,6 +67,14 @@ export class GuiaService {
           },
         }))
       ),
+      // CU-50: los reportados por cualquier guía de la salida, desde cualquier dispositivo
+      incidentes: s.incidentes.map((i) => ({
+        idincidente: i.idincidente,
+        tipoIncidente: i.tipoIncidente,
+        nivelGravedad: i.nivelGravedad,
+        descripcion: i.descripcion,
+        fechaHoraReporte: i.fechaHoraReporte,
+      })),
       personal: s.personalAsignado.map((a) => a.personal),
       servicios: s.servicios.map((x) => ({ tipo: x.tipo, nombreServicio: x.servicio.nombreServicio })),
       equipamiento: s.equipamientos.map((e) => ({

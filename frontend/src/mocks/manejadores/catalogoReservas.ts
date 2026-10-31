@@ -695,6 +695,14 @@ export const manejadoresCatalogoReservas = [
         });
     }),
 
+    // CU-31 (administrador): GET /api/reservas
+    http.get(construirUrl("/reservas"), async () => {
+        await delay(150);
+        const titular = { nombre: "Juan", apellido: "Pérez", email: "juan@test.com" };
+        const data = reservasClienteMock.map((r) => ({ ...r, titular }));
+        return HttpResponse.json({ data, total: data.length, pagina: 1, limite: 20 });
+    }),
+
     // CU-31: GET /api/reservas/mis-reservas
     http.get(construirUrl("/reservas/mis-reservas"), async ({ request }) => {
         const denegado = exigirRol(request, "CLIENTE");

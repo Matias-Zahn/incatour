@@ -25,6 +25,16 @@ export class EvaluacionService {
     };
   }
 
+  // CU-42: cuántas evaluaciones le faltan a cada salida finalizada, para saber dónde hay trabajo sin abrirlas una por una
+  async pendientes() {
+    const salidas = await this.repository.salidasFinalizadas();
+    return salidas.map((salida) => {
+      const personal = salida.personalAsignado.filter((a) => !salida.evaluacionesPersonal.some((e) => e.idpersonal === a.idpersonal));
+      const proveedores = [...proveedoresDe(salida).keys()].filter((id) => !salida.evaluacionesProveedores.some((e) => e.idproveedor === id));
+      return { idsalida: salida.idsalida, pendientes: personal.length + proveedores.length };
+    });
+  }
+
   // CU-42: evaluar a una persona o a un proveedor por su desempeño en la salida
   async evaluar(idsalida: number, dto: EvaluarDto) {
     const salida = await this.salidaFinalizada(idsalida);
