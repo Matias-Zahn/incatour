@@ -72,6 +72,15 @@ describe("CatalogoService (CU-26)", () => {
     vi.clearAllMocks();
   });
 
+  it("no ofrece tarifas de temporadas vencidas, aunque sigan activas", async () => {
+    const vencida = { monto: 500, moneda: "USD", temporada: { idtemporada: 2, nombre: "Baja 2020", estado: "ACTIVO", fechaInicio: new Date("2020-01-01"), fechaFin: new Date("2020-03-31") } };
+    repo.buscarPaquetesActivos.mockResolvedValue([paqueteMock({ tarifas: [...paqueteMock().tarifas, vencida] })]);
+
+    const [paquete] = await new CatalogoService().consultarCatalogo();
+
+    expect(paquete!.precios.map((t) => t.temporada)).toEqual(["Alta Enero"]);
+  });
+
   it("CAT-07: marca precioPersona como null si ninguna temporada activa cubre la fecha de la salida", async () => {
     repo.buscarPaquetesActivos.mockResolvedValue([paqueteMock()]);
 

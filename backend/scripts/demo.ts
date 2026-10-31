@@ -419,6 +419,11 @@ async function llevarALaFechaReal(
     if (c.primeraCompra) await db.usuario.update({ where: { idusuario: c.idusuario }, data: { creadoEn: instante(sumarDias(c.primeraCompra, -3), 10) } });
   }
 
+  // Las temporadas lejanas solo sirvieron para operar la historia en el futuro: ninguna salida real las usa
+  const temporadasDeSimulacion = { fechaInicio: { gte: new Date(`${Number(hoy.slice(0, 4)) + 2}-01-01`) } };
+  await db.tarifaPaquete.deleteMany({ where: { temporada: temporadasDeSimulacion } });
+  await db.temporada.deleteMany({ where: temporadasDeSimulacion });
+
   // Números correlativos por año de la fecha real: primero a un nombre temporal para no chocar con el @unique
   const porAnio = new Map<string, number>();
   for (const s of marcas.salidas) await db.salida.update({ where: { idsalida: s.idsalida }, data: { nroSalida: `TMP-${s.idsalida}` } });

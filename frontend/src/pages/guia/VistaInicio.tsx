@@ -6,6 +6,7 @@ import {
     type DetalleSalidaGuia,
     type SalidaGuiaResumen,
 } from "../../services/guiaService";
+import { Link } from "react-router-dom";
 import { IconoCalendario, IconoMontana } from "./IconosGuia";
 
 type VistaInicioProps = {
@@ -149,7 +150,7 @@ export function VistaInicio({
                             <IconoMontana tamano={18} />
                         </div>
                         <h3 className="text-sm font-bold text-navegacion">
-                            Salida en curso actual
+                            {salidaActual?.estado === "EN_CURSO" ? "Salida en curso actual" : "Salida seleccionada"}
                         </h3>
                         {salidaActual ? (
                             <>
@@ -262,6 +263,16 @@ export function VistaInicio({
                             </tbody>
                         </table>
                     </div>
+                    {(detalleSalida?.nomina.length ?? 0) > pasajerosResumen.length ? (
+                        <div className="mt-3 flex items-center justify-between border-t border-borde/50 pt-3 text-xs">
+                            <span className="font-bold text-texto">
+                                {pasajerosResumen.length} de {detalleSalida?.nomina.length} pasajeros
+                            </span>
+                            <Link to="/guia/salidas" replace className="font-bold text-marca hover:underline">
+                                Ver nómina completa
+                            </Link>
+                        </div>
+                    ) : null}
                 </article>
 
                 {/* Novedades recientes */}

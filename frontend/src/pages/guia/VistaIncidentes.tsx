@@ -18,6 +18,7 @@ import {
     guardarIncidenteOffline,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
+    ESTADOS_CON_AVANCES,
     tiposIncidente,
     usePasajerosSalida,
     useRegistrarIncidente,
@@ -277,7 +278,14 @@ export function VistaIncidentes({
                         Datos del incidente
                     </h2>
 
-                    <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5 space-y-4">
+                    {ESTADOS_CON_AVANCES.includes(salidaActual.estado) ? null : (
+                        <div className="mt-5">
+                            <Alerta tipo="informacion">Esta salida ya terminó: no admite incidentes nuevos.</Alerta>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5">
+                    <fieldset disabled={!ESTADOS_CON_AVANCES.includes(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
                         {mensajeFeedback ? (
                             <Alerta tipo={mensajeFeedback.tipo}>
                                 {mensajeFeedback.texto}
@@ -402,11 +410,12 @@ export function VistaIncidentes({
                                 Enviar Notificación
                             </Boton>
                         </div>
+                    </fieldset>
                     </form>
                 </article>
 
                 {/* Columna Derecha: Selección de Pasajeros e Historial */}
-                <div className="space-y-6">
+                <div className="space-y-6 max-lg:order-first">
                     {/* Pasajeros afectados */}
                     <article className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta">
                         <h2 className="text-sm font-bold text-navegacion">
@@ -533,7 +542,7 @@ export function VistaIncidentes({
 
                             {historialIncidentes.length === 0 ? (
                                 <p className="py-6 text-center text-xs text-texto-suave">
-                                    No hay incidentes reportados en esta salida
+                                    No hay incidentes reportados desde este dispositivo
                                 </p>
                             ) : null}
                         </div>

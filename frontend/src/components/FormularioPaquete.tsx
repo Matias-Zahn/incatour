@@ -22,7 +22,7 @@ import {
     type ServicioDisponiblePaquete,
     type TipoGarantiaPaquete,
 } from "../services/paqueteService";
-import type { Temporada } from "../services/temporadaService";
+import { temporadaVencida, type Temporada } from "../services/temporadaService";
 
 type FormularioPaqueteProps = {
     paqueteEnEdicion?: Paquete | null;
@@ -85,7 +85,7 @@ function tarifasIniciales(
             moneda: "USD",
         }));
     }
-    const primeraTemporada = temporadas[0]?.idtemporada ?? 0;
+    const primeraTemporada = (temporadas.find((t) => !temporadaVencida(t)) ?? temporadas[0])?.idtemporada ?? 0;
     return [
         {
             idtemporada: primeraTemporada,
@@ -188,6 +188,7 @@ function FormularioPaquete({
         ? (paqueteEnEdicion?.tarifas?.length ?? 0)
         : 0;
 
+    const [verTarifasVencidas, setVerTarifasVencidas] = useState(false);
     const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
         () => tarifasIniciales(paqueteEnEdicion, temporadas),
     );
@@ -446,11 +447,17 @@ function FormularioPaquete({
         );
     }
 
+    const esTemporadaVencida = (idtemporada: number) => {
+        const temporada = temporadas.find((t) => t.idtemporada === idtemporada);
+        return temporada !== undefined && temporadaVencida(temporada);
+    };
+    const tarifasVencidas = matrizPrecios.filter((f) => esTemporadaVencida(f.idtemporada)).length;
+
     function agregarFilaPrecio() {
         setErrorValidacion("");
         const usadas = new Set(matrizPrecios.map((f) => f.idtemporada));
         const temporadaLibre = temporadas.find(
-            (t) => !usadas.has(t.idtemporada),
+            (t) => !usadas.has(t.idtemporada) && !temporadaVencida(t),
         );
         if (!temporadaLibre) {
             setErrorValidacion(
@@ -1121,8 +1128,11 @@ function FormularioPaquete({
                         className="px-3 py-1.5 text-xs"
                         onClick={agregarFilaPrecio}
                         disabled={
-                            temporadas.length === 0 ||
-                            matrizPrecios.length >= temporadas.length
+                            !temporadas.some(
+                                (t) =>
+                                    !temporadaVencida(t) &&
+                                    !matrizPrecios.some((f) => f.idtemporada === t.idtemporada),
+                            )
                         }
                     >
                         + Agregar temporada
@@ -1141,13 +1151,25 @@ function FormularioPaquete({
                     </p>
                 ) : (
                     <div className="space-y-3">
+                        {tarifasVencidas > 0 ? (
+                            <button
+                                type="button"
+                                onClick={() => setVerTarifasVencidas(!verTarifasVencidas)}
+                                className="text-xs font-semibold text-marca-oscura hover:underline"
+                            >
+                                {verTarifasVencidas ? "Ocultar" : "Ver"} {tarifasVencidas} {tarifasVencidas === 1 ? "tarifa de temporada vencida" : "tarifas de temporadas vencidas"}
+                            </button>
+                        ) : null}
                         {matrizPrecios.map((fila, indice) => {
                             const esTarifaPersistida =
                                 indice < cantidadPersistidas;
                             return (
+                                // Las vencidas se ocultan sin desmontarse: se siguen enviando igual al guardar
                                 <div
                                     key={indice}
-                                    className="grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto]"
+                                    className={`grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto] ${
+                                        !verTarifasVencidas && esTemporadaVencida(fila.idtemporada) ? "hidden" : ""
+                                    }`}
                                 >
                                     <label className="grid gap-1 text-xs font-semibold text-texto">
                                         Temporada comercial
@@ -1168,12 +1190,12 @@ function FormularioPaquete({
                                                     (temp) =>
                                                         temp.idtemporada ===
                                                             fila.idtemporada ||
-                                                        !matrizPrecios.some(
+                                                        (!temporadaVencida(temp) && !matrizPrecios.some(
                                                             (otra, j) =>
                                                                 j !== indice &&
                                                                 otra.idtemporada ===
                                                                     temp.idtemporada,
-                                                        ),
+                                                        )),
                                                 )
                                                 .map((temp) => (
                                                 <option

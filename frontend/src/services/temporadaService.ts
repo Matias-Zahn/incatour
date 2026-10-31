@@ -143,3 +143,7 @@ export function useDarDeBajaTemporada() {
             }),
     });
 }
+
+/** Una temporada que ya terminó no sirve para vender: solo queda por el historial */
+export const temporadaVencida = (temporada: { fechaFin: string }) =>
+    temporada.fechaFin.slice(0, 10) < new Date().toLocaleDateString("en-CA");

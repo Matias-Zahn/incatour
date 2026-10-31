@@ -281,6 +281,7 @@ function CatalogoCompraPage() {
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
     const [soloConSalidas, setSoloConSalidas] = useState(false);
+    const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
     // Modal de detalle e itinerario (CU-26)
     const [paqueteDetalle, setPaqueteDetalle] =
@@ -562,6 +563,13 @@ function CatalogoCompraPage() {
         fechaHasta !== "" ||
         soloConSalidas;
 
+    const salidaEnRango = (s: { fechaInicio: string }) => {
+        const dia = s.fechaInicio.slice(0, 10);
+        return (!fechaDesde || dia >= fechaDesde) && (!fechaHasta || dia <= fechaHasta);
+    };
+    const salidaComprable = (s: { stockLocal: number; precioPersona?: number | null }) =>
+        s.stockLocal > 0 && s.precioPersona != null;
+
     const paquetesFiltrados = paquetes.filter((p) => {
         if (
             filtroDificultad !== "TODAS" &&
@@ -582,18 +590,11 @@ function CatalogoCompraPage() {
             return false;
         }
         if (fechaDesde || fechaHasta) {
-            const salidasRango = (p.salidasDisponibles ?? []).filter((s) => {
-                const fechaIsoDia = s.fechaInicio.slice(0, 10);
-                if (fechaDesde && fechaIsoDia < fechaDesde) return false;
-                if (fechaHasta && fechaIsoDia > fechaHasta) return false;
-                return true;
-            });
-            if (salidasRango.length === 0) return false;
+            if (!(p.salidasDisponibles ?? []).some(salidaEnRango)) return false;
         }
         if (
             soloConSalidas &&
-            (!p.salidasDisponibles ||
-                p.salidasDisponibles.every((s) => s.stockLocal <= 0))
+            !(p.salidasDisponibles ?? []).some(salidaComprable)
         ) {
             return false;
         }
@@ -1616,7 +1617,16 @@ function CatalogoCompraPage() {
                             />
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            aria-expanded={filtrosAbiertos}
+                            onClick={() => setFiltrosAbiertos(!filtrosAbiertos)}
+                            className="rounded-control border border-borde px-3 py-2 text-xs font-semibold text-texto md:hidden"
+                        >
+                            Filtros{hayFiltrosActivos ? " (activos)" : ""}
+                        </button>
+
+                        <div className={`flex flex-wrap items-center gap-3 ${filtrosAbiertos ? "" : "max-md:hidden"}`}>
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                 <span className="font-semibold text-texto-suave">
                                     Dificultad:
@@ -1659,7 +1669,7 @@ function CatalogoCompraPage() {
                             </label>
                         </div>
 
-                        <div className="flex w-full flex-wrap items-end gap-3 border-t border-borde pt-3 text-xs">
+                        <div className={`flex w-full flex-wrap items-end gap-3 border-t border-borde pt-3 text-xs ${filtrosAbiertos ? "" : "max-md:hidden"}`}>
                             <label className="grid gap-1 font-semibold text-texto-suave">
                                 Duración del circuito
                                 <select
@@ -1749,7 +1759,9 @@ function CatalogoCompraPage() {
                                 );
                                 const salidasConCupo = (
                                     paquete.salidasDisponibles ?? []
-                                ).filter((s) => s.stockLocal > 0 && s.precioPersona != null);
+                                )
+                                    .filter(salidaEnRango)
+                                    .filter(salidaComprable);
                                 const diasTotales =
                                     paquete.circuito.dias +
                                     paquete.nochesAlojamiento.previas +
@@ -1772,6 +1784,7 @@ function CatalogoCompraPage() {
                                             <img
                                                 src={urlPortada}
                                                 alt={paquete.nombre}
+                                                loading="lazy"
                                                 className="h-full w-full object-cover"
                                             />
                                             <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
@@ -1994,6 +2007,7 @@ function CatalogoCompraPage() {
                             const etapas = paqueteDetalle.circuito.etapas ?? [];
                             const salidas =
                                 paqueteDetalle.salidasDisponibles ?? [];
+                            const comprables = salidas.filter(salidaComprable);
                             const diasTotalesDetalle =
                                 paqueteDetalle.circuito.dias +
                                 paqueteDetalle.nochesAlojamiento.previas +
@@ -2167,101 +2181,16 @@ function CatalogoCompraPage() {
                                             ) : null}
                                         </div>
 
-                                        <div className="space-y-4">
-                                            {/* SERVICIOS INCLUIDOS Y EQUIPAJE */}
-                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
-                                                <p className="font-bold uppercase tracking-wide text-navegacion">
-                                                    Servicios y equipaje incluidos
-                                                </p>
-                                                {paqueteDetalle.serviciosAdicionales &&
-                                                paqueteDetalle.serviciosAdicionales.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {paqueteDetalle.serviciosAdicionales.map((serv) => (
-                                                            <span
-                                                                key={serv}
-                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-[11px] font-medium text-texto"
-                                                            >
-                                                                ✓ {serv}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-texto-suave">
-                                                        Servicios base de trekking guiado incluidos.
-                                                    </p>
-                                                )}
-                                                {paqueteDetalle.equipajeTransporte ? (
-                                                    <div className="mt-2 rounded-control border border-marca/30 bg-marca-suave/60 p-2.5 text-xs text-marca-oscura">
-                                                        <p className="font-bold">🎒 Franquicia de equipaje:</p>
-                                                        <p className="mt-0.5">
-                                                            Hasta <strong>{paqueteDetalle.equipajeTransporte.pesoEquipajeIncluido} kg</strong> incluidos por pasajero en el transporte. (Excedente: {tarifaMinimaDetalle?.moneda ?? "USD"} {paqueteDetalle.equipajeTransporte.costoPorKgExcedente}/kg).
-                                                        </p>
-                                                    </div>
-                                                ) : null}
-                                            </div>
-
-                                            {/* ALOJAMIENTO Y CONDICIONES */}
-                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
-                                                <p className="font-bold uppercase tracking-wide text-navegacion">
-                                                    Alojamiento y condiciones
-                                                </p>
-                                                <div className="grid grid-cols-2 gap-2 text-texto">
-                                                    <div className="rounded border border-borde bg-white p-2.5">
-                                                        <p className="text-texto-suave">Garantía hotelera</p>
-                                                        <p className="font-semibold text-texto">
-                                                            {paqueteDetalle.nochesAlojamiento.garantia}
-                                                        </p>
-                                                    </div>
-                                                    <div className="rounded border border-borde bg-white p-2.5">
-                                                        <p className="text-texto-suave">Estadía</p>
-                                                        <p className="font-semibold text-texto">
-                                                            {textoNoches(paqueteDetalle.nochesAlojamiento.previas, paqueteDetalle.nochesAlojamiento.posteriores)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {paqueteDetalle.condiciones ? (
-                                                    <p className="pt-1 text-texto-suave">
-                                                        <strong className="text-texto">Políticas y condiciones:</strong> {paqueteDetalle.condiciones}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-
-                                            {/* MATRIZ DE PRECIOS POR TEMPORADA */}
-                                            {paqueteDetalle.precios && paqueteDetalle.precios.length > 0 ? (
-                                                <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
-                                                    <p className="font-bold uppercase tracking-wide text-navegacion">
-                                                        Tarifas vigentes según temporada
-                                                    </p>
-                                                    <div className="space-y-1.5">
-                                                        {paqueteDetalle.precios.map((t) => (
-                                                            <div
-                                                                key={t.idtemporada}
-                                                                className="flex items-center justify-between rounded border border-borde bg-white p-2.5 text-xs"
-                                                            >
-                                                                <div>
-                                                                    <p className="font-bold text-navegacion">{t.temporada}</p>
-                                                                    <p className="text-[11px] text-texto-suave">
-                                                                        {formatearFechaCorta(t.fechaInicio)} al {formatearFechaCorta(t.fechaFin)}
-                                                                    </p>
-                                                                </div>
-                                                                <span className="font-bold text-navegacion">
-                                                                    {t.moneda} {t.precio}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : null}
-
+                                        <div className="space-y-4 max-lg:order-first">
                                             {/* SALIDAS DISPONIBLES */}
                                             <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
                                                         Próximas salidas disponibles
                                                     </p>
-                                                    {salidas.length > 0 ? (
+                                                    {comprables.length > 0 ? (
                                                         <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-exito">
-                                                            {salidas.length} {salidas.length === 1 ? "salida abierta" : "salidas abiertas"}
+                                                            {comprables.length} {comprables.length === 1 ? "salida abierta" : "salidas abiertas"}
                                                         </span>
                                                     ) : null}
                                                 </div>
@@ -2335,6 +2264,65 @@ function CatalogoCompraPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* SERVICIOS INCLUIDOS Y EQUIPAJE */}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Servicios y equipaje incluidos
+                                                </p>
+                                                {paqueteDetalle.serviciosAdicionales &&
+                                                paqueteDetalle.serviciosAdicionales.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {paqueteDetalle.serviciosAdicionales.map((serv) => (
+                                                            <span
+                                                                key={serv}
+                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-[11px] font-medium text-texto"
+                                                            >
+                                                                ✓ {serv}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-texto-suave">
+                                                        Servicios base de trekking guiado incluidos.
+                                                    </p>
+                                                )}
+                                                {paqueteDetalle.equipajeTransporte ? (
+                                                    <div className="mt-2 rounded-control border border-marca/30 bg-marca-suave/60 p-2.5 text-xs text-marca-oscura">
+                                                        <p className="font-bold">🎒 Franquicia de equipaje:</p>
+                                                        <p className="mt-0.5">
+                                                            Hasta <strong>{paqueteDetalle.equipajeTransporte.pesoEquipajeIncluido} kg</strong> incluidos por pasajero en el transporte. (Excedente: {tarifaMinimaDetalle?.moneda ?? "USD"} {paqueteDetalle.equipajeTransporte.costoPorKgExcedente}/kg).
+                                                        </p>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+
+                                            {/* ALOJAMIENTO Y CONDICIONES */}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Alojamiento y condiciones
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 text-texto">
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Garantía hotelera</p>
+                                                        <p className="font-semibold text-texto">
+                                                            {paqueteDetalle.nochesAlojamiento.garantia}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Estadía</p>
+                                                        <p className="font-semibold text-texto">
+                                                            {textoNoches(paqueteDetalle.nochesAlojamiento.previas, paqueteDetalle.nochesAlojamiento.posteriores)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {paqueteDetalle.condiciones ? (
+                                                    <p className="pt-1 text-texto-suave">
+                                                        <strong className="text-texto">Políticas y condiciones:</strong> {paqueteDetalle.condiciones}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+
                                         </div>
                                     </div>
 
@@ -2348,6 +2336,7 @@ function CatalogoCompraPage() {
                                             Cerrar
                                         </Boton>
                                         <Boton
+                                            disabled={comprables.length === 0}
                                             onClick={() =>
                                                 iniciarCompraPaquete(
                                                     paqueteDetalle,

@@ -25,7 +25,11 @@ function MiCuentaClientePage() {
         error: objErrorPerfil,
     } = usePerfilClienteActual();
 
-    const { data: reservasConfirmadas = [] } = useMisReservas("CONFIRMADA");
+    // Misma regla que el back: un viaje que ya terminó no impide la baja
+    const { data: confirmadas = [] } = useMisReservas("CONFIRMADA");
+    const reservasConfirmadas = confirmadas.filter((r) =>
+        ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"].includes(r.salida.estado),
+    );
 
     const modificarMutacion = useModificarCuentaCliente();
     const darDeBajaMutacion = useDarDeBajaCuentaCliente();

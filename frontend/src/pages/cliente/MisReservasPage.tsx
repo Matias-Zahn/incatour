@@ -67,6 +67,7 @@ function MisReservasPage() {
     const [idDescargandoComprobante, setIdDescargandoComprobante] = useState<
         number | null
     >(null);
+    const [filtroViaje, setFiltroViaje] = useState<"" | "PROXIMOS" | "PASADOS">("");
     const [avisoExito, setAvisoExito] = useState<string | null>(null);
     const [errorAccion, setErrorAccion] = useState<string | null>(null);
     const [resultadoCancelacion, setResultadoCancelacion] =
@@ -77,7 +78,7 @@ function MisReservasPage() {
         isLoading: cargandoReservas,
         isError: hayErrorReservas,
         error: errorReservas,
-    } = useMisReservas(filtroEstado || undefined);
+    } = useMisReservas();
 
     const {
         data: detalleReserva,
@@ -112,14 +113,20 @@ function MisReservasPage() {
 
     const reservasFiltradas = useMemo(() => {
         const termino = busqueda.trim().toLowerCase();
-        if (!termino) return reservas;
-        return reservas.filter(
-            (r) =>
-                r.nroReserva.toLowerCase().includes(termino) ||
-                r.paquete.nombrePaquete.toLowerCase().includes(termino) ||
-                r.salida.nroSalida.toLowerCase().includes(termino),
-        );
-    }, [reservas, busqueda]);
+        const hoy = new Date().toLocaleDateString("en-CA");
+        const esProximo = (r: ReservaClienteResumen) => r.salida.fechaFin.slice(0, 10) >= hoy;
+        return reservas
+            .filter(
+                (r) =>
+                    (!filtroEstado || r.estado === filtroEstado) &&
+                    (!filtroViaje || esProximo(r) === (filtroViaje === "PROXIMOS")) &&
+                    (!termino ||
+                        r.nroReserva.toLowerCase().includes(termino) ||
+                        r.paquete.nombrePaquete.toLowerCase().includes(termino) ||
+                        r.salida.nroSalida.toLowerCase().includes(termino)),
+            )
+            .sort((a, b) => Number(esProximo(b)) - Number(esProximo(a)));
+    }, [reservas, busqueda, filtroEstado, filtroViaje]);
 
     const totalPaginas = Math.max(
         1,
@@ -315,7 +322,7 @@ function MisReservasPage() {
             <div className="grid gap-4 sm:grid-cols-3">
                 <article className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta">
                     <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
-                        Total listadas
+                        Total
                     </p>
                     <p className="mt-1 text-2xl font-bold text-navegacion">
                         {resumenCantidades.total}
@@ -371,6 +378,28 @@ function MisReservasPage() {
                                 placeholder="Ej.: RES-0001 o Inca Clásico"
                                 className="w-60 rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca"
                             />
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="filtro-viaje-reserva"
+                                className="mb-1.5 block text-xs font-semibold text-texto"
+                            >
+                                Viaje
+                            </label>
+                            <select
+                                id="filtro-viaje-reserva"
+                                value={filtroViaje}
+                                onChange={(e) => {
+                                    setFiltroViaje(e.target.value as typeof filtroViaje);
+                                    setPaginaActual(1);
+                                }}
+                                className="rounded-control border border-borde bg-white px-3 py-2 text-xs text-texto outline-none focus:border-marca"
+                            >
+                                <option value="">Todos</option>
+                                <option value="PROXIMOS">Próximos</option>
+                                <option value="PASADOS">Pasados</option>
+                            </select>
                         </div>
 
                         <div>
@@ -516,6 +545,7 @@ function MisReservasPage() {
                                     {
                                         clave: "pagosTexto",
                                         titulo: "Pagos",
+                                        ocultarEnCelular: true,
                                         renderizar: (fila) => (
                                             <div className="text-xs">
                                                 <p className="font-semibold text-texto">
@@ -538,6 +568,7 @@ function MisReservasPage() {
                                     {
                                         clave: "acciones",
                                         titulo: "Acciones",
+                                        sinTituloEnCelular: true,
                                         renderizar: (fila) => {
                                             const puedeCancelar =
                                                 reservaAdmiteCancelacion(fila);

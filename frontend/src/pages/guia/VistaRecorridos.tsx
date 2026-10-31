@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { formatearEstadoSalida, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
+import { ESTADOS_CON_AVANCES, formatearEstadoSalida, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
 
 type VistaRecorridosProps = {
@@ -8,7 +8,6 @@ type VistaRecorridosProps = {
 };
 
 // El back solo acepta avances en estas salidas y con el recorrido ya iniciado
-const ESTADOS_CON_AVANCES = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
 
 export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecorridosProps) {
     const navegar = useNavigate();

@@ -25,9 +25,9 @@ export class CatalogoService {
 
     // 2. Formatear y limpiar los datos para el frontend (escaparate comercial y compra CU-30)
     const catalogo = paquetesDB.map((paquete) => {
-      // Filtramos para mostrar solo las tarifas de temporadas que estén vigentes
+      // Filtramos para mostrar solo las tarifas de temporadas que estén vigentes o por venir: una vencida ya no se puede comprar
       const tarifasVigentes = paquete.tarifas
-        .filter((t) => t.temporada.estado === "ACTIVO")
+        .filter((t) => t.temporada.estado === "ACTIVO" && t.temporada.fechaFin >= hoy)
         .map((t) => ({
           idtemporada: t.temporada.idtemporada,
           temporada: t.temporada.nombre,

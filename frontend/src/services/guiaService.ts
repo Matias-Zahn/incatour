@@ -87,6 +87,19 @@ export function formatearFechaSalida(fechaIso?: string | null): string {
 }
 
 /** Fecha de hoy en hora LOCAL (YYYY-MM-DD); toISOString() daría la fecha UTC */
+// En estos estados el back acepta avances e incidentes
+export const ESTADOS_CON_AVANCES = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
+
+/** Lo que falta operar va primero, por fecha; después el historial, de lo más reciente a lo más viejo */
+export function ordenarSalidasGuia<T extends { estado: string; fechaInicio: string }>(salidas: T[]) {
+    const pendientes = salidas.filter((s) => ESTADOS_CON_AVANCES.includes(s.estado));
+    const historial = salidas.filter((s) => !ESTADOS_CON_AVANCES.includes(s.estado));
+    return {
+        pendientes: [...pendientes].sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio)),
+        historial: [...historial].sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio)),
+    };
+}
+
 export function fechaLocalHoy(): string {
     const h = new Date();
     const mm = String(h.getMonth() + 1).padStart(2, "0");
