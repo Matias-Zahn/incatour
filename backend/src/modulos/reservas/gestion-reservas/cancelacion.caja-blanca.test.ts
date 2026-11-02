@@ -30,7 +30,8 @@ vi.mock("../../../integraciones/notificador/notificador.mock", () => ({
 }));
 
 const DIA = 24 * 60 * 60 * 1000;
-const dias = (n: number) => new Date(Date.now() + n * DIA);
+// Las fechas date-only se guardan a 00:00Z: con la hora actual, de noche ya serían el día siguiente en UTC
+const dias = (n: number) => new Date(hoyUTC().getTime() + n * DIA);
 const cliente = { idusuario: 5, email: "a@b.com", rol: "CLIENTE" };
 const admin = { idusuario: 1, email: "x@y.com", rol: "ADMIN" };
 
