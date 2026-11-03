@@ -244,8 +244,21 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     it("rechaza un pasaporte que vence antes de terminar el recorrido", async () => {
       const dto = crearDto({ pasajeros: [pasajero(1), pasajero(2, "2030-06-12")] });
 
-      await expect(new ReservaService().crearReserva(dto, 1)).rejects.toThrow("antes de que termine el recorrido");
+      await expect(new ReservaService().crearReserva(dto, 1)).rejects.toThrow("tiene que vencer después del fin del recorrido");
       sinEfectos();
+    });
+
+    it("RES-18: rechaza un pasaporte que vence el último día del recorrido", async () => {
+      const dto = crearDto({ pasajeros: [pasajero(1), pasajero(2, "2030-06-13")] });
+
+      await expect(new ReservaService().crearReserva(dto, 1)).rejects.toThrow("tiene que vencer después del fin del recorrido");
+      sinEfectos();
+    });
+
+    it("RES-18: acepta un pasaporte que vence el día siguiente al fin del recorrido", async () => {
+      const dto = crearDto({ pasajeros: [pasajero(1), pasajero(2, "2030-06-14")] });
+
+      await expect(new ReservaService().crearReserva(dto, 1)).resolves.toBeDefined();
     });
 
     it("rechaza si no hay tarifa activa para la fecha de la salida", async () => {
