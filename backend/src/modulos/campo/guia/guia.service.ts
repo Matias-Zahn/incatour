@@ -1,5 +1,5 @@
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { CustomError } from "../../../error/CustomError";
 import { hoyUTC } from "../../../shared/fechas";
 import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
@@ -8,7 +8,7 @@ import { GuiaRepository } from "./guia.repository";
 
 export class GuiaService {
   private repository = new GuiaRepository();
-  private notificador: INotificador = new NotificadorMock();
+  private notificador: INotificador = obtenerNotificador();
 
   // CU-48: consultarSalidasAsignadas (también es el punto de entrada de los CU-49 y CU-50)
   async consultarSalidasAsignadas(idusuario: number) {

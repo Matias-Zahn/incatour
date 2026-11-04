@@ -1,7 +1,7 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import {
   ESTADO_ALOJAMIENTO,
   ESTADO_PERMISO,
@@ -31,7 +31,7 @@ export class GestionReservaService {
 
   constructor() {
     this.repository = new GestionReservaRepository();
-    this.notificador = new NotificadorMock();
+    this.notificador = obtenerNotificador();
   }
 
   // ===================== CU-31: Consultar reservas =====================

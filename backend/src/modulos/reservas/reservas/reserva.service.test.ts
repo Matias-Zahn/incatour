@@ -99,7 +99,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       expect(r).toMatchObject({ idreserva: 99, precioCongelado: 1600, moneda: "USD", transaccionPasarela: "TXN-1", estadoAlojamiento: "CONFIRMADO" });
       expect(r.nroReserva).toMatch(/^RES-/);
       expect(repo.liberarCupos).not.toHaveBeenCalled();
-      expect(notificador.enviarEmailConfirmacion).toHaveBeenCalledWith("ana@mail.com", 99, 1600);
+      expect(notificador.enviarEmailConfirmacion).toHaveBeenCalledWith("ana@mail.com", r.nroReserva, 1600, "USD");
     });
 
     it("el cliente sale del usuario autenticado, no del body", async () => {

@@ -1,7 +1,7 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { ESTADO_PERMISO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, redondear2 } from "../../../shared/constantes";
 import { UsuarioAutenticado } from "../../reservas/gestion-reservas/gestion-reserva.service";
 import { obtenerAutoridad } from "../autoridad.wiring";
@@ -16,7 +16,7 @@ export class CancelacionSalidaService {
 
   constructor() {
     this.repository = new CancelacionSalidaRepository();
-    this.notificador = new NotificadorMock();
+    this.notificador = obtenerNotificador();
   }
 
   // Impacto de la cancelación, antes de confirmar (formulario del paso 2)
