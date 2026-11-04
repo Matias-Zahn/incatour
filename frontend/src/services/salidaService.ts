@@ -39,7 +39,13 @@ export type ServicioSalidaApi = {
     };
 };
 
-export type AlertaSalida = "SOLICITUD_PENDIENTE" | "PERMISOS_SIN_CONFIRMAR" | string;
+export type AlertaSalida =
+    | "SOLICITUD_PENDIENTE"
+    | "PERMISOS_SIN_CONFIRMAR"
+    | "SIN_INICIAR" // llegó su fecha y el guía no la inició
+    | "SIN_AVANCES" // iniciada hace más de 12 h sin ningún avance
+    | "SIN_FINALIZAR" // sigue en curso pasado el día siguiente a su fin
+    | string;
 
 /**
  * Estructura real de una salida devuelta por GET /api/salidas en el backend.
@@ -59,6 +65,11 @@ export type SalidaApi = {
     estado: string;
     lugaresPorLiberar: number;
     ultimaEtapaAlcanzada: number | null;
+    /** Cuándo la inició el guía y cuándo completó la última etapa */
+    fechaHoraInicioReal?: string | null;
+    fechaHoraFinReal?: string | null;
+    /** Llegada del primer avance informado */
+    primerAvance?: string | null;
     paquete: PaqueteSalidaApi;
     personalAsignado: PersonalAsignadoSalidaApi[];
     servicios: ServicioSalidaApi[];

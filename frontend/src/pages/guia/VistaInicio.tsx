@@ -1,6 +1,6 @@
 import {
     estilosEstadoSalida,
-    formatearEstadoSalida,
+    formatearEstadoSalidaGuia,
     formatearFechaHora,
     formatearFechaSalida,
     type DetalleSalidaGuia,
@@ -8,6 +8,7 @@ import {
 } from "../../services/guiaService";
 import { Link } from "react-router-dom";
 import { IconoCalendario, IconoMontana } from "./IconosGuia";
+import { IniciarSalida } from "./IniciarSalida";
 
 type VistaInicioProps = {
     salidaActual: SalidaGuiaResumen | null;
@@ -40,7 +41,7 @@ export function VistaInicio({
         .filter((e) => e.estadoTramo !== null)
         .map((e) => ({
             id: `etapa_${e.numeroOrden}`,
-            titulo: `Etapa ${e.numeroOrden}: ${formatearEstadoSalida(e.estadoTramo)}`,
+            titulo: `Etapa ${e.numeroOrden}: ${formatearEstadoSalidaGuia(e.estadoTramo)}`,
             subtitulo: `${e.puntoInicio} → ${e.puntoFin}${
                 e.fechaHoraLlegada
                     ? ` · Llegada: ${formatearFechaHora(e.fechaHoraLlegada)}`
@@ -93,7 +94,7 @@ export function VistaInicio({
                                 salidaActual.estado,
                             )}`}
                         >
-                            {formatearEstadoSalida(salidaActual.estado)}
+                            {formatearEstadoSalidaGuia(salidaActual.estado)}
                         </span>
                     </div>
 
@@ -137,6 +138,8 @@ export function VistaInicio({
                     No tienes una salida asignada en curso en este momento.
                 </div>
             )}
+
+            {cargando || !salidaActual ? null : <IniciarSalida salida={salidaActual} />}
 
             {sinSalidas ? null : <>
             <div>

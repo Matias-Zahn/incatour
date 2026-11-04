@@ -16,6 +16,22 @@ import Alerta from "../../components/Alerta";
 
 const POR_PAGINA = 6;
 
+// El contacto del hotel listo para usar: un mail abre el correo, un teléfono se puede llamar
+function EnlaceContacto({ dato }: { dato: string }) {
+  const href = dato.includes("@")
+    ? `mailto:${dato}`
+    : /^[+\d\s()-]{6,}$/.test(dato)
+      ? `tel:${dato.replace(/[^\d+]/g, "")}`
+      : null;
+  return href ? (
+    <a href={href} className="px-1 text-xs font-semibold text-marca hover:underline">
+      {dato}
+    </a>
+  ) : (
+    <span className="px-1 text-xs text-texto-suave">{dato}</span>
+  );
+}
+
 function esGarantiaEstablecimiento(tipoGarantia: string): boolean {
   return tipoGarantia.toUpperCase().includes("ESTABLECIMIENTO");
 }
@@ -236,8 +252,8 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                 {opciones.opcionesContacto.map((op) => {
                   const activo = servicioEfectivoId === op.servicioId;
                   return (
+                    <div key={op.servicioId} className="flex flex-col gap-1">
                     <button
-                      key={op.servicioId}
                       type="button"
                       onClick={() => setServicioSeleccionadoId(op.servicioId)}
                       className={`flex flex-col items-start rounded-xl border p-3.5 text-left transition-colors ${
@@ -265,6 +281,9 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                         Canal: {op.canalContacto}
                       </span>
                     </button>
+                    {/* Fuera del botón: un enlace dentro de un botón no es válido */}
+                    {op.datosContacto ? <EnlaceContacto dato={op.datosContacto} /> : null}
+                    </div>
                   );
                 })}
               </div>

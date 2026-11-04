@@ -3,7 +3,7 @@ import { GuiaService } from "./guia.service";
 import { RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn(), registrarIncidente: vi.fn() },
+  repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn(), registrarIncidente: vi.fn(), iniciarSalida: vi.fn() },
 }));
 vi.mock("./guia.repository", () => ({ GuiaRepository: class { constructor() { return repo; } } }));
 const { notificador } = vi.hoisted(() => ({ notificador: { enviarEmailInvitacionResenia: vi.fn() } }));
@@ -60,8 +60,9 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
   const etapas = [1, 2, 3].map((n) => ({ idcircuito: 5, numeroOrden: n }));
   const enRecorrido = (extra = {}) => ({
     ...salida,
-    estado: "CERRADA",
+    estado: "EN_CURSO",
     fechaInicio: new Date("2026-01-10"),
+    fechaHoraInicioReal: new Date("2026-01-10T08:00:00Z"),
     ultimaEtapaAlcanzada: null,
     paquete: { ...salida.paquete, circuito: { ...salida.paquete.circuito, etapas } },
     ...extra,
@@ -75,12 +76,19 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
     repo.registrarAvance.mockImplementation(async (p) => p);
   });
 
-  it("el primer avance pone la salida EN_CURSO y guarda la última etapa", async () => {
+  it("el primer avance deja la salida EN_CURSO y guarda la última etapa", async () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido());
 
     const r = await new GuiaService().registrarAvance(1, 2, avance(1));
 
-    expect(r).toMatchObject({ idcircuito: 5, numeroOrden: 1, estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1 });
+    expect(r).toMatchObject({ idcircuito: 5, numeroOrden: 1, estadoSalida: "EN_CURSO", ultimaEtapaAlcanzada: 1, fechaHoraFinReal: null });
+  });
+
+  it("sin iniciar la salida no se registran avances: el primer avance es la llegada, no la partida", async () => {
+    repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "CERRADA", fechaHoraInicioReal: null }));
+
+    await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toThrow("Primero hay que iniciar la salida");
+    expect(repo.registrarAvance).not.toHaveBeenCalled();
   });
 
   it("pasa al repositorio la etapa leída y rechaza con 409 si otro avance se coló (CTA-06)", async () => {
@@ -96,7 +104,7 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
 
     const r = await new GuiaService().registrarAvance(1, 2, avance(3));
 
-    expect(r).toMatchObject({ estadoSalida: "FINALIZADA", ultimaEtapaAlcanzada: 3 });
+    expect(r).toMatchObject({ estadoSalida: "FINALIZADA", ultimaEtapaAlcanzada: 3, fechaHoraFinReal: expect.any(Date) });
   });
 
   describe("invitación a reseñar", () => {
@@ -171,12 +179,62 @@ describe("GuiaService.registrarAvance (CU-49)", () => {
 
     await expect(servicio.registrarAvance(1, 2, avance(1, "COMPLETADO", "2099-01-01T10:00:00Z"))).rejects.toThrow("futura");
     await expect(servicio.registrarAvance(1, 2, avance(1, "COMPLETADO", "2025-12-31T10:00:00Z"))).rejects.toThrow("anterior al inicio");
+    // El inicio que cuenta es la partida real, no el día de la salida
+    await expect(servicio.registrarAvance(1, 2, avance(1, "COMPLETADO", "2026-01-10T07:00:00Z"))).rejects.toThrow("anterior al inicio");
   });
 
   it("no registra avances en una salida cancelada", async () => {
     repo.detalleSalida.mockResolvedValue(enRecorrido({ estado: "CANCELADA" }));
 
     await expect(new GuiaService().registrarAvance(1, 2, avance(1))).rejects.toThrow("CANCELADA");
+  });
+});
+
+describe("GuiaService.iniciarSalida (CU-49)", () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  const hoy = () => { const a = new Date(); return new Date(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())); };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    repo.idPersonalDelUsuario.mockResolvedValue(7);
+    repo.iniciarSalida.mockImplementation(async (idsalida, ahora) => ({ idsalida, estado: "EN_CURSO", fechaHoraInicioReal: ahora }));
+  });
+
+  it("el día de inicio la pone EN_CURSO con la hora real de partida", async () => {
+    repo.detalleSalida.mockResolvedValue({ ...salida, estado: "CERRADA", fechaInicio: hoy() });
+
+    const r = await new GuiaService().iniciarSalida(1, 2);
+
+    expect(r).toMatchObject({ estado: "EN_CURSO", fechaHoraInicioReal: expect.any(Date) });
+  });
+
+  it("antes de la fecha de inicio no se puede", async () => {
+    repo.detalleSalida.mockResolvedValue({ ...salida, estado: "CERRADA", fechaInicio: new Date(hoy().getTime() + DIA) });
+
+    await expect(new GuiaService().iniciarSalida(1, 2)).rejects.toThrow("todavía no se puede iniciar");
+    expect(repo.iniciarSalida).not.toHaveBeenCalled();
+  });
+
+  it("ya iniciada devuelve la hora de partida original, sin pisarla", async () => {
+    const partida = new Date("2026-01-10T08:00:00Z");
+    repo.detalleSalida.mockResolvedValue({ ...salida, estado: "EN_CURSO", fechaInicio: hoy(), fechaHoraInicioReal: partida });
+
+    expect(await new GuiaService().iniciarSalida(1, 2)).toEqual({ idsalida: 2, estado: "EN_CURSO", fechaHoraInicioReal: partida });
+    expect(repo.iniciarSalida).not.toHaveBeenCalled();
+  });
+
+  it("una salida finalizada o cancelada no se inicia", async () => {
+    for (const estado of ["FINALIZADA", "CANCELADA"]) {
+      repo.detalleSalida.mockResolvedValue({ ...salida, estado, fechaInicio: hoy() });
+      await expect(new GuiaService().iniciarSalida(1, 2)).rejects.toThrow(estado);
+    }
+  });
+
+  it("un guía no asignado recibe 403", async () => {
+    repo.idPersonalDelUsuario.mockResolvedValue(99);
+    repo.detalleSalida.mockResolvedValue({ ...salida, fechaInicio: hoy() });
+
+    await expect(new GuiaService().iniciarSalida(1, 2)).rejects.toMatchObject({ statusCode: 403 });
   });
 });
 
@@ -218,6 +276,9 @@ describe("GuiaService.registrarIncidente (CU-50)", () => {
 
     repo.detalleSalida.mockResolvedValue(conPasajeros("FINALIZADA"));
     await expect(new GuiaService().registrarIncidente(1, 2, incidente())).rejects.toThrow("FINALIZADA");
+
+    repo.detalleSalida.mockResolvedValue(conPasajeros("CERRADA"));
+    await expect(new GuiaService().registrarIncidente(1, 2, incidente())).rejects.toThrow("Primero hay que iniciar la salida");
   });
 
   it("el DTO exige tipo, descripción y gravedad válidos", () => {

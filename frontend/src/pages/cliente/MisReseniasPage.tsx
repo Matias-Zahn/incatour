@@ -314,8 +314,8 @@ function MisReseniasPage() {
                                                             .nombrePaquete
                                                     }
                                                 </p>
-                                                <p className="font-mono text-xs text-texto-suave">
-                                                    {fila.salida.nroSalida}
+                                                <p className="text-xs text-texto-suave">
+                                                    {formatearRangoFechasUtc(fila.salida.fechaInicio, fila.salida.fechaFin)}
                                                 </p>
                                             </div>
                                         ),
@@ -467,11 +467,7 @@ function MisReseniasPage() {
                                 }
                             </h2>
                             <p className="mt-1 text-xs text-texto-suave">
-                                Salida{" "}
-                                <span className="font-mono font-semibold">
-                                    {itemSeleccionado.salida.nroSalida}
-                                </span>{" "}
-                                ·{" "}
+                                Salida del{" "}
                                 {formatearRangoFechasUtc(
                                     itemSeleccionado.salida.fechaInicio,
                                     itemSeleccionado.salida.fechaFin,

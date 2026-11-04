@@ -28,7 +28,7 @@ function MiCuentaClientePage() {
     // Misma regla que el back: un viaje que ya terminó no impide la baja
     const { data: confirmadas = [] } = useMisReservas("CONFIRMADA");
     const reservasConfirmadas = confirmadas.filter((r) =>
-        ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"].includes(r.salida.estado),
+        ["PUBLICADA", "CERRADA", "EN_CURSO"].includes(r.salida.estado),
     );
 
     const modificarMutacion = useModificarCuentaCliente();
@@ -152,7 +152,7 @@ function MiCuentaClientePage() {
             ) : (
                 <>
                     {/* BANNER RESUMEN DE PERFIL */}
-                    <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-y border-r border-l-4 border-borde border-l-[#16d6dc] bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
+                    <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-y border-r border-l-4 border-borde border-l-[#16d6dc] bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr]">
                         <div className="grid size-12 place-items-center rounded-xl bg-[#1b9fc7] text-base font-bold text-white">
                             {`${perfil.usuario.nombre.charAt(0)}${perfil.usuario.apellido.charAt(0)}`.toUpperCase()}
                         </div>
@@ -160,18 +160,7 @@ function MiCuentaClientePage() {
                             <h2 className="text-base font-bold text-navegacion">
                                 {perfil.usuario.nombre} {perfil.usuario.apellido}
                             </h2>
-                            <p className="text-xs text-texto-suave">
-                                N° de Cliente:{" "}
-                                <span className="font-mono font-semibold text-texto">
-                                    {perfil.nroCliente}
-                                </span>{" "}
-                                · {perfil.usuario.email}
-                            </p>
-                        </div>
-                        <div>
-                            <span className="inline-flex rounded-full bg-[#e0f4e8] px-3 py-1 text-xs font-bold text-[#216442]">
-                                {perfil.estado}
-                            </span>
+                            <p className="text-xs text-texto-suave">{perfil.usuario.email}</p>
                         </div>
                     </article>
 
@@ -310,22 +299,6 @@ function MiCuentaClientePage() {
                                         </p>
                                     ) : null}
                                 </div>
-
-                                <div>
-                                    <label
-                                        htmlFor="cuenta-nro-cliente"
-                                        className="mb-1.5 block text-xs font-semibold text-texto"
-                                    >
-                                        N° de Cliente (asignado por el sistema)
-                                    </label>
-                                    <input
-                                        id="cuenta-nro-cliente"
-                                        type="text"
-                                        value={perfil.nroCliente}
-                                        disabled
-                                        className="w-full cursor-not-allowed rounded-control border border-borde bg-fondo px-3 py-2 font-mono text-sm text-texto-suave"
-                                    />
-                                </div>
                             </div>
 
                             <div className="flex flex-wrap justify-end gap-3 border-t border-borde pt-4">
@@ -355,8 +328,7 @@ function MiCuentaClientePage() {
                                 Zona de peligro · Baja de cuenta
                             </h2>
                             <p className="mt-1 text-xs leading-relaxed text-[#764c48]">
-                                La baja inhabilita tu cuenta de cliente (estado{" "}
-                                <strong>INACTIVO</strong>) y cierra tu sesión
+                                La baja inhabilita tu cuenta de cliente y cierra tu sesión
                                 actual. Para poder dar de baja la cuenta no
                                 debés poseer reservas activas en estado{" "}
                                 <strong>Confirmada</strong>.
@@ -415,7 +387,7 @@ function MiCuentaClientePage() {
             <DialogoConfirmacion
                 abierto={dialogoBajaAbierto}
                 titulo="¿Confirmás la baja de tu cuenta de cliente?"
-                descripcion="Al confirmar, tu cuenta pasará a estado INACTIVO y se cerrará tu sesión inmediatamente. Esta acción requiere no tener reservas confirmadas vigentes."
+                descripcion="Al confirmar, tu cuenta quedará dada de baja y se cerrará tu sesión inmediatamente. Esta acción requiere no tener reservas confirmadas vigentes."
                 textoConfirmar="Sí, dar de baja mi cuenta"
                 textoCancelar="Cancelar"
                 cargando={darDeBajaMutacion.isPending}

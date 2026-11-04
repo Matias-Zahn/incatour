@@ -1,13 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { ESTADOS_CON_AVANCES, formatearEstadoSalida, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
+import { admiteRegistros, formatearEstadoSalidaGuia, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
 
 type VistaRecorridosProps = {
     detalleSalida: DetalleSalidaGuia | null;
     avancesPendientes: AvanceOffline[];
 };
-
-// El back solo acepta avances en estas salidas y con el recorrido ya iniciado
 
 export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecorridosProps) {
     const navegar = useNavigate();
@@ -17,10 +15,8 @@ export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecor
         return pendiente ? { ...etapa, estadoTramo: pendiente.estadoTramo } : etapa;
     });
     const salida = detalleSalida?.salida;
-    const admiteAvances =
-        !!salida?.fechaInicio &&
-        ESTADOS_CON_AVANCES.includes(salida.estado) &&
-        new Date(salida.fechaInicio) <= new Date();
+    // El botón de cada tramo solo con la salida iniciada: antes o después del recorrido lleva a un formulario desactivado
+    const admiteAvances = admiteRegistros(salida?.estado);
     // Las etapas se informan en orden: solo la siguiente se puede registrar
     const siguienteEtapa = itinerario.find((e) => e.estadoTramo !== "COMPLETADO")?.numeroOrden;
 
@@ -92,7 +88,7 @@ export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecor
                                                           : "bg-slate-200 text-slate-700"
                                                 }`}
                                             >
-                                                {etapa.estadoTramo ? formatearEstadoSalida(etapa.estadoTramo) : "Pendiente"}
+                                                {etapa.estadoTramo ? formatearEstadoSalidaGuia(etapa.estadoTramo) : "Pendiente"}
                                             </span>
                                         </div>
                                         {etapa.campamentoPrevisto ? (

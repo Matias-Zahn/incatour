@@ -10,7 +10,10 @@ export class PersonalService {
 
   // CU-22: Consultar personal operativo
   async consultarPersonal(dto: ConsultarPersonalDto) {
-    return this.repository.buscar(dto);
+    return (await this.repository.buscar(dto)).map(({ asignaciones, ...p }) => ({
+      ...p,
+      salidaEnCurso: asignaciones[0]?.salida.nroSalida ?? null,
+    }));
   }
 
   // CU-24: Modificar personal operativo

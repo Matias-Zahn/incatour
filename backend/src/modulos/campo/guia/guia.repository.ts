@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
 
 export class GuiaRepository {
   // El token trae idusuario; el legajo se encuentra por Usuario → Guia → Personal
@@ -8,10 +8,13 @@ export class GuiaRepository {
     return guia?.idpersonal ?? null;
   }
 
-  // CU-48: salidas asignadas al guía, sin las canceladas
+  // CU-48: salidas asignadas al guía, sin las canceladas ni las que siguen a la venta (la asignación las cierra)
   async salidasAsignadas(idpersonal: number) {
     return db.salida.findMany({
-      where: { personalAsignado: { some: { idpersonal } }, estado: { not: ESTADO_SALIDA.CANCELADA } },
+      where: {
+        personalAsignado: { some: { idpersonal } },
+        estado: { notIn: [ESTADO_SALIDA.CANCELADA, ESTADO_SALIDA.PUBLICADA] },
+      },
       select: {
         idsalida: true,
         nroSalida: true,
@@ -49,6 +52,18 @@ export class GuiaRepository {
     });
   }
 
+  // CU-49: el grupo partió. Pasa una sola vez: dos toques seguidos no pisan la hora de partida
+  async iniciarSalida(idsalida: number, ahora: Date) {
+    await db.salida.updateMany({
+      where: { idsalida, estado: { in: SALIDAS_NO_INICIADAS } },
+      data: { estado: ESTADO_SALIDA.EN_CURSO, fechaHoraInicioReal: ahora },
+    });
+    return db.salida.findUniqueOrThrow({
+      where: { idsalida },
+      select: { idsalida: true, estado: true, fechaHoraInicioReal: true },
+    });
+  }
+
   // CU-49 pasos 10 y 11, en una transacción: el avance y el estado de la salida se actualizan juntos
   async registrarAvance(p: {
     idsalida: number;
@@ -59,12 +74,17 @@ export class GuiaRepository {
     ultimaEtapaAlcanzada: number | null;
     ultimaEtapaLeida: number | null;
     estadoSalida: string;
+    fechaHoraFinReal: Date | null;
   }) {
     return db.$transaction(async (tx) => {
       // Se actualiza la salida primero y solo si nadie avanzó desde que se leyó: dos avances simultáneos no pasan los dos
       const { count } = await tx.salida.updateMany({
-        where: { idsalida: p.idsalida, ultimaEtapaAlcanzada: p.ultimaEtapaLeida, estado: { in: SALIDAS_ACTIVAS } },
-        data: { estado: p.estadoSalida, ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada },
+        where: { idsalida: p.idsalida, ultimaEtapaAlcanzada: p.ultimaEtapaLeida, estado: ESTADO_SALIDA.EN_CURSO },
+        data: {
+          estado: p.estadoSalida,
+          ultimaEtapaAlcanzada: p.ultimaEtapaAlcanzada,
+          ...(p.fechaHoraFinReal && { fechaHoraFinReal: p.fechaHoraFinReal }),
+        },
       });
       if (count === 0) return null;
       // fechaHoraReporte la pone la base (default now): así quedan separados el hecho y el aviso

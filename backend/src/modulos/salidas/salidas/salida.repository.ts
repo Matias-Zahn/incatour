@@ -53,6 +53,8 @@ export class SalidaRepository {
           },
         },
         permisos: { where: { estadoTramite: ESTADO_PERMISO.EMITIDO }, select: { idpermisopersonal: true } },
+        // Cuánto tardó el primer aviso del guía desde que salió
+        avances: { select: { fechaHoraLlegada: true }, orderBy: { fechaHoraLlegada: "asc" }, take: 1 },
       },
       orderBy: { fechaInicio: "asc" },
     });

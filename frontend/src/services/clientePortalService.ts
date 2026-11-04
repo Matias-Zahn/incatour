@@ -729,8 +729,6 @@ export function etiquetaEstadoSalidaCliente(estado?: string | null): string {
     switch (estado?.trim().toUpperCase()) {
         case "PUBLICADA":
             return "Publicada";
-        case "ABIERTA":
-            return "Abierta";
         case "CERRADA":
             return "Cerrada";
         case "EN_CURSO":

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Modal from "../../components/Modal";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IniciarSalida } from "./IniciarSalida";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
@@ -13,12 +14,12 @@ import {
     etiquetasNivelGravedad,
     etiquetasTipoIncidente,
     fechaLocalHoy,
-    formatearEstadoSalida,
+    formatearEstadoSalidaGuia,
     formatearFechaHora,
     guardarIncidenteOffline,
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
-    ESTADOS_CON_AVANCES,
+    admiteRegistros,
     tiposIncidente,
     usePasajerosSalida,
     useRegistrarIncidente,
@@ -280,7 +281,7 @@ export function VistaIncidentes({
                             salidaActual.estado,
                         )}`}
                     >
-                        {formatearEstadoSalida(salidaActual.estado)}
+                        {formatearEstadoSalidaGuia(salidaActual.estado)}
                     </span>
                 </div>
             </article>
@@ -293,14 +294,18 @@ export function VistaIncidentes({
                         Datos del incidente
                     </h2>
 
-                    {ESTADOS_CON_AVANCES.includes(salidaActual.estado) ? null : (
+                    {admiteRegistros(salidaActual.estado) ? null : (
                         <div className="mt-5">
-                            <Alerta tipo="informacion">Esta salida ya terminó: no admite incidentes nuevos.</Alerta>
+                            {salidaActual.estado === "PUBLICADA" || salidaActual.estado === "CERRADA" ? (
+                                <IniciarSalida salida={salidaActual} motivo="Para registrar incidentes primero hay que iniciar la salida." />
+                            ) : (
+                                <Alerta tipo="informacion">Esta salida ya terminó: no admite incidentes nuevos.</Alerta>
+                            )}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5">
-                    <fieldset disabled={!ESTADOS_CON_AVANCES.includes(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
+                    <fieldset disabled={!admiteRegistros(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
                         {mensajeFeedback ? (
                             <Alerta tipo={mensajeFeedback.tipo}>
                                 {mensajeFeedback.texto}

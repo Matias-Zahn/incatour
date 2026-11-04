@@ -704,7 +704,7 @@ function PaquetesPage() {
                                 titulo: "Estado",
                                 renderizar: (paquete) => (
                                     <span
-                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                             paquete.estado,
                                         )}`}
                                     >
@@ -832,7 +832,7 @@ function PaquetesPage() {
                                                     }
                                                 </span>
                                                 <span
-                                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                                    className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                                         paqueteVistaPrevia.estado,
                                                     )}`}
                                                 >

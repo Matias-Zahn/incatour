@@ -45,6 +45,16 @@ export class GuiaController {
     }
   };
 
+  // CU-49: POST /api/guia/salidas/:idsalida/iniciar
+  iniciarSalida = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await service.iniciarSalida(req.usuarioAutenticado!.idusuario, leerIdSalida(req.params.idsalida));
+      return res.json({ mensaje: "Salida iniciada", data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // CU-50 FA1: GET /api/guia/salidas/:idsalida/pasajeros
   consultarPasajerosSalida = async (req: Request, res: Response, next: NextFunction) => {
     try {
