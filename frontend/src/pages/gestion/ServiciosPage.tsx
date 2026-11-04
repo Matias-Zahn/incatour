@@ -305,8 +305,8 @@ function ServiciosPage() {
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                     >
                         <option value="">Todos los estados</option>
-                        <option value="ACTIVO">ACTIVO</option>
-                        <option value="INACTIVO">INACTIVO</option>
+                        <option value="ACTIVO">Activos</option>
+                        <option value="INACTIVO">Inactivos</option>
                     </select>
 
                     {busqueda || hayFiltros ? (

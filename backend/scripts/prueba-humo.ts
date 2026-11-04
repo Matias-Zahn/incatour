@@ -182,15 +182,20 @@ async function faseC() {
   else if (porteadorSalida) avisos.push("C Sin reemplazantes disponibles: no se probó el reemplazo");
 
   // Portal del guía (CU-48 a 50): los avances de todas las etapas finalizan la salida.
-  // Una salida nueva empieza en el futuro y los avances no pueden ser futuros: se corre a "empezó ayer"
+  // Una salida nueva empieza en el futuro y los avances no pueden ser futuros: se corre a "empezó ayer",
+  // el guía la inicia y la partida se lleva a ayer, para que los avances de las últimas horas sean posteriores
   const dia = 24 * 3600 * 1000;
   const hace = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const tokGuia = guia ? await login(emailGuia, "guiaHumo123") : "";
   if (idsalida) {
     const db = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-    await db.salida.update({ where: { idsalida }, data: { fechaInicio: new Date(Date.now() - dia), fechaFin: new Date(Date.now() + dia) } });
+    // Fechas date-only (00:00Z), como las guarda la API: con hora, "empezó ayer" puede caer hoy en UTC
+    const soloDia = (ms: number) => new Date(new Date(Date.now() + ms).toISOString().slice(0, 10));
+    await db.salida.update({ where: { idsalida }, data: { fechaInicio: soloDia(-2 * dia), fechaFin: soloDia(dia) } });
+    await paso("Iniciar salida (CU-49)", "POST", `/guia/salidas/${idsalida}/iniciar`, undefined, tokGuia);
+    await db.salida.update({ where: { idsalida }, data: { fechaHoraInicioReal: new Date(Date.now() - dia) } });
     await db.$disconnect();
   }
-  const tokGuia = guia ? await login(emailGuia, "guiaHumo123") : "";
   await paso("Salidas del guía (CU-48)", "GET", "/guia/salidas", undefined, tokGuia);
   await paso("Detalle para el guía (CU-48)", "GET", `/guia/salidas/${idsalida}`, undefined, tokGuia);
   const pasajeros: any[] = (await paso("Pasajeros (CU-50)", "GET", `/guia/salidas/${idsalida}/pasajeros`, undefined, tokGuia)) ?? [];

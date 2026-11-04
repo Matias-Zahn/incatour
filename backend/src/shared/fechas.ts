@@ -2,8 +2,7 @@
 // Para compararlas con "hoy" hay que usar el día calendario local a 00:00Z, no new Date().
 
 // BE-01: hoy a las 00:00 UTC, tomando el día local
-export const hoyUTC = () => {
-  const ahora = new Date();
+export const hoyUTC = (ahora = new Date()) => {
   return new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
 };
 

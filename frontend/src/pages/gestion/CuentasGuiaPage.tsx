@@ -203,8 +203,8 @@ function CuentasGuiaPage() {
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                     >
                         <option value="">Todos los estados</option>
-                        <option value="ACTIVO">ACTIVO</option>
-                        <option value="INACTIVO">INACTIVO</option>
+                        <option value="ACTIVO">Activos</option>
+                        <option value="INACTIVO">Inactivos</option>
                     </select>
                 </label>
 
@@ -342,7 +342,7 @@ function CuentasGuiaPage() {
                                 titulo: "Estado cuenta",
                                 renderizar: (cuenta) => (
                                     <span
-                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                             cuenta.estado === "ACTIVO"
                                                 ? "bg-marca/10 text-marca"
                                                 : "bg-borde text-texto-suave"

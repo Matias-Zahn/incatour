@@ -346,6 +346,9 @@ async function main() {
         const url = `/guia/salidas/${idsalida}`;
         const etapas = etapa === "encurso" ? 1 : CIRCUITOS[paquete.circuito].etapas.length;
         await mover(fecha(-1), fecha(dias - 2));
+        await api("POST", `${url}/iniciar`, undefined, guia.token);
+        // La partida va antes del primer avance; su hora real se pone al llevar la salida a su fecha
+        await db.salida.update({ where: { idsalida }, data: { fechaHoraInicioReal: new Date(fecha(-1)) } });
         for (let i = 1; i <= etapas; i++) {
           await api("POST", `${url}/avances`, { numeroOrden: i, estadoTramo: "COMPLETADO", fechaHoraLlegada: hace((etapas - i + 2) * H) }, guia.token);
           if (i === 1 && etapa === "historica" && azar() < 0.3) {
@@ -444,6 +447,14 @@ async function llevarALaFechaReal(
     for (const [i, a] of avances.entries()) {
       const llegada = instante(sumarDias(s.virtual, i), 16);
       await db.avance.update({ where: { idavance: a.idavance }, data: { fechaHoraLlegada: llegada, fechaHoraReporte: new Date(llegada.getTime() + H / 4) } });
+    }
+    // Partió a las 7 del primer día y, si terminó, terminó con la llegada de la última etapa
+    if (salida.fechaHoraInicioReal) {
+      const ultima = avances.length ? instante(sumarDias(s.virtual, avances.length - 1), 16) : null;
+      await db.salida.update({
+        where: { idsalida: s.idsalida },
+        data: { fechaHoraInicioReal: instante(s.virtual, 7), ...(salida.fechaHoraFinReal && ultima && { fechaHoraFinReal: ultima }) },
+      });
     }
     const ocurrencia = instante(s.virtual, 15);
     await db.incidente.updateMany({ where: { idsalida: s.idsalida }, data: { fechaHoraOcurrencia: ocurrencia, fechaHoraReporte: new Date(ocurrencia.getTime() + H / 2) } });

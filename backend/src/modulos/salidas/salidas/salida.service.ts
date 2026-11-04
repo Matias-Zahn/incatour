@@ -133,16 +133,21 @@ export class SalidaService {
 
 // RF-61: una salida está "próxima" si empieza dentro de estos días (supuesto del grupo, ver ERS)
 export const DIAS_ALERTA = 7;
+// ponytail: umbral único para todos los circuitos; si cada uno necesita otro, pasarlo a la etapa 1
+export const HORAS_ALERTA_PRIMER_AVANCE = 12;
+const HORA_MS = 60 * 60 * 1000;
 
 /**
  * CU-35 (RF-50 y RF-61): agrega a cada salida los datos del listado del administrador.
  * - permisosFaltantes: pasajeros confirmados + personal asignado − permisos emitidos.
  * - etapaEsperada (solo EN_CURSO): reparto proporcional de las etapas en los días del circuito,
  *   porque el itinerario no guarda en qué día cae cada etapa (supuesto del grupo).
- * - alertas: con la salida a DIAS_ALERTA días o menos de empezar, solicitudes pendientes o permisos sin emitir.
+ * - alertas: con la salida a DIAS_ALERTA días o menos de empezar, solicitudes pendientes o permisos sin emitir;
+ *   además, la que llegó a su fecha y el guía no inició, la iniciada sin avances después de HORAS_ALERTA_PRIMER_AVANCE
+ *   y la que sigue en curso pasado el día siguiente a su fin.
  */
 export function resumirSalida(s: SalidaListada, ahora: Date) {
-  const { reservas, permisos, ...salida } = s;
+  const { reservas, permisos, avances, ...salida } = s;
   const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
   const cantidadPersonal = salida.personalAsignado.length;
   const emitidos = permisos.length + reservas.reduce((t, r) => t + r.permisos.length, 0);
@@ -164,6 +169,14 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
     if (reservas.some((r) => r.solicitudes.length > 0)) alertas.push("SOLICITUD_PENDIENTE");
     if (permisosFaltantes > 0) alertas.push("PERMISOS_SIN_CONFIRMAR");
   }
+  const hoy = hoyUTC(ahora);
+  const primerAvance = avances[0]?.fechaHoraLlegada ?? null;
+  if (porEmpezar && salida.fechaInicio <= hoy) alertas.push("SIN_INICIAR");
+  if (salida.estado === ESTADO_SALIDA.EN_CURSO) {
+    const horasDesdeInicio = salida.fechaHoraInicioReal ? (ahora.getTime() - salida.fechaHoraInicioReal.getTime()) / HORA_MS : 0;
+    if (!primerAvance && horasDesdeInicio > HORAS_ALERTA_PRIMER_AVANCE) alertas.push("SIN_AVANCES");
+    if (hoy.getTime() > salida.fechaFin.getTime() + DIA_MS) alertas.push("SIN_FINALIZAR");
+  }
 
   return {
     ...salida,
@@ -174,6 +187,7 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
     etapaEsperada,
     etapaInformada,
     etapaDesfasada: etapaEsperada !== null && etapaEsperada !== (etapaInformada ?? 0),
+    primerAvance,
     alertas,
   };
 }

@@ -774,19 +774,8 @@ function CatalogoCompraPage() {
                                         Salida Programada
                                     </p>
                                     <p className="mt-1 text-base font-bold text-navegacion">
-                                        {reservaConfirmada.salida.nroSalida}
-                                    </p>
-                                    <p className="mt-1 text-xs text-texto">
-                                        <strong>Inicio del recorrido:</strong>{" "}
-                                        {formatearFechaCorta(
-                                            reservaConfirmada.salida.fechaInicio,
-                                        )}
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-texto">
-                                        <strong>Fin del recorrido:</strong>{" "}
-                                        {formatearFechaCorta(
-                                            reservaConfirmada.salida.fechaFin,
-                                        )}
+                                        {formatearFechaCorta(reservaConfirmada.salida.fechaInicio)} al{" "}
+                                        {formatearFechaCorta(reservaConfirmada.salida.fechaFin)}
                                     </p>
                                     <p className="mt-2 text-xs text-texto-suave">
                                         Temporada aplicada:{" "}
@@ -999,9 +988,6 @@ function CatalogoCompraPage() {
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="rounded bg-marca-activa px-2 py-0.5 text-xs font-bold text-marca-oscura">
-                                                        {salida.nroSalida}
-                                                    </span>
                                                     <span
                                                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                                             salida.stockLocal >
@@ -1404,7 +1390,7 @@ function CatalogoCompraPage() {
                                 </span>
                                 <span className="font-semibold text-texto">
                                     {salidaActiva
-                                        ? `${salidaActiva.nroSalida} (${formatearFechaCorta(salidaActiva.fechaInicio)})`
+                                        ? formatearFechaCorta(salidaActiva.fechaInicio)
                                         : "Sin salida"}
                                 </span>
                             </div>
@@ -2209,10 +2195,6 @@ function CatalogoCompraPage() {
                                                             >
                                                                 <div>
                                                                     <p className="font-bold text-navegacion">
-                                                                        {
-                                                                            s.nroSalida
-                                                                        }{" "}
-                                                                        ·{" "}
                                                                         {formatearFechaCorta(
                                                                             s.fechaInicio,
                                                                         )}

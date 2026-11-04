@@ -1,9 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import LayoutCliente from "./components/LayoutCliente";
 import LayoutGestion from "./components/LayoutGestion";
 import Login from "./pages/Login";
 import RutaProtegida from "./components/RutaProtegida";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import EstadoListado from "./components/EstadoListado";
 import LimiteDeError from "./components/LimiteDeError";
 
@@ -29,9 +29,19 @@ const SolicitudesPage = lazy(() => import("./pages/gestion/SolicitudesPage"));
 const TemporadasPage = lazy(() => import("./pages/gestion/TemporadasPage"));
 const PortalGuiaPage = lazy(() => import("./pages/guia/PortalGuiaPage"));
 
+// BrowserRouter no restaura el scroll: sin esto, la pantalla nueva abre a la altura de la anterior
+function ArribaAlNavegar() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ArribaAlNavegar />
       <LimiteDeError>
       <Suspense fallback={<EstadoListado estado="cargando" />}>
       <Routes>

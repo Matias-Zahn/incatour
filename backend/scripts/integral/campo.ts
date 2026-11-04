@@ -36,8 +36,13 @@ async function armar(ctx: Ctx, o: Opciones = {}) {
 }
 type Armada = Awaited<ReturnType<typeof armar>>;
 
-/** "Empezó ayer": a partir de acá los avances e incidentes son posibles */
-const empezar = (ctx: Ctx, idsalida: number) => ctx.f.moverFechas(idsalida, fecha(-1), fecha(1));
+/** "Empezó ayer" y el guía la inició: a partir de acá los avances e incidentes son posibles */
+async function empezar(ctx: Ctx, a: Armada) {
+  await ctx.f.moverFechas(a.idsalida, fecha(-1), fecha(1));
+  await ctx.preparar("Iniciar salida", "POST", `/guia/salidas/${a.idsalida}/iniciar`, undefined, a.guia.token);
+  // La partida queda ayer a primera hora, para que los avances de las últimas horas sean posteriores
+  await ctx.db.salida.update({ where: { idsalida: a.idsalida }, data: { fechaHoraInicioReal: new Date(fecha(-1)) } });
+}
 
 const avance = (numeroOrden: number, llegada: string, estadoTramo = "COMPLETADO") => ({ numeroOrden, estadoTramo, fechaHoraLlegada: llegada });
 
@@ -61,7 +66,7 @@ export async function campo(ctx: Ctx) {
   ctx.seccion("CU-48 Acceso a las salidas asignadas");
   await ctx.escenario("Guía no asignado: detalle, pasajeros, avance e incidente dan 403", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const ajeno = await f.guia();
     const base = `/guia/salidas/${a.idsalida}`;
     await ctx.esperar("Guía no asignado: GET detalle → 403", "GET", base, undefined, ajeno.token, 403);
@@ -70,7 +75,7 @@ export async function campo(ctx: Ctx) {
     await ctx.esperar("Guía no asignado: POST incidente → 403", "POST", `${base}/incidentes`, incidente(), ajeno.token, 403);
     ctx.controlar("Guía no asignado: no se creó ningún avance", (await avances(a.idsalida)) === 0);
     ctx.controlar("Guía no asignado: no se creó ningún incidente", (await db.incidente.count({ where: { idsalida: a.idsalida } })) === 0);
-    ctx.controlar("Guía no asignado: la salida sigue sin tocar", (await estadoSalida(a.idsalida)).estado === "CERRADA");
+    ctx.controlar("Guía no asignado: la salida sigue sin tocar", (await estadoSalida(a.idsalida)).estado === "EN_CURSO");
     const lista = await ctx.esperar("Guía no asignado: GET /guia/salidas → 200", "GET", "/guia/salidas", undefined, ajeno.token, 200);
     ctx.controlar("Guía no asignado: no ve la salida en su lista", Array.isArray(lista) && !lista.some((s: any) => s.idsalida === a.idsalida));
     const propia = await ctx.esperar("Guía asignado: GET /guia/salidas → 200", "GET", "/guia/salidas", undefined, a.guia.token, 200);
@@ -102,15 +107,15 @@ export async function campo(ctx: Ctx) {
   ctx.seccion("CU-49 Registrar avances");
   await ctx.escenario("Avance de la etapa 2 sin haber informado la 1 → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await ctx.esperar("Avance etapa 2 sin la 1 → 400", "POST", `/guia/salidas/${a.idsalida}/avances`, avance(2, hace(H)), a.guia.token, 400);
     const s = await estadoSalida(a.idsalida);
-    ctx.controlar("Etapa salteada: sin avances y la salida no cambia", (await avances(a.idsalida)) === 0 && s.estado === "CERRADA" && s.ultimaEtapaAlcanzada === null, `estado=${s.estado} ultima=${s.ultimaEtapaAlcanzada}`);
+    ctx.controlar("Etapa salteada: sin avances y la salida no cambia", (await avances(a.idsalida)) === 0 && s.estado === "EN_CURSO" && s.ultimaEtapaAlcanzada === null, `estado=${s.estado} ultima=${s.ultimaEtapaAlcanzada}`);
   });
 
   await ctx.escenario("Avance con datos inválidos → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/avances`;
     await ctx.esperar("Avance con llegada futura → 400", "POST", url, avance(1, hace(-2 * H)), a.guia.token, 400);
     await ctx.esperar("Avance con etapa que no es del circuito → 400", "POST", url, avance(9, hace(H)), a.guia.token, 400);
@@ -120,7 +125,7 @@ export async function campo(ctx: Ctx) {
     await ctx.esperar("Avance con fecha basura → 400", "POST", url, avance(1, "mañana"), a.guia.token, 400);
     await ctx.esperar("Avance anterior al inicio de la salida → 400", "POST", url, avance(1, hace(5 * 24 * H)), a.guia.token, 400);
     ctx.controlar("Avances inválidos: no se creó ninguno", (await avances(a.idsalida)) === 0);
-    ctx.controlar("Avances inválidos: la salida sigue CERRADA", (await estadoSalida(a.idsalida)).estado === "CERRADA");
+    ctx.controlar("Avances inválidos: la salida sigue EN_CURSO", (await estadoSalida(a.idsalida)).estado === "EN_CURSO");
   });
 
   await ctx.escenario("Avance sobre una salida que todavía no empezó", async () => {
@@ -130,15 +135,37 @@ export async function campo(ctx: Ctx) {
     ctx.controlar("Salida sin empezar: no se creó el Avance ni cambió el estado", (await avances(a.idsalida)) === 0 && s.estado === "CERRADA", `estado=${s.estado}`);
     await ctx.esperar("Incidente antes de empezar la salida → 400", "POST", `/guia/salidas/${a.idsalida}/incidentes`, incidente(), a.guia.token, 400);
     ctx.controlar("Salida sin empezar: no se creó el Incidente", (await db.incidente.count({ where: { idsalida: a.idsalida } })) === 0);
+    await ctx.esperar("Iniciar antes de la fecha de inicio → 400", "POST", `/guia/salidas/${a.idsalida}/iniciar`, undefined, a.guia.token, 400);
+    ctx.controlar("Iniciar antes de tiempo: sigue CERRADA y sin hora de partida", (await estadoSalida(a.idsalida)).fechaHoraInicioReal === null);
+  });
+
+  await ctx.escenario("Iniciar la salida: el primer avance ya no la inicia", async () => {
+    const a = await armar(ctx);
+    await ctx.f.moverFechas(a.idsalida, fecha(-1), fecha(1));
+    const url = `/guia/salidas/${a.idsalida}`;
+    const listado = await ctx.preparar("Salidas del admin", "GET", "/salidas");
+    ctx.controlar("Admin: llegó la fecha sin iniciar → alerta SIN_INICIAR", listado.find((s: any) => s.idsalida === a.idsalida)?.alertas?.includes("SIN_INICIAR"));
+    await ctx.esperar("Avance sin iniciar la salida → 400", "POST", `${url}/avances`, avance(1, hace(H)), a.guia.token, 400);
+    await ctx.esperar("Incidente sin iniciar la salida → 400", "POST", `${url}/incidentes`, incidente(), a.guia.token, 400);
+    ctx.controlar("Sin iniciar: ni avances ni incidentes, sigue CERRADA", (await avances(a.idsalida)) === 0 && (await estadoSalida(a.idsalida)).estado === "CERRADA");
+    const ajeno = await f.guia();
+    await ctx.esperar("Guía no asignado inicia → 403", "POST", `${url}/iniciar`, undefined, ajeno.token, 403);
+    const r = await ctx.esperar("Guía asignado inicia → 200", "POST", `${url}/iniciar`, undefined, a.guia.token, 200);
+    ctx.controlar("Iniciada: EN_CURSO con hora de partida", r?.estado === "EN_CURSO" && !!r?.fechaHoraInicioReal, JSON.stringify(r));
+    const otra = await ctx.esperar("Iniciar de nuevo → 200 sin cambios", "POST", `${url}/iniciar`, undefined, a.guia.token, 200);
+    ctx.controlar("Reintento: conserva la hora de partida", otra?.fechaHoraInicioReal === r?.fechaHoraInicioReal);
+    await ctx.esperar("Avance anterior a la partida real → 400", "POST", `${url}/avances`, avance(1, hace(H)), a.guia.token, 400);
+    const despues = await ctx.preparar("Salidas del admin", "GET", "/salidas");
+    ctx.controlar("Admin: iniciada, ya no alerta SIN_INICIAR", !despues.find((s: any) => s.idsalida === a.idsalida)?.alertas?.includes("SIN_INICIAR"));
   });
 
   await ctx.escenario("Orden de etapas: repetida y anterior a la previa → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/avances`;
     const llegada1 = hace(3 * H);
     const r = await ctx.esperar("Avance 1 → 201", "POST", url, avance(1, llegada1), a.guia.token, 201);
-    ctx.controlar("Avance 1: la salida pasa a EN_CURSO con ultimaEtapa 1", r?.salida?.estado === "EN_CURSO" && r?.salida?.ultimaEtapaAlcanzada === 1, JSON.stringify(r?.salida));
+    ctx.controlar("Avance 1: la salida sigue EN_CURSO con ultimaEtapa 1", r?.salida?.estado === "EN_CURSO" && r?.salida?.ultimaEtapaAlcanzada === 1, JSON.stringify(r?.salida));
     await ctx.esperar("Avance 1 repetido (COMPLETADO) → 400", "POST", url, avance(1, hace(2 * H)), a.guia.token, 400);
     await ctx.esperar("Avance 2 con llegada anterior a la de la etapa 1 → 400", "POST", url, avance(2, hace(4 * H)), a.guia.token, 400);
     ctx.controlar("Orden: sigue habiendo un solo avance", (await avances(a.idsalida)) === 1);
@@ -146,7 +173,7 @@ export async function campo(ctx: Ctx) {
 
   await ctx.escenario("DEMORADO reenviado no se duplica (CTA-15)", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/avances`;
     const demorado = avance(1, hace(2 * H), "DEMORADO");
     await ctx.esperar("DEMORADO 1ra vez → 201", "POST", url, demorado, a.guia.token, 201);
@@ -164,7 +191,7 @@ export async function campo(ctx: Ctx) {
 
   await ctx.escenario("Completar todas las etapas finaliza la salida", async () => {
     const a = await armar(ctx, { etapas: 3 });
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/avances`;
     await ctx.esperar("Avance 1 de 3 → 201", "POST", url, avance(1, hace(4 * H)), a.guia.token, 201);
     await ctx.esperar("Avance 2 de 3 → 201", "POST", url, avance(2, hace(3 * H)), a.guia.token, 201);
@@ -185,7 +212,7 @@ export async function campo(ctx: Ctx) {
   await ctx.escenario("Incidente con un pasajero de otra salida → 400", async () => {
     const a = await armar(ctx);
     const b = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/incidentes`;
     await ctx.esperar("Incidente con pasajero ajeno → 400", "POST", url, incidente({ pasajerosAfectados: [a.pasajeros[0], b.pasajeros[0]] }), a.guia.token, 400);
     await ctx.esperar("Incidente con pasajero inexistente → 400", "POST", url, incidente({ pasajerosAfectados: [99999999] }), a.guia.token, 400);
@@ -195,7 +222,7 @@ export async function campo(ctx: Ctx) {
 
   await ctx.escenario("Incidente con datos inválidos → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/incidentes`;
     await ctx.esperar("Incidente con fecha futura → 400", "POST", url, incidente({ fechaHoraOcurrencia: hace(-2 * H) }), a.guia.token, 400);
     await ctx.esperar("Incidente anterior al inicio de la salida → 400", "POST", url, incidente({ fechaHoraOcurrencia: hace(5 * 24 * H) }), a.guia.token, 400);
@@ -208,7 +235,7 @@ export async function campo(ctx: Ctx) {
 
   await ctx.escenario("Incidente válido queda registrado y el admin lo ve", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/incidentes`;
     const nomina = await ctx.esperar("Pasajeros de la salida → 200", "GET", `/guia/salidas/${a.idsalida}/pasajeros`, undefined, a.guia.token, 200);
     ctx.controlar("Pasajeros: devuelve los 2 de la compra", Array.isArray(nomina) && nomina.length === 2 && a.pasajeros.every((id) => nomina.some((p: any) => p.idpasajero === id)));
@@ -219,7 +246,7 @@ export async function campo(ctx: Ctx) {
     const critico = filas.find((i) => i.nivelGravedad === "CRITICO");
     ctx.controlar("Base: 2 incidentes y el crítico vinculado al pasajero", filas.length === 2 && critico?.pasajeros.length === 1 && critico.pasajeros[0]!.idpasajero === afectado, `filas=${filas.length}`);
     ctx.controlar("Base: se guardan ocurrencia y reporte por separado", !!critico && critico.fechaHoraOcurrencia.getTime() < critico.fechaHoraReporte.getTime());
-    ctx.controlar("Incidente no cambia el estado de la salida", (await estadoSalida(a.idsalida)).estado === "CERRADA");
+    ctx.controlar("Incidente no cambia el estado de la salida", (await estadoSalida(a.idsalida)).estado === "EN_CURSO");
     const lista = await ctx.esperar("Admin: GET /incidentes?idsalida → 200", "GET", `/incidentes?idsalida=${a.idsalida}`, undefined, ctx.admin, 200);
     ctx.controlar("Admin ve los 2 incidentes de la salida", Array.isArray(lista) && lista.length === 2, `n=${lista?.length}`);
     const soloCriticos = await ctx.esperar("Admin: filtro por gravedad → 200", "GET", `/incidentes?idsalida=${a.idsalida}&nivelGravedad=CRITICO`, undefined, ctx.admin, 200);
@@ -231,7 +258,7 @@ export async function campo(ctx: Ctx) {
   ctx.seccion("CU-47 Publicar reseña");
   await ctx.escenario("Reseña de una salida no finalizada → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await ctx.preparar("Primer avance", "POST", `/guia/salidas/${a.idsalida}/avances`, avance(1, hace(2 * H)), a.guia.token);
     await ctx.esperar("Reseña de salida EN_CURSO → 400", "POST", "/resenias", { idsalida: a.idsalida, valoracion: 5 }, a.cliente.token, 400);
     const h = await ctx.esperar("Historial → 200", "GET", "/resenias/historial-reservas", undefined, a.cliente.token, 200);
@@ -242,7 +269,7 @@ export async function campo(ctx: Ctx) {
 
   await ctx.escenario("Reseña: duplicada, sin reserva, inválida y válida", async () => {
     const a = await armar(ctx, { etapas: 2, compradores: 1 });
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await finalizar(ctx, a);
     const s = await estadoSalida(a.idsalida);
     ctx.controlar("Salida FINALIZADA antes de reseñar", s.estado === "FINALIZADA");
@@ -283,7 +310,7 @@ export async function campo(ctx: Ctx) {
     const canc = a.otros[0]!;
     const reserva = await db.reserva.findFirstOrThrow({ where: { idsalida: a.idsalida, cliente: { usuario: { email: canc.email } } } });
     const ok = await ctx.esperar("Cancelar la reserva antes de empezar → 200", "POST", `/reservas/${reserva.idreserva}/cancelar`, { motivo: "Integral" }, canc.token, 200);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await finalizar(ctx, a);
     if (ok === undefined) return;
     await ctx.esperar("Reseña de quien canceló su reserva → 403", "POST", "/resenias", { idsalida: a.idsalida, valoracion: 5 }, canc.token, 403);
@@ -296,7 +323,7 @@ export async function campo(ctx: Ctx) {
   ctx.seccion("CU-42 Evaluar personal y proveedores");
   await ctx.escenario("Evaluación sobre una salida no finalizada → 400", async () => {
     const a = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await ctx.preparar("Primer avance", "POST", `/guia/salidas/${a.idsalida}/avances`, avance(1, hace(2 * H)), a.guia.token);
     await ctx.esperar("GET evaluables de salida EN_CURSO → 400", "GET", `/salidas/${a.idsalida}/evaluaciones`, undefined, ctx.admin, 400);
     await ctx.esperar("POST evaluación de salida EN_CURSO → 400", "POST", `/salidas/${a.idsalida}/evaluaciones`, { tipo: "PERSONAL", id: a.guia.idpersonal, puntaje: 5 }, ctx.admin, 400);
@@ -308,7 +335,7 @@ export async function campo(ctx: Ctx) {
   await ctx.escenario("Evaluación: rangos, duplicada, ajeno y proveedor", async () => {
     const a = await armar(ctx);
     const otra = await armar(ctx);
-    await empezar(ctx, a.idsalida);
+    await empezar(ctx, a);
     await finalizar(ctx, a);
     const url = `/salidas/${a.idsalida}/evaluaciones`;
     const idguia = a.guia.idpersonal;

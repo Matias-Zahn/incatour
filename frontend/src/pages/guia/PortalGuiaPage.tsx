@@ -8,7 +8,7 @@ import {
 import {
     estilosEstadoSalida,
     fechaLocalHoy,
-    formatearEstadoSalida,
+    formatearEstadoSalidaGuia,
     formatearFechaSalida,
     useDetalleSalidaGuia,
     useSalidasGuia,
@@ -184,7 +184,7 @@ export default function PortalGuiaPage() {
                                                 salidaActual.estado,
                                             )}`}
                                         >
-                                            {formatearEstadoSalida(salidaActual.estado)}
+                                            {formatearEstadoSalidaGuia(salidaActual.estado)}
                                         </span>
                                     ) : null}
                                 </div>
@@ -217,11 +217,11 @@ export default function PortalGuiaPage() {
                                     id="selector-salida-global"
                                     value={salidaActual?.idsalida ?? ""}
                                     onChange={(e) => cambiarSalidaGlobal(Number(e.target.value))}
-                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-1.5 text-base font-bold text-texto outline-none focus:border-marca md:max-w-xs md:text-xs"
+                                    className="min-h-11 w-full min-w-0 rounded-control border border-borde bg-white px-3 py-1.5 text-base font-bold text-texto outline-none focus:border-marca md:max-w-sm md:text-xs"
                                 >
                                     {[...pendientes, ...historial].map((s) => (
                                         <option key={s.idsalida} value={s.idsalida}>
-                                            {s.nroSalida} · {formatearFechaSalida(s.fechaInicio)} ({formatearEstadoSalida(s.estado)}) · {s.circuito}
+                                            {formatearFechaSalida(s.fechaInicio)} · {s.circuito} ({formatearEstadoSalidaGuia(s.estado)})
                                         </option>
                                     ))}
                                 </select>

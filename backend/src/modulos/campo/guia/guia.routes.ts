@@ -68,14 +68,42 @@ export class GuiaRoutes {
 
     /**
      * @swagger
+     * /api/guia/salidas/{idsalida}/iniciar:
+     *   post:
+     *     summary: Iniciar la salida (CU-49)
+     *     description: >
+     *       **RESTRINGIDO A GUÍA.** El guía asignado informa que el grupo partió. Se puede desde el día de inicio, con la
+     *       salida PUBLICADA o CERRADA. La pone EN_CURSO y guarda la hora real de partida; sin esto no se aceptan avances
+     *       ni incidentes. Repetirlo sobre una salida ya en curso la devuelve sin cambios.
+     *     tags: [Portal del guía]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     responses:
+     *       200:
+     *         description: Salida iniciada.
+     *         content:
+     *           application/json:
+     *             example:
+     *               mensaje: Salida iniciada
+     *               data: { idsalida: 2, estado: EN_CURSO, fechaHoraInicioReal: "2026-12-10T11:02:00.000Z" }
+     *       400: { description: Todavía no es la fecha de inicio, o la salida ya finalizó o fue cancelada. }
+     *       403: { description: El guía no está asignado a esa salida. }
+     *       404: { description: La salida no existe. }
+     */
+    router.post("/salidas/:idsalida/iniciar", controller.iniciarSalida);
+
+    /**
+     * @swagger
      * /api/guia/salidas/{idsalida}/avances:
      *   post:
      *     summary: Registrar avance del recorrido (CU-49)
      *     description: >
      *       **RESTRINGIDO A GUÍA.** El guía asignado informa la llegada al final de una etapa. Se guardan por separado
      *       cuándo ocurrió (fechaHoraLlegada) y cuándo se informó (fechaHoraReporte), porque el recorrido pasa por zonas
-     *       sin señal. Las etapas se informan en orden. El primer avance pone la salida EN_CURSO y completar la última
-     *       etapa la deja FINALIZADA.
+     *       sin señal. Las etapas se informan en orden. La salida tiene que estar iniciada (EN_CURSO); completar la
+     *       última etapa la deja FINALIZADA.
      *     tags: [Portal del guía]
      *     security:
      *       - BearerAuth: []

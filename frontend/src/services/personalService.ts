@@ -155,6 +155,8 @@ export type Personal = {
     guia: GuiaPersonal | null;
     nroHabilitacion?: string;
     fechaHabilitacion?: string;
+    /** Número de la salida EN_CURSO donde está ahora, si está en una */
+    salidaEnCurso?: string | null;
 };
 
 export type CredencialesAccesoGuia = {

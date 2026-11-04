@@ -19,6 +19,7 @@ import {
     estilosEstadoSalida,
     fechaLocalHoy,
     formatearEstadoSalida,
+    formatearFechaHora,
     formatearFechaSalida,
 } from "../../services/guiaService";
 import { usePaquetes } from "../../services/paqueteService";
@@ -57,6 +58,20 @@ import { listarSolicitudesPendientes } from "../../services/solicitudService";
 const ELEMENTOS_POR_PAGINA = 5;
 
 const ESTADOS_HISTORIAL = ["FINALIZADA", "CANCELADA"];
+
+// Alertas del recorrido: dependen del guía, no de la preparación de la salida
+const ALERTAS_RECORRIDO: Record<string, string> = {
+    SIN_INICIAR: "Sin iniciar",
+    SIN_AVANCES: "Sin avances del guía",
+    SIN_FINALIZAR: "Vencida sin cerrar",
+};
+
+const DIA_MS = 1000 * 60 * 60 * 24;
+const diaLocal = (iso: string) => {
+    const f = new Date(iso);
+    return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+};
+const diasEntre = (desde: string, hasta: string) => Math.round((new Date(hasta).getTime() - new Date(desde).getTime()) / DIA_MS);
 
 /** Lo que está en curso va arriba y después lo más cercano; en el historial, lo más reciente primero */
 function ordenarSalidas(salidas: Salida[], vista: "vigentes" | "historial") {
@@ -737,34 +752,43 @@ function SalidasPage() {
             clave: "fechaInicio" as const,
             titulo: "Fechas",
             renderizar: (fila: Salida) => {
+                // El estado real manda: una salida entre sus fechas que el guía no inició no está "en curso"
                 const hoy = fechaLocalHoy();
                 const inicioStr = fila.fechaInicio.slice(0, 10);
                 const finStr = fila.fechaFin.slice(0, 10);
-                const esFinalizada = fila.estado === "FINALIZADA" || finStr < hoy;
-                const esEnCurso = fila.estado === "EN_CURSO" || (inicioStr <= hoy && finStr >= hoy);
+                const alerta = (codigo: string) => fila.alertas?.includes(codigo);
+                const diasAntes =
+                    fila.estado === "FINALIZADA" && fila.fechaHoraFinReal
+                        ? diasEntre(diaLocal(fila.fechaHoraFinReal), finStr)
+                        : 0;
 
                 let badgeTiempo = null;
-                if (esFinalizada) {
+                if (fila.estado === "FINALIZADA") {
                     badgeTiempo = (
                         <span className="inline-block text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             Concluida
                         </span>
                     );
-                } else if (esEnCurso) {
+                } else if (alerta("SIN_FINALIZAR")) {
+                    badgeTiempo = (
+                        <span className="inline-block text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                            Vencida sin cerrar
+                        </span>
+                    );
+                } else if (fila.estado === "EN_CURSO") {
                     badgeTiempo = (
                         <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                             En curso
                         </span>
                     );
-                } else if (inicioStr === hoy) {
+                } else if (alerta("SIN_INICIAR")) {
                     badgeTiempo = (
-                        <span className="inline-block text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                            Sale hoy
+                        <span className="inline-block text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                            {inicioStr === hoy ? "Debía salir hoy" : "Sin iniciar"}
                         </span>
                     );
-                } else {
-                    const diffMs = new Date(inicioStr).getTime() - new Date(hoy).getTime();
-                    const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                } else if (fila.estado !== "CANCELADA") {
+                    const dias = diasEntre(hoy, inicioStr);
                     if (dias > 0) {
                         badgeTiempo = (
                             <span className="inline-block text-[10px] font-medium text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
@@ -785,6 +809,23 @@ function SalidasPage() {
                         <p className="text-texto-suave whitespace-nowrap">
                             Hasta: {formatearFechaSalida(fila.fechaFin)}
                         </p>
+                        {fila.fechaHoraInicioReal ? (
+                            <p className="text-texto-suave whitespace-nowrap">
+                                Inició: {formatearFechaHora(fila.fechaHoraInicioReal)}
+                            </p>
+                        ) : null}
+                        {fila.fechaHoraInicioReal && fila.primerAvance ? (
+                            <p className="text-texto-suave whitespace-nowrap">
+                                1er avance a las{" "}
+                                {Math.max(0, Math.round((new Date(fila.primerAvance).getTime() - new Date(fila.fechaHoraInicioReal).getTime()) / 36e5))}{" "}
+                                h
+                            </p>
+                        ) : null}
+                        {diasAntes > 0 ? (
+                            <p className="font-semibold text-amber-800 whitespace-nowrap">
+                                Finalizó {diasAntes} {diasAntes === 1 ? "día" : "días"} antes
+                            </p>
+                        ) : null}
                     </div>
                 );
             },
@@ -951,8 +992,9 @@ function SalidasPage() {
                 const alertaSol = fila.alertas?.includes("SOLICITUD_PENDIENTE");
                 const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
 
+                const alertasRecorrido = (fila.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO);
                 const sinNovedades =
-                    faltantes === 0 && !tieneSobrantes && !alertaSol && !alertaPermisos;
+                    faltantes === 0 && !tieneSobrantes && !alertaSol && !alertaPermisos && alertasRecorrido.length === 0;
 
                 if (sinNovedades) {
                     return (
@@ -964,6 +1006,15 @@ function SalidasPage() {
 
                 return (
                     <div className="flex flex-col gap-1 items-start text-xs">
+                        {alertasRecorrido.map((a) => (
+                            <span
+                                key={a}
+                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
+                            >
+                                <span aria-hidden="true">⚠️</span>
+                                <span>{ALERTAS_RECORRIDO[a]}</span>
+                            </span>
+                        ))}
                         {faltantes > 0 &&
                             (alertaPermisos ? (
                                 <span
@@ -1061,7 +1112,7 @@ function SalidasPage() {
 
                 // CU-38: Reemplazar personal
                 const estadoReemplazable =
-                    fila.estado === "PUBLICADA" || fila.estado === "ABIERTA" || fila.estado === "CERRADA";
+                    fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
                 const puedeReemplazarPersonal =
                     esAdmin &&
                     estadoReemplazable &&
@@ -1077,7 +1128,6 @@ function SalidasPage() {
                 // CU-37: Cancelar salida
                 const estadoCancelable =
                     fila.estado === "PUBLICADA" ||
-                    fila.estado === "ABIERTA" ||
                     fila.estado === "CERRADA";
                 const puedeCancelarSalida =
                     esAdmin &&
@@ -1950,21 +2000,20 @@ function SalidasPage() {
             {salidasConAlertasOperativas.length > 0 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo="Advertencias operativas: Salidas próximas dentro de 7 días (RF-61)"
+                    titulo="Advertencias operativas (RF-61)"
                 >
                     <div className="space-y-2">
                         <p className="text-sm">
                             Se detectaron situaciones operativas pendientes en{" "}
                             {salidasConAlertasOperativas.length}{" "}
-                            {salidasConAlertasOperativas.length === 1
-                                ? "salida próxima a iniciar"
-                                : "salidas próximas a iniciar"}
+                            {salidasConAlertasOperativas.length === 1 ? "salida" : "salidas"}
                             :
                         </p>
                         <div className="flex flex-wrap gap-2 pt-1">
                             {salidasConAlertasOperativas.map((s) => {
                                 const tieneSol = s.alertas?.includes("SOLICITUD_PENDIENTE");
                                 const tienePerm = s.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
+                                const delRecorrido = (s.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO).map((a) => ALERTAS_RECORRIDO[a]);
                                 const cantSol = solicitudesPorSalida.get(s.idsalida);
 
                                 return (
@@ -1975,6 +2024,10 @@ function SalidasPage() {
                                         <span>
                                             {s.nroSalida} ({s.paquete?.nombrePaquete}):
                                         </span>
+                                        {delRecorrido.length > 0 && (
+                                            <span className="text-rose-900 font-bold">{delRecorrido.join(" · ")}</span>
+                                        )}
+                                        {delRecorrido.length > 0 && (tieneSol || tienePerm) && <span>·</span>}
                                         {tieneSol && (
                                             <Link
                                                 to="/gestion/solicitudes"

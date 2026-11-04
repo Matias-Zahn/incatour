@@ -95,7 +95,9 @@ export class SolicitudService {
       servicioId: s.idservicio,
       hotel: s.nombreServicio,
       proveedor: s.proveedor.razonSocial,
-      canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema"
+      canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema",
+      // El dato concreto (mail o teléfono) para que el administrador contacte al hotel
+      datosContacto: s.proveedor.datosContacto
     };
   }
 
