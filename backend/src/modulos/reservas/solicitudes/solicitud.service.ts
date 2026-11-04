@@ -1,13 +1,13 @@
 import { CustomError } from "../../../error/CustomError";
 import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { SolicitudRepository } from "./solicitud.repository";
 import { ResolverSolicitudDto } from "./solicitud.dto";
 
 export class SolicitudService {
   private repository = new SolicitudRepository();
-  private notificador: INotificador = new NotificadorMock();
+  private notificador: INotificador = obtenerNotificador();
 
   // CU-33
   async consultarPendientes() {

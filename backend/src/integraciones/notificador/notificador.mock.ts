@@ -4,11 +4,11 @@ import { AlternativaSalida, INotificador } from "./notificador.interface";
 const esperar = () => new Promise((resolve) => setTimeout(resolve, 300));
 
 export class NotificadorMock implements INotificador {
-  async enviarEmailConfirmacion(email: string, reservaId: number, monto: number): Promise<boolean> {
+  async enviarEmailConfirmacion(email: string, nroReserva: string, monto: number, moneda: string): Promise<boolean> {
     await esperar();
     console.log(`\n📧 [NOTIFICADOR] Enviando EMAIL de CONFIRMACIÓN a: ${email}`);
-    console.log(`   └─ Reserva ID: ${reservaId}`);
-    console.log(`   └─ Monto pagado: $${monto.toFixed(2)}\n`);
+    console.log(`   └─ Reserva: ${nroReserva}`);
+    console.log(`   └─ Monto pagado: ${moneda} ${monto.toFixed(2)}\n`);
     return true;
   }
 

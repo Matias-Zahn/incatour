@@ -4,7 +4,7 @@ import { CustomError } from "../../../error/CustomError";
 import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interface";
 import { PasarelaMock } from "../../../integraciones/pasarela/pasarela.mock";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { DefinicionPaquete, definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaRepository } from "./reserva.repository";
@@ -17,7 +17,7 @@ const redondear2 = (n: number) => Math.round(n * 100) / 100;
 export class ReservaService {
   private repository = new ReservaRepository();
   private pasarela: IPasarelaPagos = new PasarelaMock();
-  private notificador: INotificador = new NotificadorMock();
+  private notificador: INotificador = obtenerNotificador();
 
   // CU-30 Comprar un paquete completo
   async crearReserva(dto: CrearReservaDto, idusuario: number) {
@@ -190,7 +190,7 @@ export class ReservaService {
 
     // 8. Confirmación por email: si falla, la reserva sigue siendo válida
     this.notificador
-      .enviarEmailConfirmacion(cliente.usuario.email, reserva.idreserva, reserva.precioCongelado)
+      .enviarEmailConfirmacion(cliente.usuario.email, reserva.nroReserva, reserva.precioCongelado, precio.moneda)
       .catch((e) => console.error("Fallo al notificar la confirmación:", e));
 
     return {

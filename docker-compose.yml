@@ -12,5 +12,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Atrapa los mails que manda el back y los muestra en http://localhost:8025 (no envía nada a internet)
+  mailpit:
+    image: axllent/mailpit:v1.20.5
+    container_name: incatour_mailpit
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   pgdata:
