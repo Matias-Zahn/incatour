@@ -213,7 +213,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                         }
                                                     </p>
                                                     {etapa.campamentoPrevisto ? (
-                                                        <p className="text-[11px] text-texto-suave">
+                                                        <p className="text-xs text-texto-suave">
                                                             Campamento:{" "}
                                                             {
                                                                 etapa.campamentoPrevisto
@@ -256,7 +256,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                             pasajero.nombreCompleto
                                                         }
                                                     </p>
-                                                    <p className="text-[11px] text-texto-suave">
+                                                    <p className="text-xs text-texto-suave">
                                                         Pasaporte:{" "}
                                                         <span className="font-mono">
                                                             {
@@ -270,7 +270,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="rounded-full bg-marca-suave px-2 py-0.5 text-[11px] font-bold text-marca-oscura">
+                                                    <span className="rounded-full bg-marca-suave px-2 py-0.5 text-xs font-bold text-marca-oscura">
                                                         {permiso
                                                             ? `${permiso.estadoTramite} (${permiso.nroPermiso})`
                                                             : "No emitido"}
@@ -315,7 +315,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                             pago.medioPago
                                                         }
                                                     </p>
-                                                    <p className="font-mono text-[11px] text-texto-suave">
+                                                    <p className="font-mono text-xs text-texto-suave">
                                                         {
                                                             pago.nrotransaccion
                                                         }{" "}
@@ -350,7 +350,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                             reemb.montoReembolsado,
                                                         )}
                                                     </p>
-                                                    <p className="text-[11px] text-texto">
+                                                    <p className="text-xs text-texto">
                                                         Motivo:{" "}
                                                         {
                                                             reemb.motivo

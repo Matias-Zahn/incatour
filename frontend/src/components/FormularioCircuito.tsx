@@ -193,7 +193,7 @@ function FormularioCircuito({
                                             { shouldValidate: true },
                                         )
                                     }
-                                    className="rounded bg-fondo px-2 py-0.5 text-[11px] font-medium text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
+                                    className="rounded bg-fondo px-2 py-0.5 text-xs font-medium text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
                                 >
                                     {sugerencia}
                                 </button>

@@ -443,7 +443,7 @@ export function VistaAvances({
                     <p className="text-xs font-medium text-texto">
                         {salidaActual.circuito} · <span className="text-texto-suave">{salidaActual.paquete}</span>
                     </p>
-                    <p className="mt-0.5 text-[11px] text-texto-suave">
+                    <p className="mt-0.5 text-xs text-texto-suave">
                         Inicio: <b>{formatearFechaSalida(salidaActual.fechaInicio)}</b> — Fin: <b>{formatearFechaSalida(salidaActual.fechaFin)}</b>
                     </p>
                 </div>
@@ -587,7 +587,7 @@ export function VistaAvances({
                             </label>
                         </div>
 
-                        <div className="rounded-xl bg-[#edf7f8] p-3 text-[11px] leading-relaxed text-[#426170]">
+                        <div className="rounded-xl bg-[#edf7f8] p-3 text-xs leading-relaxed text-[#426170]">
                             <b>Nota:</b> La fecha y hora ingresada debe corresponder al momento de la llegada real al final de la etapa seleccionada. La información queda preservada en este dispositivo en caso de no contar con conexión a internet.
                         </div>
 
@@ -633,7 +633,7 @@ export function VistaAvances({
                                     <div className="flex items-center justify-between">
                                         <p className="font-bold text-texto">{item.etapa}</p>
                                         <span
-                                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                                                 item.estadoTramo === "COMPLETADO"
                                                     ? "bg-emerald-100 text-emerald-800"
                                                     : "bg-amber-100 text-amber-800"
@@ -642,7 +642,7 @@ export function VistaAvances({
                                             {formatearEstadoSalidaGuia(item.estadoTramo)}
                                         </span>
                                     </div>
-                                    <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">
+                                    <div className="mt-1 flex items-center justify-between text-xs text-texto-suave">
                                         <span>{item.fechaHora}</span>
                                         {item.offline ? (
                                             <span className="font-semibold text-amber-700">
@@ -661,7 +661,7 @@ export function VistaAvances({
                         </div>
                     </div>
 
-                    <div className="mt-6 border-t border-borde/50 pt-3 text-center text-[11px] text-texto-suave">
+                    <div className="mt-6 border-t border-borde/50 pt-3 text-center text-xs text-texto-suave">
                         {avancesPendientes.length > 0 ? (
                             <span className="text-amber-800 font-semibold">
                                 Hay {avancesPendientes.length} avance(s) pendiente(s) de señal
@@ -706,7 +706,7 @@ export function VistaAvances({
                                     <div className="flex items-center justify-between">
                                         <p className="font-bold text-texto">{item.etapa}</p>
                                         <span
-                                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                                                 item.estadoTramo === "COMPLETADO"
                                                     ? "bg-emerald-100 text-emerald-800"
                                                     : "bg-amber-100 text-amber-800"
@@ -715,7 +715,7 @@ export function VistaAvances({
                                             {formatearEstadoSalidaGuia(item.estadoTramo)}
                                         </span>
                                     </div>
-                                    <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">
+                                    <div className="mt-1 flex items-center justify-between text-xs text-texto-suave">
                                         <span>{item.fechaHora}</span>
                                         {item.offline ? (
                                             <span className="font-semibold text-amber-700">

@@ -32,18 +32,6 @@ export const etiquetasEstadoSalida: Record<string, string> = {
     DEMORADO: "Demorado",
 };
 
-/** Fecha y hora del portal del guía, sin segundos */
-export function formatearFechaHora(iso: string): string {
-    return new Date(iso).toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    });
-}
-
 export function formatearEstadoSalida(estado?: string | null): string {
     if (!estado) return "Sin estado";
     const normalizado = estado.trim().toUpperCase();
@@ -70,23 +58,6 @@ export function estilosEstadoSalida(estado?: string | null): string {
             return "bg-rose-100 text-rose-800";
         default:
             return "bg-slate-100 text-slate-800";
-    }
-}
-
-/** Formatea fechas que vienen en UTC desde el backend evitando desfases por huso horario local */
-export function formatearFechaSalida(fechaIso?: string | null): string {
-    if (!fechaIso) return "--/--/----";
-    try {
-        const f = new Date(fechaIso);
-        if (isNaN(f.getTime())) return fechaIso;
-        return f.toLocaleDateString("es-ES", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            timeZone: "UTC",
-        });
-    } catch {
-        return fechaIso;
     }
 }
 
@@ -733,3 +704,6 @@ export async function listarIncidentes(): Promise<IncidenteAdmin[]> {
 export function useIncidentes() {
     return useQuery({ queryKey: ["incidentes"], queryFn: listarIncidentes });
 }
+
+// Los formatos viven en formato.ts; se re-exportan para las pantallas que ya los importan de acá
+export { formatearFechaHora, formatearFechaSalida } from "./formato";

@@ -80,7 +80,7 @@ export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecor
                                                 {etapa.puntoInicio} → {etapa.puntoFin}
                                             </p>
                                             <span
-                                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                                                     etapa.estadoTramo === "COMPLETADO"
                                                         ? "bg-emerald-100 text-emerald-800"
                                                         : etapa.estadoTramo === "DEMORADO"
@@ -97,14 +97,14 @@ export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecor
                                             </p>
                                         ) : null}
                                         {etapa.fechaHoraLlegada ? (
-                                            <p className="mt-1 text-[11px] text-emerald-700 font-medium">
+                                            <p className="mt-1 text-xs text-emerald-700 font-medium">
                                                 Llegada registrada: {formatearFechaHora(etapa.fechaHoraLlegada)}
                                             </p>
                                         ) : null}
 
                                         {admiteAvances && etapa.numeroOrden === siguienteEtapa ? (
                                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-2.5">
-                                                <span className="text-[11px] text-texto-suave">
+                                                <span className="text-xs text-texto-suave">
                                                     {etapa.estadoTramo === "DEMORADO"
                                                         ? "Tramo informado con demora"
                                                         : "Tramo pendiente de registrar"}

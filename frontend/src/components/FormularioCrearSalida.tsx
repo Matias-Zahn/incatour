@@ -346,7 +346,7 @@ function FormularioCrearSalida({
                                 {errors.fechaInicio.message}
                             </span>
                         ) : (
-                            <span className="text-[11px] text-texto-suave">
+                            <span className="text-xs text-texto-suave">
                                 Solo fechas futuras (a partir de mañana).
                             </span>
                         )}
@@ -387,7 +387,7 @@ function FormularioCrearSalida({
                                 {errors.tamanoMaximo.message}
                             </span>
                         ) : (
-                            <span className="text-[11px] text-texto-suave">
+                            <span className="text-xs text-texto-suave">
                                 Capacidad máxima del grupo para la venta.
                             </span>
                         )}
@@ -466,7 +466,7 @@ function FormularioCrearSalida({
                                     turistas
                                 </span>
                             </p>
-                            <span className="text-[11px] text-texto-suave">
+                            <span className="text-xs text-texto-suave">
                                 Paquete: {opciones.paquete.nombrePaquete}
                             </span>
                         </div>
@@ -481,7 +481,7 @@ function FormularioCrearSalida({
                                     trabajadores
                                 </span>
                             </p>
-                            <span className="text-[11px] text-texto-suave">
+                            <span className="text-xs text-texto-suave">
                                 {opciones.dotacion.guias}{" "}
                                 {opciones.dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
                                 {opciones.dotacion.porteadores}{" "}
@@ -501,7 +501,7 @@ function FormularioCrearSalida({
                                     personas
                                 </span>
                             </p>
-                            <span className="text-[11px] text-texto-suave">
+                            <span className="text-xs text-texto-suave">
                                 Bloqueo total ante la Autoridad del Parque
                             </span>
                         </div>
@@ -580,7 +580,7 @@ function FormularioCrearSalida({
                                     Alojamiento por bloqueo de plazas
                                 </label>
                                 {!tieneCupoInsuficienteAutoridad && requiereSeleccionAlojamiento ? (
-                                    <span className="inline-flex items-center rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                    <span className="inline-flex items-center rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
                                         Selección obligatoria
                                     </span>
                                 ) : null}

@@ -392,7 +392,7 @@ export function FormularioAsignarRecursos({
                                 {porteadoresRequeridos === 1 ? "Porteador" : "Porteadores"}
                             </span>
                         </div>
-                        <p className="text-[11px] text-texto-suave mt-1.5">
+                        <p className="text-xs text-texto-suave mt-1.5">
                             Calculada según los parámetros del circuito
                         </p>
                     </div>
@@ -544,7 +544,7 @@ export function FormularioAsignarRecursos({
                                                     />
                                                     <span>{guia.nombreCompleto}</span>
                                                 </div>
-                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                                                     {guia.rol}
                                                 </span>
                                             </label>
@@ -637,7 +637,7 @@ export function FormularioAsignarRecursos({
                                                     />
                                                     <span>{porteador.nombreCompleto}</span>
                                                 </div>
-                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                                                     {porteador.rol}
                                                 </span>
                                             </label>
@@ -722,7 +722,7 @@ export function FormularioAsignarRecursos({
                                             />
                                         </div>
 
-                                        <div className="mt-3 pt-2 border-t border-borde/60 flex items-center justify-between text-[11px]">
+                                        <div className="mt-3 pt-2 border-t border-borde/60 flex items-center justify-between text-xs">
                                             <span className="text-texto-suave">
                                                 Pasajeros: {pasajerosConfirmados}
                                             </span>
@@ -888,13 +888,13 @@ export function FormularioAsignarRecursos({
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {/* Nómina a emitir */}
                     <div className="rounded-control border border-borde bg-slate-50 p-3 text-xs">
-                        <span className="font-semibold text-texto-suave uppercase text-[10px]">
+                        <span className="font-semibold text-texto-suave uppercase text-[11px]">
                             Nómina total de permisos
                         </span>
                         <p className="mt-1 text-lg font-bold text-navegacion">
                             {totalNominaPermisos} personas
                         </p>
-                        <p className="text-[11px] text-texto-suave mt-0.5">
+                        <p className="text-xs text-texto-suave mt-0.5">
                             {pasajerosConfirmados} pasajeros + {guiasSeleccionados} guías +{" "}
                             {porteadoresSeleccionados} porteadores
                         </p>
@@ -902,13 +902,13 @@ export function FormularioAsignarRecursos({
 
                     {/* Transporte seleccionado */}
                     <div className="rounded-control border border-borde bg-slate-50 p-3 text-xs">
-                        <span className="font-semibold text-texto-suave uppercase text-[10px]">
+                        <span className="font-semibold text-texto-suave uppercase text-[11px]">
                             Transporte seleccionado
                         </span>
                         <p className="mt-1 text-sm font-bold text-texto truncate">
                             {transporteElegido?.nombreServicio ?? "Pendiente de selección"}
                         </p>
-                        <p className="text-[11px] text-texto-suave mt-0.5">
+                        <p className="text-xs text-texto-suave mt-0.5">
                             {transporteElegido
                                 ? `Capacidad: ${transporteElegido.capacidadVehiculo ?? "—"} asientos`
                                 : "Debe elegirse en el paso 3"}
@@ -917,7 +917,7 @@ export function FormularioAsignarRecursos({
 
                     {/* Camping asignado */}
                     <div className="rounded-control border border-borde bg-slate-50 p-3 text-xs">
-                        <span className="font-semibold text-texto-suave uppercase text-[10px]">
+                        <span className="font-semibold text-texto-suave uppercase text-[11px]">
                             Equipamiento de camping
                         </span>
                         <p className="mt-1 text-sm font-bold text-texto">
@@ -926,7 +926,7 @@ export function FormularioAsignarRecursos({
                                 ? "artículo asignado"
                                 : "artículos asignados"}
                         </p>
-                        <p className="text-[11px] text-texto-suave mt-0.5">
+                        <p className="text-xs text-texto-suave mt-0.5">
                             Total unidades:{" "}
                             {articulosCampingSeleccionados.reduce(
                                 (acc, item) => acc + item.cantidad,
@@ -937,13 +937,13 @@ export function FormularioAsignarRecursos({
 
                     {/* Liberación de sobrantes */}
                     <div className="rounded-control border border-borde bg-slate-50 p-3 text-xs">
-                        <span className="font-semibold text-texto-suave uppercase text-[10px]">
+                        <span className="font-semibold text-texto-suave uppercase text-[11px]">
                             Lugares a liberar ante la autoridad
                         </span>
                         <p className="mt-1 text-lg font-bold text-emerald-800">
                             {lugaresALiberar} lugares
                         </p>
-                        <p className="text-[11px] text-texto-suave mt-0.5">
+                        <p className="text-xs text-texto-suave mt-0.5">
                             Sobrantes: {lugaresSobrantesDisponibles} · Extra: {totalPersonalExtra}
                         </p>
                     </div>

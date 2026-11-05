@@ -120,7 +120,7 @@ export function VistaInicio({
                         </div>
 
                         <div className="w-full md:max-w-xs">
-                            <div className="flex justify-between text-[11px] font-semibold text-texto-suave">
+                            <div className="flex justify-between text-xs font-semibold text-texto-suave">
                                 <span>Avance del circuito</span>
                                 <span>{porcentajeProgreso}%</span>
                             </div>
@@ -231,7 +231,7 @@ export function VistaInicio({
                     <div className="mt-3 overflow-x-auto">
                         <table className="w-full text-left text-xs" aria-label="Resumen de pasajeros">
                             <thead>
-                                <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
+                                <tr className="border-b border-borde text-xs font-bold text-texto-suave">
                                     <th className="py-2">ID/Pasaporte</th>
                                     <th className="py-2">Nombre completo</th>
                                     <th className="py-2">Estado</th>
@@ -247,7 +247,7 @@ export function VistaInicio({
                                             {p.nombreCompleto}
                                         </td>
                                         <td className="py-2.5">
-                                            <span className="inline-flex rounded-full bg-cyan-100 px-2.5 py-0.5 text-[10px] font-bold text-cyan-800">
+                                            <span className="inline-flex rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-bold text-cyan-800">
                                                 Confirmada
                                             </span>
                                         </td>
@@ -300,7 +300,7 @@ export function VistaInicio({
                                     <p className="text-xs font-bold text-navegacion">
                                         {item.titulo}
                                     </p>
-                                    <p className="text-[11px] text-texto-suave">
+                                    <p className="text-xs text-texto-suave">
                                         {item.subtitulo}
                                     </p>
                                 </div>

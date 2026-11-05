@@ -144,7 +144,7 @@ function ReservasGestionPage() {
                                 renderizar: (r) => (
                                     <div>
                                         <p className="font-mono text-xs font-bold text-navegacion">{r.nroReserva}</p>
-                                        <p className="text-[11px] text-texto-suave">
+                                        <p className="text-xs text-texto-suave">
                                             {formatearFechaLocalCorta(r.fechaRealizacion)}
                                         </p>
                                     </div>
@@ -158,7 +158,7 @@ function ReservasGestionPage() {
                                         <p className="text-sm font-semibold text-texto">
                                             {r.titular.nombre} {r.titular.apellido}
                                         </p>
-                                        <p className="text-[11px] text-texto-suave">{r.titular.email}</p>
+                                        <p className="text-xs text-texto-suave">{r.titular.email}</p>
                                     </div>
                                 ),
                             },
@@ -168,10 +168,10 @@ function ReservasGestionPage() {
                                 renderizar: (r) => (
                                     <div>
                                         <p className="text-sm font-semibold text-texto">{r.paquete.nombrePaquete}</p>
-                                        <p className="text-[11px] text-texto-suave">
+                                        <p className="text-xs text-texto-suave">
                                             {r.salida.nroSalida} · {etiquetaEstadoSalidaCliente(r.salida.estado)}
                                         </p>
-                                        <p className="text-[11px] text-texto-suave">
+                                        <p className="text-xs text-texto-suave">
                                             {formatearRangoFechasUtc(r.salida.fechaInicio, r.salida.fechaFin)}
                                         </p>
                                     </div>
@@ -199,7 +199,7 @@ function ReservasGestionPage() {
                                 clave: "estado",
                                 titulo: "Estado",
                                 renderizar: (r) => (
-                                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${estilosEstadoReserva(r.estado)}`}>
+                                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${estilosEstadoReserva(r.estado)}`}>
                                         {etiquetaEstadoReserva(r.estado)}
                                     </span>
                                 ),

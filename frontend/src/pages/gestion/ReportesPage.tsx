@@ -80,7 +80,7 @@ function Columnas({ items, maximo }: GraficoDeReporte) {
                     </button>
                 ))}
             </div>
-            <div className="mt-1 flex gap-0.5 text-center text-[10px] text-texto-suave">
+            <div className="mt-1 flex gap-0.5 text-center text-xs text-texto-suave">
                 {items.map((item, i) => (
                     <span key={item.etiqueta} className="min-w-0 flex-1 whitespace-nowrap">
                         {i % cadaCuantas === 0 ? item.etiqueta : ""}

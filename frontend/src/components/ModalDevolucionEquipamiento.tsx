@@ -235,7 +235,7 @@ function FormularioDevolucionContenido({
                                                 <h4 className="font-bold text-texto text-sm">
                                                     {item.nombreServicio}
                                                 </h4>
-                                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                                                     {item.tipoEquipamiento}
                                                 </span>
                                             </div>
@@ -255,7 +255,7 @@ function FormularioDevolucionContenido({
                                                 </strong>{" "}
                                                 {item.cantidadAsignada === 1 ? "ud." : "uds."}
                                             </span>
-                                            <span className="text-slate-500 text-[11px]">
+                                            <span className="text-slate-500 text-xs">
                                                 Stock disp. actual: {item.stockActualDisponible}
                                             </span>
                                         </div>
@@ -354,7 +354,7 @@ function FormularioDevolucionContenido({
                                             disabled={registrarMutation.isPending}
                                             className="w-full rounded-control border border-borde bg-white px-3 py-1.5 text-xs text-texto placeholder:text-slate-400 focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca disabled:opacity-50"
                                         />
-                                        <div className="flex justify-between items-center text-[10px] text-texto-suave mt-0.5">
+                                        <div className="flex justify-between items-center text-xs text-texto-suave mt-0.5">
                                             <span>{errorItem ? <strong className="text-rose-600">{errorItem}</strong> : null}</span>
                                             <span>{item.observaciones.length} / 250</span>
                                         </div>
@@ -386,7 +386,7 @@ function FormularioDevolucionContenido({
                         disabled={registrarMutation.isPending}
                         className="w-full rounded-control border border-borde bg-white p-2.5 text-xs text-texto placeholder:text-slate-400 focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca disabled:opacity-50"
                     />
-                    <div className="flex justify-between items-center text-[11px] text-texto-suave">
+                    <div className="flex justify-between items-center text-xs text-texto-suave">
                         <span>
                             {errorObservacionesGenerales && (
                                 <strong className="text-rose-600">

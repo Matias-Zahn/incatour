@@ -387,7 +387,7 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                     <p className="font-bold text-white">
                                         {usuario.nombre} {usuario.apellido}
                                     </p>
-                                    <p className="truncate text-[11px] text-cyan-100/90">
+                                    <p className="truncate text-xs text-cyan-100/90">
                                         {usuario.email}
                                     </p>
                                 </div>

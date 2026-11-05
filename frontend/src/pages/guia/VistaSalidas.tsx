@@ -23,6 +23,7 @@ import {
 } from "./IconosGuia";
 import Boton from "../../components/Boton";
 import { IniciarSalida } from "./IniciarSalida";
+import { formatearFechaHora } from "../../services/formato";
 
 // Una salida terminada ya no tiene recorrido: avances e incidentes no tienen a dónde llevar
 const terminada = (estado: string) => estado === "FINALIZADA" || estado === "CANCELADA";
@@ -164,7 +165,7 @@ export function VistaSalidas({
                                                     {s.nroSalida}
                                                 </span>
                                                 {esActiva ? (
-                                                    <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
+                                                    <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-bold text-cyan-800">
                                                         Salida activa
                                                     </span>
                                                 ) : null}
@@ -183,7 +184,7 @@ export function VistaSalidas({
                                                 <p className="text-sm font-bold text-navegacion">
                                                     {s.circuito}
                                                 </p>
-                                                <p className="text-[11px] text-texto-suave">
+                                                <p className="text-xs text-texto-suave">
                                                     Paquete: {s.paquete}
                                                 </p>
                                             </div>
@@ -366,7 +367,7 @@ export function VistaSalidas({
                                 <div className="mt-3 overflow-x-auto">
                                     <table className="w-full text-left text-xs" aria-label="Nómina de pasajeros de la salida">
                                         <thead>
-                                            <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
+                                            <tr className="border-b border-borde text-xs font-bold text-texto-suave">
                                                 <th className="py-2">ID/Pasaporte</th>
                                                 <th className="py-2">Nombre completo</th>
                                             </tr>
@@ -443,7 +444,7 @@ export function VistaSalidas({
                                                         <p className="font-bold">
                                                             {item.tipoEquipamiento ?? item.nombreServicio}
                                                         </p>
-                                                        <p className="text-[11px] text-texto-suave">
+                                                        <p className="text-xs text-texto-suave">
                                                             Cantidad: {item.cantidad}
                                                         </p>
                                                     </div>
@@ -478,7 +479,7 @@ export function VistaSalidas({
                                             </span>
                                             {etapa.estadoTramo ? (
                                                 <span
-                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                                                         etapa.estadoTramo === "COMPLETADO"
                                                             ? "bg-emerald-100 text-emerald-800"
                                                             : "bg-amber-100 text-amber-800"
@@ -487,7 +488,7 @@ export function VistaSalidas({
                                                     {formatearEstadoSalidaGuia(etapa.estadoTramo)}
                                                 </span>
                                             ) : (
-                                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600">
                                                     Pendiente
                                                 </span>
                                             )}
@@ -496,14 +497,14 @@ export function VistaSalidas({
                                             {etapa.puntoInicio} → {etapa.puntoFin}
                                         </p>
                                         {etapa.campamentoPrevisto ? (
-                                            <p className="mt-1 text-[11px] text-texto-suave">
+                                            <p className="mt-1 text-xs text-texto-suave">
                                                 Campamento: {etapa.campamentoPrevisto}
                                             </p>
                                         ) : null}
                                         {etapa.fechaHoraLlegada ? (
-                                            <p className="mt-1 text-[11px] text-texto-suave">
+                                            <p className="mt-1 text-xs text-texto-suave">
                                                 Llegada:{" "}
-                                                {new Date(etapa.fechaHoraLlegada).toLocaleString("es-ES")}
+                                                {formatearFechaHora(etapa.fechaHoraLlegada)}
                                             </p>
                                         ) : null}
                                     </div>

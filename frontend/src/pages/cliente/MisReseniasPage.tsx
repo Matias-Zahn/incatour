@@ -292,7 +292,7 @@ function MisReseniasPage() {
                                                     {fila.nroReserva}
                                                 </p>
                                                 <span
-                                                    className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold ${estilosEstadoReserva(
+                                                    className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${estilosEstadoReserva(
                                                         fila.estadoReserva,
                                                     )}`}
                                                 >
@@ -334,7 +334,7 @@ function MisReseniasPage() {
                                         titulo: "Estado de la salida",
                                         renderizar: (fila) => (
                                             <span
-                                                className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                                className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${
                                                     fila.salida.estado ===
                                                     "FINALIZADA"
                                                         ? "bg-[#e0f4e8] text-[#216442]"
@@ -375,12 +375,12 @@ function MisReseniasPage() {
                                                             ”
                                                         </p>
                                                     ) : (
-                                                        <p className="text-[11px] italic text-texto-suave">
+                                                        <p className="text-xs italic text-texto-suave">
                                                             Sin comentario
                                                             escrito
                                                         </p>
                                                     )}
-                                                    <p className="text-[10px] text-texto-suave">
+                                                    <p className="text-xs text-texto-suave">
                                                         Publicada el{" "}
                                                         {formatearFechaUtcCorta(
                                                             fila.resenia
@@ -421,7 +421,7 @@ function MisReseniasPage() {
                                                 );
                                             }
                                             return (
-                                                <span className="text-[11px] text-texto-suave">
+                                                <span className="text-xs text-texto-suave">
                                                     {fila.estadoReserva !==
                                                     "CONFIRMADA"
                                                         ? "Reserva cancelada"
@@ -558,7 +558,7 @@ function MisReseniasPage() {
                                         Comentario sobre tu experiencia
                                         (opcional)
                                     </label>
-                                    <span className="text-[11px] text-texto-suave">
+                                    <span className="text-xs text-texto-suave">
                                         {comentarioActual.length}/1000
                                     </span>
                                 </div>

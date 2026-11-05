@@ -16,17 +16,10 @@ import {
     type DatosTemporada,
     type Temporada,
 } from "../../services/temporadaService";
+import { formatearFechaSalida } from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
-function formatearFecha(iso: string): string {
-    const fechaIso = iso.slice(0, 10);
-    const partes = fechaIso.split("-");
-    if (partes.length === 3) {
-        return `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-    return iso;
-}
 
 function estiloEstado(estado: Temporada["estado"]): string {
     return estado === "ACTIVO"
@@ -127,8 +120,8 @@ function TemporadasPage() {
             }
             return (
                 temporada.nombre.toLowerCase().includes(terminoLimpio) ||
-                formatearFecha(temporada.fechaInicio).includes(terminoLimpio) ||
-                formatearFecha(temporada.fechaFin).includes(terminoLimpio)
+                formatearFechaSalida(temporada.fechaInicio).includes(terminoLimpio) ||
+                formatearFechaSalida(temporada.fechaFin).includes(terminoLimpio)
             );
         })
         .sort((a, b) =>
@@ -290,13 +283,13 @@ function TemporadasPage() {
                                 clave: "fechaInicio",
                                 titulo: "Fecha de inicio",
                                 renderizar: (temporada) =>
-                                    formatearFecha(temporada.fechaInicio),
+                                    formatearFechaSalida(temporada.fechaInicio),
                             },
                             {
                                 clave: "fechaFin",
                                 titulo: "Fecha de fin",
                                 renderizar: (temporada) =>
-                                    formatearFecha(temporada.fechaFin),
+                                    formatearFechaSalida(temporada.fechaFin),
                             },
                             {
                                 clave: "estado",

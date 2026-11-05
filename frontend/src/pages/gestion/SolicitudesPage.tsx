@@ -13,6 +13,7 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import Paginacion from "../../components/Paginacion";
 import Alerta from "../../components/Alerta";
+import { formatearFechaUtcCorta } from "../../services/formato";
 
 const POR_PAGINA = 6;
 
@@ -36,16 +37,6 @@ function esGarantiaEstablecimiento(tipoGarantia: string): boolean {
   return tipoGarantia.toUpperCase().includes("ESTABLECIMIENTO");
 }
 
-function formatearFechaCorta(iso: string): string {
-  const fecha = new Date(iso);
-  if (Number.isNaN(fecha.getTime())) return iso;
-  return fecha.toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 interface ModalResolucionProps {
   solicitud: SolicitudPendiente;
@@ -166,7 +157,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
               <span className="block text-texto-suave">Salida planificada</span>
               <span className="font-semibold text-texto">
                 {solicitud.reserva.salida.nroSalida} (
-                {formatearFechaCorta(solicitud.reserva.salida.fechaInicio)})
+                {formatearFechaUtcCorta(solicitud.reserva.salida.fechaInicio)})
               </span>
             </div>
             <div>
@@ -265,7 +256,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                       <div className="flex w-full items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-texto">{op.hotel}</span>
                         <span
-                          className={`inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px] ${
+                          className={`inline-flex h-4 w-4 items-center justify-center rounded-full border text-xs ${
                             activo
                               ? "border-primario bg-primario text-white"
                               : "border-borde bg-white"
@@ -277,7 +268,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                       <span className="mt-1 text-xs text-texto-suave">
                         Proveedor: <strong className="text-texto">{op.proveedor}</strong>
                       </span>
-                      <span className="mt-1 inline-flex rounded bg-slate-100 px-2 py-0.5 text-[11px] text-texto-suave">
+                      <span className="mt-1 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-texto-suave">
                         Canal: {op.canalContacto}
                       </span>
                     </button>
@@ -346,7 +337,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                   <label htmlFor="motivo-rechazo" className="text-xs font-semibold text-texto">
                     Motivo del rechazo (obligatorio)
                   </label>
-                  <span className="text-[11px] text-texto-suave">
+                  <span className="text-xs text-texto-suave">
                     Atajos rápidos para no tipear:
                   </span>
                 </div>
@@ -485,6 +476,7 @@ export function SolicitudesPage() {
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="search"
+          aria-label="Buscar solicitudes"
           placeholder="Buscar por nro. de solicitud, reserva, cliente, salida o paquete..."
           value={busqueda}
           onChange={(e) => {
@@ -524,7 +516,7 @@ export function SolicitudesPage() {
                           {s.nroSolicitud}
                         </span>
                         {esReintento && (
-                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                             Reintento
                           </span>
                         )}
@@ -558,7 +550,7 @@ export function SolicitudesPage() {
                       {s.reserva.salida.nroSalida} · {s.reserva.salida.paquete.nombrePaquete}
                     </div>
                     <div className="text-xs text-texto-suave">
-                      Inicio: {formatearFechaCorta(s.reserva.salida.fechaInicio)}
+                      Inicio: {formatearFechaUtcCorta(s.reserva.salida.fechaInicio)}
                     </div>
                   </div>
                 ),

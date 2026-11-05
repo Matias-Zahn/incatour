@@ -780,7 +780,7 @@ function FormularioPaquete({
                     <div className="grid gap-1.5 text-sm font-semibold text-texto">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <span>Días de salida habilitados</span>
-                            <div className="flex gap-1.5 text-[11px] font-semibold">
+                            <div className="flex gap-1.5 text-xs font-semibold">
                                 <button
                                     type="button"
                                     onClick={() =>
@@ -901,7 +901,7 @@ function FormularioPaquete({
                                 <span className="text-sm font-bold text-navegacion">
                                     Garantía por Categoría
                                 </span>
-                                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-marca-oscura">
+                                <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
                                     Flexible
                                 </span>
                             </div>
@@ -925,7 +925,7 @@ function FormularioPaquete({
                                 <span className="text-sm font-bold text-navegacion">
                                     Garantía por Establecimiento
                                 </span>
-                                <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-semibold text-exito">
+                                <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-exito">
                                     Bloqueo de plazas
                                 </span>
                             </div>
@@ -959,7 +959,7 @@ function FormularioPaquete({
                                             onClick={() =>
                                                 setLocalidadGarantizada(loc)
                                             }
-                                            className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                                                 localidadGarantizada === loc
                                                     ? "bg-marca text-white"
                                                     : "bg-white text-texto-suave hover:text-texto"
@@ -1080,7 +1080,7 @@ function FormularioPaquete({
                                                         </p>
                                                     </div>
                                                     <span
-                                                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                                                             esBloqueo
                                                                 ? "bg-green-50 text-exito"
                                                                 : "bg-amber-50 text-advertencia"
@@ -1398,7 +1398,7 @@ function FormularioPaquete({
                             <p className="text-xs text-texto-suave">
                                 Formatos admitidos: JPG, PNG o WEBP · Máximo 3 MB por foto · Hasta{" "}
                                 {MAX_IMAGENES_PAQUETE} imágenes (la primera será la portada{" "}
-                                <code className="rounded bg-fondo px-1 py-0.5 text-[11px]">
+                                <code className="rounded bg-fondo px-1 py-0.5 text-xs">
                                     principal.*
                                 </code>
                                 ).
@@ -1420,7 +1420,7 @@ function FormularioPaquete({
                                     Imágenes actuales del paquete ({imagenesActualesPaquete.length} / {MAX_IMAGENES_PAQUETE})
                                 </span>
                                 <span
-                                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                                         tieneImagenesPropiasActual
                                             ? "bg-green-50 text-exito"
                                             : "bg-slate-200 text-texto-suave"
@@ -1466,7 +1466,7 @@ function FormularioPaquete({
                                                 className="h-24 w-full object-cover"
                                             />
                                             <span
-                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-xs font-bold shadow-xs ${
                                                     idx === 0
                                                         ? "bg-marca text-white"
                                                         : "bg-navegacion/80 text-white"
@@ -1478,7 +1478,7 @@ function FormularioPaquete({
                                             </span>
                                         </div>
 
-                                        <div className="flex items-center justify-between gap-1 bg-white px-2 py-1.5 text-[11px]">
+                                        <div className="flex items-center justify-between gap-1 bg-white px-2 py-1.5 text-xs">
                                             <label
                                                 className={`cursor-pointer font-semibold text-marca-oscura hover:underline ${
                                                     ocupado
@@ -1521,7 +1521,7 @@ function FormularioPaquete({
                                                     Eliminar
                                                 </button>
                                             ) : (
-                                                <span className="text-[10px] text-texto-suave">
+                                                <span className="text-xs text-texto-suave">
                                                     Mín. 1 foto
                                                 </span>
                                             )}
@@ -1543,7 +1543,7 @@ function FormularioPaquete({
                                         +
                                     </span>
                                     <span>Sumar 1 foto</span>
-                                    <span className="text-[10px] font-normal text-texto-suave">
+                                    <span className="text-xs font-normal text-texto-suave">
                                         Slot {obtenerProximoSlotLibre()}
                                     </span>
                                     <input
@@ -1642,7 +1642,7 @@ function FormularioPaquete({
                                                 className="h-24 w-full object-cover"
                                             />
                                             <span
-                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-xs font-bold shadow-xs ${
                                                     idx === 0
                                                         ? "bg-marca text-white"
                                                         : "bg-navegacion/80 text-white"
@@ -1654,7 +1654,7 @@ function FormularioPaquete({
                                             </span>
                                         </div>
 
-                                        <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 text-[11px]">
+                                        <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 text-xs">
                                             <div className="truncate font-semibold text-texto" title={archivo?.name}>
                                                 {archivo?.name}
                                                 <span className="ml-1 font-normal text-texto-suave">
@@ -1676,7 +1676,7 @@ function FormularioPaquete({
                                                         Usar como portada
                                                     </button>
                                                 ) : (
-                                                    <span className="text-[10px] font-semibold text-exito">
+                                                    <span className="text-xs font-semibold text-exito">
                                                         Principal
                                                     </span>
                                                 )}

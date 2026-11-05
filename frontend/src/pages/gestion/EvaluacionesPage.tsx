@@ -16,19 +16,8 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import ListaPaginada from "../../components/ListaPaginada";
 import Alerta from "../../components/Alerta";
+import { formatearFechaLocalCorta, formatearFechaUtcCorta } from "../../services/formato";
 
-// FE-50: las fechas sin hora (inicio y fin de la salida) van en UTC; los instantes (envío, evaluación), en hora local
-function formatearFechaCorta(iso?: string, enUtc = true): string {
-  if (!iso) return "—";
-  const fecha = new Date(iso);
-  if (Number.isNaN(fecha.getTime())) return iso;
-  return fecha.toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    ...(enUtc && { timeZone: "UTC" }),
-  });
-}
 
 const FILTROS_PUNTAJE: { label: string; min?: number; max?: number }[] = [
   { label: "Todos" },
@@ -149,7 +138,7 @@ function ModalCalificarEvaluado({
                   >
                     <span className="text-base font-bold">{valor} ★</span>
                     <span
-                      className={`mt-0.5 text-[10px] ${
+                      className={`mt-0.5 text-xs ${
                         activo ? "text-white/90" : "text-texto-suave"
                       }`}
                     >
@@ -166,7 +155,7 @@ function ModalCalificarEvaluado({
               <label htmlFor="comentario-evaluacion" className="text-xs font-semibold text-texto">
                 Observaciones sobre el desempeño (opcional)
               </label>
-              <span className="text-[11px] text-texto-suave">Atajos en 1 clic:</span>
+              <span className="text-xs text-texto-suave">Atajos en 1 clic:</span>
             </div>
             <div className="mb-2 flex flex-wrap gap-1.5">
               {COMENTARIOS_RAPIDOS_EVALUACION.map((sugerencia) => (
@@ -585,8 +574,8 @@ export function EvaluacionesPage() {
                           “{r.comentario}”
                         </p>
                       )}
-                      <div className="mt-2 text-[11px] text-texto-suave">
-                        Enviada el {formatearFechaCorta(r.fechaEnvio, false)}
+                      <div className="mt-2 text-xs text-texto-suave">
+                        Enviada el {formatearFechaLocalCorta(r.fechaEnvio)}
                       </div>
                     </div>
                   )}
@@ -602,7 +591,7 @@ export function EvaluacionesPage() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-marca-suave px-2 py-0.5 text-[10px] font-semibold text-primario">
+                          <span className="rounded bg-marca-suave px-2 py-0.5 text-xs font-semibold text-primario">
                             {ev.personal.rol}
                           </span>
                           <span className="text-sm font-semibold text-texto">
@@ -617,8 +606,8 @@ export function EvaluacionesPage() {
                       {ev.comentario && (
                         <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
                       )}
-                      <div className="mt-1.5 text-[11px] text-texto-suave">
-                        Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
+                      <div className="mt-1.5 text-xs text-texto-suave">
+                        Evaluado el {formatearFechaLocalCorta(ev.fechaEvaluacion)}
                       </div>
                     </div>
                   )}
@@ -634,7 +623,7 @@ export function EvaluacionesPage() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
+                          <span className="rounded bg-green-50 px-2 py-0.5 text-xs font-semibold text-exito">
                             Proveedor
                           </span>
                           <span className="text-sm font-semibold text-texto">
@@ -649,8 +638,8 @@ export function EvaluacionesPage() {
                       {ev.comentario && (
                         <p className="mt-1.5 text-xs text-texto">{ev.comentario}</p>
                       )}
-                      <div className="mt-1.5 text-[11px] text-texto-suave">
-                        Evaluado el {formatearFechaCorta(ev.fechaEvaluacion, false)}
+                      <div className="mt-1.5 text-xs text-texto-suave">
+                        Evaluado el {formatearFechaLocalCorta(ev.fechaEvaluacion)}
                       </div>
                     </div>
                   )}
@@ -714,11 +703,11 @@ export function EvaluacionesPage() {
                           {s.nroSalida}
                         </span>
                         {pendientes === undefined ? null : pendientes > 0 ? (
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-advertencia">
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-advertencia">
                             {pendientes} pendiente{pendientes === 1 ? "" : "s"}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-exito">
+                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-exito">
                             ✓ Completa
                           </span>
                         )}
@@ -727,7 +716,7 @@ export function EvaluacionesPage() {
                         {s.paquete?.nombrePaquete ?? `Paquete #${s.idpaquete}`}
                       </div>
                       <div className="mt-1 text-xs text-texto-suave">
-                        {formatearFechaCorta(s.fechaInicio)} al {formatearFechaCorta(s.fechaFin)}
+                        {formatearFechaUtcCorta(s.fechaInicio)} al {formatearFechaUtcCorta(s.fechaFin)}
                       </div>
                     </button>
                   );
@@ -784,7 +773,7 @@ export function EvaluacionesPage() {
                               <span className="text-sm font-semibold text-texto">
                                 {p.nombreCompleto}
                               </span>
-                              <span className="rounded-full bg-marca-suave px-2 py-0.5 text-[11px] font-medium text-primario">
+                              <span className="rounded-full bg-marca-suave px-2 py-0.5 text-xs font-medium text-primario">
                                 {p.rol}
                               </span>
                             </div>
@@ -858,7 +847,7 @@ export function EvaluacionesPage() {
                               <span className="text-sm font-semibold text-texto">
                                 {prov.razonSocial}
                               </span>
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-texto-suave border border-borde">
+                              <span className="rounded-full bg-white px-2 py-0.5 text-xs text-texto-suave border border-borde">
                                 Proveedor
                               </span>
                             </div>

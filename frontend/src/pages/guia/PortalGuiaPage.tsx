@@ -180,7 +180,7 @@ export default function PortalGuiaPage() {
                                     </span>
                                     {salidaActual ? (
                                         <span
-                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${estilosEstadoSalida(
+                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${estilosEstadoSalida(
                                                 salidaActual.estado,
                                             )}`}
                                         >
