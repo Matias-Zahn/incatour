@@ -96,13 +96,13 @@ export class ReservaService {
         // Si fechaTipeada > guardado... lo dejamos intacto para que Prisma lo actualice (Renovación)
       }
 
-      // FIX RES-18: Validamos que la fecha definitiva cubra todo el viaje
+      // FIX RES-18: Validamos que la fecha definitiva cubra todo el viaje, incluido el último día (misma regla que la pantalla)
       const fechaFinal = new Date(p.fechaVencimientoPasaporte);
-      
-      if (fechaFinal < salida.fechaFin) {
+
+      if (fechaFinal <= salida.fechaFin) {
         throw CustomError.badRequest(
-          `El pasaporte de ${p.nombreCompleto} vence el ${fechaFinal.toISOString().split('T')[0]}, ` +
-          `antes de que termine el recorrido (${salida.fechaFin.toISOString().split('T')[0]}). ` +
+          `El pasaporte de ${p.nombreCompleto} vence el ${fechaFinal.toISOString().split('T')[0]} ` +
+          `y tiene que vencer después del fin del recorrido (${salida.fechaFin.toISOString().split('T')[0]}). ` +
           `La autoridad rechazará el permiso.`
         );
       }

@@ -219,10 +219,12 @@ export async function ventas(ctx: Ctx) {
       f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(-30) })] }), cli.token, 400);
     await ctx.esperar("Un pasajero vencido entre varios rechaza toda la compra → 400", "POST", "/reservas",
       f.compra(idsalida, { pasajeros: [f.pasajero(), f.pasajero({ vence: fecha(dias + 1) })] }), cli.token, 400);
+    // Vigente hasta el último día no alcanza: la compra exige lo mismo que la pantalla, vencer después del fin
+    await ctx.esperar("Pasaporte que vence el último día del recorrido → 400", "POST", "/reservas",
+      f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 2) })] }), cli.token, 400);
     igual("Ninguna reserva ni pasajero creados", await foto(idsalida), antes);
-    // Vigente hasta el último día alcanza: es la misma regla que aplica CU-40 (asignacion.service, vence < fechaFin)
-    await ctx.esperar("Pasaporte que vence el último día del recorrido → 201", "POST", "/reservas",
-      f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 2) })] }), cli.token, 201);
+    await ctx.esperar("Pasaporte que vence el día siguiente al fin del recorrido → 201", "POST", "/reservas",
+      f.compra(idsalida, { pasajeros: [f.pasajero({ vence: fecha(dias + 3) })] }), cli.token, 201);
   });
 
   await ctx.escenario("Dos compras simultáneas con el mismo pasaporte ya registrado en la misma salida", async () => {
