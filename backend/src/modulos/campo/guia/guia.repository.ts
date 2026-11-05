@@ -111,6 +111,22 @@ export class GuiaRepository {
     fechaHoraOcurrencia: Date;
     pasajerosAfectados: number[];
   }) {
+    const include = { pasajeros: { include: { pasajero: { select: { nombreCompleto: true } } } } } as const;
+    // Si el guía reenvía porque se perdió la respuesta (sin señal), el mismo incidente ya está guardado: se devuelve ese.
+    // ponytail: la clave es el contenido (salida, tipo, gravedad, texto y hora); dos reenvíos simultáneos podrían
+    // pasar los dos, en ese caso hace falta una clave de idempotencia única en la tabla.
+    const existente = await db.incidente.findFirst({
+      where: {
+        idsalida: p.idsalida,
+        tipoIncidente: p.tipoIncidente,
+        descripcion: p.descripcion,
+        nivelGravedad: p.nivelGravedad,
+        fechaHoraOcurrencia: p.fechaHoraOcurrencia,
+      },
+      include,
+    });
+    if (existente) return existente;
+
     return db.incidente.create({
       data: {
         idsalida: p.idsalida,
@@ -120,7 +136,7 @@ export class GuiaRepository {
         fechaHoraOcurrencia: p.fechaHoraOcurrencia,
         pasajeros: { create: p.pasajerosAfectados.map((idpasajero) => ({ idpasajero })) },
       },
-      include: { pasajeros: { include: { pasajero: { select: { nombreCompleto: true } } } } },
+      include,
     });
   }
 

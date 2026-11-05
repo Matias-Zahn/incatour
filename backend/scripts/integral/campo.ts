@@ -233,6 +233,18 @@ export async function campo(ctx: Ctx) {
     ctx.controlar("Incidentes inválidos: no se guardó ninguno", (await db.incidente.count({ where: { idsalida: a.idsalida } })) === 0);
   });
 
+  await ctx.escenario("Reenvío del mismo incidente (se perdió la respuesta): no se duplica", async () => {
+    const a = await armar(ctx);
+    await empezar(ctx, a);
+    const url = `/guia/salidas/${a.idsalida}/incidentes`;
+    const datos = incidente({ pasajerosAfectados: [a.pasajeros[0]] });
+    const primero = await ctx.esperar("Incidente original → 201", "POST", url, datos, a.guia.token, 201);
+    const reenvio = await ctx.esperar("Reenvío idéntico → 201", "POST", url, datos, a.guia.token, 201);
+    ctx.controlar("Reenvío: devuelve el mismo incidente", !!primero && primero.idincidente === reenvio?.idincidente, `${primero?.idincidente} / ${reenvio?.idincidente}`);
+    await ctx.esperar("Otro incidente con distinto texto → 201", "POST", url, incidente({ descripcion: "Otro pasajero con malestar" }), a.guia.token, 201);
+    ctx.controlar("Reenvío: quedan 2 incidentes, no 3", (await db.incidente.count({ where: { idsalida: a.idsalida } })) === 2);
+  });
+
   await ctx.escenario("Incidente válido queda registrado y el admin lo ve", async () => {
     const a = await armar(ctx);
     await empezar(ctx, a);
