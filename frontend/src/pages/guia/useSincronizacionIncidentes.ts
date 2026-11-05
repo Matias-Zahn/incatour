@@ -20,7 +20,7 @@ export type SincronizacionIncidentes = {
 
 /**
  * Misma cola que los avances, pero sin orden entre incidentes: si uno falla por la red se corta y se reintenta después.
- * Limitación: si el servidor guardó el incidente y se perdió la respuesta, se reenvía duplicado; evitarlo necesita un id de idempotencia en el back.
+ * Si el servidor guardó el incidente y se perdió la respuesta, el reenvío es idéntico y el back devuelve el que ya tenía.
  */
 export function useSincronizacionIncidentes(idsalida: number): SincronizacionIncidentes {
     const { mutateAsync: registrarIncidente } = useRegistrarIncidente();

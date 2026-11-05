@@ -732,7 +732,7 @@ function SalidasPage() {
                         </span>
                         {fila.idbloqueo && (
                             <span
-                                className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200"
+                                className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 max-md:hidden"
                                 title={`Bloqueo Serfor/Dircetur: ${fila.idbloqueo}`}
                             >
                                 Bloq: {fila.idbloqueo}
@@ -742,7 +742,7 @@ function SalidasPage() {
                     <p className="font-semibold text-sm text-texto leading-snug">
                         {fila.paquete?.nombrePaquete ?? "—"}
                     </p>
-                    <p className="text-xs text-texto-suave">
+                    <p className="text-xs text-texto-suave max-md:hidden">
                         {fila.paquete?.nroPaquete ?? `Paquete #${fila.idpaquete}`}
                     </p>
                 </div>
@@ -863,7 +863,7 @@ function SalidasPage() {
                             />
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-texto-suave">
-                            <span>Disp: {fila.stockLocal}</span>
+                            <span className="max-md:hidden">Disp: {fila.stockLocal}</span>
                             {confirmados === 0 && (
                                 <span className="text-amber-700 font-medium">Sin ventas</span>
                             )}
@@ -961,7 +961,7 @@ function SalidasPage() {
                             {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
                         </div>
                         {dotacion.total > 0 && (
-                            <p className="text-[11px] text-texto-suave">
+                            <p className="text-[11px] text-texto-suave max-md:hidden">
                                 {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
                                 {dotacion.porteadores}{" "}
                                 {dotacion.porteadores === 1 ? "porteador" : "porteadores"}

@@ -231,7 +231,7 @@ function FormularioDevolucionContenido({
                                 >
                                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
                                         <div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <h4 className="font-bold text-texto text-sm">
                                                     {item.nombreServicio}
                                                 </h4>
@@ -247,7 +247,7 @@ function FormularioDevolucionContenido({
                                             </p>
                                         </div>
 
-                                        <div className="flex items-center gap-3 text-xs">
+                                        <div className="flex flex-wrap items-center gap-3 text-xs">
                                             <span className="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
                                                 Asignado:{" "}
                                                 <strong className="text-navegacion font-bold text-sm">
