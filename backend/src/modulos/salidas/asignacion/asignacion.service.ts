@@ -101,7 +101,8 @@ export class AsignacionService {
     // FA4 (paso 13): el personal se puede cambiar, así que con su pasaporte vencido se corta antes de tocar nada.
     // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue
     const nominaCompleta = armarNomina(salida, elegidos);
-    const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte < salida.fechaFin);
+    // RES-18: tiene que vencer después del fin; el que vence el último día ya no cubre el recorrido
+    const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte <= salida.fechaFin);
     const personalVencido = vencidos.filter((t) => t.tipo === "PERSONAL");
     if (personalVencido.length) {
       throw CustomError.badRequest(

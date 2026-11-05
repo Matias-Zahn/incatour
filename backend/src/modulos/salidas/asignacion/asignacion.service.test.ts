@@ -125,6 +125,13 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(repo.confirmar).not.toHaveBeenCalled();
   });
 
+  it("RES-18: el personal con el pasaporte que vence el último día del recorrido tampoco va", async () => {
+    repo.buscarPersonal.mockResolvedValue([{ ...persona(1, "Guía"), ...pasaporte("2026-11-23") }, ...equipo.slice(1)]);
+
+    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("Persona 1");
+    expect(repo.confirmar).not.toHaveBeenCalled();
+  });
+
   it("SAL-21: el pasajero con el pasaporte vencido queda rechazado sin ir a la autoridad y el resto sigue", async () => {
     repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1), pasajero(2, "2026-11-21"), pasajero(3)]));
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
