@@ -322,7 +322,7 @@ export function VistaIncidentes({
                                 {...register("descripcion")}
                                 className="w-full min-w-0 rounded-control border border-borde bg-white p-3 text-base text-texto outline-none md:text-sm focus:border-marca focus:ring-2 focus:ring-marca/20"
                             />
-                            <div className="flex justify-between text-[11px] text-texto-suave">
+                            <div className="flex justify-between text-xs text-texto-suave">
                                 <span>
                                     {errors.descripcion ? (
                                         <span className="text-peligro font-normal">
@@ -448,7 +448,7 @@ export function VistaIncidentes({
                         <div className="mt-3 overflow-x-auto">
                             <table className="w-full text-left text-xs" aria-label="Pasajeros de la salida">
                                 <thead>
-                                    <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
+                                    <tr className="border-b border-borde text-xs font-bold text-texto-suave">
                                         <th className="w-9 py-2"></th>
                                         <th className="py-2">ID/Pasaporte</th>
                                         <th className="py-2">Nombre completo</th>
@@ -516,7 +516,7 @@ export function VistaIncidentes({
                                 <h2 className="text-sm font-bold text-navegacion">
                                     Incidentes reportados
                                 </h2>
-                                <p className="text-[11px] text-texto-suave">
+                                <p className="text-xs text-texto-suave">
                                     Últimos reportes de esta salida
                                 </p>
                             </div>
@@ -539,17 +539,17 @@ export function VistaIncidentes({
                                             {etiquetasTipoIncidente[item.tipoIncidente] ?? item.tipoIncidente}
                                         </p>
                                         <span
-                                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${claseGravedad(
+                                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${claseGravedad(
                                                 item.nivelGravedad,
                                             )}`}
                                         >
                                             {etiquetasNivelGravedad[item.nivelGravedad] ?? item.nivelGravedad}
                                         </span>
                                     </div>
-                                    <p className="mt-1 line-clamp-2 text-[11px] text-texto-suave">
+                                    <p className="mt-1 line-clamp-2 text-xs text-texto-suave">
                                         {item.descripcion}
                                     </p>
-                                    <p className="mt-1 text-[10px] text-texto-suave">
+                                    <p className="mt-1 text-xs text-texto-suave">
                                         {item.fechaHora}
                                         {idsPendientes.has(item.id) ? (
                                             <span className="ml-2 font-semibold text-amber-700">
@@ -613,7 +613,7 @@ export function VistaIncidentes({
                         <div className="mt-4 overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
-                                    <tr className="border-b border-borde text-[11px] font-bold text-texto-suave">
+                                    <tr className="border-b border-borde text-xs font-bold text-texto-suave">
                                         <th className="w-9 py-2"></th>
                                         <th className="py-2">ID/Pasaporte</th>
                                         <th className="py-2">Nombre completo</th>
@@ -707,7 +707,7 @@ export function VistaIncidentes({
                                             {etiquetasTipoIncidente[item.tipoIncidente] ?? item.tipoIncidente}
                                         </p>
                                         <span
-                                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${claseGravedad(
+                                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${claseGravedad(
                                                 item.nivelGravedad,
                                             )}`}
                                         >
@@ -717,7 +717,7 @@ export function VistaIncidentes({
                                     <p className="mt-1.5 text-xs text-texto-suave">
                                         {item.descripcion}
                                     </p>
-                                    <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                    <p className="mt-1 text-xs font-semibold text-slate-500">
                                         Ocurrido: {item.fechaHora}
                                         {idsPendientes.has(item.id) ? " (Pendiente de envío)" : ""}
                                     </p>

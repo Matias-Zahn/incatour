@@ -362,7 +362,7 @@ export function ModalCancelarSalida({
                                             Motivo de la cancelación <span className="text-rose-600">*</span>
                                         </label>
                                         <span
-                                            className={`text-[11px] font-medium ${
+                                            className={`text-xs font-medium ${
                                                 motivoLongitud > 300
                                                     ? "text-rose-600 font-bold"
                                                     : motivoLongitud < 5 && motivoLongitud > 0

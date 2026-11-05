@@ -664,45 +664,6 @@ export function usePublicarReseniaCliente() {
 // Utilidades de formato para las pantallas del cliente
 // ============================================================================
 
-export function formatearFechaUtcCorta(iso?: string | null): string {
-    if (!iso) return "--/--/----";
-    const fecha = new Date(iso);
-    if (Number.isNaN(fecha.getTime())) return iso;
-    return fecha.toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-    });
-}
-
-/** FE-47: para instantes (fecha de emisión): en hora local, no en UTC. */
-export function formatearFechaLocalCorta(iso?: string | null): string {
-    if (!iso) return "--/--/----";
-    const fecha = new Date(iso);
-    if (Number.isNaN(fecha.getTime())) return iso;
-    return fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-export function formatearRangoFechasUtc(
-    fechaInicioIso?: string | null,
-    fechaFinIso?: string | null,
-): string {
-    const inicio = formatearFechaUtcCorta(fechaInicioIso);
-    const fin = formatearFechaUtcCorta(fechaFinIso);
-    return `${inicio} – ${fin}`;
-}
-
-export function formatearMontoUsd(monto?: number | null): string {
-    if (monto === null || monto === undefined || Number.isNaN(Number(monto))) {
-        return "USD 0.00";
-    }
-    return `USD ${Number(monto).toLocaleString("es-AR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    })}`;
-}
-
 // Las solicitudes al hotel son gestión interna: al cliente le alcanza saber si su alojamiento está confirmado
 export const textoAlojamiento = (estado?: string | null) =>
     estado === "CONFIRMADO" ? "Alojamiento confirmado" : "Alojamiento a confirmar con el hotel";
@@ -758,3 +719,6 @@ export function reservaAdmiteCancelacion(reserva: {
     // FE-47: por día calendario local, igual que hoyUTC() en el back (la fecha de inicio viene a las 00:00Z)
     return reserva.salida.fechaInicio.slice(0, 10) > fechaLocalHoy();
 }
+
+// Los formatos viven en formato.ts; se re-exportan para las pantallas que ya los importan de acá
+export { formatearFechaLocalCorta, formatearFechaUtcCorta, formatearMontoUsd, formatearRangoFechasUtc } from "./formato";

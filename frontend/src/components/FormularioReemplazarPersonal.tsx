@@ -179,13 +179,13 @@ export function FormularioReemplazarPersonal({
             {/* Resumen de la salida y logística */}
             <div className="grid gap-4 rounded-control border border-borde bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
                 <div>
-                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[10px]">
+                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[11px]">
                         Salida
                     </span>
                     <p className="font-bold text-texto text-sm">{salida.nroSalida}</p>
                 </div>
                 <div>
-                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[10px]">
+                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[11px]">
                         Fechas de recorrido
                     </span>
                     <p className="font-medium text-texto">
@@ -193,7 +193,7 @@ export function FormularioReemplazarPersonal({
                     </p>
                 </div>
                 <div>
-                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[10px]">
+                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[11px]">
                         Estado
                     </span>
                     <p className="mt-0.5">
@@ -207,7 +207,7 @@ export function FormularioReemplazarPersonal({
                     </p>
                 </div>
                 <div>
-                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[10px]">
+                    <span className="font-semibold text-texto-suave uppercase tracking-wider text-[11px]">
                         Logística asignada
                     </span>
                     <p className="font-medium text-texto">
@@ -238,7 +238,7 @@ export function FormularioReemplazarPersonal({
                 ) : (
                     <div className="overflow-x-auto rounded-control border border-borde">
                         <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-100 text-texto-suave font-semibold uppercase tracking-wider text-[10px]">
+                            <thead className="bg-slate-100 text-texto-suave font-semibold uppercase tracking-wider text-[11px]">
                                 <tr>
                                     <th className="px-4 py-2.5">Acción</th>
                                     <th className="px-4 py-2.5">Nombre completo</th>

@@ -453,7 +453,7 @@ function MisReservasPage() {
                                                 <p className="font-mono text-xs font-bold text-navegacion">
                                                     {fila.nroReserva}
                                                 </p>
-                                                <p className="text-[11px] text-texto-suave">
+                                                <p className="text-xs text-texto-suave">
                                                     Emitida:{" "}
                                                     {formatearFechaLocalCorta(
                                                         fila.fechaRealizacion,
@@ -468,7 +468,7 @@ function MisReservasPage() {
                                         renderizar: (fila) => (
                                             <div className="space-y-1">
                                                 <span
-                                                    className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${estilosEstadoReserva(
+                                                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${estilosEstadoReserva(
                                                         fila.estado,
                                                     )}`}
                                                 >
@@ -477,7 +477,7 @@ function MisReservasPage() {
                                                     )}
                                                 </span>
                                                 {fila.estadoAlojamiento ? (
-                                                    <p className="text-[11px] text-texto-suave">
+                                                    <p className="text-xs text-texto-suave">
                                                         {textoAlojamiento(fila.estadoAlojamiento)}
                                                     </p>
                                                 ) : null}
@@ -518,7 +518,7 @@ function MisReservasPage() {
                                                 <p className="text-sm font-bold text-marca-oscura">
                                                     {fila.totalTexto}
                                                 </p>
-                                                <p className="text-[11px] text-texto-suave">
+                                                <p className="text-xs text-texto-suave">
                                                     {fila.cantidadPasajeros}{" "}
                                                     {fila.cantidadPasajeros ===
                                                     1
@@ -541,7 +541,7 @@ function MisReservasPage() {
                                                     )}
                                                 </p>
                                                 {fila.reintegro !== null ? (
-                                                    <p className="text-[11px] font-semibold text-peligro">
+                                                    <p className="text-xs font-semibold text-peligro">
                                                         Reintegro:{" "}
                                                         {formatearMontoUsd(
                                                             fila.reintegro,

@@ -732,7 +732,7 @@ function SalidasPage() {
                         </span>
                         {fila.idbloqueo && (
                             <span
-                                className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 max-md:hidden"
+                                className="inline-flex items-center whitespace-nowrap text-xs font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 max-md:hidden"
                                 title={`Bloqueo Serfor/Dircetur: ${fila.idbloqueo}`}
                             >
                                 Bloq: {fila.idbloqueo}
@@ -765,25 +765,25 @@ function SalidasPage() {
                 let badgeTiempo = null;
                 if (fila.estado === "FINALIZADA") {
                     badgeTiempo = (
-                        <span className="inline-block text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        <span className="inline-block text-xs font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             Concluida
                         </span>
                     );
                 } else if (alerta("SIN_FINALIZAR")) {
                     badgeTiempo = (
-                        <span className="inline-block text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                        <span className="inline-block text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
                             Vencida sin cerrar
                         </span>
                     );
                 } else if (fila.estado === "EN_CURSO") {
                     badgeTiempo = (
-                        <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                        <span className="inline-block text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                             En curso
                         </span>
                     );
                 } else if (alerta("SIN_INICIAR")) {
                     badgeTiempo = (
-                        <span className="inline-block text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                        <span className="inline-block text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
                             {inicioStr === hoy ? "Debía salir hoy" : "Sin iniciar"}
                         </span>
                     );
@@ -791,7 +791,7 @@ function SalidasPage() {
                     const dias = diasEntre(hoy, inicioStr);
                     if (dias > 0) {
                         badgeTiempo = (
-                            <span className="inline-block text-[10px] font-medium text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                            <span className="inline-block text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
                                 En {dias} {dias === 1 ? "día" : "días"}
                             </span>
                         );
@@ -852,7 +852,7 @@ function SalidasPage() {
                                     / {fila.tamanoMaximo} pax
                                 </span>
                             </span>
-                            <span className="font-semibold text-[11px] text-texto-suave">
+                            <span className="font-semibold text-xs text-texto-suave">
                                 {porcentaje}%
                             </span>
                         </div>
@@ -862,7 +862,7 @@ function SalidasPage() {
                                 style={{ width: `${porcentaje}%` }}
                             />
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-texto-suave">
+                        <div className="flex items-center justify-between text-xs text-texto-suave">
                             <span className="max-md:hidden">Disp: {fila.stockLocal}</span>
                             {confirmados === 0 && (
                                 <span className="text-amber-700 font-medium">Sin ventas</span>
@@ -896,7 +896,7 @@ function SalidasPage() {
                                 {desfasada ? (
                                     <div className="flex flex-col gap-0.5">
                                         <span
-                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
+                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 whitespace-nowrap"
                                             title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
                                         >
                                             <span aria-hidden="true">⏱️</span>
@@ -909,13 +909,13 @@ function SalidasPage() {
                                                 </span>
                                             )}
                                         </span>
-                                        <span className="text-[10px] font-semibold text-amber-700">
+                                        <span className="text-xs font-semibold text-amber-700">
                                             Desfasada
                                         </span>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-0.5">
-                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 whitespace-nowrap">
                                             {informada !== null ? `Etapa ${informada}` : "Iniciada"}
                                             {esperada !== null && (
                                                 <span className="ml-1 text-emerald-600">
@@ -923,7 +923,7 @@ function SalidasPage() {
                                                 </span>
                                             )}
                                         </span>
-                                        <span className="text-[10px] text-emerald-700 font-medium">
+                                        <span className="text-xs text-emerald-700 font-medium">
                                             Al día
                                         </span>
                                     </div>
@@ -961,7 +961,7 @@ function SalidasPage() {
                             {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
                         </div>
                         {dotacion.total > 0 && (
-                            <p className="text-[11px] text-texto-suave max-md:hidden">
+                            <p className="text-xs text-texto-suave max-md:hidden">
                                 {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
                                 {dotacion.porteadores}{" "}
                                 {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
@@ -970,7 +970,7 @@ function SalidasPage() {
                         {guias.length > 0 && (
                             <div className="pt-0.5">
                                 <p
-                                    className="text-[11px] font-medium text-texto truncate max-w-[170px]"
+                                    className="text-xs font-medium text-texto truncate max-w-[170px]"
                                     title={guias.join(", ")}
                                 >
                                     <span className="text-texto-suave">Guías: </span>
@@ -1197,7 +1197,7 @@ function SalidasPage() {
                                 >
                                     <span>Asignar recursos</span>
                                 </button>
-                                <span className="text-[10px] text-amber-700 font-medium">
+                                <span className="text-xs text-amber-700 font-medium">
                                     ⚠️ Requiere compras
                                 </span>
                             </div>
@@ -1471,7 +1471,7 @@ function SalidasPage() {
 
                         <div className="grid gap-2 sm:grid-cols-3 pt-1 border-t border-emerald-200/70 text-xs">
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Permisos emitidos
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950">
@@ -1480,13 +1480,13 @@ function SalidasPage() {
                                         ? "permiso nominal"
                                         : "permisos nominales"}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Emitidos ante la autoridad gubernamental
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Lugares liberados
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950">
@@ -1495,13 +1495,13 @@ function SalidasPage() {
                                         ? "lugar liberado"
                                         : "lugares liberados"}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Cupos sobrantes devueltos del bloqueo
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Estado de la salida
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950 flex items-center gap-1.5">
@@ -1513,7 +1513,7 @@ function SalidasPage() {
                                         {formatearEstadoSalida(resultadoAsignacion.estado)}
                                     </span>
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Venta cerrada y cupo local en 0
                                 </p>
                             </div>
@@ -1648,37 +1648,37 @@ function SalidasPage() {
 
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 pt-1 border-t border-emerald-200/70 text-xs">
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Personal saliente
                                 </span>
                                 <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
                                     {resultadoReemplazo.sale.nombreCompleto}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Desvinculado de la salida
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Personal ingresante
                                 </span>
                                 <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
                                     {resultadoReemplazo.entra.nombreCompleto}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Asignado como reemplazante
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Permiso anterior
                                 </span>
                                 <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
                                     {resultadoReemplazo.permisoDadoDeBaja ?? "Sin permiso / N/A"}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     {resultadoReemplazo.permisoDadoDeBaja
                                         ? "Baja informada a la autoridad"
                                         : "No había permiso que dar de baja"}
@@ -1686,13 +1686,13 @@ function SalidasPage() {
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Nuevo permiso emitido
                                 </span>
                                 <p className="mt-0.5 text-sm font-extrabold text-emerald-950">
                                     {resultadoReemplazo.permisoNuevo ?? "No emitido"}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     {resultadoReemplazo.permisoNuevo
                                         ? "Emitido para el reemplazante"
                                         : "El reemplazante no recibió permiso"}
@@ -1736,7 +1736,7 @@ function SalidasPage() {
 
                         {resultadoModificarLogistica.advertencias.length > 0 && (
                             <div className="rounded bg-amber-100/70 border border-amber-300 p-2.5 text-xs text-amber-950 space-y-1">
-                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-900">
+                                <span className="font-bold uppercase tracking-wider text-[11px] block text-amber-900">
                                     Requerimientos pendientes informados por el sistema:
                                 </span>
                                 <ul className="list-disc list-inside space-y-0.5 font-medium">
@@ -1845,20 +1845,20 @@ function SalidasPage() {
 
                         <div className="grid gap-2 sm:grid-cols-3 pt-1 border-t border-emerald-200/70 text-xs">
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Artículos devueltos
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950">
                                     {resultadoDevolucion.detalle.length}{" "}
                                     {resultadoDevolucion.detalle.length === 1 ? "artículo" : "artículos"}
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Trazabilidad asentada en auditoría #{resultadoDevolucion.auditoriaId} (RF-56)
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Reintegradas a stock
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950">
@@ -1868,13 +1868,13 @@ function SalidasPage() {
                                     )}{" "}
                                     unidades
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     Reintegradas al stock del proveedor
                                 </p>
                             </div>
 
                             <div className="rounded bg-emerald-100/60 p-2.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
                                     Dañadas o extraviadas
                                 </span>
                                 <p className="mt-0.5 text-base font-extrabold text-emerald-950">
@@ -1884,7 +1884,7 @@ function SalidasPage() {
                                     )}{" "}
                                     unidades
                                 </p>
-                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                <p className="text-xs text-emerald-800 mt-0.5">
                                     No reintegradas (con registro de inspección)
                                 </p>
                             </div>

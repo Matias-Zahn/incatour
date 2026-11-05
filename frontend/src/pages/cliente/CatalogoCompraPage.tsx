@@ -30,6 +30,7 @@ import {
     type DatosCompra,
     type FormularioCompra,
 } from "./esquemaCompra";
+import { formatearFechaUtcCorta, formatearMonto } from "../../services/formato";
 
 // FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
 const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
@@ -151,16 +152,6 @@ const TARJETAS_PRUEBA = [
     },
 ];
 
-function formatearFechaCorta(iso: string): string {
-    const fecha = new Date(iso);
-    if (Number.isNaN(fecha.getTime())) return iso;
-    return fecha.toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-    });
-}
 
 function sumarDiasIso(iso: string, dias: number): string {
     const fecha = new Date(iso);
@@ -181,11 +172,11 @@ function derivarFechasAlojamiento(
 } {
     const estadiaPrevia =
         nochesPrevias > 0
-            ? `${formatearFechaCorta(sumarDiasIso(fechaInicioIso, -nochesPrevias))} al ${formatearFechaCorta(fechaInicioIso)} (${nochesPrevias} ${nochesPrevias === 1 ? "noche" : "noches"})`
+            ? `${formatearFechaUtcCorta(sumarDiasIso(fechaInicioIso, -nochesPrevias))} al ${formatearFechaUtcCorta(fechaInicioIso)} (${nochesPrevias} ${nochesPrevias === 1 ? "noche" : "noches"})`
             : null;
     const estadiaPosterior =
         nochesPosteriores > 0
-            ? `${formatearFechaCorta(fechaFinIso)} al ${formatearFechaCorta(sumarDiasIso(fechaFinIso, nochesPosteriores))} (${nochesPosteriores} ${nochesPosteriores === 1 ? "noche" : "noches"})`
+            ? `${formatearFechaUtcCorta(fechaFinIso)} al ${formatearFechaUtcCorta(sumarDiasIso(fechaFinIso, nochesPosteriores))} (${nochesPosteriores} ${nochesPosteriores === 1 ? "noche" : "noches"})`
             : null;
     return { estadiaPrevia, estadiaPosterior };
 }
@@ -372,7 +363,7 @@ function CatalogoCompraPage() {
                 crearEsquemaCompra(
                     salidaActiva?.fechaFin ?? "",
                     cupoMaximo,
-                    salidaActiva ? formatearFechaCorta(salidaActiva.fechaFin) : "fin del recorrido",
+                    salidaActiva ? formatearFechaUtcCorta(salidaActiva.fechaFin) : "fin del recorrido",
                 ),
             )(valores, contexto, opciones),
         defaultValues: {
@@ -774,8 +765,8 @@ function CatalogoCompraPage() {
                                         Salida Programada
                                     </p>
                                     <p className="mt-1 text-base font-bold text-navegacion">
-                                        {formatearFechaCorta(reservaConfirmada.salida.fechaInicio)} al{" "}
-                                        {formatearFechaCorta(reservaConfirmada.salida.fechaFin)}
+                                        {formatearFechaUtcCorta(reservaConfirmada.salida.fechaInicio)} al{" "}
+                                        {formatearFechaUtcCorta(reservaConfirmada.salida.fechaFin)}
                                     </p>
                                     <p className="mt-2 text-xs text-texto-suave">
                                         Temporada aplicada:{" "}
@@ -793,10 +784,7 @@ function CatalogoCompraPage() {
                                         Transacción y Total Congelado
                                     </p>
                                     <p className="mt-1 text-2xl font-bold text-navegacion">
-                                        {reservaConfirmada.resultado.moneda}{" "}
-                                        {reservaConfirmada.resultado.precioCongelado.toFixed(
-                                            2,
-                                        )}
+                                        {formatearMonto(reservaConfirmada.resultado.precioCongelado, reservaConfirmada.resultado.moneda)}
                                     </p>
                                     <p className="mt-1 text-xs text-texto-suave">
                                         Transacción pasarela:{" "}
@@ -817,7 +805,7 @@ function CatalogoCompraPage() {
                                         </strong>
                                     </p>
                                     {reservaConfirmada.paquete.condiciones ? (
-                                        <p className="mt-2 border-t border-borde pt-1.5 text-[11px] text-texto-suave">
+                                        <p className="mt-2 border-t border-borde pt-1.5 text-xs text-texto-suave">
                                             <strong>
                                                 Condiciones congeladas:
                                             </strong>{" "}
@@ -1008,13 +996,13 @@ function CatalogoCompraPage() {
                                                 <div className="mt-3">
                                                     <p className="text-sm font-bold text-navegacion">
                                                         Salida:{" "}
-                                                        {formatearFechaCorta(
+                                                        {formatearFechaUtcCorta(
                                                             salida.fechaInicio,
                                                         )}
                                                     </p>
                                                     <p className="text-xs text-texto-suave">
                                                         Regreso:{" "}
-                                                        {formatearFechaCorta(
+                                                        {formatearFechaUtcCorta(
                                                             salida.fechaFin,
                                                         )}{" "}
                                                         ·{" "}
@@ -1030,7 +1018,7 @@ function CatalogoCompraPage() {
                                                     <span className="text-base font-bold text-navegacion">
                                                         {sinTarifaSalida
                                                             ? "Sin tarifa para esta fecha"
-                                                            : `${salida.moneda} ${salida.precioPersona}`}
+                                                            : formatearMonto(salida.precioPersona, salida.moneda)}
                                                     </span>
                                                 </div>
                                             </button>
@@ -1058,7 +1046,7 @@ function CatalogoCompraPage() {
                                             Cada pasaporte debe ser único y
                                             vencer después del{" "}
                                             {salidaActiva
-                                                ? formatearFechaCorta(
+                                                ? formatearFechaUtcCorta(
                                                       salidaActiva.fechaFin,
                                                   )
                                                 : "fin del recorrido"}
@@ -1100,10 +1088,7 @@ function CatalogoCompraPage() {
                                     </strong>{" "}
                                     por pasajero sin cargo adicional. Excedente:{" "}
                                     <strong>
-                                        {monedaActiva}{" "}
-                                        {infoEquipaje.costoPorKgExcedente.toFixed(
-                                            2,
-                                        )}{" "}
+                                        {formatearMonto(infoEquipaje.costoPorKgExcedente, monedaActiva)}{" "}
                                         por kg extra
                                     </strong>
                                     .
@@ -1219,16 +1204,15 @@ function CatalogoCompraPage() {
                                                     ayuda={
                                                         <>
                                                             {excesoKg > 0 ? (
-                                                                <span className="text-[11px] font-semibold text-advertencia">
-                                                                    +{excesoKg} kg extra ({monedaActiva}{" "}
-                                                                    {costoExceso.toFixed(2)})
+                                                                <span className="text-xs font-semibold text-advertencia">
+                                                                    +{excesoKg} kg extra ({formatearMonto(costoExceso, monedaActiva)})
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-[11px] font-normal text-exito">
+                                                                <span className="text-xs font-normal text-exito">
                                                                     Dentro de franquicia
                                                                 </span>
                                                             )}
-                                                            <span className="text-[11px] font-normal text-texto-suave">
+                                                            <span className="text-xs font-normal text-texto-suave">
                                                                 Máximo {PESO_MAXIMO_DECLARADO_KG} kg por pasajero
                                                             </span>
                                                         </>
@@ -1291,7 +1275,7 @@ function CatalogoCompraPage() {
                                             >
                                                 {t.etiqueta}
                                             </p>
-                                            <p className="mt-0.5 text-[11px] text-texto-suave">
+                                            <p className="mt-0.5 text-xs text-texto-suave">
                                                 {t.descripcion}
                                             </p>
                                         </button>
@@ -1390,7 +1374,7 @@ function CatalogoCompraPage() {
                                 </span>
                                 <span className="font-semibold text-texto">
                                     {salidaActiva
-                                        ? formatearFechaCorta(salidaActiva.fechaInicio)
+                                        ? formatearFechaUtcCorta(salidaActiva.fechaInicio)
                                         : "Sin salida"}
                                 </span>
                             </div>
@@ -1433,7 +1417,7 @@ function CatalogoCompraPage() {
                                                           "No incluido"}
                                                   </span>
                                               </div>
-                                              <p className="text-[11px] text-texto-suave">
+                                              <p className="text-xs text-texto-suave">
                                                   Las noches de alojamiento las
                                                   define el paquete y no se
                                                   pueden modificar durante la
@@ -1444,7 +1428,7 @@ function CatalogoCompraPage() {
                                   })()
                                 : null}
                             {(paqueteVendido ?? paqueteEnCompra).condiciones ? (
-                                <p className="rounded-control border border-borde bg-fondo/50 p-2 text-[11px] text-texto">
+                                <p className="rounded-control border border-borde bg-fondo/50 p-2 text-xs text-texto">
                                     <strong>Condiciones comerciales:</strong>{" "}
                                     {(paqueteVendido ?? paqueteEnCompra).condiciones}
                                     <span className="block text-texto-suave">
@@ -1462,12 +1446,12 @@ function CatalogoCompraPage() {
                                     {pasajeros.length === 1
                                         ? "pasajero"
                                         : "pasajeros"}{" "}
-                                    × {sinTarifa ? "sin tarifa" : `${monedaActiva} ${precioUnitario}`})
+                                    × {sinTarifa ? "sin tarifa" : formatearMonto(precioUnitario, monedaActiva)})
                                 </span>
                                 <span className="font-semibold text-texto">
                                     {sinTarifa
                                         ? "—"
-                                        : `${monedaActiva} ${subtotalPasajeros.toFixed(2)}`}
+                                        : formatearMonto(subtotalPasajeros, monedaActiva)}
                                 </span>
                             </div>
 
@@ -1477,7 +1461,7 @@ function CatalogoCompraPage() {
                                 </span>
                                 <span className="font-semibold text-texto">
                                     {recargoEquipajeTotal > 0
-                                        ? `${monedaActiva} ${recargoEquipajeTotal.toFixed(2)}`
+                                        ? formatearMonto(recargoEquipajeTotal, monedaActiva)
                                         : "Sin recargo"}
                                 </span>
                             </div>
@@ -1489,7 +1473,7 @@ function CatalogoCompraPage() {
                                 <span className="text-2xl font-bold text-navegacion">
                                     {sinTarifa
                                         ? "—"
-                                        : `${monedaActiva} ${totalPagar.toFixed(2)}`}
+                                        : formatearMonto(totalPagar, monedaActiva)}
                                 </span>
                             </div>
                         </div>
@@ -1549,7 +1533,7 @@ function CatalogoCompraPage() {
                                   ? "Elegí una salida"
                                   : sinTarifa
                                     ? "Salida sin tarifa vigente"
-                                  : `Confirmar y pagar ${monedaActiva} ${totalPagar.toFixed(2)}`}
+                                  : `Confirmar y pagar ${formatearMonto(totalPagar, monedaActiva)}`}
                         </Boton>
                         {salidaActiva && sinTarifa ? (
                             <p className="text-center text-xs text-peligro">
@@ -1565,7 +1549,7 @@ function CatalogoCompraPage() {
                             <div className="min-w-0">
                                 <p className="text-xs text-texto-suave">Total</p>
                                 <p className="truncate text-lg font-bold text-navegacion">
-                                    {sinTarifa ? "—" : `${monedaActiva} ${totalPagar.toFixed(2)}`}
+                                    {sinTarifa ? "—" : formatearMonto(totalPagar, monedaActiva)}
                                 </p>
                             </div>
                             <Boton
@@ -1823,16 +1807,11 @@ function CatalogoCompraPage() {
 
                                                     {tarifaMinima ? (
                                                         <div className="text-right">
-                                                            <p className="text-[11px] text-texto-suave">
+                                                            <p className="text-xs text-texto-suave">
                                                                 Desde
                                                             </p>
-                                                            <p className="text-xl font-bold text-navegacion">
-                                                                {
-                                                                    tarifaMinima.moneda
-                                                                }{" "}
-                                                                {
-                                                                    tarifaMinima.precio
-                                                                }
+                                                            <p className="whitespace-nowrap text-xl font-bold text-navegacion">
+                                                                {formatearMonto(tarifaMinima.precio, tarifaMinima.moneda)}
                                                             </p>
                                                         </div>
                                                     ) : null}
@@ -1884,14 +1863,14 @@ function CatalogoCompraPage() {
                                                             (serv) => (
                                                                 <span
                                                                     key={serv}
-                                                                    className="rounded-full border border-borde bg-fondo px-2.5 py-0.5 text-[11px] font-medium text-texto"
+                                                                    className="rounded-full border border-borde bg-fondo px-2.5 py-0.5 text-xs font-medium text-texto"
                                                                 >
                                                                     ✓ {serv}
                                                                 </span>
                                                             ),
                                                         )}
                                                         {paquete.equipajeTransporte ? (
-                                                            <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-[11px] font-semibold text-marca-oscura">
+                                                            <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
                                                                 🎒{" "}
                                                                 {
                                                                     paquete
@@ -1927,7 +1906,7 @@ function CatalogoCompraPage() {
                                                                     .stockLocal
                                                             }{" "}
                                                             cupos en{" "}
-                                                            {formatearFechaCorta(
+                                                            {formatearFechaUtcCorta(
                                                                 salidasConCupo[0]
                                                                     .fechaInicio,
                                                             )}
@@ -2016,7 +1995,7 @@ function CatalogoCompraPage() {
                                                 <span className="flex items-center gap-1 rounded bg-marca px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
                                                     🏔️ {paqueteDetalle.circuito.nombre}
                                                 </span>
-                                                <span className="rounded border border-borde bg-fondo px-2 py-0.5 font-mono text-[11px] font-semibold text-texto-suave">
+                                                <span className="rounded border border-borde bg-fondo px-2 py-0.5 font-mono text-xs font-semibold text-texto-suave">
                                                     {paqueteDetalle.codigo}
                                                 </span>
                                                 <span className="text-xs font-semibold text-texto-suave">
@@ -2036,9 +2015,9 @@ function CatalogoCompraPage() {
                                         <div className="flex items-center gap-4">
                                             {tarifaMinimaDetalle ? (
                                                 <div className="text-right max-sm:hidden">
-                                                    <p className="text-[11px] text-texto-suave">Tarifa desde</p>
+                                                    <p className="text-xs text-texto-suave">Tarifa desde</p>
                                                     <p className="text-2xl font-bold text-navegacion">
-                                                        {tarifaMinimaDetalle.moneda} {tarifaMinimaDetalle.precio}
+                                                        {formatearMonto(tarifaMinimaDetalle.precio, tarifaMinimaDetalle.moneda)}
                                                     </p>
                                                 </div>
                                             ) : null}
@@ -2175,7 +2154,7 @@ function CatalogoCompraPage() {
                                                         Próximas salidas disponibles
                                                     </p>
                                                     {comprables.length > 0 ? (
-                                                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-exito">
+                                                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-exito">
                                                             {comprables.length} {comprables.length === 1 ? "salida abierta" : "salidas abiertas"}
                                                         </span>
                                                     ) : null}
@@ -2195,7 +2174,7 @@ function CatalogoCompraPage() {
                                                             >
                                                                 <div>
                                                                     <p className="font-bold text-navegacion">
-                                                                        {formatearFechaCorta(
+                                                                        {formatearFechaUtcCorta(
                                                                             s.fechaInicio,
                                                                         )}
                                                                     </p>
@@ -2209,7 +2188,7 @@ function CatalogoCompraPage() {
                                                                         {s.precioPersona ==
                                                                         null
                                                                             ? "Sin tarifa para esta fecha"
-                                                                            : `${s.moneda} ${s.precioPersona}`}
+                                                                            : formatearMonto(s.precioPersona, s.moneda)}
                                                                     </p>
                                                                     {s.garantia &&
                                                                     s.garantia !==
@@ -2258,7 +2237,7 @@ function CatalogoCompraPage() {
                                                         {paqueteDetalle.serviciosAdicionales.map((serv) => (
                                                             <span
                                                                 key={serv}
-                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-[11px] font-medium text-texto"
+                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-xs font-medium text-texto"
                                                             >
                                                                 ✓ {serv}
                                                             </span>

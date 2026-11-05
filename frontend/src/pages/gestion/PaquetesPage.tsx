@@ -24,6 +24,7 @@ import {
     type Paquete,
 } from "../../services/paqueteService";
 import { temporadaVencida, useTemporadas } from "../../services/temporadaService";
+import { formatearMonto } from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
@@ -571,7 +572,7 @@ function PaquetesPage() {
                                                     alt={paquete.nombrePaquete}
                                                     className="h-14 w-20 object-cover transition group-hover:scale-105"
                                                 />
-                                                <span className="absolute right-1 bottom-1 rounded bg-navegacion/85 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                                                <span className="absolute right-1 bottom-1 rounded bg-navegacion/85 px-1.5 py-0.5 text-xs font-bold text-white">
                                                     {galeria.length}{" "}
                                                     {galeria.length === 1
                                                         ? "foto"
@@ -681,8 +682,7 @@ function PaquetesPage() {
                                                         `Temp. #${tarifa.idtemporada}`}
                                                     :{" "}
                                                     <strong className="ml-1 text-navegacion">
-                                                        {tarifa.moneda}{" "}
-                                                        {tarifa.monto}
+                                                        {formatearMonto(tarifa.monto, tarifa.moneda)}
                                                     </strong>
                                                 </span>
                                             ))
@@ -977,7 +977,7 @@ function PaquetesPage() {
                                                                 alt={`Miniatura ${idx + 1}`}
                                                                 className="h-14 w-full object-cover"
                                                             />
-                                                            <span className="absolute bottom-0.5 left-0.5 rounded bg-navegacion/80 px-1 text-[9px] font-bold text-white">
+                                                            <span className="absolute bottom-0.5 left-0.5 rounded bg-navegacion/80 px-1 text-xs font-bold text-white">
                                                                 {idx === 0
                                                                     ? "Portada"
                                                                     : `#${idx + 1}`}
@@ -1016,7 +1016,7 @@ function PaquetesPage() {
                                                 </p>
                                                 <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
                                                     <div className="rounded bg-white p-2 border border-borde">
-                                                        <p className="text-[11px] text-texto-suave">
+                                                        <p className="text-xs text-texto-suave">
                                                             Duración total
                                                         </p>
                                                         <p className="text-sm font-bold text-navegacion">
@@ -1028,7 +1028,7 @@ function PaquetesPage() {
                                                         </p>
                                                     </div>
                                                     <div className="rounded bg-white p-2 border border-borde">
-                                                        <p className="text-[11px] text-texto-suave">
+                                                        <p className="text-xs text-texto-suave">
                                                             Noches previas
                                                         </p>
                                                         <p className="text-sm font-bold text-navegacion">
@@ -1038,7 +1038,7 @@ function PaquetesPage() {
                                                         </p>
                                                     </div>
                                                     <div className="rounded bg-white p-2 border border-borde">
-                                                        <p className="text-[11px] text-texto-suave">
+                                                        <p className="text-xs text-texto-suave">
                                                             Noches post.
                                                         </p>
                                                         <p className="text-sm font-bold text-navegacion">

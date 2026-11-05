@@ -401,7 +401,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                                         className={`rounded-full bg-rose-600 font-bold text-white ${
                                             colapsada
                                                 ? "absolute right-1.5 top-1.5 size-2.5"
-                                                : "ml-auto min-w-5 px-1.5 text-center text-[11px] leading-5 max-md:absolute max-md:right-0.5 max-md:top-0.5 max-md:size-2.5 max-md:min-w-0 max-md:p-0 max-md:text-[0px]"
+                                                : "ml-auto min-w-5 px-1.5 text-center text-xs leading-5 max-md:absolute max-md:right-0.5 max-md:top-0.5 max-md:size-2.5 max-md:min-w-0 max-md:p-0 max-md:text-[0px]"
                                         }`}
                                     >
                                         {colapsada ? null : aviso}
@@ -435,13 +435,13 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             <div className="mt-3 border-t border-white/30 pt-3 text-xs max-md:border-none max-md:pt-0">
                 {!colapsada ? (
                     <div className="max-md:hidden">
-                        <p className="text-cyan-100 text-[11px]">Usuario de gestión</p>
+                        <p className="text-cyan-100 text-xs">Usuario de gestión</p>
                         <p className="font-bold text-white truncate">
                             {usuario
                                 ? `${usuario.nombre} ${usuario.apellido}`
                                 : "Administrador/a"}
                         </p>
-                        <p className="text-cyan-100/80 text-[10px] truncate">
+                        <p className="text-cyan-100/80 text-xs truncate">
                             {usuario?.email ?? "Perfil Administrador"}
                         </p>
                     </div>

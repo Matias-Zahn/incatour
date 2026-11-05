@@ -527,7 +527,7 @@ export function FormularioModificarLogistica({
                             <span className="font-bold text-rose-800">
                                 Se desasignará: {transActual.nombreServicio} ({transActual.proveedor.razonSocial})
                             </span>
-                            <span className="inline-flex items-center rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-[11px] font-bold text-rose-900">
+                            <span className="inline-flex items-center rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900">
                                 Pendiente de baja
                             </span>
                         </div>
@@ -583,7 +583,7 @@ export function FormularioModificarLogistica({
                                     maxLength={100}
                                     className="w-full rounded border border-borde p-2 text-xs text-texto focus:border-marca focus:outline-none"
                                 />
-                                <p className="text-[11px] text-texto-suave">
+                                <p className="text-xs text-texto-suave">
                                     Obligatorio. Identificador de la confirmación o voucher emitido por el proveedor.
                                 </p>
                             </div>
@@ -645,12 +645,12 @@ export function FormularioModificarLogistica({
                                             <td className="p-2.5 font-medium">
                                                 {eq.nombreServicio}
                                                 {estaQuitado && (
-                                                    <span className="ml-2 inline-flex items-center rounded bg-rose-100 px-1.5 py-0.2 text-[10px] font-bold text-rose-800">
+                                                    <span className="ml-2 inline-flex items-center rounded bg-rose-100 px-1.5 py-0.2 text-xs font-bold text-rose-800">
                                                         Baja
                                                     </span>
                                                 )}
                                                 {!estaQuitado && cantidadActual !== eq.cantidad && (
-                                                    <span className="ml-2 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-amber-800">
+                                                    <span className="ml-2 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.2 text-xs font-bold text-amber-800">
                                                         Modificado
                                                     </span>
                                                 )}
@@ -676,7 +676,7 @@ export function FormularioModificarLogistica({
                                                             }
                                                             className="w-16 rounded border border-borde p-1 text-center font-semibold text-xs focus:border-marca focus:outline-none"
                                                         />
-                                                        <span className="text-[11px] text-texto-suave">/ máx {maxPermitido}</span>
+                                                        <span className="text-xs text-texto-suave">/ máx {maxPermitido}</span>
                                                     </div>
                                                 )}
                                             </td>
@@ -737,7 +737,7 @@ export function FormularioModificarLogistica({
                                                     }
                                                     className="w-16 rounded border border-emerald-300 p-1 text-center font-bold text-xs bg-white focus:border-marca focus:outline-none"
                                                 />
-                                                <span className="ml-1 text-[11px] text-emerald-700">/ {nuevo.stockMaximo}</span>
+                                                <span className="ml-1 text-xs text-emerald-700">/ {nuevo.stockMaximo}</span>
                                             </td>
                                             <td className="p-2.5 text-right">
                                                 <button
@@ -772,7 +772,7 @@ export function FormularioModificarLogistica({
                     ) : (
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="flex-1 min-w-[240px] space-y-1">
-                                <label htmlFor={`${idSeccion}-sel-eq`} className="text-[11px] font-semibold text-texto-suave block">
+                                <label htmlFor={`${idSeccion}-sel-eq`} className="text-xs font-semibold text-texto-suave block">
                                     Servicio de equipamiento
                                 </label>
                                 <select
@@ -794,7 +794,7 @@ export function FormularioModificarLogistica({
                                 </select>
                             </div>
                             <div className="w-24 space-y-1">
-                                <label htmlFor={`${idSeccion}-cant-eq`} className="text-[11px] font-semibold text-texto-suave block">
+                                <label htmlFor={`${idSeccion}-cant-eq`} className="text-xs font-semibold text-texto-suave block">
                                     Cantidad
                                 </label>
                                 <input
@@ -833,7 +833,7 @@ export function FormularioModificarLogistica({
                     <label htmlFor={`${idSeccion}-motivo`} className="text-xs font-bold text-texto uppercase tracking-wide">
                         Motivo de la modificación (Opcional)
                     </label>
-                    <span className={`text-[11px] font-mono ${motivo.length > 300 ? "text-rose-600 font-bold" : "text-texto-suave"}`}>
+                    <span className={`text-xs font-mono ${motivo.length > 300 ? "text-rose-600 font-bold" : "text-texto-suave"}`}>
                         {motivo.length}/300
                     </span>
                 </div>

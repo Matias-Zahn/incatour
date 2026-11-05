@@ -15,16 +15,15 @@ import {
     type IncidenteAdmin,
 } from "../../services/guiaService";
 import { useSalidas } from "../../services/salidaService";
+import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
+import { formatearFechaHora } from "../../services/formato";
 
 const estiloGravedad: Record<string, string> = {
     CRITICO: "bg-peligro text-white",
     MEDIO: "bg-amber-50 text-advertencia",
     BAJO: "bg-marca-activa text-marca-oscura",
 };
-
-const fechaHoraLocal = (iso: string) =>
-    new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 
 const INCIDENTES_EN_RESUMEN = 5;
 
@@ -33,7 +32,7 @@ function FilaIncidente({ incidente: inc }: { incidente: IncidenteAdmin }) {
         <div className="px-6 py-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
                 >
                     {inc.nivelGravedad}
                 </span>
@@ -46,13 +45,18 @@ function FilaIncidente({ incidente: inc }: { incidente: IncidenteAdmin }) {
                 {inc.pasajeros.length > 0
                     ? `Afectados: ${inc.pasajeros.map((p) => p.pasajero.nombreCompleto).join(", ")} · `
                     : ""}
-                {fechaHoraLocal(inc.fechaHoraReporte)}
+                {formatearFechaHora(inc.fechaHoraReporte)}
             </p>
         </div>
     );
 }
 
+// Según la hora local: hasta las 12 buen día, hasta las 20 buenas tardes
+const saludo = (hora = new Date().getHours()) =>
+    hora >= 5 && hora < 12 ? "Buen día" : hora >= 12 && hora < 20 ? "Buenas tardes" : "Buenas noches";
+
 function InicioGestionPage() {
+    const nombre = obtenerUsuario()?.nombre;
     const navigate = useNavigate();
     const [verIncidentes, setVerIncidentes] = useState(false);
     const salidasQ = useSalidas();
@@ -91,7 +95,8 @@ function InicioGestionPage() {
                         Resumen general
                     </p>
                     <h1 className="text-3xl font-bold text-navegacion">
-                        Buen día, Administrador/a
+                        {saludo()}
+                        {nombre ? `, ${nombre}` : ""}
                     </h1>
                     <p className="mt-2 text-sm text-texto-suave">
                         Este es el estado de la operación de IncaTour.
