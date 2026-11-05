@@ -266,6 +266,58 @@ export async function catalogoCuentas(ctx: Ctx) {
     await esperar("Guía en GET /clientes → 403", "GET", "/clientes", undefined, guia.token, 403);
   });
 
+  // Plan de Prueba, caso 1: cada ruta protegida con cada perfil. Sin token → 401; con un perfil no permitido → 403.
+  // El perfil permitido no se prueba acá (con ids de relleno podría dar de baja datos reales): lo cubren los demás escenarios.
+  await escenario("Matriz de permisos: cada ruta con cada perfil", async () => {
+    const cli = await f.cliente();
+    const guia = await f.guia();
+    const tokens = { ADMIN: admin, CLIENTE: cli.token, GUIA: guia.token };
+    const A = ["ADMIN"], C = ["CLIENTE"], G = ["GUIA"], AC = ["ADMIN", "CLIENTE"];
+    const rutas: [string, string, string[]][] = [
+      ["GET", "/clientes", A], ["GET", "/clientes/mi-perfil", C], ["GET", "/clientes/1", AC], ["PUT", "/clientes/1", AC], ["PATCH", "/clientes/1/baja", AC],
+      ["GET", "/personal", A], ["POST", "/personal", A], ["PUT", "/personal/1", A], ["PATCH", "/personal/1/baja", A],
+      ["GET", "/cuentas-guia", A], ["POST", "/cuentas-guia", A], ["PUT", "/cuentas-guia/1", A], ["PATCH", "/cuentas-guia/1/baja", A],
+      ["GET", "/circuitos", A], ["POST", "/circuitos", A], ["PUT", "/circuitos/1", A], ["PATCH", "/circuitos/1/baja", A],
+      ["GET", "/circuitos/1/etapas", A], ["PUT", "/circuitos/1/etapas", A],
+      ["GET", "/temporadas", A], ["POST", "/temporadas", A], ["PUT", "/temporadas/1", A], ["PATCH", "/temporadas/1/baja", A],
+      ["GET", "/paquetes", A], ["GET", "/paquetes/1", A], ["POST", "/paquetes", A], ["PUT", "/paquetes/1", A], ["PATCH", "/paquetes/1/baja", A],
+      ["POST", "/paquetes/1/imagen", A], ["POST", "/paquetes/1/carrusel", A], ["DELETE", "/paquetes/1/carrusel/x.jpg", A],
+      ["GET", "/proveedores", A], ["GET", "/proveedores/1", A], ["POST", "/proveedores", A], ["PUT", "/proveedores/1", A], ["PATCH", "/proveedores/1/baja", A],
+      ["GET", "/proveedores/1/servicios", A], ["POST", "/proveedores/1/servicios", A],
+      ["GET", "/servicios/1", A], ["PUT", "/servicios/1", A], ["PATCH", "/servicios/1/baja", A],
+      ["GET", "/solicitudes", A], ["GET", "/solicitudes/1/opciones", A], ["POST", "/solicitudes/1/resolver", A],
+      ["POST", "/reservas", C], ["GET", "/reservas/mis-reservas", C], ["GET", "/reservas", A],
+      ["GET", "/reservas/1", AC], ["GET", "/reservas/1/comprobante", AC], ["GET", "/reservas/1/cancelacion", AC], ["POST", "/reservas/1/cancelar", AC],
+      ["GET", "/resenias/historial-reservas", C], ["POST", "/resenias", C], ["GET", "/resenias", A],
+      ["GET", "/salidas", A], ["GET", "/salidas/opciones", A], ["POST", "/salidas", A],
+      ["GET", "/salidas/1/cancelacion", A], ["POST", "/salidas/1/cancelar", A],
+      ["GET", "/salidas/1/logistica", A], ["GET", "/salidas/1/logistica/disponibles", A], ["PUT", "/salidas/1/logistica", A],
+      ["GET", "/salidas/1/equipamiento-asignado", A], ["POST", "/salidas/1/devolucion-equipamiento", A],
+      ["GET", "/salidas/1/asignacion", A], ["POST", "/salidas/1/asignacion", A], ["POST", "/salidas/1/asignacion/liberar-sobrantes", A],
+      ["GET", "/salidas/1/personal", A], ["GET", "/salidas/1/personal/1/reemplazantes", A], ["POST", "/salidas/1/reemplazos", A],
+      ["GET", "/salidas/evaluaciones-pendientes", A], ["GET", "/salidas/1/evaluaciones", A], ["POST", "/salidas/1/evaluaciones", A],
+      ["GET", "/guia/salidas", G], ["GET", "/guia/salidas/1", G], ["POST", "/guia/salidas/1/iniciar", G],
+      ["POST", "/guia/salidas/1/avances", G], ["GET", "/guia/salidas/1/pasajeros", G], ["POST", "/guia/salidas/1/incidentes", G],
+      ["GET", "/incidentes", A],
+      ["GET", "/reportes/ventas", A], ["GET", "/reportes/ocupacion", A], ["GET", "/reportes/cancelaciones", A], ["GET", "/reportes/solicitudes", A], ["GET", "/reportes/calidad", A],
+    ];
+    for (const [metodo, ruta, permitidos] of rutas) {
+      const errores: string[] = [];
+      // fetch no acepta body en un GET
+      const body = metodo === "GET" ? undefined : {};
+      const sinToken = await ctx.back.llamar(metodo, ruta, body, "");
+      if (sinToken.status !== 401) errores.push(`sin token → ${sinToken.status}`);
+      for (const [rol, tok] of Object.entries(tokens).filter(([rol]) => !permitidos.includes(rol))) {
+        const { status } = await ctx.back.llamar(metodo, ruta, body, tok);
+        if (status !== 403) errores.push(`${rol} → ${status}`);
+      }
+      controlar(`${metodo} ${ruta}: solo ${permitidos.join(" y ")}`, errores.length === 0, errores.join(", "));
+    }
+    // Lo público tiene que seguir abierto sin token
+    await esperar("Catálogo público sin token → 200", "GET", "/catalogo", undefined, "", 200);
+    await esperar("Imágenes de un paquete sin token → no pide login", "GET", "/paquetes/1/imagenes", undefined, "", [200, 404]);
+  });
+
   await escenario("Un cliente no ve datos de otro cliente", async () => {
     const c = await conReserva();
     const otro = await f.cliente();

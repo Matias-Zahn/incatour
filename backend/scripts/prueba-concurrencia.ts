@@ -3,18 +3,26 @@
  * 20 compras simultáneas de 1 pasajero sobre una salida con 10 lugares.
  * Tienen que confirmarse exactamente 10 y el stock tiene que quedar en 0, nunca negativo.
  *
- * Usa la base local (Docker levantado y seed cargado). Crea una salida propia y la borra al terminar.
+ * Corre sobre su propia base (incatour_concurrencia), que resetea con el seed: nunca toca incatour_db.
  * Uso, desde backend: npm run test:concurrencia
  */
 import crypto from "crypto";
-import { db } from "../src/config/postgresDatabase";
-import { CrearReservaDto } from "../src/modulos/reservas/reservas/reserva.dto";
-import { ReservaService } from "../src/modulos/reservas/reservas/reserva.service";
+import { crearEntorno } from "./lib-prueba";
+
+const entorno = crearEntorno("incatour_concurrencia");
 
 const LUGARES = 10;
 const COMPRAS = 20;
 
 async function main() {
+  entorno.resetear();
+  // El cliente de Prisma lee DATABASE_URL al importarse: se pisa antes del import dinámico
+  process.env.DATABASE_URL = entorno.DB_URL;
+  process.env.SMTP_HOST = "";
+  const { db } = await import("../src/config/postgresDatabase.js");
+  const { CrearReservaDto } = await import("../src/modulos/reservas/reservas/reserva.dto.js");
+  const { ReservaService } = await import("../src/modulos/reservas/reservas/reserva.service.js");
+
   const cliente = await db.usuario.findUniqueOrThrow({ where: { email: "juan@test.com" } });
   const paquete = await db.paquete.findUniqueOrThrow({ where: { nroPaquete: "PAQ-INC-01" } });
   const prueba = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -60,18 +68,7 @@ async function main() {
     console.log(ok ? "✅ OK: no se vendió de más" : "❌ FALLÓ: se vendieron más o menos lugares de los que había");
     process.exitCode = ok ? 0 : 1;
   } finally {
-    // Limpieza: la salida de prueba y todo lo que generaron las compras
-    const idsReserva = (await db.reserva.findMany({ where: { idsalida: salida.idsalida }, select: { idreserva: true } })).map((r) => r.idreserva);
-    const idsPasajero = (await db.reservaPasajero.findMany({ where: { idreserva: { in: idsReserva } }, select: { idpasajero: true } })).map((p) => p.idpasajero);
-    await db.$transaction([
-      db.gestionSolicitud.deleteMany({ where: { solicitud: { idreserva: { in: idsReserva } } } }),
-      db.solicitud.deleteMany({ where: { idreserva: { in: idsReserva } } }),
-      db.pago.deleteMany({ where: { idreserva: { in: idsReserva } } }),
-      db.reservaPasajero.deleteMany({ where: { idreserva: { in: idsReserva } } }),
-      db.reserva.deleteMany({ where: { idreserva: { in: idsReserva } } }),
-      db.pasajero.deleteMany({ where: { idpasajero: { in: idsPasajero } } }),
-      db.salida.delete({ where: { idsalida: salida.idsalida } }),
-    ]);
+    // La base es de la prueba: se resetea en la próxima corrida, no hace falta limpiar
     await db.$disconnect();
   }
 }
