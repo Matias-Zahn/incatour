@@ -200,7 +200,7 @@ export class PersonalRoutes {
      *     summary: Baja de personal operativo (CU-25)
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** Baja lógica: el personal queda INACTIVO y, si es guía, también su cuenta de acceso.
-     *       No procede si está asignado a una salida que todavía no finalizó (PUBLICADA, ABIERTA, CERRADA o EN_CURSO).
+     *       No procede si está asignado a una salida que todavía no finalizó (PUBLICADA, CERRADA o EN_CURSO).
      *     tags: [Personal]
      *     security:
      *       - BearerAuth: []

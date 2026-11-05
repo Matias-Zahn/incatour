@@ -1,6 +1,6 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { ConsultarPersonalDto, ModificarPersonalDto, ROL_GUIA, ROL_PORTEADOR } from "./personal.dto";
 
 export interface DatosPersonal {
@@ -115,7 +115,11 @@ export class PersonalRepository {
           guia: { fechaHabilitacion: dto.habilitacionVigente ? { gte: hoy } : { lt: hoy } },
         }),
       },
-      include: { guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } } },
+      include: {
+        guia: { select: { nroHabilitacion: true, fechaHabilitacion: true } },
+        // Quién está en el recorrido ahora mismo
+        asignaciones: { where: { salida: { estado: ESTADO_SALIDA.EN_CURSO } }, select: { salida: { select: { nroSalida: true } } } },
+      },
       orderBy: { nombreCompleto: "asc" },
     });
   }

@@ -5,7 +5,7 @@ import Tabla from "../../components/Tabla";
 import { useNavigate } from "react-router-dom";
 import {
     estilosEstadoSalida,
-    formatearEstadoSalida,
+    formatearEstadoSalidaGuia,
     formatearFechaSalida,
     ordenarSalidasGuia,
     type DetalleSalidaGuia,
@@ -22,6 +22,11 @@ import {
     IconoReloj,
 } from "./IconosGuia";
 import Boton from "../../components/Boton";
+import { IniciarSalida } from "./IniciarSalida";
+
+// Una salida terminada ya no tiene recorrido: avances e incidentes no tienen a dónde llevar
+const terminada = (estado: string) => estado === "FINALIZADA" || estado === "CANCELADA";
+const AVISO_TERMINADA = "La salida ya terminó: no admite avances ni incidentes";
 
 type VistaSalidasProps = {
     salidaActual: SalidaGuiaResumen | null;
@@ -169,7 +174,7 @@ export function VistaSalidas({
                                                     s.estado,
                                                 )}`}
                                             >
-                                                {formatearEstadoSalida(s.estado)}
+                                                {formatearEstadoSalidaGuia(s.estado)}
                                             </span>
                                         </div>
 
@@ -213,6 +218,8 @@ export function VistaSalidas({
                                         <Boton
                                             variante="secundario"
                                             className="text-xs py-1.5"
+                                            disabled={terminada(s.estado)}
+                                            title={terminada(s.estado) ? AVISO_TERMINADA : undefined}
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
                                                 navegar("/guia/novedades", { replace: true });
@@ -223,6 +230,8 @@ export function VistaSalidas({
                                         <Boton
                                             variante="secundario"
                                             className="text-xs py-1.5"
+                                            disabled={terminada(s.estado)}
+                                            title={terminada(s.estado) ? AVISO_TERMINADA : undefined}
                                             onClick={() => {
                                                 onSeleccionarSalida(s.idsalida);
                                                 navegar("/guia/incidentes", { replace: true });
@@ -248,16 +257,20 @@ export function VistaSalidas({
                         >
                             ← Volver al listado de salidas
                         </button>
-                        <div className="flex items-center gap-2">
-                            <Boton
-                                variante="secundario"
-                                className="text-xs py-1"
-                                onClick={() => navegar("/guia/novedades", { replace: true })}
-                            >
-                                Registrar avances de esta salida →
-                            </Boton>
-                        </div>
+                        {terminada(salidaInfo.estado) ? null : (
+                            <div className="flex items-center gap-2">
+                                <Boton
+                                    variante="secundario"
+                                    className="text-xs py-1"
+                                    onClick={() => navegar("/guia/novedades", { replace: true })}
+                                >
+                                    Registrar avances de esta salida →
+                                </Boton>
+                            </div>
+                        )}
                     </div>
+
+                    <IniciarSalida salida={salidaInfo} />
 
                     {/* Banner de Salida Actual */}
                     <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-l-4 border-l-[#16d6dc] border-y border-r border-borde bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
@@ -279,7 +292,7 @@ export function VistaSalidas({
                                     salidaInfo.estado,
                                 )}`}
                             >
-                                {formatearEstadoSalida(salidaInfo.estado)}
+                                {formatearEstadoSalidaGuia(salidaInfo.estado)}
                             </span>
                         </div>
                     </article>
@@ -306,7 +319,7 @@ export function VistaSalidas({
                                             <IconoReloj tamano={18} />
                                         </span>
                                         <span>
-                                            <b>Estado:</b> {formatearEstadoSalida(salidaInfo.estado)}
+                                            <b>Estado:</b> {formatearEstadoSalidaGuia(salidaInfo.estado)}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -471,7 +484,7 @@ export function VistaSalidas({
                                                             : "bg-amber-100 text-amber-800"
                                                     }`}
                                                 >
-                                                    {formatearEstadoSalida(etapa.estadoTramo)}
+                                                    {formatearEstadoSalidaGuia(etapa.estadoTramo)}
                                                 </span>
                                             ) : (
                                                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">

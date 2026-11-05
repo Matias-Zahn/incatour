@@ -1,13 +1,13 @@
 import { CustomError } from "../../../error/CustomError";
 import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { SolicitudRepository } from "./solicitud.repository";
 import { ResolverSolicitudDto } from "./solicitud.dto";
 
 export class SolicitudService {
   private repository = new SolicitudRepository();
-  private notificador: INotificador = new NotificadorMock();
+  private notificador: INotificador = obtenerNotificador();
 
   // CU-33
   async consultarPendientes() {
@@ -95,7 +95,9 @@ export class SolicitudService {
       servicioId: s.idservicio,
       hotel: s.nombreServicio,
       proveedor: s.proveedor.razonSocial,
-      canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema"
+      canalContacto: s.proveedor.canalComunicacion || s.proveedor.datosContacto || "Por fuera del sistema",
+      // El dato concreto (mail o teléfono) para que el administrador contacte al hotel
+      datosContacto: s.proveedor.datosContacto
     };
   }
 

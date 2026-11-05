@@ -1,13 +1,14 @@
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
-import { NotificadorMock } from "../../../integraciones/notificador/notificador.mock";
+import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { hoyUTC } from "../../../shared/fechas";
+import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
 import { ESTADO_TRAMO, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 import { GuiaRepository } from "./guia.repository";
 
 export class GuiaService {
   private repository = new GuiaRepository();
-  private notificador: INotificador = new NotificadorMock();
+  private notificador: INotificador = obtenerNotificador();
 
   // CU-48: consultarSalidasAsignadas (también es el punto de entrada de los CU-49 y CU-50)
   async consultarSalidasAsignadas(idusuario: number) {
@@ -85,12 +86,27 @@ export class GuiaService {
     };
   }
 
+  // CU-49: iniciarSalida — el guía informa que el grupo partió. Recién ahí la salida está EN_CURSO
+  async iniciarSalida(idusuario: number, idsalida: number) {
+    const s = await this.salidaDelGuia(idusuario, idsalida);
+    if (s.estado === ESTADO_SALIDA.EN_CURSO) {
+      return { idsalida, estado: s.estado, fechaHoraInicioReal: s.fechaHoraInicioReal };
+    }
+    if (!SALIDAS_NO_INICIADAS.includes(s.estado)) {
+      throw CustomError.badRequest(`No se puede iniciar una salida ${s.estado}`);
+    }
+    if (s.fechaInicio > hoyUTC()) {
+      throw CustomError.badRequest(
+        `La salida empieza el ${s.fechaInicio.toISOString().slice(0, 10)}; todavía no se puede iniciar`
+      );
+    }
+    return this.repository.iniciarSalida(idsalida, new Date());
+  }
+
   // CU-49: registrarAvance — el guía informa la llegada al final de una etapa
   async registrarAvance(idusuario: number, idsalida: number, dto: RegistrarAvanceDto) {
     const s = await this.salidaDelGuia(idusuario, idsalida);
-    if (!SALIDAS_ACTIVAS.includes(s.estado)) {
-      throw CustomError.badRequest(`No se pueden registrar avances en una salida ${s.estado}`);
-    }
+    this.exigirEnCurso(s.estado, "avances");
 
     // La etapa tiene que pertenecer al circuito del paquete de la salida (restricción del documento de la base)
     const { etapas } = s.paquete.circuito;
@@ -117,7 +133,7 @@ export class GuiaService {
     }
 
     if (dto.fechaHoraLlegada > new Date()) throw CustomError.badRequest("La fecha y hora de llegada no puede ser futura");
-    if (dto.fechaHoraLlegada < s.fechaInicio) {
+    if (dto.fechaHoraLlegada < (s.fechaHoraInicioReal ?? s.fechaInicio)) {
       throw CustomError.badRequest("La fecha y hora de llegada es anterior al inicio de la salida");
     }
     const anterior = s.avances.find((a) => a.numeroOrden === ultima && a.estadoTramo === ESTADO_TRAMO.COMPLETADO);
@@ -125,7 +141,7 @@ export class GuiaService {
       throw CustomError.badRequest(`La llegada no puede ser anterior a la de la etapa ${ultima}`);
     }
 
-    // Paso 11: el primer avance pone la salida en curso; completar la última etapa la finaliza
+    // Paso 11: completar la última etapa finaliza la salida y guarda cuándo terminó
     const completa = dto.estadoTramo === ESTADO_TRAMO.COMPLETADO;
     const ultimaDelCircuito = Math.max(...etapas.map((e) => e.numeroOrden));
     const finaliza = completa && dto.numeroOrden === ultimaDelCircuito;
@@ -139,6 +155,7 @@ export class GuiaService {
       ultimaEtapaAlcanzada: completa ? dto.numeroOrden : s.ultimaEtapaAlcanzada,
       ultimaEtapaLeida: s.ultimaEtapaAlcanzada,
       estadoSalida: finaliza ? ESTADO_SALIDA.FINALIZADA : ESTADO_SALIDA.EN_CURSO,
+      fechaHoraFinReal: finaliza ? new Date() : null,
     });
     if (!r) throw CustomError.conflict("Otro avance de esta salida se registró al mismo tiempo; volvé a consultar la salida");
 
@@ -164,14 +181,12 @@ export class GuiaService {
   // CU-50: confirmarRegistro — el guía informa un imprevisto de la salida
   async registrarIncidente(idusuario: number, idsalida: number, dto: RegistrarIncidenteDto) {
     const s = await this.salidaDelGuia(idusuario, idsalida);
-    if (!SALIDAS_ACTIVAS.includes(s.estado)) {
-      throw CustomError.badRequest(`No se pueden registrar incidentes en una salida ${s.estado}`);
-    }
+    this.exigirEnCurso(s.estado, "incidentes");
 
     if (dto.fechaHoraOcurrencia > new Date()) {
       throw CustomError.badRequest("La fecha y hora del incidente no puede ser futura");
     }
-    if (dto.fechaHoraOcurrencia < s.fechaInicio) {
+    if (dto.fechaHoraOcurrencia < (s.fechaHoraInicioReal ?? s.fechaInicio)) {
       throw CustomError.badRequest("La fecha y hora del incidente es anterior al inicio de la salida");
     }
 
@@ -189,6 +204,16 @@ export class GuiaService {
   // CU-50 paso 17: panel de alertas del administrador
   async listarIncidentes(filtros: { idsalida?: number; nivelGravedad?: string }) {
     return this.repository.listarIncidentes(filtros);
+  }
+
+  // Avances e incidentes son del recorrido: no hay recorrido antes de iniciar la salida ni después de finalizarla
+  private exigirEnCurso(estado: string, que: string) {
+    if (SALIDAS_NO_INICIADAS.includes(estado)) {
+      throw CustomError.badRequest(`Primero hay que iniciar la salida para registrar ${que}`);
+    }
+    if (estado !== ESTADO_SALIDA.EN_CURSO) {
+      throw CustomError.badRequest(`No se pueden registrar ${que} en una salida ${estado}`);
+    }
   }
 
   // La salida, solo si el guía del token está asignado a ella

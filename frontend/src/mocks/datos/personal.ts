@@ -91,7 +91,7 @@ export const personalSemilla: Personal[] = [
 ];
 
 /**
- * Cantidad de salidas no finalizadas (PUBLICADA, ABIERTA, CERRADA, EN_CURSO)
+ * Cantidad de salidas no finalizadas (PUBLICADA, CERRADA, EN_CURSO)
  * por idpersonal para simular las validaciones de CU-25 y CU-46 en MSW.
  */
 export const salidasActivasPorPersonal: Record<number, number> = {

@@ -1,7 +1,11 @@
 import { useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink } from "react-router-dom";
 import logoIncaTour from "../assets/logo-incatour.png";
+import { useIncidentes } from "../services/guiaService";
+import { useSalidas } from "../services/salidaService";
 import { obtenerUsuario } from "../services/sesionService";
+import { listarSolicitudesPendientes } from "../services/solicitudService";
 
 function IconoMenu() {
     return (
@@ -258,6 +262,18 @@ const elementosNavegacion: ElementoNavegacion[] = [
     { etiqueta: "Reseñas y evaluaciones", icono: <IconoResenias />, ruta: "/gestion/evaluaciones" },
 ];
 
+// Lo que pide atención, con las mismas consultas del Inicio: react-query las comparte y no se piden dos veces
+function useAvisosGestion(): Record<string, number> {
+    const salidas = useSalidas().data ?? [];
+    const solicitudes = useQuery({ queryKey: ["solicitudes"], queryFn: listarSolicitudesPendientes }).data ?? [];
+    const incidentes = useIncidentes().data ?? [];
+    return {
+        "/": incidentes.filter((i) => i.nivelGravedad === "CRITICO").length,
+        "/gestion/salidas": salidas.filter((s) => s.alertas?.length > 0).length,
+        "/gestion/solicitudes": solicitudes.length,
+    };
+}
+
 type BarraLateralProps = {
     seccionActiva: string;
 };
@@ -273,6 +289,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
     });
 
     const usuario = obtenerUsuario();
+    const avisos = useAvisosGestion();
     const iniciales = usuario
         ? `${usuario.nombre.charAt(0)}${usuario.apellido.charAt(0)}`.toUpperCase()
         : "AD";
@@ -355,17 +372,20 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                 className="mt-6 flex-1 max-md:mt-0 max-md:ml-3 max-md:flex max-md:min-w-0 max-md:overflow-x-auto"
             >
                 <ul className="flex flex-col gap-1.5 max-md:flex-row max-md:gap-1">
-                    {elementosNavegacion.map((elemento) => (
+                    {elementosNavegacion.map((elemento) => {
+                        const aviso = avisos[elemento.ruta] ?? 0;
+                        const etiqueta = aviso > 0 ? `${elemento.etiqueta} (${aviso} ${aviso === 1 ? "pendiente" : "pendientes"})` : elemento.etiqueta;
+                        return (
                         <li key={elemento.etiqueta}>
                             <NavLink
                                 to={elemento.ruta}
                                 end={elemento.ruta === "/"}
-                                title={elemento.etiqueta}
-                                aria-label={elemento.etiqueta}
+                                title={etiqueta}
+                                aria-label={etiqueta}
                                 className={({ isActive }) => {
                                     const estaActivo =
                                         isActive || elemento.etiqueta === seccionActiva;
-                                    return claseElemento(estaActivo);
+                                    return `relative ${claseElemento(estaActivo)}`;
                                 }}
                             >
                                 <span className="shrink-0">{elemento.icono}</span>
@@ -374,9 +394,23 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                                         {elemento.etiqueta}
                                     </span>
                                 )}
+                                {/* Número a la derecha; con la barra colapsada o en el celular, solo un punto sobre el ícono */}
+                                {aviso > 0 ? (
+                                    <span
+                                        aria-hidden="true"
+                                        className={`rounded-full bg-rose-600 font-bold text-white ${
+                                            colapsada
+                                                ? "absolute right-1.5 top-1.5 size-2.5"
+                                                : "ml-auto min-w-5 px-1.5 text-center text-[11px] leading-5 max-md:absolute max-md:right-0.5 max-md:top-0.5 max-md:size-2.5 max-md:min-w-0 max-md:p-0 max-md:text-[0px]"
+                                        }`}
+                                    >
+                                        {colapsada ? null : aviso}
+                                    </span>
+                                ) : null}
                             </NavLink>
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             </nav>
 

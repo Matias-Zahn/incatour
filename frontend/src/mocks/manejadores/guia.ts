@@ -75,6 +75,31 @@ export const manejadoresGuia = [
         },
     ),
 
+    // POST /api/guia/salidas/:idsalida/iniciar (CU-49): el grupo partió
+    http.post(
+        construirUrl("/guia/salidas/:idsalida/iniciar"),
+        async ({ request, params }) => {
+            await delay();
+            const falloAuth = exigirRol(request, "GUIA");
+            if (falloAuth) return falloAuth;
+
+            const idsalida = Number(params.idsalida);
+            const detalle = detallesSalidas[idsalida];
+            if (!detalle) {
+                return HttpResponse.json({ error: "La salida no existe." }, { status: 404 });
+            }
+            if (detalle.salida.estado === "PUBLICADA" || detalle.salida.estado === "CERRADA") {
+                detalle.salida.estado = "EN_CURSO";
+                const salidaEnLista = salidas.find((s) => s.idsalida === idsalida);
+                if (salidaEnLista) salidaEnLista.estado = "EN_CURSO";
+            }
+            return HttpResponse.json({
+                mensaje: "Salida iniciada",
+                data: { idsalida, estado: detalle.salida.estado, fechaHoraInicioReal: new Date().toISOString() },
+            });
+        },
+    ),
+
     // POST /api/guia/salidas/:idsalida/avances (CU-49)
     http.post(
         construirUrl("/guia/salidas/:idsalida/avances"),

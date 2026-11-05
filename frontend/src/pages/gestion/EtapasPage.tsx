@@ -341,7 +341,7 @@ function EtapasPage() {
                         <div>
                             <span className="font-semibold text-texto">Estado:</span>{" "}
                             <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                     circuitoSeleccionado.estado === "ACTIVO"
                                         ? "bg-marca/10 text-marca"
                                         : "bg-borde text-texto-suave"

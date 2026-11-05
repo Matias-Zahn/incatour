@@ -42,6 +42,10 @@ type FilaReservaTabla = ReservaClienteResumen & {
 
 const FILAS_POR_PAGINA = 6;
 
+// Las solicitudes al hotel son gestión interna: al cliente le alcanza saber si su alojamiento está confirmado
+const textoAlojamiento = (estado?: string | null) =>
+    estado === "CONFIRMADO" ? "Alojamiento confirmado" : "Alojamiento a confirmar con el hotel";
+
 function MisReservasPage() {
     const navegar = useNavigate();
 
@@ -122,8 +126,7 @@ function MisReservasPage() {
                     (!filtroViaje || esProximo(r) === (filtroViaje === "PROXIMOS")) &&
                     (!termino ||
                         r.nroReserva.toLowerCase().includes(termino) ||
-                        r.paquete.nombrePaquete.toLowerCase().includes(termino) ||
-                        r.salida.nroSalida.toLowerCase().includes(termino)),
+                        r.paquete.nombrePaquete.toLowerCase().includes(termino)),
             )
             .sort((a, b) => Number(esProximo(b)) - Number(esProximo(a)));
     }, [reservas, busqueda, filtroEstado, filtroViaje]);
@@ -485,10 +488,7 @@ function MisReservasPage() {
                                                 </span>
                                                 {fila.estadoAlojamiento ? (
                                                     <p className="text-[11px] text-texto-suave">
-                                                        Alojamiento:{" "}
-                                                        <span className="font-semibold text-texto">
-                                                            {fila.estadoAlojamiento}
-                                                        </span>
+                                                        {textoAlojamiento(fila.estadoAlojamiento)}
                                                     </p>
                                                 ) : null}
                                             </div>
@@ -504,10 +504,6 @@ function MisReservasPage() {
                                                 </p>
                                                 <p className="text-xs text-texto-suave">
                                                     Salida:{" "}
-                                                    <span className="font-mono font-semibold text-texto">
-                                                        {fila.salida.nroSalida}
-                                                    </span>{" "}
-                                                    ·{" "}
                                                     {etiquetaEstadoSalidaCliente(
                                                         fila.salida.estado,
                                                     )}
@@ -725,9 +721,7 @@ function MisReservasPage() {
                                                 Alojamiento
                                             </p>
                                             <p className="mt-1 text-xs font-bold text-navegacion">
-                                                {
-                                                    detalleReserva.estadoAlojamiento
-                                                }
+                                                {textoAlojamiento(detalleReserva.estadoAlojamiento)}
                                             </p>
                                         </div>
                                         <div>
@@ -775,18 +769,10 @@ function MisReservasPage() {
                                             </p>
                                             <p>
                                                 <strong>Salida:</strong>{" "}
-                                                <span className="font-mono">
-                                                    {
-                                                        detalleReserva.salida
-                                                            .nroSalida
-                                                    }
-                                                </span>{" "}
-                                                (
                                                 {etiquetaEstadoSalidaCliente(
                                                     detalleReserva.salida
                                                         .estado,
                                                 )}
-                                                )
                                             </p>
                                             <p>
                                                 <strong>Fechas:</strong>{" "}
@@ -1009,51 +995,6 @@ function MisReservasPage() {
                                             ) : null}
                                         </div>
 
-                                        <div className="rounded-control border border-borde p-4 text-xs space-y-2">
-                                            <p className="font-bold uppercase tracking-wide text-navegacion">
-                                                Solicitudes de alojamiento
-                                            </p>
-                                            {detalleReserva
-                                                .solicitudesAlojamiento
-                                                .length === 0 ? (
-                                                <p className="text-texto-suave">
-                                                    Sin solicitudes de
-                                                    alojamiento pendientes
-                                                    (garantía cubierta o no
-                                                    aplicable).
-                                                </p>
-                                            ) : (
-                                                <ul className="space-y-1.5">
-                                                    {detalleReserva.solicitudesAlojamiento.map(
-                                                        (sol) => (
-                                                            <li
-                                                                key={
-                                                                    sol.nroSolicitud
-                                                                }
-                                                                className="flex items-center justify-between rounded border border-borde bg-fondo/30 p-2"
-                                                            >
-                                                                <div>
-                                                                    <p className="font-mono font-bold text-navegacion">
-                                                                        {
-                                                                            sol.nroSolicitud
-                                                                        }
-                                                                    </p>
-                                                                    <p className="text-[11px] text-texto-suave">
-                                                                        {
-                                                                            sol.cantidadPlazas
-                                                                        }{" "}
-                                                                        plaza(s)
-                                                                    </p>
-                                                                </div>
-                                                                <span className="rounded bg-fondo px-2 py-0.5 text-[11px] font-bold text-texto">
-                                                                    {sol.estado}
-                                                                </span>
-                                                            </li>
-                                                        ),
-                                                    )}
-                                                </ul>
-                                            )}
-                                        </div>
                                     </div>
                                 </>
                             )}

@@ -6,7 +6,8 @@ export interface AlternativaSalida {
 }
 
 export interface INotificador {
-  enviarEmailConfirmacion(email: string, reservaId: number, monto: number): Promise<boolean>;
+  // El número de reserva (RES-…) es el que ve el cliente; el id es interno
+  enviarEmailConfirmacion(email: string, nroReserva: string, monto: number, moneda: string): Promise<boolean>;
   enviarEmailRechazo(email: string, motivo: string): Promise<boolean>;
 
   // CU-32: constancia de cancelación de una reserva

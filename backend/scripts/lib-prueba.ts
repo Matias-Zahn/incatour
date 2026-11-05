@@ -27,7 +27,8 @@ export function idDe(obj: any, campo: string): number | undefined {
 export function crearEntorno(nombreDb: string) {
   const DB_URL = process.env.DATABASE_URL!.replace(/\/[^/?]+(\?|$)/, `/${nombreDb}$1`);
   if (/\/incatour_db(\?|$)/.test(DB_URL)) throw new Error("La prueba no puede correr sobre incatour_db");
-  const env = { ...process.env, DATABASE_URL: DB_URL, DB_NAME: nombreDb };
+  // Sin SMTP_HOST: las pruebas y la demo no mandan cientos de mails a Mailpit
+  const env = { ...process.env, DATABASE_URL: DB_URL, DB_NAME: nombreDb, SMTP_HOST: "" };
 
   function resetear({ seed = true } = {}) {
     console.log(`Reseteando ${nombreDb} (migraciones${seed ? " + seed" : ""})...`);

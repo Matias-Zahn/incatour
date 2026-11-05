@@ -196,7 +196,7 @@ export class PaqueteService {
 
   /**
    * CU-13: Baja de Paquete Turístico (Baja Lógica).
-   * RN: No se puede dar de baja si tiene salidas activas (PUBLICADA, ABIERTA, CERRADA, EN_CURSO).
+   * RN: No se puede dar de baja si tiene salidas activas (PUBLICADA, CERRADA, EN_CURSO).
    */
   async darDeBajaPaquete(id: number) {
     const paquete = await this.repository.findById(id);

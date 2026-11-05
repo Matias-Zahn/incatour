@@ -28,7 +28,6 @@ export const etiquetasEstadoSalida: Record<string, string> = {
     CANCELADA: "Cancelada",
     CERRADA: "Cerrada",
     PROGRAMADA: "Programada",
-    ABIERTA: "Abierta",
     COMPLETADO: "Completado",
     DEMORADO: "Demorado",
 };
@@ -49,6 +48,11 @@ export function formatearEstadoSalida(estado?: string | null): string {
     if (!estado) return "Sin estado";
     const normalizado = estado.trim().toUpperCase();
     return etiquetasEstadoSalida[normalizado] ?? estado;
+}
+
+/** En el portal del guía "Cerrada" (cerrada a la venta) se lee como lo que es para él: lista para salir */
+export function formatearEstadoSalidaGuia(estado?: string | null): string {
+    return estado?.trim().toUpperCase() === "CERRADA" ? "Lista para salir" : formatearEstadoSalida(estado);
 }
 
 export function estilosEstadoSalida(estado?: string | null): string {
@@ -86,20 +90,28 @@ export function formatearFechaSalida(fechaIso?: string | null): string {
     }
 }
 
-/** Fecha de hoy en hora LOCAL (YYYY-MM-DD); toISOString() daría la fecha UTC */
-// En estos estados el back acepta avances e incidentes
-export const ESTADOS_CON_AVANCES = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
+// Salidas que todavía no terminaron: por iniciar o en curso
+const ESTADOS_PENDIENTES = ["PUBLICADA", "CERRADA", "EN_CURSO"];
+
+/** El back acepta avances e incidentes solo con la salida iniciada (EN_CURSO) */
+export const admiteRegistros = (estado?: string) => estado === "EN_CURSO";
+
+/** El guía la puede iniciar desde el día de inicio, mientras no haya empezado */
+export function puedeIniciarSalida(s?: { estado: string; fechaInicio?: string } | null): boolean {
+    return !!s?.fechaInicio && (s.estado === "PUBLICADA" || s.estado === "CERRADA") && s.fechaInicio.slice(0, 10) <= fechaLocalHoy();
+}
 
 /** Lo que falta operar va primero, por fecha; después el historial, de lo más reciente a lo más viejo */
 export function ordenarSalidasGuia<T extends { estado: string; fechaInicio: string }>(salidas: T[]) {
-    const pendientes = salidas.filter((s) => ESTADOS_CON_AVANCES.includes(s.estado));
-    const historial = salidas.filter((s) => !ESTADOS_CON_AVANCES.includes(s.estado));
+    const pendientes = salidas.filter((s) => ESTADOS_PENDIENTES.includes(s.estado));
+    const historial = salidas.filter((s) => !ESTADOS_PENDIENTES.includes(s.estado));
     return {
         pendientes: [...pendientes].sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio)),
         historial: [...historial].sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio)),
     };
 }
 
+/** Fecha de hoy en hora LOCAL (YYYY-MM-DD); toISOString() daría la fecha UTC */
 export function fechaLocalHoy(): string {
     const h = new Date();
     const mm = String(h.getMonth() + 1).padStart(2, "0");
@@ -348,6 +360,14 @@ export function listarPasajerosSalida(idsalida: number): Promise<PasajeroAfectab
     ).then(extraerDatos);
 }
 
+/** CU-49: el grupo partió. Sin esto el back no acepta avances ni incidentes */
+export function iniciarSalida(idsalida: number) {
+    return solicitarApi<RespuestaDatos<{ idsalida: number; estado: string; fechaHoraInicioReal: string }>>(
+        `/guia/salidas/${idsalida}/iniciar`,
+        { method: "POST" },
+    ).then(extraerDatos);
+}
+
 /** CU-49: Registrar avance del recorrido */
 export async function registrarAvance(
     idsalida: number,
@@ -419,6 +439,17 @@ export function useRegistrarAvance() {
             clienteConsultas.invalidateQueries({
                 queryKey: clavesGuia.salidas,
             });
+        },
+    });
+}
+
+export function useIniciarSalida() {
+    const clienteConsultas = useQueryClient();
+    return useMutation({
+        mutationFn: iniciarSalida,
+        onSuccess: (_data, idsalida) => {
+            clienteConsultas.invalidateQueries({ queryKey: clavesGuia.detalleSalida(idsalida) });
+            clienteConsultas.invalidateQueries({ queryKey: clavesGuia.salidas });
         },
     });
 }

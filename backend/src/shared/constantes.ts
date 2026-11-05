@@ -1,7 +1,7 @@
 /**
  * Valores de estado compartidos por los módulos del rol 2.
  * Usar SIEMPRE estas constantes en lugar de strings sueltos: en el repo ya hay
- * dos vocabularios mezclados ("Confirmada" vs "CONFIRMADA"; "PUBLICADA" vs "ABIERTA/CERRADA").
+ * vocabularios mezclados ("Confirmada" vs "CONFIRMADA").
  */
 export const ESTADO = { ACTIVO: "ACTIVO", INACTIVO: "INACTIVO" } as const;
 
@@ -21,16 +21,17 @@ export const ESTADO_PERMISO = { EMITIDO: "Emitido", PERDIDO: "Perdido", DADO_DE_
 
 export const ESTADO_SALIDA = {
   PUBLICADA: "PUBLICADA",
-  EN_CURSO: "EN_CURSO", // desde el primer avance informado por el guía (CU-49)
+  CERRADA: "CERRADA", // venta cerrada al asignar los recursos (CU-40): lista para salir
+  EN_CURSO: "EN_CURSO", // desde que el guía la inicia (CU-49)
   FINALIZADA: "FINALIZADA",
   CANCELADA: "CANCELADA",
 } as const;
 
-/** "Activas o En curso" (CU-17, CU-20). Unifica los dos vocabularios que hoy usa el repo. */
-export const SALIDAS_ACTIVAS = ["PUBLICADA", "ABIERTA", "CERRADA", "EN_CURSO"];
+/** "Activas o En curso" (CU-17, CU-20). */
+export const SALIDAS_ACTIVAS = ["PUBLICADA", "CERRADA", "EN_CURSO"];
 
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
-export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "ABIERTA", "CERRADA"];
+export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];
 
 /** Tope de equipaje que puede declarar cada pasajero al comprar (RES, PR #138). */
 export const PESO_MAXIMO_DECLARADO_KG = 20;

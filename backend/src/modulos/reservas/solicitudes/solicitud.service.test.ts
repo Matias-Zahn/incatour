@@ -84,8 +84,8 @@ describe("SolicitudService", () => {
       expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).toHaveBeenCalledWith("Doble", "3 estrellas", "Cusco", []);
       expect(r).toMatchObject({ solicitudId: 5, reserva: "RES-1", cliente: "CLI-9" });
       expect(r.opcionesContacto).toEqual([
-        { servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp" },
-        { servicioId: 41, hotel: "Hotel 41", proveedor: "Proveedor 41", canalContacto: "Correo electrónico" },
+        { servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp", datosContacto: expect.anything() },
+        { servicioId: 41, hotel: "Hotel 41", proveedor: "Proveedor 41", canalContacto: "Correo electrónico", datosContacto: expect.anything() },
       ]);
     });
 
@@ -112,8 +112,8 @@ describe("SolicitudService", () => {
       const r = await new SolicitudService().buscarServiciosCompatibles(5);
 
       expect(r.opcionesContacto).toEqual([
-        { servicioId: 50, hotel: "Hotel 50", proveedor: "Proveedor 50", canalContacto: "+51 84 123456" },
-        { servicioId: 51, hotel: "Hotel 51", proveedor: "Proveedor 51", canalContacto: "Por fuera del sistema" },
+        { servicioId: 50, hotel: "Hotel 50", proveedor: "Proveedor 50", canalContacto: "+51 84 123456", datosContacto: "+51 84 123456" },
+        { servicioId: 51, hotel: "Hotel 51", proveedor: "Proveedor 51", canalContacto: "Por fuera del sistema", datosContacto: "" },
       ]);
     });
 
@@ -161,7 +161,7 @@ describe("SolicitudService", () => {
       const r = await new SolicitudService().buscarServiciosCompatibles(5);
       expect(repo.buscarServicio).toHaveBeenCalledWith(40);
       expect(repo.buscarServiciosCompatiblesExcluyendoRechazados).not.toHaveBeenCalled();
-      expect(r.opcionesContacto).toEqual([{ servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp" }]);
+      expect(r.opcionesContacto).toEqual([{ servicioId: 40, hotel: "Hotel 40", proveedor: "Proveedor 40", canalContacto: "WhatsApp", datosContacto: expect.anything() }]);
     });
 
     it("RES-04: garantía por establecimiento con el hotel ya rechazado devuelve lista vacía", async () => {

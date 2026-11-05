@@ -80,6 +80,7 @@ export const manejadoresSolicitudes = [
         hotel: s.nombreServicio,
         proveedor: s.proveedor,
         canalContacto: "Por fuera del sistema",
+        datosContacto: null,
       })),
     } });
   }),

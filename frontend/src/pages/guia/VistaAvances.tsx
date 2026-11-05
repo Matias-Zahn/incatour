@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "../../components/Modal";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IniciarSalida } from "./IniciarSalida";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import { ErrorApi } from "../../services/clienteApi";
@@ -10,14 +11,14 @@ import {
     esquemaAvance,
     fechaLocalHoy,
     estilosEstadoSalida,
-    formatearEstadoSalida,
+    formatearEstadoSalidaGuia,
     formatearFechaHora,
     formatearFechaSalida,
     guardarAvanceOffline,
     guardarBorradorAvance,
     limpiarBorradorAvance,
     obtenerBorradorAvance,
-    ESTADOS_CON_AVANCES,
+    admiteRegistros,
     obtenerHistorialLocalAvances,
     useRegistrarAvance,
     type AvanceOffline,
@@ -452,7 +453,7 @@ export function VistaAvances({
                             salidaActual.estado,
                         )}`}
                     >
-                        {formatearEstadoSalida(salidaActual.estado)}
+                        {formatearEstadoSalidaGuia(salidaActual.estado)}
                     </span>
                 </div>
             </article>
@@ -488,14 +489,18 @@ export function VistaAvances({
                         Registrar avance o novedad para {salidaActual.nroSalida}
                     </h2>
 
-                    {ESTADOS_CON_AVANCES.includes(salidaActual.estado) ? null : (
+                    {admiteRegistros(salidaActual.estado) ? null : (
                         <div className="mt-5">
-                            <Alerta tipo="informacion">Esta salida ya terminó: no admite avances nuevos.</Alerta>
+                            {salidaActual.estado === "PUBLICADA" || salidaActual.estado === "CERRADA" ? (
+                                <IniciarSalida salida={salidaActual} motivo="Para registrar avances primero hay que iniciar la salida." />
+                            ) : (
+                                <Alerta tipo="informacion">Esta salida ya terminó: no admite avances nuevos.</Alerta>
+                            )}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit(enviarAvance)} noValidate className="mt-5">
-                    <fieldset disabled={!ESTADOS_CON_AVANCES.includes(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
+                    <fieldset disabled={!admiteRegistros(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
                         {aviso ? (
                             <Alerta tipo={aviso.tipo}>
                                 {aviso.texto}
@@ -521,7 +526,7 @@ export function VistaAvances({
                                                 disabled={estaCompletada || etapa.numeroOrden > (sugerida ?? 0)}
                                             >
                                                 Etapa {etapa.numeroOrden}: {etapa.puntoInicio} → {etapa.puntoFin}
-                                                {etapa.estadoTramo ? ` (${formatearEstadoSalida(etapa.estadoTramo)})` : ""}
+                                                {etapa.estadoTramo ? ` (${formatearEstadoSalidaGuia(etapa.estadoTramo)})` : ""}
                                                 {esSugerida && !estaCompletada ? " — Sugerida" : ""}
                                             </option>
                                         );
@@ -634,7 +639,7 @@ export function VistaAvances({
                                                     : "bg-amber-100 text-amber-800"
                                             }`}
                                         >
-                                            {formatearEstadoSalida(item.estadoTramo)}
+                                            {formatearEstadoSalidaGuia(item.estadoTramo)}
                                         </span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">
@@ -707,7 +712,7 @@ export function VistaAvances({
                                                     : "bg-amber-100 text-amber-800"
                                             }`}
                                         >
-                                            {formatearEstadoSalida(item.estadoTramo)}
+                                            {formatearEstadoSalidaGuia(item.estadoTramo)}
                                         </span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between text-[11px] text-texto-suave">

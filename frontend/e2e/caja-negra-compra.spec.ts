@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const API = process.env.URL_API ?? "http://localhost:3998/api";
 
-type Salida = { idsalida: number; nroSalida: string; fechaFin: string; cupoDisponible: number };
+type Salida = { idsalida: number; fechaInicio: string; fechaFin: string; cupoDisponible: number };
 let paquete: string;
 let salida: Salida;
 
@@ -33,7 +33,9 @@ async function abrirFormulario(page: Page) {
     await page.waitForURL((url) => !url.pathname.includes("login"));
     await page.goto("/catalogo");
     await page.locator("article", { hasText: paquete }).getByRole("button", { name: "Comprar paquete" }).click();
-    await page.getByRole("button", { name: new RegExp(salida.nroSalida) }).click();
+    // El cliente no ve el código de la salida: la elige por la fecha
+    const fecha = new Date(salida.fechaInicio).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+    await page.getByRole("button").filter({ hasText: `Salida: ${fecha}` }).first().click();
     if (!(await page.locator("#pasajero-0-nombre").isVisible())) {
         await page.getByRole("button", { name: "+ Agregar pasajero vacío" }).click();
     }

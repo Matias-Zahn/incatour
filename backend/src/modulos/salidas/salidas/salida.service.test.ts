@@ -130,7 +130,10 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       idsalida: 1,
       estado: "PUBLICADA",
       fechaInicio: new Date("2026-11-20"),
+      fechaFin: new Date("2026-11-23"),
+      fechaHoraInicioReal: null,
       ultimaEtapaAlcanzada: null,
+      avances: [],
       paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, _count: { etapas: 4 } } },
       personalAsignado: [],
       servicios: [],
@@ -173,5 +176,27 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
 
   it("si no está en curso no calcula etapa esperada", () => {
     expect(resumirSalida(listada(), AHORA)).toMatchObject({ etapaEsperada: null, etapaDesfasada: false });
+  });
+
+  it("SIN_INICIAR: llegó el día de inicio y el guía no la inició; el día antes, no", () => {
+    expect(resumirSalida(listada({ estado: "CERRADA", fechaInicio: new Date("2026-11-15") }), AHORA).alertas).toContain("SIN_INICIAR");
+    expect(resumirSalida(listada({ estado: "CERRADA", fechaInicio: new Date("2026-11-16") }), AHORA).alertas).not.toContain("SIN_INICIAR");
+  });
+
+  it("SIN_AVANCES: iniciada hace más de 12 horas sin ningún avance", () => {
+    const enCurso = { estado: "EN_CURSO", fechaInicio: new Date("2026-11-14") };
+    expect(resumirSalida(listada({ ...enCurso, fechaHoraInicioReal: new Date("2026-11-14T23:00:00Z") }), AHORA).alertas).toEqual(["SIN_AVANCES"]);
+    expect(resumirSalida(listada({ ...enCurso, fechaHoraInicioReal: new Date("2026-11-15T01:00:00Z") }), AHORA).alertas).toEqual([]);
+    const conAvance = resumirSalida(
+      listada({ ...enCurso, fechaHoraInicioReal: new Date("2026-11-14T08:00:00Z"), avances: [{ fechaHoraLlegada: new Date("2026-11-14T15:00:00Z") }] }),
+      AHORA
+    );
+    expect(conAvance).toMatchObject({ alertas: [], primerAvance: new Date("2026-11-14T15:00:00Z") });
+  });
+
+  it("SIN_FINALIZAR: sigue en curso pasado el día siguiente a su fin", () => {
+    const enCurso = { estado: "EN_CURSO", fechaInicio: new Date("2026-11-10"), fechaHoraInicioReal: new Date("2026-11-10T08:00:00Z"), avances: [{ fechaHoraLlegada: new Date("2026-11-10T12:00:00Z") }] };
+    expect(resumirSalida(listada({ ...enCurso, fechaFin: new Date("2026-11-13") }), AHORA).alertas).toEqual(["SIN_FINALIZAR"]);
+    expect(resumirSalida(listada({ ...enCurso, fechaFin: new Date("2026-11-14") }), AHORA).alertas).toEqual([]);
   });
 });

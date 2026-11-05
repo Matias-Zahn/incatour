@@ -50,6 +50,8 @@ export interface OpcionContactoHotel {
   hotel: string;
   proveedor: string;
   canalContacto: string;
+  /** Mail o teléfono del proveedor, para contactar al hotel */
+  datosContacto: string | null;
 }
 
 export interface OpcionesGestionSolicitud {
