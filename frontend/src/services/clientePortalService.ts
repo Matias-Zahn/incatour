@@ -703,6 +703,10 @@ export function formatearMontoUsd(monto?: number | null): string {
     })}`;
 }
 
+// Las solicitudes al hotel son gestión interna: al cliente le alcanza saber si su alojamiento está confirmado
+export const textoAlojamiento = (estado?: string | null) =>
+    estado === "CONFIRMADO" ? "Alojamiento confirmado" : "Alojamiento a confirmar con el hotel";
+
 export function etiquetaEstadoReserva(estado?: string | null): string {
     switch (estado?.trim().toUpperCase()) {
         case "CONFIRMADA":

@@ -63,8 +63,9 @@ export class ReemplazoService {
     if (reemplazante.rol === ROL_GUIA && !habilitacionVigente(reemplazante.guia, salida.fechaFin)) {
       throw CustomError.badRequest(`${reemplazante.nombreCompleto} no tiene la habilitación vigente para las fechas de la salida`);
     }
-    if (reemplazante.fechaVencimientoPasaporte < salida.fechaFin) {
-      throw CustomError.badRequest(`El pasaporte de ${reemplazante.nombreCompleto} vence antes del fin del recorrido`);
+    // RES-18: misma regla que la compra y la asignación: vencer el último día no alcanza
+    if (reemplazante.fechaVencimientoPasaporte <= salida.fechaFin) {
+      throw CustomError.badRequest(`El pasaporte de ${reemplazante.nombreCompleto} vence antes del fin del recorrido o ese mismo día`);
     }
 
     // Pasos 16 a 19: si el original tenía permiso, se da de baja y se emite uno nuevo sobre el mismo lugar.

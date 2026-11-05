@@ -69,6 +69,12 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     await expect(new ReemplazoService().confirmarReemplazo(2, dto, "a")).rejects.toThrow("habilitación vigente");
   });
 
+  it("RES-18: rechaza un reemplazante con el pasaporte que vence el último día del recorrido", async () => {
+    repo.buscarPersonal.mockResolvedValue({ ...persona(9), fechaVencimientoPasaporte: FIN });
+
+    await expect(new ReemplazoService().confirmarReemplazo(2, dto, "a")).rejects.toThrow("vence antes del fin");
+  });
+
   it("si falla la emisión del nuevo, deja registrada la baja y el reintento emite sin volver a dar de baja", async () => {
     vi.spyOn(autoridad, "solicitarPermisoIndividual").mockRejectedValueOnce(new Error("caída"));
 

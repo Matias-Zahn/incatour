@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
+import ModalDetalleReserva from "../../components/ModalDetalleReserva";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import { solicitarApi } from "../../services/clienteApi";
@@ -42,6 +43,7 @@ function ReservasGestionPage() {
     const [filtros, setFiltros] = useState(FILTROS_VACIOS);
     const [pagina, setPagina] = useState(1);
     const [errorComprobante, setErrorComprobante] = useState<string | null>(null);
+    const [idDetalle, setIdDetalle] = useState<number | null>(null);
 
     const { data, isPending, error } = useQuery({
         queryKey: ["reservas-gestion", filtros, pagina],
@@ -207,13 +209,18 @@ function ReservasGestionPage() {
                                 titulo: "Acciones",
                                 sinTituloEnCelular: true,
                                 renderizar: (r) => (
-                                    <Boton
-                                        variante="secundario"
-                                        className="px-3 py-1.5 text-xs"
-                                        onClick={() => descargarComprobante(r.idreserva)}
-                                    >
-                                        Comprobante
-                                    </Boton>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Boton className="px-3 py-1.5 text-xs" onClick={() => setIdDetalle(r.idreserva)}>
+                                            Ver detalle
+                                        </Boton>
+                                        <Boton
+                                            variante="secundario"
+                                            className="px-3 py-1.5 text-xs"
+                                            onClick={() => descargarComprobante(r.idreserva)}
+                                        >
+                                            Comprobante
+                                        </Boton>
+                                    </div>
                                 ),
                             },
                         ]}
@@ -226,6 +233,10 @@ function ReservasGestionPage() {
                     />
                 </div>
             )}
+
+            {idDetalle !== null ? (
+                <ModalDetalleReserva idreserva={idDetalle} onCerrar={() => setIdDetalle(null)} />
+            ) : null}
         </section>
     );
 }
