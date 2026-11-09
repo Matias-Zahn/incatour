@@ -347,8 +347,8 @@ function MisReservasPage() {
                             Reservas del cliente
                         </h2>
                         <p className="text-xs text-texto-suave">
-                            Filtrá por estado o buscá por código de reserva,
-                            paquete o salida.
+                            Filtrá por estado o buscá por código de reserva o
+                            paquete.
                         </p>
                     </div>
 
