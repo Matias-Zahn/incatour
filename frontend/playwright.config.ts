@@ -9,6 +9,8 @@ export default defineConfig({
     use: {
         baseURL: process.env.URL_FRONT ?? "http://localhost:5191",
         channel: "chrome",
+        // LENTO=400 frena cada accion para mostrarla en vivo
+        launchOptions: { slowMo: Number(process.env.LENTO ?? 0) },
         locale: "es-AR",
         timezoneId: "America/Argentina/Buenos_Aires",
     },
