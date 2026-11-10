@@ -76,4 +76,19 @@ export class NotificadorMock implements INotificador {
 `);
     return true;
   }
+
+  async enviarEmailIncidenteCritico(
+    email: string,
+    nroSalida: string,
+    nombrePaquete: string,
+    tipoIncidente: string,
+    descripcion: string
+  ): Promise<boolean> {
+    await esperar();
+    console.log(`\n🚨 [NOTIFICADOR] Enviando ALERTA DE INCIDENTE CRÍTICO a: ${email}`);
+    console.log(`   └─ Salida: ${nroSalida} (${nombrePaquete})`);
+    console.log(`   └─ Tipo: ${tipoIncidente}`);
+    console.log(`   └─ Descripción: ${descripcion}\n`);
+    return true;
+  }
 }

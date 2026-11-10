@@ -126,4 +126,21 @@ export class NotificadorSmtp implements INotificador {
         p(`<b>Establecimiento:</b> ${esc(establecimiento)}${localidad ? ` (${esc(localidad)})` : ""}`)
     );
   }
+
+  enviarEmailIncidenteCritico(
+    email: string,
+    nroSalida: string,
+    nombrePaquete: string,
+    tipoIncidente: string,
+    descripcion: string
+  ) {
+    return this.enviar(
+      email,
+      `[URGENTE] Incidente crítico en salida ${nroSalida}`,
+      "Alerta de incidente crítico en campo",
+      p(`Se reportó un incidente de gravedad <b>CRÍTICA</b> durante la operación de la salida <b>${esc(nroSalida)}</b> (${esc(nombrePaquete)}).`) +
+        p(`<b>Tipo de incidente:</b> ${esc(tipoIncidente)}<br><b>Descripción:</b> ${esc(descripcion)}`) +
+        p("Ingresá al <b>Panel de Gestión</b> para revisar el detalle y los pasajeros afectados.")
+    );
+  }
 }

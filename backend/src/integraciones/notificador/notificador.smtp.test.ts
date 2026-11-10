@@ -32,4 +32,20 @@ describe("NotificadorSmtp", () => {
 
     await expect(notificador.enviarEmailInvitacionResenia("ana@x.com", "SAL-1", "Inca")).rejects.toThrow("ECONNREFUSED");
   });
+
+  it("arma el mail urgente de incidente crítico para la administración", async () => {
+    await notificador.enviarEmailIncidenteCritico("admin@incatour.com", "SAL-2026-010", "Camino Inca", "ACCIDENTE", "Caída en tramo rocoso");
+
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "admin@incatour.com",
+        subject: "[URGENTE] Incidente crítico en salida SAL-2026-010",
+      })
+    );
+    const { html } = sendMail.mock.calls.at(-1)![0];
+    expect(html).toContain("SAL-2026-010");
+    expect(html).toContain("Camino Inca");
+    expect(html).toContain("ACCIDENTE");
+    expect(html).toContain("Caída en tramo rocoso");
+  });
 });

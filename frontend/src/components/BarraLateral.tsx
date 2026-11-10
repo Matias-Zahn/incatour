@@ -265,10 +265,18 @@ const elementosNavegacion: ElementoNavegacion[] = [
 // Lo que pide atención, con las mismas consultas del Inicio: react-query las comparte y no se piden dos veces
 function useAvisosGestion(): Record<string, number> {
     const salidas = useSalidas().data ?? [];
-    const solicitudes = useQuery({ queryKey: ["solicitudes"], queryFn: listarSolicitudesPendientes }).data ?? [];
+    const solicitudes =
+        useQuery({
+            queryKey: ["solicitudes"],
+            queryFn: listarSolicitudesPendientes,
+            refetchInterval: 30_000,
+            refetchOnWindowFocus: true,
+        }).data ?? [];
     const incidentes = useIncidentes().data ?? [];
+    // Solo los críticos de salidas en curso: los de salidas terminadas ya no piden atención y el número no bajaría nunca
+    const enCurso = new Set(salidas.filter((s) => s.estado === "EN_CURSO").map((s) => s.nroSalida));
     return {
-        "/": incidentes.filter((i) => i.nivelGravedad === "CRITICO").length,
+        "/": incidentes.filter((i) => i.nivelGravedad === "CRITICO" && enCurso.has(i.salida.nroSalida)).length,
         "/gestion/salidas": salidas.filter((s) => s.alertas?.length > 0).length,
         "/gestion/solicitudes": solicitudes.length,
     };
@@ -390,7 +398,8 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                             >
                                 <span className="shrink-0">{elemento.icono}</span>
                                 {!colapsada && (
-                                    <span className="max-md:hidden whitespace-nowrap">
+                                    // min-w-0 + flex-1: las etiquetas largas pasan a dos líneas en vez de empujar el contador afuera
+                                    <span className="max-md:hidden min-w-0 flex-1 leading-tight">
                                         {elemento.etiqueta}
                                     </span>
                                 )}
@@ -398,7 +407,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                                 {aviso > 0 ? (
                                     <span
                                         aria-hidden="true"
-                                        className={`rounded-full bg-rose-600 font-bold text-white ${
+                                        className={`shrink-0 rounded-full bg-rose-600 font-bold text-white ${
                                             colapsada
                                                 ? "absolute right-1.5 top-1.5 size-2.5"
                                                 : "ml-auto min-w-5 px-1.5 text-center text-xs leading-5 max-md:absolute max-md:right-0.5 max-md:top-0.5 max-md:size-2.5 max-md:min-w-0 max-md:p-0 max-md:text-[0px]"

@@ -954,6 +954,8 @@ export function useSalidas(filtros?: FiltrosSalidas) {
     return useQuery({
         queryKey: clavesSalidas.lista(filtros),
         queryFn: () => consultarSalidas(filtros),
+        refetchInterval: 30_000,
+        refetchOnWindowFocus: true,
     });
 }
 

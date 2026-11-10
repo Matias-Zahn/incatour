@@ -702,7 +702,12 @@ export async function listarIncidentes(): Promise<IncidenteAdmin[]> {
 }
 
 export function useIncidentes() {
-    return useQuery({ queryKey: ["incidentes"], queryFn: listarIncidentes });
+    return useQuery({
+        queryKey: ["incidentes"],
+        queryFn: listarIncidentes,
+        refetchInterval: 30_000,
+        refetchOnWindowFocus: true,
+    });
 }
 
 // Los formatos viven en formato.ts; se re-exportan para las pantallas que ya los importan de acá

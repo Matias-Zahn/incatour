@@ -6,7 +6,9 @@ const { repo } = vi.hoisted(() => ({
   repo: { idPersonalDelUsuario: vi.fn(), salidasAsignadas: vi.fn(), detalleSalida: vi.fn(), registrarAvance: vi.fn(), registrarIncidente: vi.fn(), iniciarSalida: vi.fn() },
 }));
 vi.mock("./guia.repository", () => ({ GuiaRepository: class { constructor() { return repo; } } }));
-const { notificador } = vi.hoisted(() => ({ notificador: { enviarEmailInvitacionResenia: vi.fn() } }));
+const { notificador } = vi.hoisted(() => ({
+  notificador: { enviarEmailInvitacionResenia: vi.fn(), enviarEmailIncidenteCritico: vi.fn() },
+}));
 vi.mock("../../../integraciones/notificador/notificador.mock", () => ({ NotificadorMock: class { constructor() { return notificador; } } }));
 
 const salida = {
@@ -259,12 +261,43 @@ describe("GuiaService.registrarIncidente (CU-50)", () => {
     repo.idPersonalDelUsuario.mockResolvedValue(7);
     repo.detalleSalida.mockResolvedValue(conPasajeros());
     repo.registrarIncidente.mockImplementation(async (p) => p);
+    notificador.enviarEmailIncidenteCritico.mockResolvedValue(true);
   });
 
   it("registra el incidente con los pasajeros afectados (FA1)", async () => {
     const r = await new GuiaService().registrarIncidente(1, 2, incidente({ pasajerosAfectados: [3] }));
 
     expect(r).toMatchObject({ idsalida: 2, tipoIncidente: "SALUD", nivelGravedad: "MEDIO", pasajerosAfectados: [3] });
+    expect(notificador.enviarEmailIncidenteCritico).not.toHaveBeenCalled();
+  });
+
+  it("envía correo de alerta urgente a la administración solo cuando el incidente es CRITICO y no es reenvío", async () => {
+    await new GuiaService().registrarIncidente(1, 2, incidente({ nivelGravedad: "CRITICO", descripcion: "Esguince severo" }));
+
+    expect(notificador.enviarEmailIncidenteCritico).toHaveBeenCalledOnce();
+    expect(notificador.enviarEmailIncidenteCritico).toHaveBeenCalledWith(
+      expect.any(String),
+      "SAL-2026-002",
+      "Inca",
+      "SALUD",
+      "Esguince severo"
+    );
+
+    // Si el mismo incidente ya figuraba en la salida (reenvío por falta de señal), no duplica el mail
+    notificador.enviarEmailIncidenteCritico.mockClear();
+    repo.detalleSalida.mockResolvedValue({
+      ...conPasajeros(),
+      incidentes: [
+        {
+          tipoIncidente: "SALUD",
+          descripcion: "Esguince severo",
+          nivelGravedad: "CRITICO",
+          fechaHoraOcurrencia: new Date("2026-01-11T10:00:00Z"),
+        },
+      ],
+    });
+    await new GuiaService().registrarIncidente(1, 2, incidente({ nivelGravedad: "CRITICO", descripcion: "Esguince severo" }));
+    expect(notificador.enviarEmailIncidenteCritico).not.toHaveBeenCalled();
   });
 
   it("rechaza pasajeros que no viajan en la salida", async () => {

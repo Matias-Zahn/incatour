@@ -1,3 +1,4 @@
+import { envs } from "../../../config/envs";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { CustomError } from "../../../error/CustomError";
@@ -197,8 +198,25 @@ export class GuiaService {
       throw CustomError.badRequest(`Estos pasajeros no viajan en la salida: ${ajenos.join(", ")}`);
     }
 
+    const yaEstaba = s.incidentes.some(
+      (i) =>
+        i.tipoIncidente === dto.tipoIncidente &&
+        i.descripcion === dto.descripcion &&
+        i.nivelGravedad === dto.nivelGravedad &&
+        i.fechaHoraOcurrencia?.getTime?.() === dto.fechaHoraOcurrencia.getTime()
+    );
+
     // Paso 17: el incidente registrado es la alerta del panel del administrador (GET /api/incidentes)
-    return this.repository.registrarIncidente({ idsalida, ...dto });
+    const incidente = await this.repository.registrarIncidente({ idsalida, ...dto });
+
+    // Si es crítico y no es un reenvío duplicado, se avisa por correo a la administración sin frenar la respuesta al guía
+    if (dto.nivelGravedad === "CRITICO" && !yaEstaba) {
+      this.notificador
+        .enviarEmailIncidenteCritico(envs.ADMIN_EMAIL, s.nroSalida, s.paquete.nombrePaquete, dto.tipoIncidente, dto.descripcion)
+        .catch((e) => console.error("Fallo al enviar alerta de incidente crítico:", e));
+    }
+
+    return incidente;
   }
 
   // CU-50 paso 17: panel de alertas del administrador

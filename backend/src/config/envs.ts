@@ -15,4 +15,5 @@ export const envs = {
   SMTP_USER: get("SMTP_USER").asString(),
   SMTP_PASSWORD: get("SMTP_PASSWORD").asString(),
   SMTP_FROM: get("SMTP_FROM").default("IncaTour <no-responder@incatour.com>").asString(),
+  ADMIN_EMAIL: get("ADMIN_EMAIL").default("admin@incatour.com").asString(),
 };
