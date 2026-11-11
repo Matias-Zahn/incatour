@@ -15,6 +15,8 @@ type ModalProps = {
     children: ReactNode;
 };
 
+let modalesAbiertos = 0;
+
 const anchoPorTamano = {
     sm: "max-w-lg",
     md: "max-w-2xl",
@@ -40,12 +42,15 @@ function Modal({
     // Layout: el cierre tiene que correr con el <dialog> todavía en el DOM para que el foco vuelva a su lugar
     useLayoutEffect(() => {
         const elemento = dialogo.current;
-        const scrollPrevio = document.body.style.overflow;
         elemento?.showModal();
+        modalesAbiertos++;
         document.body.style.overflow = "hidden";
         return () => {
             elemento?.close();
-            document.body.style.overflow = scrollPrevio;
+            // Con modales anidados (detalle de salida → devolución del equipo) se cierran en cualquier orden:
+            // el scroll vuelve recién cuando no queda ninguno abierto
+            modalesAbiertos--;
+            if (modalesAbiertos === 0) document.body.style.overflow = "";
         };
     }, []);
 

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
 import {
+    categoriasAlojamiento,
     esquemaServicio,
     modalidadesConfirmacion,
     tiposServicio,
@@ -112,7 +113,7 @@ function FormularioServicio({
         }[]
     > = {
         ALOJAMIENTO: [
-            { nombre: "categoria", etiqueta: "Categoría", placeholder: "Ej. 3 estrellas" },
+            { nombre: "categoria", etiqueta: "Categoría" },
             { nombre: "tipoHabitacion", etiqueta: "Tipo de habitación", placeholder: "Ej. Doble" },
             {
                 nombre: "capacidadDisponible",
@@ -315,6 +316,35 @@ function FormularioServicio({
                                         role="alert"
                                     >
                                         {errors.modalidadConfirmacion.message}
+                                    </span>
+                                ) : null}
+                            </label>
+                        );
+                    }
+
+                    if (nombreCampo === "categoria") {
+                        // Una categoría cargada antes como texto libre se conserva como opción para no perderla
+                        const actual = servicioEnEdicion?.categoria;
+                        const opciones: string[] = [...categoriasAlojamiento];
+                        if (actual && !opciones.includes(actual)) opciones.push(actual);
+                        return (
+                            <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
+                                {campo.etiqueta}
+                                <select
+                                    disabled={deshabilitado}
+                                    {...register("categoria")}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
+                                >
+                                    <option value="">Elegí una categoría</option>
+                                    {opciones.map((categoria) => (
+                                        <option key={categoria} value={categoria}>
+                                            {categoria}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.categoria ? (
+                                    <span className="text-xs font-normal text-peligro" role="alert">
+                                        {errors.categoria.message}
                                     </span>
                                 ) : null}
                             </label>

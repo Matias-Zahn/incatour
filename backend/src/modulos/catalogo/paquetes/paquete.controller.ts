@@ -186,30 +186,9 @@ export class PaqueteController {
     try {
       const id = leerIdUrl(req.params.id, "El ID proporcionado no es válido.");
 
-      await paqueteService.consultarPaquetePorId(id);
-
-      const dir = path.resolve(process.cwd(), `public/imagenes/paquetes/${id}`);
-      let principal: string | null = null;
-      const carrusel: string[] = [];
-
-      if (fs.existsSync(dir)) {
-        const archivos = fs.readdirSync(dir).filter((arch) => !esArchivoTemporal(arch));
-        for (const arch of archivos) {
-          const url = `/imagenes/paquetes/${id}/${arch}`;
-          if (arch.startsWith("principal.")) {
-            principal = url;
-          }
-          carrusel.push(url);
-        }
-      }
-
-      // Si no tiene foto personalizada, usamos fallback del catálogo por defecto
-      if (!principal && carrusel.length === 0) {
-        principal = "/imagenes/catalogo/camino_inca_tradicional.jpg";
-        carrusel.push(principal);
-      } else if (!principal && carrusel.length > 0) {
-        principal = carrusel[0]!;
-      }
+      // Misma regla que el catálogo: sus fotos o, si no tiene, la foto por defecto según el nombre
+      const paquete = await paqueteService.consultarPaquetePorId(id);
+      const { imagenPrincipal: principal, imagenes: carrusel } = enriquecerPaqueteConImagenes(paquete);
 
       return res.status(200).json({
         idpaquete: id,

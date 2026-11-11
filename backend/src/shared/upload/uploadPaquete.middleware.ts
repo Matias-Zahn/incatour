@@ -222,29 +222,14 @@ export const modificarFotoEspecifica = envolverMulter(multerModificarFotoInterno
   `${nombreArchivoFoto(req.params.nombreFoto as string)}.`,
 ]);
 
-const IMAGENES_CATALOGO_POR_DEFECTO = [
-  "/imagenes/catalogo/camino_inca_tradicional.jpg",
-  "/imagenes/catalogo/travesia_salkantay.jpg",
-  "/imagenes/catalogo/camino_choquequirao.jpg",
-  "/imagenes/catalogo/secretos_valle_sagrado.jpg",
-  "/imagenes/catalogo/sendero_de_los_andes.jpg",
-  "/imagenes/catalogo/centro_cusco.jpg",
-];
-
-function imagenCatalogoSugerida(
-  idpaquete: number,
-  nombrePaquete?: string | null,
-  nombreCircuito?: string | null,
-): string {
+// Sin fotos propias, una foto del lugar según el nombre del paquete o del circuito; si no se reconoce, Machu Picchu
+function imagenCatalogoSugerida(nombrePaquete?: string | null, nombreCircuito?: string | null): string {
   const texto = `${nombrePaquete ?? ""} ${nombreCircuito ?? ""}`.toLowerCase();
-  if (texto.includes("salkantay")) return "/imagenes/catalogo/travesia_salkantay.jpg";
+  if (texto.includes("salkantay") || texto.includes("ausangate")) return "/imagenes/catalogo/travesia_salkantay.jpg";
   if (texto.includes("choquequirao")) return "/imagenes/catalogo/camino_choquequirao.jpg";
-  if (texto.includes("valle")) return "/imagenes/catalogo/secretos_valle_sagrado.jpg";
-  if (texto.includes("andes") || texto.includes("ausangate")) return "/imagenes/catalogo/sendero_de_los_andes.jpg";
+  if (texto.includes("valle") || texto.includes("lares") || texto.includes("ollantaytambo")) return "/imagenes/catalogo/secretos_valle_sagrado.jpg";
   if (texto.includes("cusco") || texto.includes("city")) return "/imagenes/catalogo/centro_cusco.jpg";
-  if (texto.includes("inca")) return "/imagenes/catalogo/camino_inca_tradicional.jpg";
-  const idx = Math.max(0, idpaquete - 1) % IMAGENES_CATALOGO_POR_DEFECTO.length;
-  return IMAGENES_CATALOGO_POR_DEFECTO[idx]!;
+  return "/imagenes/catalogo/camino_inca_tradicional.jpg";
 }
 
 export function obtenerImagenesDePaquete(
@@ -289,7 +274,7 @@ export function obtenerImagenesDePaquete(
     // Si no se puede leer el directorio, usar imagen por defecto
   }
 
-  const porDefecto = imagenCatalogoSugerida(idpaquete, nombrePaquete, nombreCircuito);
+  const porDefecto = imagenCatalogoSugerida(nombrePaquete, nombreCircuito);
   return {
     imagenPrincipal: porDefecto,
     imagenes: [porDefecto],
