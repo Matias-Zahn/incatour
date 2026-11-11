@@ -227,8 +227,8 @@ async function main() {
         const dominio = `${correo(nombre).replace(/\./g, "")}.com.pe`;
         const prov = await api("POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `${nombre} S.A.C.`, localidad: z.localidad, datosContacto: `reservas@${dominio}`, canalComunicacion: "Email" });
         const idproveedor = idDe(prov, "idproveedor")!;
-        // ponytail: la API descuenta del hotel las plazas de cada bloqueo y no las devuelve cuando la salida termina,
-        // así que la historia se opera con capacidad de sobra y al final se deja lo que el hotel tiene libre hoy
+        // La historia se opera con capacidad de sobra (cada salida a la venta bloquea su cupo entero en el hotel)
+        // y al final se deja lo que el hotel tiene libre hoy
         const s = await api("POST", `/proveedores/${idproveedor}/servicios`, {
           tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: 900, modalidadConfirmacion: z.modalidad,
         });
