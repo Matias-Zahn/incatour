@@ -91,7 +91,7 @@ const INCIDENTES = [
 
 type Cliente = { idcliente: number; idusuario: number; token: string; primeraCompra?: string };
 type Etapa = "historica" | "encurso" | "cerrada" | "publicada";
-type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; carlos?: boolean; cancelada?: boolean };
+type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; carlos?: boolean; cancelada?: boolean; deHoy?: boolean; juan?: boolean };
 
 /** Calendario de salidas: desde hace dos años hasta cinco meses adelante. En febrero el Camino Inca cierra */
 function armarCalendario(hoy: string) {
@@ -115,11 +115,17 @@ function armarCalendario(hoy: string) {
     }
   }
   const clasico = PAQUETES[0];
-  planes.push({ virtual: sumarDias(hoy, -1), paquete: clasico, etapa: "encurso", carlos: true });
+  // Para la presentación: una en curso (con otro guía) y la de Carlos que empieza hoy, lista para iniciarla en vivo
+  planes.push({ virtual: sumarDias(hoy, -1), paquete: clasico, etapa: "encurso" });
+  planes.push({ virtual: hoy, paquete: clasico, etapa: "cerrada", carlos: true, deHoy: true });
   planes.push({ virtual: sumarDias(hoy, 12), paquete: clasico, etapa: "cerrada", carlos: true });
   const historicas = planes.filter((p) => p.etapa === "historica");
   for (const i of [7, 25, 44]) historicas[i]!.cancelada = true;
-  return planes.sort((a, b) => a.virtual.localeCompare(b.virtual));
+  planes.sort((a, b) => a.virtual.localeCompare(b.virtual));
+  // Juan tiene una salida terminada sin reseñar y una reserva a la venta que puede cancelar con reintegro
+  planes.filter((p) => p.etapa === "historica" && !p.cancelada).at(-1)!.juan = true;
+  planes.find((p) => p.etapa === "publicada")!.juan = true;
+  return planes;
 }
 
 async function main() {
@@ -247,7 +253,9 @@ async function main() {
       const { paquete, virtual, etapa } = plan;
       const dias = CIRCUITOS[paquete.circuito].dias;
       const viaja = etapa === "historica" || etapa === "encurso";
-      const real = viaja ? masAnios(virtual, ANIOS_DE_VIAJE) : virtual;
+      // La de hoy también se opera en el futuro: la API no crea salidas que empiezan hoy
+      const adelantada = viaja || !!plan.deHoy;
+      const real = adelantada ? masAnios(virtual, ANIOS_DE_VIAJE) : virtual;
       const fin = sumarDias(virtual, dias - 1);
       const realFin = sumarDias(real, dias - 1);
       const mover = (inicio: string, hasta: string) => db.salida.update({ where: { idsalida }, data: { fechaInicio: new Date(inicio), fechaFin: new Date(hasta) } });
@@ -262,7 +270,8 @@ async function main() {
       // CU-30: compras de clientes distintos hasta llenar lo que pide la temporada
       const avance = etapa === "publicada" ? 0.45 : 1;
       let porVender = Math.min(paquete.cupo, Math.round(paquete.cupo * temporadaDe(virtual).demanda * avance * (0.8 + azar() * 0.35)));
-      const compradores = mezclar(clientes);
+      const juan = clientes[0]!;
+      const compradores = plan.juan ? [juan, ...mezclar(clientes.slice(1))] : mezclar(clientes);
       const compras: { cliente: Cliente; pasajeros: ReturnType<typeof pasajeroNuevo>[]; anticipacion: number }[] = [];
       while (porVender > 0) {
         const cantidad = Math.min(porVender, elegir([1, 2, 2, 2, 3, 4]));
@@ -278,7 +287,7 @@ async function main() {
         const idreserva = idDe(r, "idreserva")!;
         const base = viaja || etapa === "cerrada" ? virtual : hoy;
         const compra = sumarDias(base, -c.anticipacion);
-        const marca: (typeof marcas.reservas)[number] = { idreserva, viajo: viaja, compra: compra > hoy ? sumarDias(hoy, -1) : compra };
+        const marca: (typeof marcas.reservas)[number] = { idreserva, viajo: adelantada, compra: compra > hoy ? sumarDias(hoy, -1) : compra };
         marcas.reservas.push(marca);
         if (!c.cliente.primeraCompra || marca.compra < c.cliente.primeraCompra) c.cliente.primeraCompra = marca.compra;
         return { ...c, idreserva, marca };
@@ -287,7 +296,8 @@ async function main() {
       // CU-33/34: en las salidas a la venta quedan solicitudes sin resolver
       const pendientes = (await api("GET", "/solicitudes")).filter((s: any) => s.reserva.idsalida === idsalida);
       for (const pendiente of pendientes) {
-        if (etapa === "publicada" && azar() < 0.5) continue;
+        // Quedan sin resolver para mostrarlas en vivo
+        if (etapa === "publicada") continue;
         const venta = vendidas.find((v) => v.idreserva === pendiente.idreserva)!;
         let idsolicitud: number = pendiente.idsolicitud;
         let dia = sumarDias(venta.marca.compra, 1);
@@ -315,7 +325,7 @@ async function main() {
       // CU-32: la fecha de la salida se acerca a hoy para que cuente la anticipación que dice la historia
       const vigentes = [...vendidas];
       for (const v of mezclar(vendidas)) {
-        if (azar() > 0.12 || vigentes.length === 1) continue;
+        if (azar() > 0.12 || vigentes.length === 1 || (plan.juan && v.cliente === juan)) continue;
         const delAdmin = azar() < 0.25;
         const tarde = !delAdmin && azar() < 0.4;
         if (viaja) {
@@ -361,7 +371,7 @@ async function main() {
       if (etapa === "historica") {
         // CU-47: la nota acompaña a la temporada alta, donde los grupos van llenos
         for (const v of vigentes) {
-          if (azar() > 0.6) continue;
+          if (azar() > 0.6 || (plan.juan && v.cliente === juan)) continue;
           const valoracion = elegir([5, 5, 5, 4, 4, 4, 3, 2]);
           await api("POST", "/resenias", { idsalida, valoracion, comentario: elegir(COMENTARIOS[valoracion]!) }, v.cliente.token);
           marcas.resenias.push({ idcliente: v.cliente.idcliente, idsalida, fecha: antesDe(sumarDias(fin, entre(1, 12)), sumarDias(hoy, -1)) });
@@ -382,6 +392,7 @@ async function main() {
 
     await llevarALaFechaReal(db, marcas, clientes, hoy);
     await verificar(db, hoy);
+    await mostrarPresentacion(db, hoy);
     console.log("\nUsuarios: admin@incatour.com / AdminIncaTour123 · juan@test.com / cliente123 · carlos.guia@incatour.com / guia12345");
   } finally {
     back.apagar();
@@ -536,6 +547,20 @@ async function verificar(db: PrismaClient, hoy: string) {
   await contar("Respuestas de hoteles", db.gestionSolicitud.count());
   await contar("Incidentes", db.incidente.count());
   await contar("Reseñas", db.resenia.count());
+}
+
+/** Lo que se usa en vivo el día de la presentación (ver presentacion/datos-demo.md) */
+async function mostrarPresentacion(db: PrismaClient, hoy: string) {
+  const deHoy = await db.salida.findFirstOrThrow({ where: { fechaInicio: new Date(hoy), estado: "CERRADA" } });
+  const enCurso = await db.salida.findFirstOrThrow({ where: { estado: "EN_CURSO" } });
+  const juan = await db.reserva.findMany({ where: { cliente: { usuario: { email: "juan@test.com" } } }, include: { salida: true }, orderBy: { salida: { fechaInicio: "asc" } } });
+  const pendientes = await db.solicitud.count({ where: { estado: "PENDIENTE" } });
+  console.log(`
+Para la presentación (${hoy}):`);
+  console.log(`  Carlos inicia en vivo: ${deHoy.nroSalida} (${deHoy.estado})`);
+  console.log(`  En curso con otro guía: ${enCurso.nroSalida}`);
+  console.log(`  Solicitudes de alojamiento pendientes: ${pendientes}`);
+  for (const r of juan) console.log(`  Juan: ${r.nroReserva} en ${r.salida.nroSalida} (${r.salida.estado}, ${r.estado})`);
 }
 
 main().catch((e) => {
