@@ -1300,14 +1300,17 @@ function FormularioPaquete({
                                 Servicios operativos incluidos en el paquete
                             </h3>
                             <p className="text-xs text-texto-suave">
-                                Seleccioná los alojamientos, transportes, trenes o equipamientos que componen este paquete.
+                                Seleccioná los transportes, trenes o equipamientos que componen este paquete. El alojamiento sale de la garantía del paso 2.
                             </p>
                         </div>
                     </div>
 
                     <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                         {[
-                            ...serviciosDisponibles.map((s) => ({
+                            // El alojamiento lo define la garantía del paso 2; un hotel solo aparece si ya estaba incluido, para poder quitarlo
+                            ...serviciosDisponibles
+                                .filter((s) => s.tipo !== "ALOJAMIENTO" || serviciosIncluidos.includes(s.idservicio))
+                                .map((s) => ({
                                 ...s,
                                 inactivo: false,
                             })),
