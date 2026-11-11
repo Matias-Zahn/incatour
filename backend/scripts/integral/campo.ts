@@ -196,7 +196,12 @@ export async function campo(ctx: Ctx) {
     await ctx.esperar("Avance 1 de 3 → 201", "POST", url, avance(1, hace(4 * H)), a.guia.token, 201);
     await ctx.esperar("Avance 2 de 3 → 201", "POST", url, avance(2, hace(3 * H)), a.guia.token, 201);
     ctx.controlar("A mitad de camino la salida sigue EN_CURSO", (await estadoSalida(a.idsalida)).estado === "EN_CURSO");
+    const plazasHotel = async () => (await ctx.db.servicioAlojamiento.findUniqueOrThrow({ where: { idservicio: a.hotel.idservicio } })).capacidadDisponible;
+    const plazasAntes = await plazasHotel();
     const r = await ctx.esperar("Avance 3 de 3 → 201", "POST", url, avance(3, hace(2 * H)), a.guia.token, 201);
+    // El hotel tenía 50: el bloqueo de 8 lo dejó en 42 y la asignación devolvió los 6 sin vender; al terminar vuelven los 2 del grupo
+    const plazasDespues = await plazasHotel();
+    ctx.controlar("Al finalizar, el hotel recupera las 2 plazas del grupo (vuelve a 50)", plazasDespues === plazasAntes + 2 && plazasDespues === 50, `antes=${plazasAntes} después=${plazasDespues}`);
     ctx.controlar("Respuesta: salida FINALIZADA", r?.salida?.estado === "FINALIZADA" && r?.salida?.ultimaEtapaAlcanzada === 3, JSON.stringify(r?.salida));
     const s = await estadoSalida(a.idsalida);
     ctx.controlar("Base: salida FINALIZADA con ultimaEtapa 3 y 3 avances", s.estado === "FINALIZADA" && s.ultimaEtapaAlcanzada === 3 && (await avances(a.idsalida)) === 3, `estado=${s.estado} ultima=${s.ultimaEtapaAlcanzada}`);

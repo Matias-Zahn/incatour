@@ -1,5 +1,6 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
+import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { plazasADevolverAlHotel } from "../../salidas/cancelacion-salida/cancelacion-salida.plazas";
 
 export class GuiaRepository {
   // El token trae idusuario; el legajo se encuentra por Usuario → Guia → Personal
@@ -87,6 +88,23 @@ export class GuiaRepository {
         },
       });
       if (count === 0) return null;
+      // Al finalizar, el hotel del bloqueo recupera las plazas que ocupó el grupo (misma regla que al cancelar la salida)
+      if (p.estadoSalida === ESTADO_SALIDA.FINALIZADA) {
+        const hotel = await tx.salidaServicio.findFirst({
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          select: { idservicio: true, salida: { select: { stockLocalAlojamiento: true } } },
+        });
+        if (hotel) {
+          const reservas = await tx.reserva.findMany({
+            where: { idsalida: p.idsalida, estado: ESTADO_RESERVA.CONFIRMADA },
+            select: { cantidadPasajeros: true, estadoAlojamiento: true, solicitudes: { select: { estado: true } } },
+          });
+          await tx.servicioAlojamiento.update({
+            where: { idservicio: hotel.idservicio },
+            data: { capacidadDisponible: { increment: plazasADevolverAlHotel(hotel.salida.stockLocalAlojamiento, reservas) } },
+          });
+        }
+      }
       // fechaHoraReporte la pone la base (default now): así quedan separados el hecho y el aviso
       const avance = await tx.avance.create({
         data: {
