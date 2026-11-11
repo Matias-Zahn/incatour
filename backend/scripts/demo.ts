@@ -54,42 +54,94 @@ const CIRCUITOS = {
   lares: { nombre: "Valle de Lares", dias: 3, dificultad: "Moderada", etapas: [["Lares", "Huacahuasi"], ["Huacahuasi", "Patacancha"], ["Patacancha", "Ollantaytambo"]] },
 } as const;
 
-type Zona = { localidad: string; categoria: string; modalidad: "BLOQUEO_PLAZAS" | "A_SOLICITUD"; hoteles: [string, number][] };
-// El número es la probabilidad de que el hotel rechace una solicitud
+// [nombre, probabilidad de rechazar una solicitud, costo por noche en USD, plazas libres hoy]
+type Hotel = [string, number, number, number];
+type Zona = { localidad: string; categoria: string; modalidad: "BLOQUEO_PLAZAS" | "A_SOLICITUD"; hoteles: Hotel[] };
 const ZONAS: Record<string, Zona> = {
-  cusco3: { localidad: "Cusco", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Plaza de Armas", 0], ["Hostal San Blas", 0]] },
-  cusco4: { localidad: "Cusco", categoria: "4 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hotel Imperial Cusco", 0.45], ["Casa Andina Koricancha", 0.2], ["Hotel Sacsayhuamán", 0.3]] },
-  aguas: { localidad: "Aguas Calientes", categoria: "3 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hostal Río Vilcanota", 0.5], ["Hotel Machu Picchu Inn", 0.25], ["Hostal Inti Wasi", 0.15]] },
-  ollanta: { localidad: "Ollantaytambo", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Pakaritampu", 0]] },
+  cusco3: { localidad: "Cusco", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Tikari Cusco", 0, 62, 22], ["Hostal Wayra San Blas", 0, 48, 12]] },
+  cusco4: { localidad: "Cusco", categoria: "4 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hotel Killa Imperial", 0.45, 118, 14], ["Ayllu Boutique Cusco", 0.2, 132, 8], ["Hotel Antawasi Plaza", 0.3, 104, 18]] },
+  aguas: { localidad: "Aguas Calientes", categoria: "3 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hostal Rumi Wasi", 0.5, 58, 10], ["Hotel Vilcanota Lodge", 0.25, 74, 16], ["Hostal Inti Pakarina", 0.15, 52, 6]] },
+  ollanta: { localidad: "Ollantaytambo", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Tambo Ollanta", 0, 55, 20]] },
 };
 
+// [empresa, vehículo, asientos, costo del traslado, kg de equipaje incluidos, canal]
+const TRANSPORTES: [string, string, number, number, number, string][] = [
+  ["Trans Andes", "Sprinter 19 asientos", 19, 95, 15, "WhatsApp"],
+  ["Vilcanota Tours", "Coaster 25 asientos", 25, 130, 20, "Email"],
+  ["Inka Express Bus", "Bus 33 asientos", 33, 180, 20, "Email"],
+  ["Valle Sagrado Traslados", "Sprinter 19 asientos", 19, 90, 15, "WhatsApp"],
+  ["Cusco Van", "Hiace 20 asientos", 20, 100, 15, "Teléfono"],
+  ["Qosqo Móvil", "Coaster 25 asientos", 25, 125, 20, "WhatsApp"],
+];
+// Equipamiento de campamento: [artículo, tipo, inventario, costo por unidad]
+const EQUIPOS: [string, string, number, number][] = [
+  ["Carpa doble 4 estaciones", "Carpa", 60, 12],
+  ["Bolsa de dormir -10 °C", "Bolsa de dormir", 120, 6],
+  ["Colchoneta autoinflable", "Colchoneta", 120, 3],
+  ["Carpa comedor con mesa y bancos", "Carpa comedor", 10, 25],
+];
+
 const PAQUETES = [
-  { nombre: "Camino Inca Clásico 4 días", circuito: "clasico", zona: "cusco3", tarifa: 780, previas: 1, posteriores: 1, cupo: 16, peso: 4 },
-  { nombre: "Camino Inca Premium", circuito: "clasico", zona: "cusco4", tarifa: 1150, previas: 2, posteriores: 1, cupo: 10, peso: 2 },
-  { nombre: "Camino Inca Express", circuito: "corto", zona: "aguas", tarifa: 490, previas: 0, posteriores: 1, cupo: 12, peso: 3 },
-  { nombre: "Salkantay Aventura", circuito: "salkantay", zona: "aguas", tarifa: 690, previas: 1, posteriores: 0, cupo: 14, peso: 2 },
-  { nombre: "Lares Cultural", circuito: "lares", zona: "ollanta", tarifa: 540, previas: 1, posteriores: 0, cupo: 10, peso: 1 },
+  // tren: servicio de tren de vuelta desde Aguas Calientes (null: no toma tren); transporte: índice en TRANSPORTES
+  { nombre: "Camino Inca Clásico 4 días", circuito: "clasico", zona: "cusco3", tarifa: 780, previas: 1, posteriores: 1, cupo: 16, peso: 4, tren: 0, transporte: 1 },
+  { nombre: "Camino Inca Premium", circuito: "clasico", zona: "cusco4", tarifa: 1150, previas: 2, posteriores: 1, cupo: 10, peso: 2, tren: 1, transporte: 0 },
+  { nombre: "Camino Inca Express", circuito: "corto", zona: "aguas", tarifa: 490, previas: 0, posteriores: 1, cupo: 12, peso: 3, tren: 0, transporte: 4 },
+  { nombre: "Salkantay Aventura", circuito: "salkantay", zona: "cusco3", tarifa: 690, previas: 1, posteriores: 1, cupo: 14, peso: 2, tren: 0, transporte: 5 },
+  { nombre: "Lares Cultural", circuito: "lares", zona: "ollanta", tarifa: 540, previas: 1, posteriores: 0, cupo: 10, peso: 1, tren: null, transporte: 3 },
 ] as const;
 
-const NOMBRES = ["Lucía", "Martín", "Sofía", "Diego", "Valentina", "Tomás", "Camila", "Nicolás", "Julieta", "Mateo", "Paula", "Andrés", "Florencia", "Joaquín", "Agustina", "Facundo", "Carolina", "Gonzalo", "Natalia", "Ignacio", "Renata", "Bruno", "Elena", "Hugo"];
-const APELLIDOS = ["Fernández", "Gómez", "Ramírez", "Castro", "Herrera", "Molina", "Rojas", "Silva", "Vega", "Ortiz", "Navarro", "Paz", "Medina", "Suárez", "Acosta", "Benítez", "Cabrera", "Domínguez", "Ibarra", "Luna", "Peralta", "Quiroga", "Ríos", "Sosa"];
-const NACIONALIDADES = ["Argentina", "Chilena", "Uruguaya", "Brasileña", "Colombiana", "Mexicana", "Española", "Peruana"];
+// Nombres, pasaportes y correos según el país: una nómina creíble
+const PAISES = [
+  { nacionalidad: "Argentina", peso: 5, pasaporte: () => `AA${letra()}${digitos(6)}`, nombres: ["Lucía", "Martín", "Sofía", "Tomás", "Valentina", "Nicolás", "Julieta", "Facundo", "Agustina", "Gonzalo", "Florencia", "Joaquín"], apellidos: ["Fernández", "González", "Rodríguez", "López", "Martínez", "Sosa", "Romero", "Álvarez", "Benítez", "Acosta", "Medina", "Herrera"], dominios: ["gmail.com", "hotmail.com", "yahoo.com.ar"] },
+  { nacionalidad: "Chilena", peso: 2, pasaporte: () => `F${digitos(8)}`, nombres: ["Camila", "Benjamín", "Antonia", "Vicente", "Catalina", "Matías", "Javiera", "Cristóbal"], apellidos: ["Muñoz", "Rojas", "Díaz", "Soto", "Contreras", "Silva", "Morales", "Fuentes"], dominios: ["gmail.com", "hotmail.com"] },
+  { nacionalidad: "Uruguaya", peso: 1, pasaporte: () => `C${digitos(6)}`, nombres: ["Florencia", "Santiago", "Lucía", "Federico", "Paula", "Diego"], apellidos: ["Pereira", "Rodríguez", "Méndez", "Techera", "Olivera", "Cabrera"], dominios: ["gmail.com", "adinet.com.uy"] },
+  { nacionalidad: "Brasileña", peso: 2, pasaporte: () => `F${letra()}${digitos(6)}`, nombres: ["Thiago", "Ana", "Pedro", "Beatriz", "Lucas", "Mariana", "Gabriel", "Larissa"], apellidos: ["Silva", "Santos", "Oliveira", "Souza", "Costa", "Pereira", "Almeida", "Ribeiro"], dominios: ["gmail.com", "uol.com.br", "hotmail.com"] },
+  { nacionalidad: "Colombiana", peso: 1, pasaporte: () => `A${letra()}${digitos(6)}`, nombres: ["Andrés", "Valeria", "Felipe", "Daniela", "Sebastián", "Laura"], apellidos: ["Restrepo", "Gómez", "Cárdenas", "Ospina", "Vargas", "Mejía"], dominios: ["gmail.com", "hotmail.com"] },
+  { nacionalidad: "Mexicana", peso: 1, pasaporte: () => `G${digitos(8)}`, nombres: ["Diego", "Ximena", "Emiliano", "Regina", "Rodrigo", "Fernanda"], apellidos: ["Hernández", "García", "Ramírez", "Flores", "Torres", "Navarro"], dominios: ["gmail.com", "outlook.com"] },
+  { nacionalidad: "Española", peso: 2, pasaporte: () => `PA${letra()}${digitos(6)}`, nombres: ["Pablo", "Lucía", "Alejandro", "Marta", "Javier", "Carmen", "Hugo", "Elena"], apellidos: ["García", "Martín", "Ruiz", "Jiménez", "Moreno", "Navarro", "Serrano", "Molina"], dominios: ["gmail.com", "hotmail.es"] },
+  { nacionalidad: "Peruana", peso: 1, pasaporte: () => digitos(9), nombres: ["José", "María", "Luis", "Rosa", "Jorge", "Milagros"], apellidos: ["Quispe", "Flores", "Huamán", "Chávez", "Mendoza", "Vargas"], dominios: ["gmail.com", "hotmail.com"] },
+] as const;
+type Pais = (typeof PAISES)[number];
+const LETRAS = "ABCDEFGHJKLMNPRSTUVWXYZ";
+const letra = () => LETRAS[entre(0, LETRAS.length - 1)]!;
+const digitos = (n: number) => Array.from({ length: n }, (_, i) => entre(i === 0 ? 1 : 0, 9)).join("");
+// Vencimientos repartidos, siempre después de las salidas que se operan en el futuro (hasta tres años adelante)
+const vencimiento = () => `${entre(2030, 2036)}-${String(entre(1, 12)).padStart(2, "0")}-${String(entre(1, 28)).padStart(2, "0")}`;
 const GUIAS = ["Carlos Mendoza", "Rosa Huamán", "Marcos Quispe", "Elena Condori", "Raúl Mamani", "Sofía Ccori", "Hernán Apaza", "Pilar Yupanqui"];
 const PORTEADORES = ["Julián Quispe", "Wilber Huamán", "Rubén Condori", "Efraín Mamani", "Percy Choque", "Edwin Puma", "Fredy Ccahuana", "Nilo Sallo", "Abel Turpo", "Ciro Hancco", "Dante Illa", "Elmer Pacco", "Fidel Roque", "Germán Sutta", "Hilario Tito", "Isaías Umasi", "Jaime Vilca", "Lino Waman", "Mario Yucra", "Néstor Zúñiga", "Óscar Arqque", "Pablo Bellota", "Raúl Cusi", "Saúl Dueñas"];
 const MOTIVOS_RECHAZO = ["Sin disponibilidad en las fechas solicitadas", "Cupo tomado por un grupo", "Cierre por refacciones", "Tarifa no vigente para la temporada"];
 const MOTIVOS_CANCELACION = ["Cambio de planes", "Problemas de salud", "Motivos laborales", "Encontró otra fecha", "Problema con el vuelo"];
 const COMENTARIOS: Record<number, string[]> = {
-  5: ["Una experiencia inolvidable, el guía fue excelente.", "Todo perfecto, de principio a fin.", "Superó lo que esperábamos."],
-  4: ["Muy linda experiencia, con algún detalle en la logística.", "Muy bueno, los campamentos cómodos."],
-  3: ["Correcto, esperaba un poco más del alojamiento.", "Bien, aunque hubo demoras."],
-  2: ["La organización dejó que desear.", "Demoras y poca información."],
+  5: [
+    "Una experiencia inolvidable, el guía fue excelente.", "Todo perfecto, de principio a fin.", "Superó lo que esperábamos.",
+    "Llegar a la Puerta del Sol al amanecer no tiene precio. Gracias al equipo.", "Los porteadores son unos genios, siempre con una sonrisa.",
+    "La comida en los campamentos fue increíble, no lo esperábamos en la montaña.", "Nuestro guía sabía muchísimo de historia inca, se hizo corto.",
+    "Organización impecable: nos buscaron puntuales en el hotel y nunca faltó nada.", "Lo volvería a hacer mañana. Recomendadísimo.",
+    "El paso de Warmiwañusca fue duro, pero el grupo y el guía nos acompañaron todo el tiempo.", "Viajé sola y me sentí cuidada en todo momento.",
+    "Excelente relación entre precio y calidad. Las carpas, en muy buen estado.",
+  ],
+  4: [
+    "Muy linda experiencia, con algún detalle en la logística.", "Muy bueno, los campamentos cómodos.",
+    "El recorrido es espectacular; el hotel de la noche previa, correcto sin más.", "Todo bien, aunque el bus de vuelta salió con demora.",
+    "Buen guía y buen grupo. Hubiera venido bien más información antes de viajar.", "Muy recomendable. La bolsa de dormir se quedó corta con el frío de la segunda noche.",
+    "Hermoso. El último día fue un poco apurado para recorrer Machu Picchu.", "Gran experiencia, la comida un poco repetitiva.",
+  ],
+  3: [
+    "Correcto, esperaba un poco más del alojamiento.", "Bien, aunque hubo demoras.", "El paisaje lo vale, la organización fue regular.",
+    "Nos cambiaron el hotel a último momento y no nos avisaron bien.", "El guía cambió a mitad de camino y se notó.",
+  ],
+  2: [
+    "La organización dejó que desear.", "Demoras y poca información.", "El tren de vuelta no estaba reservado y esperamos dos horas.",
+    "La carpa tenía una rotura y entró agua la primera noche.",
+  ],
 };
 const INCIDENTES = [
   ["SALUD", "Pasajero con malestar por la altura", "BAJO"], ["SALUD", "Esguince de tobillo en el descenso", "MEDIO"], ["CLIMA", "Lluvia intensa demoró el tramo", "BAJO"],
   ["RETRASO", "Demora del transporte al punto de inicio", "BAJO"], ["EQUIPAMIENTO", "Carpa dañada por el viento", "MEDIO"], ["ACCIDENTE", "Caída en un tramo con piedras sueltas", "CRITICO"], ["OTRO", "Pasajero extravió su documentación", "MEDIO"],
 ] as const;
 
-type Cliente = { idcliente: number; idusuario: number; token: string; primeraCompra?: string };
+type Persona = { nombre: string; apellido: string; pais: Pais; pasaporte: string; vence: string };
+type Cliente = Persona & { idcliente: number; idusuario: number; token: string; primeraCompra?: string };
 type Etapa = "historica" | "encurso" | "cerrada" | "publicada";
 type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; carlos?: boolean; cancelada?: boolean; deHoy?: boolean; juan?: boolean };
 
@@ -134,7 +186,7 @@ async function main() {
   entorno.resetear({ seed: false });
   const db = new PrismaClient({ datasources: { db: { url: entorno.DB_URL } } });
   await db.usuario.create({
-    data: { nombre: "Carolina", apellido: "Gerente", email: "admin@incatour.com", contrasenia: await bcrypt.hash("AdminIncaTour123", 10), rol: "ADMIN", estado: "ACTIVO" },
+    data: { nombre: "Carolina", apellido: "Vargas", email: "admin@incatour.com", contrasenia: await bcrypt.hash("AdminIncaTour123", 10), rol: "ADMIN", estado: "ACTIVO" },
   });
 
   const back = await entorno.levantarBack(PUERTO);
@@ -168,25 +220,45 @@ async function main() {
     }
 
     const correo = (texto: string) => texto.normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-zA-Z]+/g, ".").toLowerCase();
-    const hoteles: Record<string, { idservicio: number; idproveedor: number; rechazo: number }[]> = {};
+    const hoteles: Record<string, { idservicio: number; idproveedor: number; rechazo: number; plazasHoy: number }[]> = {};
     for (const [clave, z] of Object.entries(ZONAS)) {
       hoteles[clave] = [];
-      for (const [nombre, rechazo] of z.hoteles) {
-        const prov = await api("POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `${nombre} S.A.C.`, localidad: z.localidad, datosContacto: `reservas@${correo(nombre)}.example`, canalComunicacion: "Email" });
+      for (const [nombre, rechazo, costo, plazasHoy] of z.hoteles) {
+        const dominio = `${correo(nombre).replace(/\./g, "")}.com.pe`;
+        const prov = await api("POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `${nombre} S.A.C.`, localidad: z.localidad, datosContacto: `reservas@${dominio}`, canalComunicacion: "Email" });
         const idproveedor = idDe(prov, "idproveedor")!;
+        // ponytail: la API descuenta del hotel las plazas de cada bloqueo y no las devuelve cuando la salida termina,
+        // así que la historia se opera con capacidad de sobra y al final se deja lo que el hotel tiene libre hoy
         const s = await api("POST", `/proveedores/${idproveedor}/servicios`, {
-          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: 45, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: 900, modalidadConfirmacion: z.modalidad,
+          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: 900, modalidadConfirmacion: z.modalidad,
         });
-        hoteles[clave]!.push({ idservicio: idDe(s, "idservicio")!, idproveedor, rechazo });
+        hoteles[clave]!.push({ idservicio: idDe(s, "idservicio")!, idproveedor, rechazo, plazasHoy });
       }
     }
 
     const transportes: { idservicio: number; idproveedor: number; ocupado: [string, string][] }[] = [];
-    for (const nombre of ["Trans Andes", "Vilcanota Tours", "Inka Express Bus", "Valle Sagrado Traslados", "Cusco Van", "Qosqo Movil"]) {
-      const prov = await api("POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `${nombre} E.I.R.L.`, localidad: "Cusco", datosContacto: `operaciones@${correo(nombre)}.example`, canalComunicacion: "WhatsApp" });
+    for (const [empresa, vehiculo, asientos, costo, kg, canal] of TRANSPORTES) {
+      const contacto = canal === "Email" ? `operaciones@${correo(empresa).replace(/\./g, "")}.com.pe` : `+51 984 ${digitos(3)} ${digitos(3)}`;
+      const prov = await api("POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `${empresa} E.I.R.L.`, localidad: "Cusco", datosContacto: contacto, canalComunicacion: canal });
       const idproveedor = idDe(prov, "idproveedor")!;
-      const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `Traslado ${nombre}`, localidad: "Cusco", costoBase: 120, capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+      const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `${empresa} · ${vehiculo}`, localidad: "Cusco", costoBase: costo, capacidadVehiculo: asientos, pesoEquipajeIncluido: kg, costoPorKgExcedente: 2.5 });
       transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, ocupado: [] });
+    }
+
+    // Tren de vuelta desde Aguas Calientes
+    const ferrocarril = idDe(await api("POST", "/proveedores", { tipoProveedor: "TREN", razonSocial: "Ferrocarril del Vilcanota S.A.", localidad: "Aguas Calientes", datosContacto: "grupos@ferrovilcanota.com.pe", canalComunicacion: "Email" }), "idproveedor")!;
+    const trenes: number[] = [];
+    for (const [nombre, costo, sale, llega] of [["Tren Expedition Aguas Calientes - Ollantaytambo", 70, "14:55", "16:45"], ["Tren Vistadome Aguas Calientes - Ollantaytambo", 95, "16:22", "17:58"]] as const) {
+      const s = await api("POST", `/proveedores/${ferrocarril}/servicios`, { tipo: "TREN", nombreServicio: nombre, localidad: "Aguas Calientes", costoBase: costo, horarioSalida: sale, horarioLlegada: llega, diasOperacion: "L-M-X-J-V-S-D" });
+      trenes.push(idDe(s, "idservicio")!);
+    }
+
+    // Equipamiento de campamento: se presta en cada salida y vuelve al terminar
+    const alquiler = idDe(await api("POST", "/proveedores", { tipoProveedor: "EQUIPAMIENTO", razonSocial: "Andes Outdoor Rental E.I.R.L.", localidad: "Cusco", datosContacto: "+51 974 318 552", canalComunicacion: "WhatsApp" }), "idproveedor")!;
+    const equipos: Record<string, number> = {};
+    for (const [nombre, tipoEquipamiento, inventario, costo] of EQUIPOS) {
+      const s = await api("POST", `/proveedores/${alquiler}/servicios`, { tipo: "EQUIPAMIENTO", nombreServicio: nombre, localidad: "Cusco", costoBase: costo, tipoEquipamiento, cantidadDisponible: inventario });
+      equipos[tipoEquipamiento] = idDe(s, "idservicio")!;
     }
 
     const paquetes = new Map<string, number>();
@@ -197,9 +269,18 @@ async function main() {
         tipoGarantia: "POR_CATEGORIA", localidadGarantizada: z.localidad, categoriaGarantizada: z.categoria, tipoHabitacionGarantizada: "Doble",
         nochesPrevias: p.previas, nochesPosteriores: p.posteriores, diasMinimosReintegro: 15,
         matrizPrecios: tarifasPorFactor.map((t) => ({ idtemporada: t.idtemporada, monto: Math.round(p.tarifa * t.factor), moneda: "USD" })),
+        serviciosIncluidos: [transportes[p.transporte]!.idservicio, ...(p.tren === null ? [] : [trenes[p.tren]!])],
       });
       paquetes.set(p.nombre, idDe(pq, "idpaquete")!);
     }
+
+    const usados = new Set<string>();
+    const unico = (generar: () => string) => { for (;;) { const v = generar(); if (!usados.has(v)) { usados.add(v); return v; } } };
+    const paisesPorPeso = PAISES.flatMap((p) => Array.from({ length: p.peso }, () => p));
+    const personaNueva = (pais: Pais = elegir(paisesPorPeso), apellido?: string): Persona => ({
+      nombre: elegir(pais.nombres), apellido: apellido ?? elegir(pais.apellidos), pais, pasaporte: unico(pais.pasaporte), vence: vencimiento(),
+    });
+    const peru = PAISES.find((p) => p.nacionalidad === "Peruana")!;
 
     type Empleado = { idpersonal: number; ocupado: [string, string][]; token?: string };
     const separar = (completo: string) => { const [nombre, ...resto] = completo.split(" "); return { nombre: nombre!, apellido: resto.join(" ") }; };
@@ -207,26 +288,29 @@ async function main() {
     for (const [i, completo] of GUIAS.entries()) {
       const email = `${correo(separar(completo).nombre)}.guia@incatour.com`;
       const g = await api("POST", "/personal", {
-        ...separar(completo), nroPasaporte: `PEG${1000 + i}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2036-06-30", rolOperativo: "Guía",
-        email, contrasenia: CLAVE_GUIA, nroHabilitacion: `HAB-${2000 + i}`, fechaHabilitacion: "2032-12-31",
+        ...separar(completo), nroPasaporte: unico(peru.pasaporte), nacionalidad: "Peruana", fechaVencimientoPasaporte: vencimiento(), rolOperativo: "Guía",
+        email, contrasenia: CLAVE_GUIA, nroHabilitacion: `GO-${digitos(5)}`, fechaHabilitacion: vencimiento(),
       });
       guias.push({ idpersonal: idDe(g, "idpersonal")!, ocupado: [], token: await back.login(email, CLAVE_GUIA) });
     }
     const porteadores: Empleado[] = [];
     for (const [i, completo] of PORTEADORES.entries()) {
-      const p = await api("POST", "/personal", { ...separar(completo), nroPasaporte: `PEP${3000 + i}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2036-06-30", rolOperativo: "Porteador" });
+      const p = await api("POST", "/personal", { ...separar(completo), nroPasaporte: unico(peru.pasaporte), nacionalidad: "Peruana", fechaVencimientoPasaporte: vencimiento(), rolOperativo: "Porteador" });
       porteadores.push({ idpersonal: idDe(p, "idpersonal")!, ocupado: [] });
     }
 
     const clientes: Cliente[] = [];
-    const registrarCliente = async (nombre: string, apellido: string, email: string) => {
-      const c = await api("POST", "/clientes", { email, contrasenia: CLAVE_CLIENTE, nombre, apellido }, "");
-      clientes.push({ idcliente: idDe(c, "idcliente")!, idusuario: idDe(c, "idusuario")!, token: await back.login(email, CLAVE_CLIENTE) });
+    const registrarCliente = async (persona: Persona, email: string) => {
+      const c = await api("POST", "/clientes", { email, contrasenia: CLAVE_CLIENTE, nombre: persona.nombre, apellido: persona.apellido }, "");
+      clientes.push({ ...persona, idcliente: idDe(c, "idcliente")!, idusuario: idDe(c, "idusuario")!, token: await back.login(email, CLAVE_CLIENTE) });
     };
-    await registrarCliente("Juan", "Pérez", "juan@test.com");
+    const argentina = PAISES.find((p) => p.nacionalidad === "Argentina")!;
+    await registrarCliente({ nombre: "Juan", apellido: "Pérez", pais: argentina, pasaporte: unico(argentina.pasaporte), vence: vencimiento() }, "juan@test.com");
     for (let i = 0; i < 59; i++) {
-      const [nombre, apellido] = [NOMBRES[i % NOMBRES.length]!, APELLIDOS[(i * 7) % APELLIDOS.length]!];
-      await registrarCliente(nombre, apellido, `${correo(nombre)}.${correo(apellido)}${i}@demo.example`);
+      const persona = personaNueva();
+      const [n, a] = [correo(persona.nombre), correo(persona.apellido)];
+      const usuario = unico(() => elegir([`${n}.${a}`, `${n}${a}${entre(70, 99)}`, `${n[0]}${a}`, `${n}.${a}${entre(1, 9)}`]));
+      await registrarCliente(persona, `${usuario}@${elegir(persona.pais.dominios)}`);
     }
 
     // ==================== Operación ====================
@@ -237,10 +321,12 @@ async function main() {
       gestiones: [] as { idsolicitud: number; idservicio: number; fecha: string }[],
       resenias: [] as { idcliente: number; idsalida: number; fecha: string }[],
     };
-    let pasaporte = 100000;
-    const pasajeroNuevo = () => ({
-      nombreCompleto: `${elegir(NOMBRES)} ${elegir(APELLIDOS)}`, nroPasaporte: `DM${pasaporte++}`, nacionalidad: elegir(NACIONALIDADES), fechaVencimientoPasaporte: "2036-01-01",
-    });
+    const comoPasajero = (p: Persona) => ({ nombreCompleto: `${p.nombre} ${p.apellido}`, nroPasaporte: p.pasaporte, nacionalidad: p.pais.nacionalidad, fechaVencimientoPasaporte: p.vence });
+    // Casi siempre viaja el titular; los acompañantes son del mismo país y a veces de la misma familia
+    const nomina = (titular: Cliente, cantidad: number) => [
+      ...(azar() < 0.85 ? [titular] : [personaNueva(titular.pais)]),
+      ...Array.from({ length: cantidad - 1 }, () => personaNueva(titular.pais, azar() < 0.4 ? titular.apellido : undefined)),
+    ].map(comoPasajero);
     const libres = <T extends { ocupado: [string, string][] }>(lista: T[], desde: string, hasta: string, n: number) => {
       const elegidos = mezclar(lista).filter((x) => !x.ocupado.some(([a, b]) => a <= hasta && desde <= b)).slice(0, n);
       if (elegidos.length < n) throw new Error(`No hay ${n} recursos libres el ${desde}`);
@@ -272,17 +358,18 @@ async function main() {
       let porVender = Math.min(paquete.cupo, Math.round(paquete.cupo * temporadaDe(virtual).demanda * avance * (0.8 + azar() * 0.35)));
       const juan = clientes[0]!;
       const compradores = plan.juan ? [juan, ...mezclar(clientes.slice(1))] : mezclar(clientes);
-      const compras: { cliente: Cliente; pasajeros: ReturnType<typeof pasajeroNuevo>[]; anticipacion: number }[] = [];
+      const compras: { cliente: Cliente; pasajeros: ReturnType<typeof comoPasajero>[]; anticipacion: number }[] = [];
       while (porVender > 0) {
         const cantidad = Math.min(porVender, elegir([1, 2, 2, 2, 3, 4]));
         const maxima = viaja ? 120 : Math.max(2, Math.min(120, 120 + Math.floor((new Date(virtual).getTime() - new Date(hoy).getTime()) / (24 * H))));
-        compras.push({ cliente: compradores[compras.length]!, pasajeros: Array.from({ length: cantidad }, pasajeroNuevo), anticipacion: entre(viaja ? 30 : 1, maxima) });
+        const cliente = compradores[compras.length]!;
+        compras.push({ cliente, pasajeros: nomina(cliente, cantidad), anticipacion: entre(viaja ? 30 : 1, maxima) });
         porVender -= cantidad;
       }
       const vendidas = await Promise.all(compras.map(async (c) => {
         const r = await api("POST", "/reservas", {
           idsalida, medioPago: "TARJETA", pasajeros: c.pasajeros, equipaje: c.pasajeros.map(() => ({ pesoDeclarado: entre(6, 14) })),
-          tarjeta: { numero: "4242424242424242", titular: "DEMO INCATOUR", vencimiento: "12/30", cvv: "123" },
+          tarjeta: { numero: "4242424242424242", titular: `${c.cliente.nombre} ${c.cliente.apellido}`.toUpperCase(), vencimiento: "12/30", cvv: "123" },
         }, c.cliente.token);
         const idreserva = idDe(r, "idreserva")!;
         const base = viaja || etapa === "cerrada" ? virtual : hoy;
@@ -347,7 +434,13 @@ async function main() {
       const equipoGuias = plan.carlos ? [guias[0]!, ...libres(guias.slice(1), real, realFin, panel.dotacionRequerida.guias - 1)] : libres(guias.slice(1), real, realFin, panel.dotacionRequerida.guias);
       const equipoPorteadores = libres(porteadores, real, realFin, panel.dotacionRequerida.porteadores);
       const transporte = libres(transportes, real, realFin, 1)[0]!;
-      await api("POST", `/salidas/${idsalida}/asignacion`, { personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal), idtransporte: transporte.idservicio, itemsCamping: [] });
+      // Los circuitos que acampan llevan carpas, bolsas y colchonetas para los pasajeros, y una carpa comedor
+      const pasajerosSalida = vigentes.reduce((a, v) => a + v.pasajeros.length, 0);
+      const acampa = paquete.circuito !== "corto";
+      const itemsCamping = acampa
+        ? [["Carpa", Math.ceil(pasajerosSalida / 2)], ["Bolsa de dormir", pasajerosSalida], ["Colchoneta", pasajerosSalida], ["Carpa comedor", 1]].map(([tipo, cantidad]) => ({ idservicio: equipos[tipo as string]!, cantidad: cantidad as number }))
+        : [];
+      await api("POST", `/salidas/${idsalida}/asignacion`, { personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal), idtransporte: transporte.idservicio, itemsCamping });
       for (const r of [...equipoGuias, ...equipoPorteadores, transporte]) r.ocupado.push([real, realFin]);
 
       if (viaja) {
@@ -366,6 +459,14 @@ async function main() {
             await api("POST", `${url}/incidentes`, { tipoIncidente, descripcion, nivelGravedad, fechaHoraOcurrencia: hace(H) }, guia.token);
           }
         }
+      }
+
+      if (etapa === "historica" && itemsCamping.length) {
+        // CU-41: el equipo vuelve al depósito; de vez en cuando algo vuelve roto
+        const roto = azar() < 0.15 ? elegir([equipos["Bolsa de dormir"], equipos["Colchoneta"], equipos["Carpa"]]) : undefined;
+        await api("POST", `/salidas/${idsalida}/devolucion-equipamiento`, {
+          items: itemsCamping.map((i) => ({ idservicio: i.idservicio, cantidadBuenEstado: i.cantidad - (i.idservicio === roto ? 1 : 0), cantidadDaniada: i.idservicio === roto ? 1 : 0 })),
+        });
       }
 
       if (etapa === "historica") {
@@ -390,6 +491,7 @@ async function main() {
       marcas.salidas.push({ idsalida, virtual, fin, idbloqueo: null, cancelada: false });
     }
 
+    for (const h of Object.values(hoteles).flat()) await api("PUT", `/servicios/${h.idservicio}`, { capacidadDisponible: h.plazasHoy });
     await llevarALaFechaReal(db, marcas, clientes, hoy);
     await verificar(db, hoy);
     await mostrarPresentacion(db, hoy);
