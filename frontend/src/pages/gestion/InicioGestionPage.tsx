@@ -7,6 +7,7 @@ import EstadoListado from "../../components/EstadoListado";
 import ListaPaginada from "../../components/ListaPaginada";
 import Modal from "../../components/Modal";
 import {
+    criticosEnCurso,
     estilosEstadoSalida,
     fechaLocalHoy,
     formatearEstadoSalida,
@@ -75,7 +76,10 @@ function InicioGestionPage() {
     const enCurso = salidas.filter((s) => s.estado === "EN_CURSO").length;
     const conAlertas = salidas.filter((s) => s.alertas?.length > 0).length;
     const incidentes = incidentesQ.data ?? [];
-    // El listado completo arranca por lo grave; el resumen de arriba, por lo reciente
+    // El resumen arranca por los que cuenta el aviso rojo del menú y sigue por lo reciente
+    const criticos = criticosEnCurso(incidentes, salidas);
+    const resumen = [...criticos, ...incidentes.filter((i) => !criticos.includes(i))].slice(0, INCIDENTES_EN_RESUMEN);
+    // El listado completo arranca por lo grave
     const incidentesPorGravedad = [...incidentes].sort(
         (a, b) => Number(b.nivelGravedad === "CRITICO") - Number(a.nivelGravedad === "CRITICO"),
     );
@@ -195,6 +199,13 @@ function InicioGestionPage() {
                     <div className="flex items-center justify-between border-b border-borde px-6 py-5">
                         <div>
                             <h2 className="font-bold text-navegacion">Incidentes recientes</h2>
+                            {criticos.length > 0 ? (
+                                <p className="mt-1 text-sm font-semibold text-peligro">
+                                    {criticos.length === 1
+                                        ? "1 crítico en una salida en curso"
+                                        : `${criticos.length} críticos en salidas en curso`}
+                                </p>
+                            ) : null}
                             <p className="mt-1 text-sm text-texto-suave">
                                 {incidentes.length > INCIDENTES_EN_RESUMEN
                                     ? `Los últimos ${INCIDENTES_EN_RESUMEN} de ${incidentes.length}`
@@ -220,7 +231,7 @@ function InicioGestionPage() {
                         <EstadoListado estado="vacio" mensaje="No hay incidentes reportados" />
                     ) : (
                         <div className="divide-y divide-borde">
-                            {incidentes.slice(0, INCIDENTES_EN_RESUMEN).map((inc) => (
+                            {resumen.map((inc) => (
                                 <FilaIncidente key={inc.idincidente} incidente={inc} />
                             ))}
                         </div>

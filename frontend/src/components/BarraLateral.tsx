@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink } from "react-router-dom";
 import logoIncaTour from "../assets/logo-incatour.png";
-import { useIncidentes } from "../services/guiaService";
+import { criticosEnCurso, useIncidentes } from "../services/guiaService";
 import { useSalidas } from "../services/salidaService";
 import { obtenerUsuario } from "../services/sesionService";
 import { listarSolicitudesPendientes } from "../services/solicitudService";
@@ -273,10 +273,8 @@ function useAvisosGestion(): Record<string, number> {
             refetchOnWindowFocus: true,
         }).data ?? [];
     const incidentes = useIncidentes().data ?? [];
-    // Solo los críticos de salidas en curso: los de salidas terminadas ya no piden atención y el número no bajaría nunca
-    const enCurso = new Set(salidas.filter((s) => s.estado === "EN_CURSO").map((s) => s.nroSalida));
     return {
-        "/": incidentes.filter((i) => i.nivelGravedad === "CRITICO" && enCurso.has(i.salida.nroSalida)).length,
+        "/": criticosEnCurso(incidentes, salidas).length,
         "/gestion/salidas": salidas.filter((s) => s.alertas?.length > 0).length,
         "/gestion/solicitudes": solicitudes.length,
     };

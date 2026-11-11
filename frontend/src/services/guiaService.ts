@@ -710,5 +710,11 @@ export function useIncidentes() {
     });
 }
 
+// Los críticos de salidas en curso: lo que cuenta el aviso rojo del Inicio. Los de salidas terminadas ya no piden atención
+export function criticosEnCurso(incidentes: IncidenteAdmin[], salidas: { estado: string; nroSalida: string }[]) {
+    const enCurso = new Set(salidas.filter((s) => s.estado === "EN_CURSO").map((s) => s.nroSalida));
+    return incidentes.filter((i) => i.nivelGravedad === "CRITICO" && enCurso.has(i.salida.nroSalida));
+}
+
 // Los formatos viven en formato.ts; se re-exportan para las pantallas que ya los importan de acá
 export { formatearFechaHora, formatearFechaSalida } from "./formato";
