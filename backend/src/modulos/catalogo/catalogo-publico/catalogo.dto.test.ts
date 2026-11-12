@@ -4,9 +4,9 @@ import { FiltrosCatalogoDto } from "./catalogo.dto";
 describe("FiltrosCatalogoDto (CAT-13)", () => {
   it("acepta filtros válidos y vacíos", () => {
     expect(FiltrosCatalogoDto.create({})[0]).toBeUndefined();
-    const [error, dto] = FiltrosCatalogoDto.create({ duracionDias: "4", fechaInicio: "2026-11-01", fechaFin: "2026-11-30", dificultad: "Moderada" });
+    const [error, dto] = FiltrosCatalogoDto.create({ duracionDias: "4", fechaInicio: "2026-11-01", fechaFin: "2026-11-30", dificultad: "Media" });
     expect(error).toBeUndefined();
-    expect(dto).toMatchObject({ duracionDias: 4, fechaDesde: "2026-11-01", fechaHasta: "2026-11-30", dificultad: "Moderada" });
+    expect(dto).toMatchObject({ duracionDias: 4, fechaDesde: "2026-11-01", fechaHasta: "2026-11-30", dificultad: "Media" });
   });
 
   it("rechaza duracionDias no numérico", () => {

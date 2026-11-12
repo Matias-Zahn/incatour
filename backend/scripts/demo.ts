@@ -49,9 +49,9 @@ const temporadaDe = (iso: string) => TEMPORADAS.find((t) => iso.slice(5) >= t.de
 
 const CIRCUITOS = {
   clasico: { nombre: "Camino Inca Clásico", dias: 4, dificultad: "Alta", etapas: [["Km 82 (Piscacucho)", "Wayllabamba"], ["Wayllabamba", "Pacaymayo"], ["Pacaymayo", "Wiñay Wayna"], ["Wiñay Wayna", "Machu Picchu"]] },
-  corto: { nombre: "Camino Inca Corto", dias: 2, dificultad: "Moderada", etapas: [["Km 104", "Wiñay Wayna"], ["Wiñay Wayna", "Machu Picchu"]] },
+  corto: { nombre: "Camino Inca Corto", dias: 2, dificultad: "Media", etapas: [["Km 104", "Wiñay Wayna"], ["Wiñay Wayna", "Machu Picchu"]] },
   salkantay: { nombre: "Salkantay", dias: 5, dificultad: "Alta", etapas: [["Mollepata", "Soraypampa"], ["Soraypampa", "Chaullay"], ["Chaullay", "La Playa"], ["La Playa", "Aguas Calientes"], ["Aguas Calientes", "Machu Picchu"]] },
-  lares: { nombre: "Valle de Lares", dias: 3, dificultad: "Moderada", etapas: [["Lares", "Huacahuasi"], ["Huacahuasi", "Patacancha"], ["Patacancha", "Ollantaytambo"]] },
+  lares: { nombre: "Valle de Lares", dias: 3, dificultad: "Media", etapas: [["Lares", "Huacahuasi"], ["Huacahuasi", "Patacancha"], ["Patacancha", "Ollantaytambo"]] },
 } as const;
 
 type Zona = { localidad: string; categoria: string; modalidad: "BLOQUEO_PLAZAS" | "A_SOLICITUD"; hoteles: [string, number][] };

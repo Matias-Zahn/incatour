@@ -14,7 +14,7 @@ import { CatalogoController } from "./catalogo.controller";
  *         name: dificultad
  *         schema:
  *           type: string
- *         description: Filtrar por dificultad (ej. Fácil, Moderada, Alta)
+ *         description: Filtrar por dificultad (ej. Baja, Media, Alta)
  *       - in: query
  *         name: duracionDias
  *         schema:

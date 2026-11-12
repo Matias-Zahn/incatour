@@ -24,7 +24,7 @@ const paqueteMock = (overrides: Record<string, any> = {}) => ({
     idcircuito: 1,
     nombreCircuito: "Camino Inca Clásico",
     duracionDias: 4,
-    dificultad: "Moderada",
+    dificultad: "Media",
     etapas: [
       { numeroOrden: 1, puntoInicio: "Km 82", puntoFin: "Wayllabamba", campamentoPrevisto: "Camp 1" },
     ],
