@@ -151,7 +151,7 @@ export async function catalogoCuentas(ctx: Ctx) {
     await esperar("Cambiar minimoGuias con paquetes activos → 400", "PUT", `/circuitos/${idcircuito}`, { minimoGuias: 3 }, admin, 400);
     const despues = await db.circuito.findUnique({ where: { idcircuito } });
     controlar("Duración y guías sin cambios", despues?.duracionDias === antes?.duracionDias && despues?.minimoGuias === antes?.minimoGuias);
-    await esperar("Cambiar solo la dificultad sí se permite → 200", "PUT", `/circuitos/${idcircuito}`, { dificultad: "Difícil" }, admin, 200);
+    await esperar("Cambiar solo la dificultad sí se permite → 200", "PUT", `/circuitos/${idcircuito}`, { dificultad: "Alta" }, admin, 200);
     await esperar("Baja de circuito con paquetes activos → 400", "PATCH", `/circuitos/${idcircuito}/baja`, undefined, admin, 400);
     controlar("El circuito sigue ACTIVO", (await estadoDe("circuito", { idcircuito })) === "ACTIVO");
   });

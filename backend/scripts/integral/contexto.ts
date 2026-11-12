@@ -110,7 +110,7 @@ export function crearContexto(p: {
     async circuito(o: { etapas?: number; minimoGuias?: number; duracionDias?: number } = {}) {
       const etapas = o.etapas ?? 2;
       const c = await ctx.preparar("Crear circuito", "POST", "/circuitos", {
-        nombreCircuito: `Int ${unico()}`, duracionDias: o.duracionDias ?? 3, dificultad: "Moderada",
+        nombreCircuito: `Int ${unico()}`, duracionDias: o.duracionDias ?? 3, dificultad: "Media",
         minimoGuias: o.minimoGuias ?? 1, parametrosPorteadores: "1 por cada 2 pasajeros",
       });
       const idcircuito = idDe(c, "idcircuito")!;

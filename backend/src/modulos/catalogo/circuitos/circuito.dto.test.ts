@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CrearCircuitoDto, FiltrosCircuitoDto, ModificarCircuitoDto } from "./circuito.dto";
 
-const base = { nombreCircuito: "Camino Inca", duracionDias: 4, dificultad: "MEDIA", minimoGuias: 1 };
+const base = { nombreCircuito: "Camino Inca", duracionDias: 4, dificultad: "Media", minimoGuias: 1 };
 
 describe("CrearCircuitoDto", () => {
   it("acepta un circuito válido, con parametrosPorteadores opcional", () => {
@@ -9,6 +9,12 @@ describe("CrearCircuitoDto", () => {
 
     expect(error).toBeUndefined();
     expect(dto).toMatchObject({ ...base, parametrosPorteadores: "1 cada 2" });
+  });
+
+  it("normaliza la dificultad a Baja, Media o Alta sin importar mayúsculas", () => {
+    expect(CrearCircuitoDto.create({ ...base, dificultad: "baja" })[1]?.dificultad).toBe("Baja");
+    expect(CrearCircuitoDto.create({ ...base, dificultad: "MEDIA" })[1]?.dificultad).toBe("Media");
+    expect(CrearCircuitoDto.create({ ...base, dificultad: "Alta" })[1]?.dificultad).toBe("Alta");
   });
 
   it.each([
@@ -19,6 +25,8 @@ describe("CrearCircuitoDto", () => {
     [{ duracionDias: 2.5 }, "duracionDias debe ser un número entero mayor a 0"],
     [{ duracionDias: "4" }, "duracionDias debe ser un número entero mayor a 0"],
     [{ dificultad: "" }, "dificultad es requerido"],
+    [{ dificultad: "Moderada" }, "dificultad debe ser Baja, Media o Alta"],
+    [{ dificultad: "Extrema" }, "dificultad debe ser Baja, Media o Alta"],
     [{ minimoGuias: undefined }, "minimoGuias es requerido"],
     [{ minimoGuias: -1 }, "minimoGuias debe ser un número entero mayor a 0"],
     [{ minimoGuias: 1.5 }, "minimoGuias debe ser un número entero mayor a 0"],
@@ -32,6 +40,7 @@ describe("ModificarCircuitoDto", () => {
     expect(ModificarCircuitoDto.create({ nombreCircuito: "  ", minimoGuias: 2 })[0]).toBe("nombreCircuito es requerido.");
     expect(ModificarCircuitoDto.create({ nombreCircuito: 5 })[0]).toBe("nombreCircuito es requerido.");
     expect(ModificarCircuitoDto.create({ dificultad: "", duracionDias: 3 })[0]).toBe("dificultad es requerido.");
+    expect(ModificarCircuitoDto.create({ dificultad: "Moderada" })[0]).toBe("dificultad debe ser Baja, Media o Alta");
   });
 
   it("exige al menos un campo", () => {

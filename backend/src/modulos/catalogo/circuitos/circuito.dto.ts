@@ -1,6 +1,12 @@
 import { enteroOpcional } from "../../../shared/filtros";
 import { textoRequerido } from "../../../shared/validaciones";
 
+const DIFICULTADES_VALIDAS: Record<string, string> = {
+  BAJA: "Baja",
+  MEDIA: "Media",
+  ALTA: "Alta",
+};
+
 export class CrearCircuitoDto {
   private constructor(
     public nombreCircuito: string,
@@ -25,6 +31,10 @@ export class CrearCircuitoDto {
 
     if (!dificultad) return ["dificultad es requerido"];
     if (typeof dificultad !== "string") return ["dificultad debe ser un texto"];
+    const dificultadNormalizada = DIFICULTADES_VALIDAS[dificultad.trim().toUpperCase()];
+    if (!dificultadNormalizada) {
+      return ["dificultad debe ser Baja, Media o Alta"];
+    }
 
     if (minimoGuias == null) return ["minimoGuias es requerido"];
     if (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0) {
@@ -35,7 +45,7 @@ export class CrearCircuitoDto {
       return ["parametrosPorteadores debe ser un texto (ej. '1 por cada 2 pasajeros')"];
     }
 
-    return [undefined, new CrearCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
+    return [undefined, new CrearCircuitoDto(nombreCircuito, duracionDias, dificultadNormalizada, minimoGuias, parametrosPorteadores)];
   }
 }
 
@@ -67,7 +77,11 @@ export class ModificarCircuitoDto {
     if (dificultad !== undefined) {
       const [error, limpio] = textoRequerido(dificultad, "dificultad", 255);
       if (error) return [error];
-      dificultad = limpio;
+      const dificultadNormalizada = DIFICULTADES_VALIDAS[limpio!.toUpperCase()];
+      if (!dificultadNormalizada) {
+        return ["dificultad debe ser Baja, Media o Alta"];
+      }
+      dificultad = dificultadNormalizada;
     }
 
     if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {

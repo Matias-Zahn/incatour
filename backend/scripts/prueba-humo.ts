@@ -78,7 +78,7 @@ async function faseC() {
   const t = Date.now().toString(36).toUpperCase();
 
   // Catálogo
-  const circuito = await paso("Crear circuito (CU-02)", "POST", "/circuitos", { nombreCircuito: `Humo ${t}`, duracionDias: 3, dificultad: "Moderada", minimoGuias: 1, parametrosPorteadores: "1 por cada 2 pasajeros" });
+  const circuito = await paso("Crear circuito (CU-02)", "POST", "/circuitos", { nombreCircuito: `Humo ${t}`, duracionDias: 3, dificultad: "Media", minimoGuias: 1, parametrosPorteadores: "1 por cada 2 pasajeros" });
   const idcircuito = idDe(circuito, "idcircuito");
   await paso("Modificar circuito (CU-03)", "PUT", `/circuitos/${idcircuito}`, { dificultad: "Alta" });
   await paso("Definir etapas (CU-05)", "PUT", `/circuitos/${idcircuito}/etapas`, {

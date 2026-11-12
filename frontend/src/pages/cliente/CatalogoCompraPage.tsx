@@ -1604,9 +1604,8 @@ function CatalogoCompraPage() {
                                 {[
                                     "TODAS",
                                     "BAJA",
-                                    "MODERADA",
+                                    "MEDIA",
                                     "ALTA",
-                                    "EXTREMA",
                                 ].map((dif) => (
                                     <button
                                         key={dif}
