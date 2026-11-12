@@ -167,7 +167,9 @@ function armarCalendario(hoy: string) {
     }
   }
   const clasico = PAQUETES[0];
-  // Para la presentación: una en curso (con otro guía) y la de Carlos que empieza hoy, lista para iniciarla en vivo
+  // Para la presentación: dos en curso con otros guías (una al día y una atrasada, que empezó hace dos días y solo
+  // informó la etapa 1) y la de Carlos que empieza hoy, lista para iniciarla en vivo
+  planes.push({ virtual: sumarDias(hoy, -2), paquete: clasico, etapa: "encurso" });
   planes.push({ virtual: sumarDias(hoy, -1), paquete: clasico, etapa: "encurso" });
   planes.push({ virtual: hoy, paquete: clasico, etapa: "cerrada", carlos: true, deHoy: true });
   planes.push({ virtual: sumarDias(hoy, 12), paquete: clasico, etapa: "cerrada", carlos: true });
@@ -654,13 +656,13 @@ async function verificar(db: PrismaClient, hoy: string) {
 /** Lo que se usa en vivo el día de la presentación (ver presentacion/datos-demo.md) */
 async function mostrarPresentacion(db: PrismaClient, hoy: string) {
   const deHoy = await db.salida.findFirstOrThrow({ where: { fechaInicio: new Date(hoy), estado: "CERRADA" } });
-  const enCurso = await db.salida.findFirstOrThrow({ where: { estado: "EN_CURSO" } });
+  const enCurso = await db.salida.findMany({ where: { estado: "EN_CURSO" }, orderBy: { fechaInicio: "desc" } });
   const juan = await db.reserva.findMany({ where: { cliente: { usuario: { email: "juan@test.com" } } }, include: { salida: true }, orderBy: { salida: { fechaInicio: "asc" } } });
   const pendientes = await db.solicitud.count({ where: { estado: "PENDIENTE" } });
   console.log(`
 Para la presentación (${hoy}):`);
   console.log(`  Carlos inicia en vivo: ${deHoy.nroSalida} (${deHoy.estado})`);
-  console.log(`  En curso con otro guía: ${enCurso.nroSalida}`);
+  console.log(`  En curso al día: ${enCurso[0]?.nroSalida} · atrasada (Desfasada): ${enCurso[1]?.nroSalida}`);
   console.log(`  Solicitudes de alojamiento pendientes: ${pendientes}`);
   for (const r of juan) console.log(`  Juan: ${r.nroReserva} en ${r.salida.nroSalida} (${r.salida.estado}, ${r.estado})`);
 }
