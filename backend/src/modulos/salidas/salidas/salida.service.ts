@@ -186,7 +186,11 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
     permisosFaltantes,
     etapaEsperada,
     etapaInformada,
-    etapaDesfasada: etapaEsperada !== null && etapaEsperada !== (etapaInformada ?? 0),
+    // La esperada es la que el grupo está caminando y la informada la última que completó:
+    // al día cuando completó la anterior a la esperada, o la esperada misma
+    etapaDesfasada:
+      etapaEsperada !== null &&
+      ((etapaInformada ?? 0) < etapaEsperada - 1 || (etapaInformada ?? 0) > etapaEsperada),
     primerAvance,
     alertas,
   };

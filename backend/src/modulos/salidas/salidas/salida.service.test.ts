@@ -174,6 +174,11 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
     expect(resumirSalida(listada({ estado: "EN_CURSO", fechaInicio: new Date("2026-11-01"), ultimaEtapaAlcanzada: 4 }), AHORA).etapaEsperada).toBe(4);
   });
 
+  it("recién iniciada: caminando la etapa 1 sin informar ninguna no está desfasada", () => {
+    const r = resumirSalida(listada({ estado: "EN_CURSO", fechaInicio: new Date("2026-11-15"), ultimaEtapaAlcanzada: null }), AHORA);
+    expect(r).toMatchObject({ etapaEsperada: 1, etapaInformada: null, etapaDesfasada: false });
+  });
+
   it("si no está en curso no calcula etapa esperada", () => {
     expect(resumirSalida(listada(), AHORA)).toMatchObject({ etapaEsperada: null, etapaDesfasada: false });
   });
