@@ -49,7 +49,7 @@ export function BarraLateralGuia({
     return (
         <aside
             aria-label="Navegación principal del guía"
-            className="flex w-64 shrink-0 flex-col bg-[#1b9fc7] p-5 text-white shadow-md max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3"
+            className="flex w-64 shrink-0 flex-col bg-[#1b9fc7] p-5 text-white shadow-md md:sticky md:top-0 md:h-screen md:overflow-y-auto max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3"
         >
             <div className="flex items-center gap-3 border-b border-white/30 pb-4 max-md:border-none max-md:pb-0">
                 <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">

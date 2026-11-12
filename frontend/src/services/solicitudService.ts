@@ -17,6 +17,7 @@ export interface SolicitudPendiente {
     cliente: {
       idcliente: number;
       nroCliente: string;
+      usuario: { nombre: string; apellido: string };
     };
     salida: {
       idsalida: number;

@@ -40,6 +40,7 @@ export const solicitudesIniciales: Omit<SolicitudPendiente, "garantia">[] = [
       cliente: {
         idcliente: 1,
         nroCliente: "CLI-001",
+        usuario: { nombre: "Juan", apellido: "Pérez" },
       },
       salida: {
         idsalida: 1,
