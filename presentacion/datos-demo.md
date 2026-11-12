@@ -16,13 +16,17 @@ Tarda unos minutos y al final imprime lo que se usa en vivo, por ejemplo:
 ```
 Para la presentación (2026-11-13):
   Carlos inicia en vivo: SAL-2026-038 (CERRADA)
-  En curso con otro guía: SAL-2026-037
+  En curso al día: SAL-2026-037 · atrasada (Desfasada): SAL-2026-036
   Solicitudes de alojamiento pendientes: 8
   Juan: ... en SAL-2026-036 (FINALIZADA, CONFIRMADA)   ← la puede reseñar
   Juan: ... en SAL-2026-043 (PUBLICADA, CONFIRMADA)    ← la puede cancelar con 100% de reintegro
 ```
 
 Los números de salida cambian según el día: anotar los que imprima.
+
+En Salidas, las dos en curso muestran el control sobre el guía: la que va al día ("Al día") y la que empezó
+hace dos días y solo informó la etapa 1 ("Desfasada", en amarillo), con el punto al que llegó y el tramo que
+le toca hoy.
 
 Después, levantar el back contra esa base (`DATABASE_URL` apuntando a `incatour_demo`) y el front.
 
@@ -49,6 +53,26 @@ Mailpit: http://localhost:8025
 | El cliente compra | Sepúlveda | Juan compra en una salida Publicada y cancela la que ya tiene en estado Publicada (100% de reintegro) |
 | La salida en el campo | Martín | Carlos inicia la salida de hoy, registra un avance, prueba sin señal y notifica un incidente crítico |
 | Resultados | Alexis | Reportes con dos años de historia. Juan reseña su última salida finalizada |
+
+## Simular que el guía se queda sin señal
+
+Primero iniciar la salida con conexión: iniciar necesita señal. Después, en la ventana del guía, F12 → Console:
+
+Cortar la señal:
+
+```js
+Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false }); dispatchEvent(new Event("offline"))
+```
+
+Ya se puede cerrar F12. El avance o incidente que se registre queda guardado en el dispositivo, como pendiente.
+Mostrar en la ventana del administrador que todavía no llegó. Para volver a tener señal (se manda la cola sola):
+
+```js
+delete navigator.onLine; dispatchEvent(new Event("online"))
+```
+
+No recargar la página en el medio: al recargar se pierde la simulación y la cola se manda.
+Alternativa sin consola: F12 → Network → "Offline", dejando las DevTools abiertas (si se cierran, vuelve la conexión).
 
 ## Pasajeros para pegar en la compra
 
