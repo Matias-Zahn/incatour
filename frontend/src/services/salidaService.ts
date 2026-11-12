@@ -12,6 +12,7 @@ export type CircuitoSalidaApi = {
     _count: {
         etapas: number;
     };
+    etapas?: { numeroOrden: number; puntoInicio: string; puntoFin: string }[];
 };
 
 export type PaqueteSalidaApi = {

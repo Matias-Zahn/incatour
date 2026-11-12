@@ -35,6 +35,7 @@ import {
     IconoMontana,
 } from "./IconosGuia";
 import type { SincronizacionIncidentes } from "./useSincronizacionIncidentes";
+import { siguienteOrdenAviso } from "./useSincronizacionAvances";
 
 type VistaIncidentesProps = {
     salidaActual: SalidaGuiaResumen | null;
@@ -62,7 +63,11 @@ export function VistaIncidentes({
     const [mensajeFeedback, setMensajeFeedback] = useState<{
         tipo: "exito" | "error" | "advertencia";
         texto: string;
+        orden: number;
     } | null>(null);
+    // FE-38: si después se sincronizó la cola, el aviso del portal reemplaza al de esta vista ("Sin conexión…")
+    const avisoVisible =
+        mensajeFeedback && !(sincronizacion.mensaje && sincronizacion.mensaje.orden > mensajeFeedback.orden) ? mensajeFeedback : null;
 
     const [pasajerosSeleccionados, setPasajerosSeleccionados] = useState<number[]>([]);
 
@@ -187,6 +192,7 @@ export function VistaIncidentes({
             registrarEnHistorial(guardarIncidenteOffline(idsalida, payload).idLocal);
             sincronizacion.refrescar();
             setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
                 tipo: "advertencia",
                 texto: "Sin conexión: el incidente quedó guardado en tu dispositivo y se enviará cuando recuperes señal.",
             });
@@ -207,6 +213,7 @@ export function VistaIncidentes({
             registrarEnHistorial(`inc_${idGenerado}`);
 
             setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
                 tipo: "exito",
                 texto: "Notificación de incidente enviada exitosamente al equipo de administración.",
             });
@@ -217,6 +224,7 @@ export function VistaIncidentes({
                 return;
             }
             setMensajeFeedback({
+                orden: siguienteOrdenAviso(),
                 tipo: "error",
                 texto: error.message || "Ocurrió un error al intentar notificar el incidente.",
             });
@@ -306,9 +314,9 @@ export function VistaIncidentes({
 
                     <form onSubmit={handleSubmit(enviarIncidente)} noValidate className="mt-5">
                     <fieldset disabled={!admiteRegistros(salidaActual.estado)} className="min-w-0 space-y-4 disabled:opacity-60">
-                        {mensajeFeedback ? (
-                            <Alerta tipo={mensajeFeedback.tipo}>
-                                {mensajeFeedback.texto}
+                        {avisoVisible ? (
+                            <Alerta tipo={avisoVisible.tipo}>
+                                {avisoVisible.texto}
                             </Alerta>
                         ) : null}
 
