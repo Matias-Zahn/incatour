@@ -26,6 +26,17 @@ export class PersonalRepository {
     return db.personal.findUnique({ where: { nroPasaporte } });
   }
 
+  async checkHabilitacionExists(nroHabilitacion: string) {
+    return db.guia.findFirst({
+      where: {
+        nroHabilitacion: {
+          equals: nroHabilitacion.trim(),
+          mode: "insensitive",
+        },
+      },
+    });
+  }
+
   // Guía = Usuario (acceso) + Personal (legajo) + Guia (habilitación), todo en una transacción
   // Sin cuenta (email y contraseña ausentes) solo se crean Personal y Guia (CTA-03)
   async crearGuia(data: DatosGuia, contraseniaHasheada?: string) {

@@ -1,4 +1,4 @@
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TipoServicio } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio } from "../../../shared/constantes";
 
 export const MODALIDADES_CONFIRMACION = [MODALIDAD_BLOQUEO_PLAZAS, "A_SOLICITUD"];
 const DIAS_VALIDOS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -15,8 +15,15 @@ const vTexto = (max: number): Validador => (v, c) =>
 const vEntero = (min: number): Validador => (v, c) =>
   Number.isInteger(v) && v >= min ? [undefined, v] : [`${c} debe ser un número entero mayor o igual a ${min}.`];
 
-const vNumero = (min: number): Validador => (v, c) =>
-  typeof v === "number" && Number.isFinite(v) && v >= min ? [undefined, v] : [`${c} debe ser un número mayor o igual a ${min}.`];
+const vNumero = (min: number, max?: number): Validador => (v, c) => {
+  if (typeof v !== "number" || !Number.isFinite(v) || v < min) {
+    return [`${c} debe ser un número mayor o igual a ${min}.`];
+  }
+  if (max !== undefined && v > max) {
+    return [`${c} no puede superar el máximo de ${max}.`];
+  }
+  return [undefined, v];
+};
 
 const vHora: Validador = (v, c) =>
   typeof v === "string" && REGEX_HORA.test(v) ? [undefined, v] : [`${c} debe tener el formato HH:MM.`];
@@ -34,7 +41,7 @@ const vModalidad: Validador = (v, c) =>
 // ---------- Campos comunes (ServicioBase) ----------
 const CAMPOS_BASE: { [campo: string]: Validador } = {
   nombreServicio: vTexto(120),
-  costoBase: vNumero(0),
+  costoBase: vNumero(0, 10_000_000),
   localidad: vTexto(80),
 };
 
@@ -48,7 +55,7 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
   },
   TRANSPORTE: {
     capacidadVehiculo: vEntero(1),
-    pesoEquipajeIncluido: vNumero(0),
+    pesoEquipajeIncluido: vNumero(0, PESO_MAXIMO_DECLARADO_KG),
     costoPorKgExcedente: vNumero(0),
   },
   TREN: {

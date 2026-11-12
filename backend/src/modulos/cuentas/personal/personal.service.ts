@@ -80,6 +80,13 @@ export class PersonalService {
       if (existe) throw CustomError.conflict("Este número de pasaporte ya está registrado");
     }
 
+    if (dto.nroHabilitacion && dto.nroHabilitacion !== personal.guia?.nroHabilitacion) {
+      const existe = await this.repository.checkHabilitacionExists(dto.nroHabilitacion);
+      if (existe && existe.idpersonal !== idpersonal) {
+        throw CustomError.conflict("Este número de habilitación ya está registrado");
+      }
+    }
+
     // El nombre del guía vive también en su cuenta (Usuario): se actualiza junto con el legajo
     let usuario: { idusuario: number; nombre: string; apellido: string } | undefined;
     if (dto.nombreCompleto && personal.guia?.idusuario) {
@@ -132,6 +139,11 @@ export class PersonalService {
     const { email, contrasenia, nroHabilitacion, fechaHabilitacion } = dto;
     if (!nroHabilitacion || !fechaHabilitacion) {
       throw CustomError.badRequest("Faltan datos obligatorios del guía (habilitación)");
+    }
+
+    const existeHabilitacion = await this.repository.checkHabilitacionExists(nroHabilitacion);
+    if (existeHabilitacion) {
+      throw CustomError.conflict("Este número de habilitación ya está registrado");
     }
 
     // CTA-03: la cuenta es opcional; el DTO garantiza que email y contraseña vienen juntos

@@ -154,6 +154,21 @@ export const manejadoresPersonal = [
             }
         }
 
+        if (datos.rolOperativo === "Guía" && datos.nroHabilitacion) {
+            const habDuplicada = listaPersonal.some(
+                (persona) =>
+                    persona.rol === "Guía" &&
+                    (persona.guia?.nroHabilitacion?.toLowerCase() === datos.nroHabilitacion?.toLowerCase() ||
+                        persona.nroHabilitacion?.toLowerCase() === datos.nroHabilitacion?.toLowerCase()),
+            );
+            if (habDuplicada) {
+                return HttpResponse.json(
+                    { error: "Este número de habilitación ya está registrado" },
+                    { status: 409 },
+                );
+            }
+        }
+
         const nuevoIdPersonal =
             Math.max(0, ...listaPersonal.map((persona) => persona.idpersonal)) + 1;
         const nombreCompleto = `${datos.nombre} ${datos.apellido}`.trim();
@@ -317,6 +332,26 @@ export const manejadoresPersonal = [
                 return HttpResponse.json(
                     { error: "Este número de pasaporte ya está registrado" },
                     { status: 400 },
+                );
+            }
+        }
+
+        if (
+            existente.rol === "Guía" &&
+            datos.nroHabilitacion &&
+            datos.nroHabilitacion.toLowerCase() !== (existente.guia?.nroHabilitacion ?? "").toLowerCase()
+        ) {
+            const habDuplicada = listaPersonal.some(
+                (persona) =>
+                    persona.idpersonal !== id &&
+                    persona.rol === "Guía" &&
+                    (persona.guia?.nroHabilitacion?.toLowerCase() === datos.nroHabilitacion!.toLowerCase() ||
+                        persona.nroHabilitacion?.toLowerCase() === datos.nroHabilitacion!.toLowerCase()),
+            );
+            if (habDuplicada) {
+                return HttpResponse.json(
+                    { error: "Este número de habilitación ya está registrado" },
+                    { status: 409 },
                 );
             }
         }
@@ -552,6 +587,23 @@ export const manejadoresPersonal = [
         const partes = personal.nombreCompleto.trim().split(" ");
         const nombre = partes[0] || personal.nombreCompleto;
         const apellido = partes.slice(1).join(" ") || "Guía";
+
+        if (datos.nroHabilitacion?.trim()) {
+            const habNorm = datos.nroHabilitacion.trim().toLowerCase();
+            const habDuplicada = listaPersonal.some(
+                (p) =>
+                    p.idpersonal !== datos.idpersonal &&
+                    p.rol === "Guía" &&
+                    (p.guia?.nroHabilitacion?.toLowerCase() === habNorm ||
+                        p.nroHabilitacion?.toLowerCase() === habNorm),
+            );
+            if (habDuplicada) {
+                return HttpResponse.json(
+                    { error: "Este número de habilitación ya está registrado" },
+                    { status: 409 },
+                );
+            }
+        }
 
         if (datos.nroHabilitacion?.trim() || datos.fechaHabilitacion) {
             personal.guia = {

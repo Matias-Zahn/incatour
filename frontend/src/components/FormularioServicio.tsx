@@ -238,6 +238,7 @@ function FormularioServicio({
                                 type={nombre === "costoBase" ? "number" : "text"}
                                 step={nombre === "costoBase" ? "0.01" : undefined}
                                 min={nombre === "costoBase" ? 0 : undefined}
+                                max={nombre === "costoBase" ? 10000000 : undefined}
                                 placeholder={placeholder}
                                 disabled={deshabilitado}
                                 {...register(
@@ -352,6 +353,11 @@ function FormularioServicio({
                                           : campo.tipo === "number"
                                             ? 0
                                             : undefined
+                                }
+                                max={
+                                    nombreCampo === "pesoEquipajeIncluido"
+                                        ? 20
+                                        : undefined
                                 }
                                 placeholder={campo.placeholder}
                                 disabled={deshabilitado}

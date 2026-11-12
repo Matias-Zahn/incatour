@@ -37,6 +37,13 @@ export class CuentaGuiaService {
     }
     this.validarHabilitacion(dto.fechaHabilitacion);
 
+    if (dto.nroHabilitacion) {
+      const habExiste = await this.repository.checkHabilitacionExists(dto.nroHabilitacion);
+      if (habExiste && habExiste.idpersonal !== dto.idpersonal) {
+        throw CustomError.conflict("Este número de habilitación ya está registrado");
+      }
+    }
+
     const emailExiste = await this.repository.checkEmailExists(dto.email);
     if (emailExiste) {
       throw CustomError.conflict("El email ya se encuentra en uso por otra cuenta.");
@@ -107,6 +114,13 @@ export class CuentaGuiaService {
     }
 
     this.validarHabilitacion(dto.fechaHabilitacion);
+
+    if (dto.nroHabilitacion && dto.nroHabilitacion !== cuenta.nroHabilitacion) {
+      const habExiste = await this.repository.checkHabilitacionExists(dto.nroHabilitacion);
+      if (habExiste && habExiste.idpersonal !== cuenta.idpersonal) {
+        throw CustomError.conflict("Este número de habilitación ya está registrado");
+      }
+    }
 
     if (dto.email && dto.email !== cuenta.usuario.email) {
       const emailExiste = await this.repository.checkEmailExists(dto.email);
