@@ -29,7 +29,8 @@ const camposComunes = {
     descripcion: z.string().trim().max(500, "Máximo 500 caracteres.").optional(),
     costoBase: z
         .number({ message: "Ingresá un costo numérico válido." })
-        .min(0, "El costo no puede ser negativo."),
+        .min(0, "El costo no puede ser negativo.")
+        .max(10_000_000, "El costo no puede superar los 10.000.000."),
     localidad: z.string().trim().min(1, "La localidad es obligatoria.").max(80),
 };
 
@@ -41,7 +42,11 @@ export const esquemaServicio = z
         capacidadDisponible: z.number().int().min(0, "No puede ser negativa.").optional(),
         modalidadConfirmacion: z.string().trim().optional(),
         capacidadVehiculo: z.number().int().min(1, "Debe ser al menos 1.").optional(),
-        pesoEquipajeIncluido: z.number().min(0, "No puede ser negativo.").optional(),
+        pesoEquipajeIncluido: z
+            .number()
+            .min(0, "No puede ser negativo.")
+            .max(20, "El peso tope incluido no puede superar los 20 kg.")
+            .optional(),
         costoPorKgExcedente: z.number().min(0, "No puede ser negativo.").optional(),
         horarioSalida: z.string().trim().optional(),
         horarioLlegada: z.string().trim().optional(),

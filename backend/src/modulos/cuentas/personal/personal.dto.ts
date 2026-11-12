@@ -82,6 +82,7 @@ export class CrearPersonalDto {
       return ["El número de habilitación es requerido para un guía"];
     }
     nroHabilitacion = nroHabilitacion.trim();
+    if (!nroHabilitacion) return ["El número de habilitación es requerido para un guía"];
 
     if (!fechaHabilitacion) return ["La fecha de la habilitación es requerida para un guía"];
     const fechaHab = new Date(fechaHabilitacion);

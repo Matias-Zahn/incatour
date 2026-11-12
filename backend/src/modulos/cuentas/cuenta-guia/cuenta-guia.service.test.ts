@@ -3,7 +3,7 @@ import { CuentaGuiaService } from "./cuenta-guia.service";
 import { CrearCuentaGuiaDto, ModificarCuentaGuiaDto } from "./cuenta-guia.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { findPersonalGuia: vi.fn(), findCuenta: vi.fn(), checkEmailExists: vi.fn(), crearCuentaGuia: vi.fn(), modificarCuenta: vi.fn(), consultarAsignacionesActivas: vi.fn().mockResolvedValue([]) },
+  repo: { findPersonalGuia: vi.fn(), findCuenta: vi.fn(), checkEmailExists: vi.fn(), checkHabilitacionExists: vi.fn(), crearCuentaGuia: vi.fn(), modificarCuenta: vi.fn(), consultarAsignacionesActivas: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock("./cuenta-guia.repository", () => ({ CuentaGuiaRepository: class { constructor() { return repo; } } }));
 
@@ -16,6 +16,15 @@ describe("CuentaGuiaService (CTA-07)", () => {
     vi.clearAllMocks();
     repo.findPersonalGuia.mockResolvedValue({ idpersonal: 4, nombreCompleto: "Ana Quispe", rol: "Guía", estado: "ACTIVO", guia: null });
     repo.checkEmailExists.mockResolvedValue(null);
+    repo.checkHabilitacionExists.mockResolvedValue(null);
+  });
+
+  it("rechaza con 409 si el número de habilitación ya está registrado en otro guía", async () => {
+    repo.checkHabilitacionExists.mockResolvedValue({ idpersonal: 2, nroHabilitacion: "HAB-REPETIDA" });
+    const dto = CrearCuentaGuiaDto.create({ idpersonal: 4, email: "g@incatour.com", contrasenia: "clave1234", nroHabilitacion: "HAB-REPETIDA", fechaHabilitacion: "2030-01-01" })[1]!;
+
+    await expect(new CuentaGuiaService().crearCuentaGuia(dto)).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.crearCuentaGuia).not.toHaveBeenCalled();
   });
 
   it("no crea una cuenta con la habilitación vencida", async () => {

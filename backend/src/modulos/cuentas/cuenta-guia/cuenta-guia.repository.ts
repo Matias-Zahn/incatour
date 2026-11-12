@@ -68,6 +68,17 @@ export class CuentaGuiaRepository {
     return db.usuario.findUnique({ where: { email } });
   }
 
+  async checkHabilitacionExists(nroHabilitacion: string) {
+    return db.guia.findFirst({
+      where: {
+        nroHabilitacion: {
+          equals: nroHabilitacion.trim(),
+          mode: "insensitive",
+        },
+      },
+    });
+  }
+
   // CU-45: Crear cuenta de acceso para un guía ya registrado en el personal
   async crearCuentaGuia(
     idpersonal: number,

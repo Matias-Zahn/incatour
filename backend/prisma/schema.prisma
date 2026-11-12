@@ -171,7 +171,7 @@ model Personal {
 model Guia {
   idpersonal        Int       @id
   idusuario         Int?      @unique
-  nroHabilitacion   String?
+  nroHabilitacion   String?   @unique
   fechaHabilitacion DateTime?
 
   personal Personal @relation(fields: [idpersonal], references: [idpersonal])

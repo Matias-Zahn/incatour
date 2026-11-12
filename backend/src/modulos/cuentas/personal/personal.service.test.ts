@@ -3,7 +3,7 @@ import { PersonalService } from "./personal.service";
 import { CrearPersonalDto, ModificarPersonalDto } from "./personal.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn(), consultarAsignacionesActivas: vi.fn() },
+  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), checkHabilitacionExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn(), consultarAsignacionesActivas: vi.fn() },
 }));
 vi.mock("./personal.repository", () => ({ PersonalRepository: class { constructor() { return repo; } } }));
 
@@ -43,6 +43,15 @@ describe("PersonalService.modificarPersonal (CU-24)", () => {
     });
     expect(repo.modificar).not.toHaveBeenCalled();
   });
+
+  it("rechaza con 409 si el número de habilitación ya está registrado en otro guía", async () => {
+    repo.buscarPorId.mockResolvedValue({ idpersonal: 1, estado: "ACTIVO", nroPasaporte: "X", guia: { idpersonal: 1, nroHabilitacion: "HAB-100" } });
+    repo.checkHabilitacionExists.mockResolvedValue({ idpersonal: 2, nroHabilitacion: "HAB-200" });
+
+    await expect(new PersonalService().modificarPersonal(1, ModificarPersonalDto.create({ nroHabilitacion: "HAB-200" })[1]!))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.modificar).not.toHaveBeenCalled();
+  });
 });
 
 describe("PersonalService.crearPersonal: vencimiento del pasaporte (BE-01)", () => {
@@ -77,6 +86,13 @@ describe("PersonalService.crearPersonal (CTA-03: guía con cuenta opcional)", ()
     vi.clearAllMocks();
     repo.checkPasaporteExists.mockResolvedValue(null);
     repo.checkEmailExists.mockResolvedValue(null);
+    repo.checkHabilitacionExists.mockResolvedValue(null);
+  });
+
+  it("rechaza con 409 si el número de habilitación ya está registrado", async () => {
+    repo.checkHabilitacionExists.mockResolvedValue({ idpersonal: 2, nroHabilitacion: "H-1" });
+    await expect(new PersonalService().crearPersonal(dtoDe({}))).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.crearGuia).not.toHaveBeenCalled();
   });
 
   it("sin email ni contraseña crea el guía sin cuenta", async () => {
