@@ -863,12 +863,19 @@ function SalidasPage() {
                             />
                         </div>
                         <div className="flex items-center justify-between text-xs text-texto-suave">
-                            <span className="max-md:hidden">Disp: {fila.stockLocal}</span>
-                            {confirmados === 0 && (
-                                <span className="text-amber-700 font-medium">Sin ventas</span>
-                            )}
-                            {fila.stockLocal === 0 && (
-                                <span className="text-rose-600 font-semibold">Completo</span>
+                            {/* Al asignar recursos la venta se cierra y el stock queda en 0: no significa que se llenó */}
+                            {fila.estado === "PUBLICADA" ? (
+                                <>
+                                    <span className="max-md:hidden">Disp: {fila.stockLocal}</span>
+                                    {confirmados === 0 && (
+                                        <span className="text-amber-700 font-medium">Sin ventas</span>
+                                    )}
+                                    {fila.stockLocal === 0 && (
+                                        <span className="text-rose-600 font-semibold">Completo</span>
+                                    )}
+                                </>
+                            ) : (
+                                fila.estado !== "CANCELADA" && <span>Venta cerrada</span>
                             )}
                         </div>
                     </div>
