@@ -110,11 +110,11 @@ export function BarraLateralGuia({
                 <button
                     type="button"
                     onClick={onAbrirSalir}
-                    aria-label="Salir del portal"
+                    aria-label="Cerrar sesión"
                     className="flex min-h-11 min-w-11 w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 max-md:w-auto"
                 >
                     <IconoSalir tamano={16} />
-                    <span className="max-md:hidden">Salir</span>
+                    <span className="max-md:hidden">Cerrar sesión</span>
                 </button>
             </div>
         </aside>
