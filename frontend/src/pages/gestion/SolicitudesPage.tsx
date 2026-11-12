@@ -33,6 +33,8 @@ function EnlaceContacto({ dato }: { dato: string }) {
   );
 }
 
+const nombreCliente = (s: SolicitudPendiente) => `${s.reserva.cliente.usuario.nombre} ${s.reserva.cliente.usuario.apellido}`;
+
 function esGarantiaEstablecimiento(tipoGarantia: string): boolean {
   return tipoGarantia.toUpperCase().includes("ESTABLECIMIENTO");
 }
@@ -150,7 +152,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
             <div>
               <span className="block text-texto-suave">Reserva / Cliente</span>
               <span className="font-semibold text-texto">
-                {solicitud.reserva.nroReserva} · {solicitud.reserva.cliente.nroCliente}
+                {solicitud.reserva.nroReserva} · {nombreCliente(solicitud)}
               </span>
             </div>
             <div>
@@ -417,6 +419,7 @@ export function SolicitudesPage() {
         s.nroSolicitud.toLowerCase().includes(q) ||
         s.reserva.nroReserva.toLowerCase().includes(q) ||
         s.reserva.cliente.nroCliente.toLowerCase().includes(q) ||
+        nombreCliente(s).toLowerCase().includes(q) ||
         s.reserva.salida.nroSalida.toLowerCase().includes(q) ||
         s.reserva.salida.paquete.nombrePaquete.toLowerCase().includes(q)
       );
@@ -535,7 +538,7 @@ export function SolicitudesPage() {
                   <div>
                     <div className="font-medium text-texto">{s.reserva.nroReserva}</div>
                     <div className="text-xs text-texto-suave">
-                      Cliente: {s.reserva.cliente.nroCliente} · {s.reserva.cantidadPasajeros}{" "}
+                      {nombreCliente(s)} · {s.reserva.cantidadPasajeros}{" "}
                       pasajero(s)
                     </div>
                   </div>

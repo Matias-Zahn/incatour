@@ -12,7 +12,7 @@ export class SolicitudRepository {
       include: {
         reserva: {
           include: {
-            cliente: true,
+            cliente: { include: { usuario: { select: { nombre: true, apellido: true } } } },
             salida: {
               include: {
                 paquete: true
