@@ -38,7 +38,13 @@ export class SalidaRepository {
           select: {
             nroPaquete: true,
             nombrePaquete: true,
-            circuito: { select: { idcircuito: true, nombreCircuito: true, duracionDias: true, _count: { select: { etapas: true } } } },
+            circuito: {
+              select: {
+                idcircuito: true, nombreCircuito: true, duracionDias: true, _count: { select: { etapas: true } },
+                // Para mostrar dónde está el grupo, no solo el número de etapa
+                etapas: { select: { numeroOrden: true, puntoInicio: true, puntoFin: true }, orderBy: { numeroOrden: "asc" } },
+              },
+            },
           },
         },
         personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },

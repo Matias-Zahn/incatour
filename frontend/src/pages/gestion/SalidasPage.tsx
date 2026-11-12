@@ -882,6 +882,9 @@ function SalidasPage() {
                 const informada = fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
                 const esperada = fila.etapaEsperada;
                 const desfasada = fila.etapaDesfasada;
+                const etapas = fila.paquete.circuito.etapas ?? [];
+                const llegoA = etapas.find((e) => e.numeroOrden === informada);
+                const tramoHoy = etapas.find((e) => e.numeroOrden === esperada);
 
                 return (
                     <div className="space-y-1.5">
@@ -926,6 +929,16 @@ function SalidasPage() {
                                         <span className="text-xs text-emerald-700 font-medium">
                                             Al día
                                         </span>
+                                    </div>
+                                )}
+                                {(llegoA || tramoHoy) && (
+                                    <div className="mt-1 space-y-0.5 text-texto-suave">
+                                        {llegoA && <div>Llegó a: <span className="text-texto">{llegoA.puntoFin}</span></div>}
+                                        {tramoHoy && (
+                                            <div>
+                                                Hoy: {tramoHoy.puntoInicio} → {tramoHoy.puntoFin}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
