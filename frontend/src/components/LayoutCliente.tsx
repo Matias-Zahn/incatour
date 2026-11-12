@@ -404,7 +404,7 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                             >
                                 <IconoSalir />
                                 {!colapsada ? (
-                                    <span className="max-md:hidden">Salir</span>
+                                    <span className="max-md:hidden">Cerrar sesión</span>
                                 ) : null}
                             </button>
                         </>

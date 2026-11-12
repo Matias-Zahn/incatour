@@ -1,6 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import DialogoConfirmacion from "./DialogoConfirmacion";
+import { IconoSalir } from "../pages/guia/IconosGuia";
+import { cerrarSesion } from "../services/autenticacionService";
 import logoIncaTour from "../assets/logo-incatour.png";
 import { criticosEnCurso, useIncidentes } from "../services/guiaService";
 import { useSalidas } from "../services/salidaService";
@@ -296,6 +299,8 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
 
     const usuario = obtenerUsuario();
     const avisos = useAvisosGestion();
+    const navegar = useNavigate();
+    const [modalSalirAbierto, setModalSalirAbierto] = useState(false);
     const iniciales = usuario
         ? `${usuario.nombre.charAt(0)}${usuario.apellido.charAt(0)}`.toUpperCase()
         : "AD";
@@ -462,7 +467,33 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
                         </div>
                     </div>
                 )}
+                {/* Mismo lugar y misma confirmación que en los portales del cliente y del guía */}
+                <button
+                    type="button"
+                    onClick={() => setModalSalirAbierto(true)}
+                    className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 text-xs font-bold text-white transition hover:bg-white/20 max-md:mt-0 max-md:w-auto max-md:px-3 max-md:py-2 ${
+                        colapsada ? "py-2.5" : "px-3 py-2"
+                    }`}
+                    title="Cerrar sesión"
+                    aria-label="Cerrar sesión"
+                >
+                    <IconoSalir tamano={16} />
+                    {!colapsada && <span className="max-md:hidden">Cerrar sesión</span>}
+                </button>
             </div>
+
+            <DialogoConfirmacion
+                abierto={modalSalirAbierto}
+                titulo="¿Deseás cerrar tu sesión?"
+                descripcion="Al confirmar, cerrarás tu sesión en el panel de gestión de IncaTour."
+                textoConfirmar="Sí, salir"
+                textoCancelar="Cancelar"
+                onConfirmar={() => {
+                    cerrarSesion();
+                    navegar("/login", { replace: true });
+                }}
+                onCancelar={() => setModalSalirAbierto(false)}
+            />
         </aside>
     );
 }
