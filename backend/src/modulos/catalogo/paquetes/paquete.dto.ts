@@ -1,3 +1,4 @@
+import { TOPES } from "../../../shared/constantes";
 import { enteroOpcional } from "../../../shared/filtros";
 import { textoRequerido } from "../../../shared/validaciones";
 
@@ -76,16 +77,16 @@ export class CrearPaqueteDto {
     }
 
     // --- Validación de noches (opcionales, pero si vienen deben ser >= 0 y enteros, CAT-11) ---
-    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
-      return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
+    if (nochesPrevias != null && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0 || nochesPrevias > TOPES.noches)) {
+      return [`nochesPrevias debe ser un número entero entre 0 y ${TOPES.noches}.`];
     }
-    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
-      return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
+    if (nochesPosteriores != null && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0 || nochesPosteriores > TOPES.noches)) {
+      return [`nochesPosteriores debe ser un número entero entre 0 y ${TOPES.noches}.`];
     }
 
     // RES-06: plazo de reintegro (opcional; sin plazo, el reintegro es siempre del 100%)
-    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0)) {
-      return ["diasMinimosReintegro debe ser un número entero mayor o igual a 0."];
+    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0 || diasMinimosReintegro > TOPES.diasMinimosReintegro)) {
+      return [`diasMinimosReintegro debe ser un número entero entre 0 y ${TOPES.diasMinimosReintegro}.`];
     }
 
     // --- Validación de matriz de precios (RN: Viabilidad Comercial, CAT-11) ---
@@ -101,8 +102,8 @@ export class CrearPaqueteDto {
       }
       const monto = p.monto ?? p.precioPersona;
       p.monto = monto;
-      if (monto == null || typeof monto !== "number" || monto <= 0) {
-        return [`matrizPrecios[${i}]: monto debe ser un número mayor a 0.`];
+      if (monto == null || typeof monto !== "number" || monto <= 0 || monto > TOPES.montoTarifa) {
+        return [`matrizPrecios[${i}]: monto debe ser mayor a 0 y no superar ${TOPES.montoTarifa}.`];
       }
       // RES-16: hay una sola moneda; si no viene se asume USD
       p.moneda = p.moneda ?? "USD";
@@ -220,16 +221,16 @@ export class ModificarPaqueteDto {
       return ["Con garantía por categoría, no debe indicarse idservicioGarantizado."];
     }
 
-    if (nochesPrevias !== undefined && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0)) {
-      return ["nochesPrevias debe ser un número entero mayor o igual a 0."];
+    if (nochesPrevias !== undefined && (typeof nochesPrevias !== "number" || !Number.isInteger(nochesPrevias) || nochesPrevias < 0 || nochesPrevias > TOPES.noches)) {
+      return [`nochesPrevias debe ser un número entero entre 0 y ${TOPES.noches}.`];
     }
-    if (nochesPosteriores !== undefined && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0)) {
-      return ["nochesPosteriores debe ser un número entero mayor o igual a 0."];
+    if (nochesPosteriores !== undefined && (typeof nochesPosteriores !== "number" || !Number.isInteger(nochesPosteriores) || nochesPosteriores < 0 || nochesPosteriores > TOPES.noches)) {
+      return [`nochesPosteriores debe ser un número entero entre 0 y ${TOPES.noches}.`];
     }
 
     // RES-06: null quita el plazo (reintegro siempre del 100%)
-    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0)) {
-      return ["diasMinimosReintegro debe ser un número entero mayor o igual a 0."];
+    if (diasMinimosReintegro != null && (typeof diasMinimosReintegro !== "number" || !Number.isInteger(diasMinimosReintegro) || diasMinimosReintegro < 0 || diasMinimosReintegro > TOPES.diasMinimosReintegro)) {
+      return [`diasMinimosReintegro debe ser un número entero entre 0 y ${TOPES.diasMinimosReintegro}.`];
     }
 
     // Si mandan matrizPrecios en el PUT, validamos la estructura
@@ -245,8 +246,8 @@ export class ModificarPaqueteDto {
         }
         const monto = p.monto ?? p.precioPersona;
         p.monto = monto;
-        if (monto == null || typeof monto !== "number" || monto <= 0) {
-          return [`matrizPrecios[${i}]: monto debe ser mayor a 0.`];
+        if (monto == null || typeof monto !== "number" || monto <= 0 || monto > TOPES.montoTarifa) {
+          return [`matrizPrecios[${i}]: monto debe ser mayor a 0 y no superar ${TOPES.montoTarifa}.`];
         }
         p.moneda = p.moneda ?? "USD";
         if (p.moneda !== "USD") return [`matrizPrecios[${i}]: la moneda tiene que ser USD.`];

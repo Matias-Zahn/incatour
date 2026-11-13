@@ -28,6 +28,14 @@ describe("CrearPaqueteDto", () => {
     expect(dto?.matrizPrecios[0]?.moneda).toBe("USD");
   });
 
+  it("rechaza valores por encima de los topes (noches 30, plazo 365, monto 10.000.000)", () => {
+    expect(error({ nochesPrevias: 31 })).toMatch("entre 0 y 30");
+    expect(error({ nochesPosteriores: 31 })).toMatch("entre 0 y 30");
+    expect(error({ diasMinimosReintegro: 366 })).toMatch("entre 0 y 365");
+    expect(error({ matrizPrecios: [{ idtemporada: 1, monto: 10_000_001 }] })).toMatch("no superar 10000000");
+    expect(error({ nochesPrevias: 30, diasMinimosReintegro: 365, matrizPrecios: [{ idtemporada: 1, monto: 10_000_000 }] })).toBeUndefined();
+  });
+
   it("acepta un paquete por establecimiento con idservicioGarantizado", () => {
     expect(error({ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 40 })).toBeUndefined();
   });
@@ -44,12 +52,12 @@ describe("CrearPaqueteDto", () => {
     [{ categoriaGarantizada: undefined }, "Con garantía por categoría, categoriaGarantizada es obligatoria."],
     [{ tipoHabitacionGarantizada: undefined }, "Con garantía por categoría, tipoHabitacionGarantizada es obligatoria."],
     [{ tipoGarantia: "POR_CATEGORIA", idservicioGarantizado: 40 }, "Con garantía por categoría, no debe indicarse idservicioGarantizado."],
-    [{ nochesPrevias: -1 }, "nochesPrevias debe ser un número entero mayor o igual a 0."],
-    [{ nochesPrevias: 1.5 }, "nochesPrevias debe ser un número entero mayor o igual a 0."],
-    [{ nochesPosteriores: "2" }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
-    [{ nochesPosteriores: 2.5 }, "nochesPosteriores debe ser un número entero mayor o igual a 0."],
-    [{ diasMinimosReintegro: -1 }, "diasMinimosReintegro debe ser un número entero mayor o igual a 0."],
-    [{ diasMinimosReintegro: 2.5 }, "diasMinimosReintegro debe ser un número entero mayor o igual a 0."],
+    [{ nochesPrevias: -1 }, "nochesPrevias debe ser un número entero entre 0 y 30."],
+    [{ nochesPrevias: 1.5 }, "nochesPrevias debe ser un número entero entre 0 y 30."],
+    [{ nochesPosteriores: "2" }, "nochesPosteriores debe ser un número entero entre 0 y 30."],
+    [{ nochesPosteriores: 2.5 }, "nochesPosteriores debe ser un número entero entre 0 y 30."],
+    [{ diasMinimosReintegro: -1 }, "diasMinimosReintegro debe ser un número entero entre 0 y 365."],
+    [{ diasMinimosReintegro: 2.5 }, "diasMinimosReintegro debe ser un número entero entre 0 y 365."],
     [{ serviciosIncluidos: "40" }, "serviciosIncluidos debe ser un arreglo de IDs de servicios."],
     [{ serviciosIncluidos: [40, "x"] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
     [{ serviciosIncluidos: [40, 2.5] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
@@ -63,7 +71,7 @@ describe("CrearPaqueteDto", () => {
       [[], "La matriz de precios es obligatoria y debe contener al menos una tarifa."],
       [[{ monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
       [[{ idtemporada: 1.5, monto: 1, moneda: "USD" }], "matrizPrecios[0]: idtemporada debe ser un número entero mayor a 0."],
-      [[{ idtemporada: 1, monto: 0, moneda: "USD" }], "matrizPrecios[0]: monto debe ser un número mayor a 0."],
+      [[{ idtemporada: 1, monto: 0, moneda: "USD" }], "matrizPrecios[0]: monto debe ser mayor a 0 y no superar 10000000."],
       [[{ idtemporada: 1, monto: 10, moneda: "PEN" }], "matrizPrecios[0]: la moneda tiene que ser USD."],
       [[...precios, { idtemporada: 1, monto: 900, moneda: "USD" }], "matrizPrecios[1]: la temporada 1 está duplicada."],
     ])("rechaza %o", (matrizPrecios, mensaje) => {
@@ -124,12 +132,12 @@ describe("ModificarPaqueteDto", () => {
   });
 
   it("valida las noches enteras (CAT-11)", () => {
-    expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
-    expect(ModificarPaqueteDto.create({ nochesPrevias: 1.5 })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
+    expect(ModificarPaqueteDto.create({ nochesPrevias: -2 })[0]).toBe("nochesPrevias debe ser un número entero entre 0 y 30.");
+    expect(ModificarPaqueteDto.create({ nochesPrevias: 1.5 })[0]).toBe("nochesPrevias debe ser un número entero entre 0 y 30.");
     // CAT-11: null explícito no es "sin cambio" (terminaba en 500 de Prisma)
-    expect(ModificarPaqueteDto.create({ nochesPrevias: null })[0]).toBe("nochesPrevias debe ser un número entero mayor o igual a 0.");
-    expect(ModificarPaqueteDto.create({ nombrePaquete: "X", nochesPosteriores: null })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
-    expect(ModificarPaqueteDto.create({ nochesPosteriores: 2.5 })[0]).toBe("nochesPosteriores debe ser un número entero mayor o igual a 0.");
+    expect(ModificarPaqueteDto.create({ nochesPrevias: null })[0]).toBe("nochesPrevias debe ser un número entero entre 0 y 30.");
+    expect(ModificarPaqueteDto.create({ nombrePaquete: "X", nochesPosteriores: null })[0]).toBe("nochesPosteriores debe ser un número entero entre 0 y 30.");
+    expect(ModificarPaqueteDto.create({ nochesPosteriores: 2.5 })[0]).toBe("nochesPosteriores debe ser un número entero entre 0 y 30.");
   });
 });
 

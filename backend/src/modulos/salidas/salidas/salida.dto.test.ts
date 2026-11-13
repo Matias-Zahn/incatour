@@ -44,6 +44,12 @@ describe("CrearSalidaDto", () => {
     expect(dto?.fechaInicio.toISOString().slice(0, 10)).toBe("2026-11-15");
   });
 
+  it("tamanoMaximo entre 1 y 100", () => {
+    const conTamano = (tamanoMaximo: number) => CrearSalidaDto.create({ ...base, fechaInicio: "2026-11-15", tamanoMaximo })[0];
+    expect(conTamano(101)).toMatch("entre 1 y 100");
+    expect(conTamano(100)).toBeUndefined();
+  });
+
   it("rechaza fechas que no empiezan con AAAA-MM-DD", () => {
     expect(CrearSalidaDto.create({ ...base, fechaInicio: "abc" })[0]).toMatch("fechaInicio");
     expect(CrearSalidaDto.create({ ...base, fechaInicio: 1763000000000 })[0]).toMatch("fechaInicio");

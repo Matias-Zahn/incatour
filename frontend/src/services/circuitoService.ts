@@ -23,7 +23,8 @@ export const esquemaCircuito = z.object({
     duracionDias: z
         .number({ message: "Ingresá una duración válida en días." })
         .int("La duración debe ser un número entero.")
-        .min(1, "La duración debe ser de al menos 1 día."),
+        .min(1, "La duración debe ser de al menos 1 día.")
+        .max(30, "La duración no puede superar los 30 días."),
     dificultad: z
         .string()
         .trim()
@@ -31,7 +32,8 @@ export const esquemaCircuito = z.object({
     minimoGuias: z
         .number({ message: "Ingresá una cantidad de guías válida." })
         .int("El mínimo de guías debe ser un número entero.")
-        .min(1, "El mínimo de guías debe ser de al menos 1."),
+        .min(1, "El mínimo de guías debe ser de al menos 1.")
+        .max(10, "El mínimo de guías no puede superar 10."),
     parametrosPorteadores: z
         .string()
         .trim()

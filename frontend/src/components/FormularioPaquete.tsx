@@ -519,11 +519,18 @@ function FormularioPaquete({
             !Number.isFinite(nochesPreviasNumero) ||
             !Number.isFinite(nochesPosterioresNumero) ||
             nochesPreviasNumero < 0 ||
-            nochesPosterioresNumero < 0
+            nochesPosterioresNumero < 0 ||
+            nochesPreviasNumero > 30 ||
+            nochesPosterioresNumero > 30
         ) {
             setErrorValidacion(
-                "Las noches previas y posteriores deben ser mayores o iguales a 0.",
+                "Las noches previas y posteriores deben estar entre 0 y 30.",
             );
+            return;
+        }
+
+        if (diasMinimosReintegro !== "" && Number(diasMinimosReintegro) > 365) {
+            setErrorValidacion("Los días mínimos para reintegro no pueden superar 365.");
             return;
         }
 
@@ -543,9 +550,9 @@ function FormularioPaquete({
                 );
                 return;
             }
-            if (!Number.isFinite(fila.monto) || fila.monto <= 0) {
+            if (!Number.isFinite(fila.monto) || fila.monto <= 0 || fila.monto > 10_000_000) {
                 setErrorValidacion(
-                    `El monto en la fila #${i + 1} debe ser mayor a 0.`,
+                    `El monto en la fila #${i + 1} debe ser mayor a 0 y no superar 10.000.000.`,
                 );
                 return;
             }

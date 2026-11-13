@@ -91,7 +91,8 @@ const esquemaParametrosSalida = z.object({
     tamanoMaximo: z
         .number({ message: "Ingresá el tamaño del grupo de pasajeros" })
         .int("El tamaño debe ser un número entero")
-        .positive("El tamaño del grupo debe ser mayor a 0"),
+        .positive("El tamaño del grupo debe ser mayor a 0")
+        .max(100, "El grupo no puede superar los 100 pasajeros"),
 });
 
 export type ValoresFormularioSalida = z.infer<typeof esquemaParametrosSalida>;

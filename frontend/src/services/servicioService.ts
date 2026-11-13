@@ -39,21 +39,21 @@ export const esquemaServicio = z
         ...camposComunes,
         categoria: z.string().trim().max(40).optional(),
         tipoHabitacion: z.string().trim().max(40).optional(),
-        capacidadDisponible: z.number().int().min(0, "No puede ser negativa.").optional(),
+        capacidadDisponible: z.number().int().min(0, "No puede ser negativa.").max(5000, "No puede superar las 5000 plazas.").optional(),
         modalidadConfirmacion: z.string().trim().optional(),
-        capacidadVehiculo: z.number().int().min(1, "Debe ser al menos 1.").optional(),
+        capacidadVehiculo: z.number().int().min(1, "Debe ser al menos 1.").max(60, "No puede superar los 60 asientos.").optional(),
         pesoEquipajeIncluido: z
             .number()
             .min(0, "No puede ser negativo.")
             .max(20, "El peso tope incluido no puede superar los 20 kg.")
             .optional(),
-        costoPorKgExcedente: z.number().min(0, "No puede ser negativo.").optional(),
+        costoPorKgExcedente: z.number().min(0, "No puede ser negativo.").max(1000, "No puede superar los 1000 por kg.").optional(),
         horarioSalida: z.string().trim().optional(),
         horarioLlegada: z.string().trim().optional(),
         diasOperacion: z.string().trim().optional(),
         tipoEquipamiento: z.string().trim().max(60).optional(),
-        cantidadDisponible: z.number().int().min(0, "No puede ser negativa.").optional(),
-        inventarioTotal: z.number().int().min(0, "No puede ser negativo.").optional(),
+        cantidadDisponible: z.number().int().min(0, "No puede ser negativa.").max(10000, "No puede superar las 10000 unidades.").optional(),
+        inventarioTotal: z.number().int().min(0, "No puede ser negativo.").max(10000, "No puede superar las 10000 unidades.").optional(),
     })
     .superRefine((datos, contexto) => {
         const requeridos: Record<TipoServicio, [keyof DatosServicio, string][]> = {

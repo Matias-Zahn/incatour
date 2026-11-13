@@ -1,3 +1,4 @@
+import { TOPES } from "../../../shared/constantes";
 export class ConsultarSalidasDto {
   private constructor(
     public idpaquete: number | undefined,
@@ -67,7 +68,7 @@ export class CrearSalidaDto {
     if (!idpaquete) return ["idpaquete es requerido y debe ser un entero positivo"];
 
     const tamanoMaximo = entero(obj.tamanoMaximo);
-    if (!tamanoMaximo) return ["tamanoMaximo es requerido y debe ser un entero positivo"];
+    if (!tamanoMaximo || tamanoMaximo > TOPES.tamanoSalida) return [`tamanoMaximo es requerido y debe ser un entero entre 1 y ${TOPES.tamanoSalida}`];
 
     // Solo cuenta el día calendario (el cupo de la autoridad es por día UTC): se descarta la hora y la zona
     const fechaInicio =
