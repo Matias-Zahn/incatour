@@ -2200,6 +2200,15 @@ function CatalogoCompraPage() {
                                                                             {s.garantia}
                                                                         </p>
                                                                     ) : null}
+                                                                    {s.nochesPrevias !== undefined &&
+                                                                    s.nochesPosteriores !== undefined &&
+                                                                    (s.nochesPrevias !== paqueteDetalle.nochesAlojamiento.previas ||
+                                                                        s.nochesPosteriores !== paqueteDetalle.nochesAlojamiento.posteriores) ? (
+                                                                        // CAT-05: la salida conserva las noches con las que se publicó
+                                                                        <p className="font-semibold text-advertencia">
+                                                                            Noches de hotel de esta salida: {s.nochesPrevias} previas · {s.nochesPosteriores} posteriores
+                                                                        </p>
+                                                                    ) : null}
                                                                 </div>
                                                                 <Boton
                                                                     className="px-3 py-1.5 text-xs"
