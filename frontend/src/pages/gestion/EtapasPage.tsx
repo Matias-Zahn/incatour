@@ -123,40 +123,23 @@ function EtapasPage() {
     }
 
     function guardarEtapaEnBorrador(datos: DatosEtapa) {
+        const ordenFinal = etapaEnEdicion ? etapaEnEdicion.numeroOrden : etapas.length + 1;
         const etapaNormalizada: Etapa = {
-            id: datos.numeroOrden,
+            id: ordenFinal,
             idcircuito: idCircuitoActivo,
-            numeroOrden: datos.numeroOrden,
+            numeroOrden: ordenFinal,
             puntoInicio: datos.puntoInicio.trim(),
             puntoFin: datos.puntoFin.trim(),
             campamentoPrevisto: datos.campamentoPrevisto?.trim() ?? "",
         };
 
-        let siguienteLista: Etapa[];
-        if (etapaEnEdicion) {
-            const sinEditada = etapas.filter(
-                (item) => item.numeroOrden !== etapaEnEdicion.numeroOrden,
-            );
-            const indiceDestino = Math.max(
-                0,
-                Math.min(sinEditada.length, datos.numeroOrden - 1),
-            );
-            siguienteLista = [
-                ...sinEditada.slice(0, indiceDestino),
-                etapaNormalizada,
-                ...sinEditada.slice(indiceDestino),
-            ];
-        } else {
-            const indiceDestino = Math.max(
-                0,
-                Math.min(etapas.length, datos.numeroOrden - 1),
-            );
-            siguienteLista = [
-                ...etapas.slice(0, indiceDestino),
-                etapaNormalizada,
-                ...etapas.slice(indiceDestino),
-            ];
-        }
+        const siguienteLista = etapaEnEdicion
+            ? etapas.map((item) =>
+                  item.numeroOrden === etapaEnEdicion.numeroOrden
+                      ? etapaNormalizada
+                      : item,
+              )
+            : [...etapas, etapaNormalizada];
 
         actualizarBorrador(siguienteLista);
         setFormularioAbierto(false);

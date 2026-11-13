@@ -125,11 +125,11 @@ function FormularioPaquete({
     const [condiciones, setCondiciones] = useState(
         paqueteEnEdicion?.condiciones ?? "",
     );
-    const [nochesPrevias, setNochesPrevias] = useState<number>(
-        paqueteEnEdicion?.nochesPrevias ?? 0,
+    const [nochesPrevias, setNochesPrevias] = useState<string>(
+        String(paqueteEnEdicion?.nochesPrevias ?? 0),
     );
-    const [nochesPosteriores, setNochesPosteriores] = useState<number>(
-        paqueteEnEdicion?.nochesPosteriores ?? 0,
+    const [nochesPosteriores, setNochesPosteriores] = useState<string>(
+        String(paqueteEnEdicion?.nochesPosteriores ?? 0),
     );
     // Vacío = sin plazo: el reintegro es siempre del 100% (RES-06)
     const [diasMinimosReintegro, setDiasMinimosReintegro] = useState<string>(
@@ -508,7 +508,19 @@ function FormularioPaquete({
             return;
         }
 
-        if (nochesPrevias < 0 || nochesPosteriores < 0) {
+        const nochesPreviasNumero =
+            nochesPrevias.trim() === "" ? 0 : Math.trunc(Number(nochesPrevias));
+        const nochesPosterioresNumero =
+            nochesPosteriores.trim() === ""
+                ? 0
+                : Math.trunc(Number(nochesPosteriores));
+
+        if (
+            !Number.isFinite(nochesPreviasNumero) ||
+            !Number.isFinite(nochesPosterioresNumero) ||
+            nochesPreviasNumero < 0 ||
+            nochesPosterioresNumero < 0
+        ) {
             setErrorValidacion(
                 "Las noches previas y posteriores deben ser mayores o iguales a 0.",
             );
@@ -610,8 +622,8 @@ function FormularioPaquete({
                       tipoHabitacionGarantizada:
                           tipoHabitacionGarantizada.trim() || undefined,
                   }),
-            nochesPrevias,
-            nochesPosteriores,
+            nochesPrevias: nochesPreviasNumero,
+            nochesPosteriores: nochesPosterioresNumero,
             diasMinimosReintegro:
                 diasMinimosReintegro === ""
                     ? null
@@ -752,11 +764,13 @@ function FormularioPaquete({
                             min={0}
                             step={1}
                             value={nochesPrevias}
-                            onChange={(e) =>
-                                setNochesPrevias(
-                                    Math.max(0, Number(e.target.value) || 0),
-                                )
-                            }
+                            onChange={(e) => setNochesPrevias(e.target.value)}
+                            onBlur={() => {
+                                if (nochesPrevias.trim() === "") {
+                                    setNochesPrevias("0");
+                                }
+                            }}
+                            placeholder="0"
                             className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
                     </label>
@@ -769,10 +783,14 @@ function FormularioPaquete({
                             step={1}
                             value={nochesPosteriores}
                             onChange={(e) =>
-                                setNochesPosteriores(
-                                    Math.max(0, Number(e.target.value) || 0),
-                                )
+                                setNochesPosteriores(e.target.value)
                             }
+                            onBlur={() => {
+                                if (nochesPosteriores.trim() === "") {
+                                    setNochesPosteriores("0");
+                                }
+                            }}
+                            placeholder="0"
                             className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
                     </label>
