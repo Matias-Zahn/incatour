@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
@@ -12,6 +12,7 @@ import {
     type Servicio,
     type TipoServicio,
 } from "../services/servicioService";
+import { DIAS_SEMANA, serializarDiasDisponibles, type CodigoDia } from "../services/paqueteService";
 
 type Props = {
     servicioEnEdicion?: Servicio | null;
@@ -51,6 +52,8 @@ function FormularioServicio({
         handleSubmit,
         reset,
         setError,
+        control,
+        setValue,
         formState: { errors },
     } = useForm<DatosServicio>({
         resolver: zodResolver(esquemaServicio),
@@ -80,6 +83,9 @@ function FormularioServicio({
     const comprometidaEquipamiento = servicioEnEdicion?.cantidadComprometida ?? 0;
 
     const esTipoValido = (tiposServicio as readonly string[]).includes(tipoProveedor);
+    const modalidad = useWatch({ control, name: "modalidadConfirmacion" });
+    const diasOperacion = useWatch({ control, name: "diasOperacion" });
+    const aSolicitud = tipoProveedor === "ALOJAMIENTO" && modalidad === "A_SOLICITUD";
 
     function esCampoEditable(campo: string): boolean {
         if (!edicion?.camposEditables) return true;
@@ -100,7 +106,8 @@ function FormularioServicio({
             });
             return;
         }
-        alGuardar(datos);
+        // El back exige la columna al crear; a solicitud no se usa
+        alGuardar(aSolicitud ? { ...datos, capacidadDisponible: datos.capacidadDisponible ?? 0 } : datos);
     }
 
     const campos: Record<
@@ -147,8 +154,7 @@ function FormularioServicio({
             { nombre: "horarioLlegada", etiqueta: "Horario de llegada", tipo: "time" },
             {
                 nombre: "diasOperacion",
-                etiqueta: "Días de operación (L-M-X-J-V-S-D)",
-                placeholder: "Ej. L-M-X-J-V-S-D",
+                etiqueta: "Días de operación",
             },
         ],
         EQUIPAMIENTO: [
@@ -275,7 +281,9 @@ function FormularioServicio({
                     ) : null}
                 </label>
 
-                {(esTipoValido ? campos[tipoProveedor as TipoServicio] : []).map((campo) => {
+                {(esTipoValido ? campos[tipoProveedor as TipoServicio] : [])
+                    .filter((campo) => !(aSolicitud && campo.nombre === "capacidadDisponible"))
+                    .map((campo) => {
                     const nombreCampo =
                         servicioEnEdicion &&
                         tipoProveedor === "EQUIPAMIENTO" &&
@@ -290,6 +298,51 @@ function FormularioServicio({
                             nombreCampo === "modalidadConfirmacion");
                     const deshabilitado =
                         !esCampoEditable(nombreCampo) || bloqueadoGarantiaCampo;
+
+                    if (nombreCampo === "diasOperacion") {
+                        const elegidos = (diasOperacion ?? "").toUpperCase().split("-");
+                        const alternar = (codigo: CodigoDia) => {
+                            const nuevos = elegidos.includes(codigo)
+                                ? (elegidos.filter((d) => d !== codigo) as CodigoDia[])
+                                : ([...elegidos, codigo] as CodigoDia[]);
+                            setValue("diasOperacion", serializarDiasDisponibles(nuevos), {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                            });
+                        };
+                        return (
+                            <div key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
+                                {campo.etiqueta}
+                                <div role="group" aria-label={campo.etiqueta} className="grid grid-cols-7 gap-1.5">
+                                    {DIAS_SEMANA.map((dia) => {
+                                        const activo = elegidos.includes(dia.codigo);
+                                        return (
+                                            <button
+                                                key={dia.codigo}
+                                                type="button"
+                                                title={dia.nombre}
+                                                aria-pressed={activo}
+                                                disabled={deshabilitado}
+                                                onClick={() => alternar(dia.codigo)}
+                                                className={`rounded-control border py-2 text-center text-xs font-bold transition-colors disabled:opacity-60 ${
+                                                    activo
+                                                        ? "border-marca bg-marca text-white shadow-sm"
+                                                        : "border-borde bg-white text-texto-suave hover:border-marca/40 hover:text-texto"
+                                                }`}
+                                            >
+                                                {dia.corto}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {errors.diasOperacion ? (
+                                    <span className="text-xs font-normal text-peligro" role="alert">
+                                        {errors.diasOperacion.message}
+                                    </span>
+                                ) : null}
+                            </div>
+                        );
+                    }
 
                     if (nombreCampo === "modalidadConfirmacion") {
                         return (
