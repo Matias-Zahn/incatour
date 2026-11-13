@@ -5,6 +5,7 @@ import Boton from "./Boton";
 import {
     esquemaCircuito,
     nivelesDificultad,
+    reglasPorteadores,
     type Circuito,
     type DatosCircuito,
 } from "../services/circuitoService";
@@ -38,7 +39,6 @@ function FormularioCircuito({
         register,
         handleSubmit,
         reset,
-        setValue,
         formState: { errors },
     } = useForm<DatosCircuito>({
         resolver: zodResolver(esquemaCircuito),
@@ -56,12 +56,14 @@ function FormularioCircuito({
         ]),
     );
 
-    const sugerenciasPorteadores = [
-        "1 por cada 2 pasajeros",
-        "1 por cada 3 pasajeros",
-        "1 por cada 4 pasajeros",
-        "Sin porteadores requeridos",
-    ];
+    const opcionesPorteadores = Array.from(
+        new Set([
+            ...reglasPorteadores,
+            ...(circuitoEnEdicion?.parametrosPorteadores
+                ? [circuitoEnEdicion.parametrosPorteadores]
+                : []),
+        ]),
+    );
 
     return (
         <form
@@ -176,40 +178,29 @@ function FormularioCircuito({
                     ) : null}
                 </label>
 
-                <div className="grid gap-2 text-sm font-semibold text-texto md:col-span-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <label htmlFor="input-parametros-porteadores">
-                            Parámetros de porteadores (opcional)
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                            {sugerenciasPorteadores.map((sugerencia) => (
-                                <button
-                                    key={sugerencia}
-                                    type="button"
-                                    onClick={() =>
-                                        setValue(
-                                            "parametrosPorteadores",
-                                            sugerencia,
-                                            { shouldValidate: true },
-                                        )
-                                    }
-                                    className="rounded bg-fondo px-2 py-0.5 text-xs font-medium text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
-                                >
-                                    {sugerencia}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <input
+                <label className="grid gap-2 text-sm font-semibold text-texto md:col-span-2">
+                    Parámetros de porteadores (opcional)
+                    <select
                         id="input-parametros-porteadores"
                         {...register("parametrosPorteadores")}
-                        className={`rounded-control border px-3 py-2 font-normal outline-none focus:ring-2 ${
+                        className={`rounded-control border bg-white px-3 py-2 font-normal outline-none focus:ring-2 ${
                             errors.parametrosPorteadores
                                 ? "border-peligro focus:border-peligro focus:ring-peligro/20"
                                 : "border-borde focus:border-marca focus:ring-marca/20"
                         }`}
-                        placeholder="Ej. 1 por cada 2 pasajeros"
-                    />
+                    >
+                        <option value="">Sin especificar</option>
+                        {opcionesPorteadores.map((regla) => (
+                            <option key={regla} value={regla}>
+                                {regla === "0 por cada 1 pasajeros"
+                                    ? "0 por cada 1 pasajeros (sin porteadores)"
+                                    : regla}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="text-xs font-normal text-texto-suave">
+                        Define la relación de porteadores según el cupo máximo al programar salidas de este circuito.
+                    </span>
                     {errors.parametrosPorteadores ? (
                         <span
                             className="text-xs font-normal text-peligro"
@@ -218,7 +209,7 @@ function FormularioCircuito({
                             {errors.parametrosPorteadores.message}
                         </span>
                     ) : null}
-                </div>
+                </label>
             </div>
 
             {errorServidor ? (

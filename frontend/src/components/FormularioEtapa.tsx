@@ -101,22 +101,18 @@ function FormularioEtapa({
 
             <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold text-texto">
-                    Número de orden
+                    Número de orden (secuencial)
                     <input
                         type="number"
                         min={1}
+                        readOnly
+                        tabIndex={-1}
                         {...register("numeroOrden", { valueAsNumber: true })}
-                        className={`rounded-control border px-3 py-2 font-normal outline-none focus:ring-2 ${
-                            errors.numeroOrden
-                                ? "border-peligro focus:ring-peligro/20"
-                                : "border-borde focus:border-marca focus:ring-marca/20"
-                        }`}
+                        className="cursor-not-allowed rounded-control border border-borde bg-fondo px-3 py-2 font-semibold text-texto-suave outline-none"
                     />
-                    {errors.numeroOrden ? (
-                        <span className="text-xs font-normal text-peligro" role="alert">
-                            {errors.numeroOrden.message}
-                        </span>
-                    ) : null}
+                    <span className="text-xs font-normal text-texto-suave">
+                        Asignado automáticamente. Podés reordenar las etapas desde la tabla con los botones ↑ y ↓.
+                    </span>
                 </label>
 
                 <label className="grid gap-2 text-sm font-semibold text-texto">

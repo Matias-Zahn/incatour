@@ -4,6 +4,16 @@ import { solicitarApi } from "./clienteApi";
 
 export const nivelesDificultad = ["Baja", "Media", "Alta"] as const;
 
+export const reglasPorteadores = [
+    "1 por cada 1 pasajeros",
+    "1 por cada 2 pasajeros",
+    "1 por cada 3 pasajeros",
+    "1 por cada 4 pasajeros",
+    "1 por cada 5 pasajeros",
+    "2 por cada 3 pasajeros",
+    "0 por cada 1 pasajeros",
+] as const;
+
 export const esquemaCircuito = z.object({
     nombreCircuito: z
         .string()
