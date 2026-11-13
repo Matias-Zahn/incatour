@@ -1257,7 +1257,9 @@ function FormularioPaquete({
                                             type="number"
                                             min={1}
                                             step="0.01"
-                                            value={fila.monto}
+                                            // 0 se muestra vacío: si no, Number("") vuelve a poner 0 y no se puede borrar
+                                            value={fila.monto || ""}
+                                            placeholder="0"
                                             onChange={(e) =>
                                                 actualizarFilaPrecio(indice, {
                                                     monto: Number(

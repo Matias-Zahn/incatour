@@ -81,6 +81,8 @@ export const esquemaServicio = z
 
         const camposRequeridos = requeridos[datos.tipo] ?? [];
         for (const [campo, mensaje] of camposRequeridos) {
+            // A solicitud no lleva stock de plazas: el hotel confirma cada pedido
+            if (campo === "capacidadDisponible" && datos.modalidadConfirmacion === "A_SOLICITUD") continue;
             const esCantidadEquipamientoConInventario =
                 datos.tipo === "EQUIPAMIENTO" &&
                 campo === "cantidadDisponible" &&
