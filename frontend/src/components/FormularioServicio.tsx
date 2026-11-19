@@ -7,6 +7,8 @@ import {
     categoriasAlojamiento,
     esquemaServicio,
     modalidadesConfirmacion,
+    tiposEquipamiento,
+    tiposHabitacion,
     tiposServicio,
     type DatosServicio,
     type Servicio,
@@ -34,7 +36,10 @@ const valoresIniciales = (
     descripcion: "",
     costoBase: 0,
     localidad,
-    ...(tipo === "ALOJAMIENTO" ? { modalidadConfirmacion: "BLOQUEO_PLAZAS" } : {}),
+    ...(tipo === "ALOJAMIENTO"
+        ? { modalidadConfirmacion: "BLOQUEO_PLAZAS", tipoHabitacion: "Doble" }
+        : {}),
+    ...(tipo === "EQUIPAMIENTO" ? { tipoEquipamiento: "Carpa" } : {}),
 });
 
 function FormularioServicio({
@@ -83,9 +88,16 @@ function FormularioServicio({
     const comprometidaEquipamiento = servicioEnEdicion?.cantidadComprometida ?? 0;
 
     const esTipoValido = (tiposServicio as readonly string[]).includes(tipoProveedor);
+    const esEquipamiento = tipoProveedor === "EQUIPAMIENTO";
     const modalidad = useWatch({ control, name: "modalidadConfirmacion" });
     const diasOperacion = useWatch({ control, name: "diasOperacion" });
     const aSolicitud = tipoProveedor === "ALOJAMIENTO" && modalidad === "A_SOLICITUD";
+
+    useEffect(() => {
+        if (aSolicitud) {
+            setValue("capacidadDisponible", 0);
+        }
+    }, [aSolicitud, setValue]);
 
     function esCampoEditable(campo: string): boolean {
         if (!edicion?.camposEditables) return true;
@@ -106,8 +118,8 @@ function FormularioServicio({
             });
             return;
         }
-        // El back exige la columna al crear; a solicitud no se usa
-        alGuardar(aSolicitud ? { ...datos, capacidadDisponible: datos.capacidadDisponible ?? 0 } : datos);
+        // Para modalidad a solicitud, la capacidad de plazas no aplica y se fija en 0
+        alGuardar(aSolicitud ? { ...datos, capacidadDisponible: 0 } : datos);
     }
 
     const campos: Record<
@@ -186,7 +198,13 @@ function FormularioServicio({
         >
             <div>
                 <h2 className="font-bold text-navegacion">
-                    {servicioEnEdicion ? "Editar servicio" : "Registrar servicio"}
+                    {servicioEnEdicion
+                        ? esEquipamiento
+                            ? "Editar equipamiento"
+                            : "Editar servicio"
+                        : esEquipamiento
+                          ? "Registrar equipamiento"
+                          : "Registrar servicio"}
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
                     Rubro del proveedor: <span className="font-semibold text-texto">{tipoProveedor}</span>
@@ -228,7 +246,11 @@ function FormularioServicio({
 
             <div className="grid gap-4 md:grid-cols-2">
                 {([
-                    ["nombreServicio", "Nombre del servicio", "Ej. Hotel Valle Sagrado"],
+                    [
+                        "nombreServicio",
+                        esEquipamiento ? "Nombre de equipamiento" : "Nombre del servicio",
+                        esEquipamiento ? "Ej. Carpa doble 4 estaciones" : "Ej. Hotel Valle Sagrado",
+                    ],
                     ["localidad", "Localidad", "Ej. Cusco"],
                     ["costoBase", "Costo base", "0.00"],
                 ] as const).map(([nombre, etiqueta, placeholder]) => {
@@ -346,30 +368,90 @@ function FormularioServicio({
 
                     if (nombreCampo === "modalidadConfirmacion") {
                         return (
-                            <label
-                                key={nombreCampo}
-                                className="grid gap-2 text-sm font-semibold text-texto"
-                            >
+                            <div key={nombreCampo} className="grid gap-2">
+                                <label className="grid gap-2 text-sm font-semibold text-texto">
+                                    {campo.etiqueta}
+                                    <select
+                                        disabled={deshabilitado}
+                                        {...register("modalidadConfirmacion")}
+                                        className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
+                                    >
+                                        {modalidadesConfirmacion.map((modalidad) => (
+                                            <option key={modalidad} value={modalidad}>
+                                                {modalidad === "BLOQUEO_PLAZAS"
+                                                    ? "BLOQUEO_PLAZAS (Confirmación por bloqueo)"
+                                                    : "A_SOLICITUD (Confirmación a solicitud)"}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {errors.modalidadConfirmacion ? (
+                                        <span
+                                            className="text-xs font-normal text-peligro"
+                                            role="alert"
+                                        >
+                                            {errors.modalidadConfirmacion.message}
+                                        </span>
+                                    ) : null}
+                                </label>
+                                {aSolicitud ? (
+                                    <p className="rounded-control border border-borde bg-fondo px-3 py-2 text-xs text-texto-suave">
+                                        <span className="font-semibold text-texto">Modalidad a solicitud:</span> No requiere definir cantidad de plazas previas. Las solicitudes de alojamiento se gestionan directamente con el hotel para cada reserva.
+                                    </p>
+                                ) : null}
+                            </div>
+                        );
+                    }
+
+                    if (nombreCampo === "tipoHabitacion") {
+                        const actual = servicioEnEdicion?.tipoHabitacion;
+                        const opciones: string[] = [...tiposHabitacion];
+                        if (actual && !opciones.includes(actual as any)) opciones.push(actual);
+                        return (
+                            <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
                                 {campo.etiqueta}
                                 <select
                                     disabled={deshabilitado}
-                                    {...register("modalidadConfirmacion")}
+                                    {...register("tipoHabitacion")}
                                     className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
                                 >
-                                    {modalidadesConfirmacion.map((modalidad) => (
-                                        <option key={modalidad} value={modalidad}>
-                                            {modalidad === "BLOQUEO_PLAZAS"
-                                                ? "BLOQUEO_PLAZAS (Confirmación por bloqueo)"
-                                                : "A_SOLICITUD (Confirmación a solicitud)"}
+                                    <option value="">Elegí un tipo de habitación</option>
+                                    {opciones.map((hab) => (
+                                        <option key={hab} value={hab}>
+                                            {hab}
                                         </option>
                                     ))}
                                 </select>
-                                {errors.modalidadConfirmacion ? (
-                                    <span
-                                        className="text-xs font-normal text-peligro"
-                                        role="alert"
-                                    >
-                                        {errors.modalidadConfirmacion.message}
+                                {errors.tipoHabitacion ? (
+                                    <span className="text-xs font-normal text-peligro" role="alert">
+                                        {errors.tipoHabitacion.message}
+                                    </span>
+                                ) : null}
+                            </label>
+                        );
+                    }
+
+                    if (nombreCampo === "tipoEquipamiento") {
+                        const actual = servicioEnEdicion?.tipoEquipamiento;
+                        const opciones: string[] = [...tiposEquipamiento];
+                        if (actual && !opciones.includes(actual as any)) opciones.push(actual);
+                        return (
+                            <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
+                                {campo.etiqueta}
+                                <select
+                                    disabled={deshabilitado}
+                                    {...register("tipoEquipamiento")}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
+                                >
+                                    <option value="">Elegí un tipo de equipamiento</option>
+                                    {opciones.map((eq) => (
+                                        <option key={eq} value={eq}>
+                                            {eq}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.tipoEquipamiento ? (
+                                    <span className="text-xs font-normal text-peligro" role="alert">
+                                        {errors.tipoEquipamiento.message}
                                     </span>
                                 ) : null}
                             </label>
@@ -485,7 +567,9 @@ function FormularioServicio({
                         ? "Guardando..."
                         : servicioEnEdicion
                           ? "Guardar cambios"
-                          : "Guardar servicio"}
+                          : esEquipamiento
+                            ? "Guardar equipamiento"
+                            : "Guardar servicio"}
                 </Boton>
             </div>
         </form>

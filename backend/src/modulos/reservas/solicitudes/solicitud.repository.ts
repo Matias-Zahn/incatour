@@ -55,13 +55,13 @@ export class SolicitudRepository {
     return db.servicioBase.findMany({
       where: {
         estado: "ACTIVO",
-        localidad: localidad,
+        localidad: { equals: localidad, mode: "insensitive" },
         idservicio: {
           notIn: serviciosRechazadosIds
         },
         alojamiento: {
-          tipoHabitacion: tipoHabitacion,
-          categoria: categoria
+          tipoHabitacion: { equals: tipoHabitacion, mode: "insensitive" },
+          categoria: { equals: categoria, mode: "insensitive" }
         }
       },
       include: {

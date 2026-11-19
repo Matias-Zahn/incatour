@@ -11,6 +11,13 @@ export const modalidadesConfirmacion = ["BLOQUEO_PLAZAS", "A_SOLICITUD"] as cons
 export const categoriasAlojamiento = ["1 Estrella", "2 Estrellas", "3 Estrellas", "4 Estrellas", "5 Estrellas"] as const;
 export type ModalidadConfirmacion = (typeof modalidadesConfirmacion)[number];
 
+// Tipos sugeridos de habitación y equipamiento alineados con la definición de paquetes y datos semilla
+export const tiposHabitacion = ["Doble", "Simple", "Triple", "Matrimonial"] as const;
+export type TipoHabitacion = (typeof tiposHabitacion)[number];
+
+export const tiposEquipamiento = ["Carpa", "Bolsa de dormir", "Colchoneta", "Carpa comedor"] as const;
+export type TipoEquipamiento = (typeof tiposEquipamiento)[number];
+
 const REGEX_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DIAS_VALIDOS = new Set(["L", "M", "X", "J", "V", "S", "D"]);
 

@@ -50,7 +50,10 @@ function describirDisponibilidad(servicio: Servicio): string {
             return `${servicio.tipoEquipamiento ?? "Equipo"} · Libre: ${libre} / Comprometido: ${comprometida} / Total: ${total}`;
         }
         case "ALOJAMIENTO":
-            return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${servicio.capacidadDisponible ?? 0} plazas (${servicio.modalidadConfirmacion ?? "-"})`;
+            if (servicio.modalidadConfirmacion === "A_SOLICITUD") {
+                return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · A solicitud`;
+            }
+            return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${servicio.capacidadDisponible ?? 0} plazas (${servicio.modalidadConfirmacion ?? "BLOQUEO_PLAZAS"})`;
         case "TRANSPORTE":
             return `${servicio.capacidadVehiculo ?? 0} asientos · ${servicio.pesoEquipajeIncluido ?? 0} kg incl. (+$${servicio.costoPorKgExcedente ?? 0}/kg)`;
         case "TREN":

@@ -87,11 +87,11 @@ export class SalidaRepository {
       estado: ESTADO.ACTIVO,
       alojamiento: {
         modalidadConfirmacion: MODALIDAD_BLOQUEO_PLAZAS,
-        ...(!porEstablecimiento && paquete.categoriaGarantizada && { categoria: paquete.categoriaGarantizada }),
-        ...(!porEstablecimiento && paquete.tipoHabitacionGarantizada && { tipoHabitacion: paquete.tipoHabitacionGarantizada }),
+        ...(!porEstablecimiento && paquete.categoriaGarantizada && { categoria: { equals: paquete.categoriaGarantizada, mode: "insensitive" } }),
+        ...(!porEstablecimiento && paquete.tipoHabitacionGarantizada && { tipoHabitacion: { equals: paquete.tipoHabitacionGarantizada, mode: "insensitive" } }),
       },
       ...(porEstablecimiento && { idservicio: { in: paquete.garantiasEstablecimiento.map((g) => g.idservicio) } }),
-      ...(!porEstablecimiento && paquete.localidadGarantizada && { localidad: paquete.localidadGarantizada }),
+      ...(!porEstablecimiento && paquete.localidadGarantizada && { localidad: { equals: paquete.localidadGarantizada, mode: "insensitive" } }),
     };
     return db.servicioBase.findMany({
       where,

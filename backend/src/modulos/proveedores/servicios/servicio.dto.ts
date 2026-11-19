@@ -120,7 +120,13 @@ export class CrearServicioDto {
     const [errDesc, descripcion] = validarDescripcion(obj.descripcion);
     if (errDesc) return [errDesc];
 
-    const [errEsp, especifico] = validarCampos(obj, CAMPOS_CREAR[tipo], true);
+    const clon = { ...obj };
+    // Alojamiento a solicitud: la capacidad de plazas no aplica y se fija en 0 por defecto
+    if (tipo === TIPO_SERVICIO.ALOJAMIENTO && clon.modalidadConfirmacion === "A_SOLICITUD" && clon.capacidadDisponible === undefined) {
+      clon.capacidadDisponible = 0;
+    }
+
+    const [errEsp, especifico] = validarCampos(clon, CAMPOS_CREAR[tipo], true);
     if (errEsp) return [errEsp];
 
     if (tipo === TIPO_SERVICIO.TREN && especifico!.horarioSalida === especifico!.horarioLlegada) {
@@ -158,7 +164,11 @@ export class ModificarServicioDto {
 
     // Unión de los campos de todos los rubros: el servicio valida luego cuáles corresponden al tipo real
     const todos: { [campo: string]: Validador } = Object.assign({}, ...Object.values(CAMPOS_MODIFICAR));
-    const [errEsp, especifico] = validarCampos(obj, todos, false);
+    const clon = { ...obj };
+    if (clon.modalidadConfirmacion === "A_SOLICITUD" && clon.capacidadDisponible === undefined) {
+      clon.capacidadDisponible = 0;
+    }
+    const [errEsp, especifico] = validarCampos(clon, todos, false);
     if (errEsp) return [errEsp];
 
     if (Object.keys(baseFinal).length === 0 && Object.keys(especifico!).length === 0) {
