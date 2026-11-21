@@ -91,7 +91,8 @@ const PAQUETES = [
   { nombre: "Camino Inca Premium", circuito: "clasico", zona: "cusco4", tarifa: 1150, previas: 2, posteriores: 1, cupo: 10, peso: 2, tren: 1, transporte: 0 },
   { nombre: "Camino Inca Express", circuito: "corto", zona: "aguas", tarifa: 490, previas: 0, posteriores: 1, cupo: 12, peso: 3, tren: 0, transporte: 4 },
   { nombre: "Salkantay Aventura", circuito: "salkantay", zona: "cusco3", tarifa: 690, previas: 1, posteriores: 1, cupo: 14, peso: 2, tren: 0, transporte: 5 },
-  { nombre: "Lares Cultural", circuito: "lares", zona: "ollanta", tarifa: 540, previas: 1, posteriores: 0, cupo: 10, peso: 1, tren: null, transporte: 3 },
+  // establecimiento: garantiza el hotel de su zona por nombre (RF-06); los demás garantizan solo la categoría
+  { nombre: "Lares Cultural", circuito: "lares", zona: "ollanta", tarifa: 540, previas: 1, posteriores: 0, cupo: 10, peso: 1, tren: null, transporte: 3, establecimiento: true },
 ] as const;
 
 // Nombres, pasaportes y correos según el país: una nómina creíble
@@ -275,7 +276,10 @@ async function main() {
       const z = ZONAS[p.zona]!;
       const pq = await api("POST", "/paquetes", {
         idcircuito: circuitos[p.circuito], nombrePaquete: p.nombre, condiciones: "Incluye permisos de ingreso, guía y porteadores. Reintegro total hasta 15 días antes de la salida.",
-        tipoGarantia: "POR_CATEGORIA", localidadGarantizada: z.localidad, categoriaGarantizada: z.categoria, tipoHabitacionGarantizada: "Doble",
+        localidadGarantizada: z.localidad, // "Sale desde": obligatoria con las dos garantías
+        ...("establecimiento" in p
+          ? { tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hoteles[p.zona]![0]!.idservicio }
+          : { tipoGarantia: "POR_CATEGORIA", categoriaGarantizada: z.categoria, tipoHabitacionGarantizada: "Doble" }),
         nochesPrevias: p.previas, nochesPosteriores: p.posteriores, diasMinimosReintegro: 15,
         matrizPrecios: tarifasPorFactor.map((t) => ({ idtemporada: t.idtemporada, monto: Math.round(p.tarifa * t.factor), moneda: "USD" })),
         idtransporte: transportes[p.transporte]!.idservicio, ...(p.tren !== null && { idtren: trenes[p.tren]! }), // B2
