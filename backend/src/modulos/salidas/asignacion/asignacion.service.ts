@@ -1,114 +1,75 @@
-import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, ESTADO_ALOJAMIENTO } from "../../../shared/constantes";
+import { ESTADO_ALOJAMIENTO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { fechaCorta, hoyUTC } from "../../../shared/fechas";
+import { unaPorServicio } from "../../../shared/ocupacion";
+import { datosVenta } from "../../../shared/ventaAbierta";
 import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
 import { obtenerAutoridad } from "../autoridad.wiring";
-import { LogisticaRepository } from "../logistica/logistica.repository";
 import { calcularDotacion } from "../salidas/salida.dotacion";
+import { SalidaRepository } from "../salidas/salida.repository";
+import { revisarRecursos } from "../salidas/salida.service";
 import { ROL_GUIA, ROL_PORTEADOR } from "../../cuentas/personal/personal.dto";
-import { ConfirmarAsignacionDto } from "./asignacion.dto";
-import { AsignacionRepository, ESTADOS_ASIGNABLES, SalidaParaAsignar } from "./asignacion.repository";
+import { AsignacionRepository, SalidaParaAsignar } from "./asignacion.repository";
 
+/**
+ * CU-40 "Confirmar salida" (B4, decisiones 4 y 15): todo llegó asignado al crear la salida (CU-36) y el equipo lo ocupa
+ * cada compra. Acá se revisa, se emiten los permisos de la nómina y la salida pasa a CERRADA. No asigna nada.
+ */
 export class AsignacionService {
   private repository = new AsignacionRepository();
-  private logistica = new LogisticaRepository();
+  private salidas = new SalidaRepository();
 
-  // CU-40 pasos 2 y 3: panel de asignación (obtenerPanelAsignacion)
+  // CU-40 pasos 2 y 3: panel de control. Funciona en cualquier momento antes del inicio
   async obtenerPanelAsignacion(idsalida: number) {
-    const { salida, vendidos, dotacion, bloqueoInicial, sobrantes } = await this.prepararAsignacion(idsalida);
-    const [personal, transportes, equipamiento] = await Promise.all([
-      this.repository.personalLibre(salida),
-      this.logistica.disponiblesTransporte(salida, vendidos),
-      this.logistica.disponiblesEquipamiento(salida),
-    ]);
-
+    const c = await this.prepararConfirmacion(idsalida);
+    const { salida, venta, vendidos, dotacion, recursos } = c;
+    const ocupacion = (tipo: string) => unaPorServicio(salida.ocupaciones.filter((o) => o.tipo === tipo));
     return {
-      salida: { idsalida, nroSalida: salida.nroSalida, fechaInicio: salida.fechaInicio, fechaFin: salida.fechaFin },
+      salida: {
+        idsalida, nroSalida: salida.nroSalida, fechaInicio: salida.fechaInicio, fechaFin: salida.fechaFin, estado: salida.estado,
+        ultimoDiaVenta: venta.ultimoDiaVenta, ventaAbierta: venta.ventaAbierta,
+      },
+      puedeConfirmar: c.motivoNoConfirmable === null,
+      motivoNoConfirmable: c.motivoNoConfirmable,
       pasajerosConfirmados: vendidos,
       dotacionRequerida: dotacion,
-      bloqueoInicial,
-      lugaresSobrantes: sobrantes,
-      personalDisponible: personal
-        // FIX CTA-18: El guía debe tener habilitación vigente Y cuenta de usuario activa
-        .filter(
-          (p) =>
-            p.rol !== ROL_GUIA ||
-            (habilitacionVigente(p.guia, salida.fechaFin) && p.guia?.usuario?.estado === ESTADO.ACTIVO)
-        )
-        .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
-      transportesDisponibles: transportes.map((t) => ({
-        idservicio: t.idservicio,
-        nombreServicio: t.nombreServicio,
-        capacidadVehiculo: t.transporte?.capacidadVehiculo,
+      personal: recursos.personal.map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol, apto: !p.motivo, motivo: p.motivo })),
+      porteadoresSobrantes: Math.max(0, recursos.personal.filter((p) => p.rol === ROL_PORTEADOR).length - dotacion.porteadores), // decisión 5: solo avisa
+      // ponytail: un hotel por salida hasta el bloque 10; los pasajeros con el alojamiento confirmado son de ese hotel
+      hoteles: ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
+        idservicio: o.idservicio,
+        nombreServicio: o.servicio.nombreServicio,
+        modalidadConfirmacion: o.servicio.alojamiento?.modalidadConfirmacion ?? null,
+        pasajeros: salida.reservas.filter((r) => r.estadoAlojamiento === ESTADO_ALOJAMIENTO.CONFIRMADO).reduce((t, r) => t + r.pasajeros.length, 0),
       })),
-      stockCamping: equipamiento.map((e) => ({
+      transporte: recursos.transporte,
+      equipo: recursos.equipos.map((e) => ({
         idservicio: e.idservicio,
         nombreServicio: e.nombreServicio,
-        tipoEquipamiento: e.equipamiento?.tipoEquipamiento,
-        cantidadDisponible: e.disponible, // A1: en las fechas de la salida
+        tipoEquipamiento: salida.ocupaciones.find((o) => o.idservicio === e.idservicio)?.servicio.equipamiento?.tipoEquipamiento ?? null,
+        necesita: e.necesita,
+        ocupado: e.ocupado,
+        falta: e.falta,
       })),
+      reservasSinAlojamiento: c.pendientes,
+      faltantes: c.faltantes,
+      bloqueoInicial: c.bloqueoInicial,
+      lugaresSobrantes: c.sobrantes,
     };
   }
 
-  // CU-40 pasos 4 a 15: confirmarAsignacion
-  async confirmarAsignacion(idsalida: number, dto: ConfirmarAsignacionDto) {
-    const { salida, vendidos, dotacion, sobrantes } = await this.prepararAsignacion(idsalida);
-
-    // FA1: personal disponible, activo y con habilitación vigente
-    const elegidos = await this.repository.buscarPersonal(dto.personalIds);
-    const libres = new Set((await this.repository.personalLibre(salida, dto.personalIds)).map((p) => p.idpersonal));
-    const problemas: string[] = [];
-    for (const id of dto.personalIds) {
-      const p = elegidos.find((e) => e.idpersonal === id);
-      if (!p) problemas.push(`El personal ${id} no existe`);
-      else if (!libres.has(id)) problemas.push(`${p.nombreCompleto} está dado de baja o asignado a otra salida en esas fechas`);
-      else if (p.rol === ROL_GUIA && !habilitacionVigente(p.guia, salida.fechaFin)) {
-        problemas.push(`${p.nombreCompleto} no tiene la habilitación vigente para las fechas de la salida`);
-      } else if (p.rol === ROL_GUIA && (!p.guia?.usuario || p.guia.usuario.estado !== ESTADO.ACTIVO)) {
-        // FIX CTA-18: Rechazar si el guía no tiene cuenta de usuario activa
-        problemas.push(`${p.nombreCompleto} no posee una cuenta de usuario activa para reportar avances`);
-      }
-    }
-    if (problemas.length) throw CustomError.badRequest(problemas.join(". "));
-
-    const guias = elegidos.filter((p) => p.rol === ROL_GUIA).length;
-    const porteadores = elegidos.filter((p) => p.rol === ROL_PORTEADOR).length;
-    if (guias < dotacion.guias || porteadores < dotacion.porteadores) {
-      throw CustomError.badRequest(
-        `La salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (elegiste ${guias} y ${porteadores})`
-      );
-    }
-    const extra = guias + porteadores - dotacion.guias - dotacion.porteadores;
-    if (extra > sobrantes) {
-      throw CustomError.badRequest(`Solo quedan ${sobrantes} lugares en el bloqueo para personal adicional`);
+  // CU-40 pasos 4 a 15: confirmar (body vacío, decisión 15)
+  async confirmarAsignacion(idsalida: number) {
+    const { salida, sobrantes, motivoNoConfirmable, bloqueaPorRecursos, pendientes, faltantes } = await this.prepararConfirmacion(idsalida);
+    if (motivoNoConfirmable) {
+      // Los alojamientos pendientes y los faltantes son 409, con el detalle para el panel
+      throw bloqueaPorRecursos ? CustomError.conflict(motivoNoConfirmable, { reservasSinAlojamiento: pendientes, faltantes }) : CustomError.badRequest(motivoNoConfirmable);
     }
 
-    // FA3: transporte libre en esas fechas y con capacidad para los pasajeros
-    const transportes = await this.logistica.disponiblesTransporte(salida, vendidos);
-    if (!transportes.some((t) => t.idservicio === dto.idtransporte)) {
-      throw CustomError.badRequest("El transporte elegido no tiene cupo para las fechas o la cantidad de pasajeros de la salida");
-    }
-
-    // FA2: stock de camping (se vuelve a controlar en la transacción por si cambia en el medio)
-    const stock = await this.logistica.disponiblesEquipamiento(salida);
-    for (const item of dto.itemsCamping) {
-      const disponible = stock.find((s) => s.idservicio === item.idservicio)?.disponible ?? 0;
-      if (item.cantidad > disponible) {
-        throw CustomError.badRequest(`No hay stock suficiente del artículo ${item.idservicio}: hay ${disponible}`);
-      }
-    }
-
-    // FA4 (paso 13): el personal se puede cambiar, así que con su pasaporte vencido se corta antes de tocar nada.
-    // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue
-    const nominaCompleta = armarNomina(salida, elegidos);
-    // RES-18: tiene que vencer después del fin; el que vence el último día ya no cubre el recorrido
+    // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue.
+    // El personal vencido ya frenó la confirmación como no apto (12.3)
+    const nominaCompleta = armarNomina(salida, salida.personalAsignado.map((a) => a.personal));
     const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte <= salida.fechaFin);
-    const personalVencido = vencidos.filter((t) => t.tipo === "PERSONAL");
-    if (personalVencido.length) {
-      throw CustomError.badRequest(
-        `Pasaportes que vencen antes del fin del recorrido: ${personalVencido.map((t) => t.nombreCompleto).join(", ")}`
-      );
-    }
     const nomina = nominaCompleta.filter((t) => !vencidos.includes(t));
 
     // Paso 14: emisión nominal. Va antes de la transacción porque es un servicio externo
@@ -134,17 +95,14 @@ export class AsignacionService {
 
     // RF-47: los rechazados no ocupan lugar. Se liberan los de pasajeros junto con los sobrantes; los del personal
     // quedan reservados para su reemplazo (CU-38), que pide ahí un permiso nuevo
-    const pasajerosRechazados = rechazados.filter((r) => r.titular.tipo === "PASAJERO").length;
+    const lugaresALiberar = sobrantes + rechazados.filter((r) => r.titular.tipo === "PASAJERO").length;
     let salidaActualizada;
     try {
       salidaActualizada = await this.repository.confirmar({
         salida,
-        personalIds: dto.personalIds,
-        idtransporte: dto.idtransporte,
-        itemsCamping: dto.itemsCamping,
         permisos,
         rechazados,
-        lugaresPorLiberar: sobrantes - extra + pasajerosRechazados,
+        lugaresPorLiberar: lugaresALiberar,
         reservaDePasajero: new Map(
           salida.reservas.flatMap((r) => r.pasajeros.map((rp) => [rp.idpasajero, r.idreserva] as [number, number]))
         ),
@@ -156,7 +114,6 @@ export class AsignacionService {
 
     // Paso 12: liberar los lugares sobrantes. La salida ya quedó bien, así que si la autoridad
     // falla acá no se deshace nada: la cantidad queda guardada y se reintenta con liberarSobrantes
-    const lugaresALiberar = sobrantes - extra + pasajerosRechazados;
     const sobrantesLiberados = lugaresALiberar === 0 || (await this.liberar(salida.idbloqueo!, idsalida, lugaresALiberar));
 
     return {
@@ -170,7 +127,7 @@ export class AsignacionService {
       })),
       lugaresLiberados: sobrantesLiberados ? lugaresALiberar : 0,
       ...(!sobrantesLiberados && {
-        advertencia: `La asignación se guardó, pero no se pudieron liberar ${lugaresALiberar} lugares sobrantes ante la autoridad. Reintentá con POST /api/salidas/${idsalida}/asignacion/liberar-sobrantes`,
+        advertencia: `La salida se confirmó, pero no se pudieron liberar ${lugaresALiberar} lugares sobrantes ante la autoridad. Reintentá con POST /api/salidas/${idsalida}/asignacion/liberar-sobrantes`,
       }),
     };
   }
@@ -203,45 +160,52 @@ export class AsignacionService {
     }
   }
 
-  // Precondiciones, FA5 y cálculos compartidos por el panel y la confirmación
-  private async prepararAsignacion(idsalida: number) {
+  // Precondiciones, FA5, faltantes (B4, 12.3) y cálculos compartidos por el panel y la confirmación
+  private async prepararConfirmacion(idsalida: number) {
     const salida = await this.repository.buscarSalida(idsalida);
     if (!salida) throw CustomError.notFound("La salida no existe");
-    if (!ESTADOS_ASIGNABLES.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
-      throw CustomError.badRequest("No se pueden asignar recursos a una salida que ya inició o no está activa");
+    const hoy = hoyUTC();
+    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= hoy) {
+      throw CustomError.badRequest("No se puede confirmar una salida que ya inició o no está activa");
     }
     if (!salida.idbloqueo) throw CustomError.badRequest("La salida no tiene un bloqueo de cupo ante la autoridad");
-    if (salida.personalAsignado.length > 0) {
-      throw CustomError.badRequest("La salida ya tiene personal asignado. Los cambios se hacen con el CU-38 y el CU-39");
-    }
-
-    // FA5: no se consolida con alojamientos sin confirmar (se resuelven con el CU-34)
-    const pendientes = salida.reservas.filter((r) => r.estadoAlojamiento === ESTADO_ALOJAMIENTO.PENDIENTE);
-    if (pendientes.length) {
-      throw CustomError.conflict(
-        `No se puede consolidar: hay alojamientos sin confirmar en las reservas ${pendientes.map((r) => r.nroReserva).join(", ")}`
-      );
-    }
 
     const vendidos = salida.reservas.reduce((total, r) => total + r.pasajeros.length, 0);
-    if (vendidos === 0) throw CustomError.badRequest("La salida no tiene pasajeros confirmados: corresponde cancelarla (CU-37)");
-
     const { circuito } = salida.paquete;
     const dotacion = calcularDotacion(circuito.minimoGuias, circuito.parametrosPorteadores, vendidos);
-    const estimada = calcularDotacion(circuito.minimoGuias, circuito.parametrosPorteadores, salida.tamanoMaximo);
-    if (!dotacion || !estimada) throw CustomError.badRequest("El circuito no tiene cargados sus parámetros de dotación");
+    if (!dotacion) throw CustomError.badRequest("El circuito no tiene cargados sus parámetros de dotación");
 
-    // Limitación: el bloqueo inicial se recalcula con los parámetros actuales del circuito, porque la salida
-    // no guarda la dotación estimada; si el circuito cambió desde el CU-36, guardar ese número en Salida.
-    const bloqueoInicial = salida.tamanoMaximo + estimada.guias + estimada.porteadores;
-    const sobrantes = bloqueoInicial - vendidos - dotacion.guias - dotacion.porteadores;
+    const recursos = revisarRecursos(salida, await this.salidas.cargarEquipoDe([salida]), vendidos);
+    const guias = recursos.personal.filter((p) => p.rol === ROL_GUIA).length;
+    const porteadores = recursos.personal.length - guias;
+    const faltantes = [
+      ...recursos.faltas,
+      ...recursos.noAptos,
+      ...(guias < dotacion.guias || porteadores < dotacion.porteadores
+        ? [`La salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (tiene ${guias} y ${porteadores})`]
+        : []),
+    ];
+    // FA5: no se confirma con alojamientos sin confirmar (se resuelven con el CU-34)
+    const pendientes = salida.reservas.filter((r) => r.estadoAlojamiento === ESTADO_ALOJAMIENTO.PENDIENTE).map((r) => r.nroReserva);
 
-    return { salida, vendidos, dotacion, bloqueoInicial, sobrantes };
+    const venta = datosVenta(salida, hoy);
+    const bloqueaPorRecursos = salida.estado !== ESTADO_SALIDA.CERRADA && !venta.ventaAbierta && vendidos > 0;
+    const motivoNoConfirmable =
+      salida.estado === ESTADO_SALIDA.CERRADA ? "La salida ya está confirmada"
+      : venta.ventaAbierta ? `La venta sigue abierta hasta el ${fechaCorta(new Date(venta.ultimoDiaVenta))}: la salida se confirma después del corte`
+      : vendidos === 0 ? "La salida no tiene pasajeros confirmados: corresponde cancelarla"
+      : pendientes.length ? `No se puede confirmar: hay alojamientos sin confirmar en las reservas ${pendientes.join(", ")}`
+      : faltantes.length ? `Falta resolver antes de confirmar: ${faltantes.join(". ")}`
+      : null;
+
+    // El cupo ante la autoridad se pidió por el máximo más el personal (decisión 5). CU-38 reemplaza uno por uno,
+    // así que lo que sobra son los lugares de pasajeros sin vender
+    const bloqueoInicial = salida.tamanoMaximo + recursos.personal.length;
+    const sobrantes = Math.max(0, salida.tamanoMaximo - vendidos);
+
+    return { salida, venta, vendidos, dotacion, recursos, faltantes, pendientes, motivoNoConfirmable, bloqueaPorRecursos, bloqueoInicial, sobrantes };
   }
 }
-
-export const habilitacionVigente = (guia: { fechaHabilitacion: Date | null } | null, hasta: Date) =>
-  !!guia?.fechaHabilitacion && guia.fechaHabilitacion >= hasta;
 
 // Nómina completa (paso 14): pasajeros de las reservas confirmadas y personal asignado
 const MOTIVO_PASAPORTE_VENCIDO = "Pasaporte vence antes de finalizar el recorrido";

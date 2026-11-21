@@ -1,20 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { CustomError } from "../../../error/CustomError";
-import {
-  ESTADO,
-  ESTADO_PERMISO,
-  ESTADO_RESERVA,
-  SALIDAS_ACTIVAS,
-  TIPO_SERVICIO,
-} from "../../../shared/constantes";
+import { ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { PermisoEmitido, PermisoRechazado } from "../../../integraciones/autoridad/autoridad.interface";
-import { rangosDe } from "../../../shared/ocupacion";
-import { disponible, ocupar } from "../../../shared/ocupacion.repository";
-import { LogisticaRepository } from "../logistica/logistica.repository";
-import { ItemCamping } from "./asignacion.dto";
-
-export const ESTADOS_ASIGNABLES = ["PUBLICADA", "CERRADA"];
 
 export type SalidaParaAsignar = NonNullable<Awaited<ReturnType<AsignacionRepository["buscarSalida"]>>>;
 
@@ -24,10 +12,24 @@ export class AsignacionRepository {
       where: { idsalida },
       include: {
         paquete: { include: { circuito: true } },
-        personalAsignado: true,
+        // 12.3: la aptitud se vuelve a controlar al confirmar, y el personal va a la nómina
+        personalAsignado: { include: { personal: { include: { guia: { include: { usuario: { select: { estado: true } } } } } } } },
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },
           include: { pasajeros: { include: { pasajero: true } } },
+        },
+        ocupaciones: {
+          include: {
+            servicio: {
+              select: {
+                nombreServicio: true,
+                transporte: { select: { capacidadVehiculo: true } },
+                alojamiento: { select: { modalidadConfirmacion: true } },
+                equipamiento: { select: { tipoEquipamiento: true } },
+              },
+            },
+          },
+          orderBy: { idocupacion: "asc" },
         },
       },
     });
@@ -75,15 +77,11 @@ export class AsignacionRepository {
   }
 
   /**
-   * CU-40 pasos 7 a 11 y 14, en una transacción: asignar personal, transporte y equipamiento,
-   * registrar los permisos emitidos y los rechazados (RF-47), devolver al hotel las plazas que no se vendieron y cerrar la venta.
-   * Los permisos ya los emitió la autoridad antes de entrar acá.
+   * CU-40 pasos 11 y 14, en una transacción: registrar los permisos emitidos y los rechazados (RF-47), devolver al hotel
+   * las plazas que no se vendieron y pasar la salida a CERRADA. Los permisos ya los emitió la autoridad antes de entrar acá.
    */
   async confirmar(p: {
     salida: SalidaParaAsignar;
-    personalIds: number[];
-    idtransporte: number;
-    itemsCamping: ItemCamping[];
     permisos: PermisoEmitido[];
     rechazados: PermisoRechazado[];
     reservaDePasajero: Map<number, number>;
@@ -91,36 +89,17 @@ export class AsignacionRepository {
   }) {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
-      // Lock de la salida: una compra que confirma en paralelo espera (o ya cerró la salida) y se detecta acá
-      // Limitación: la compra en curso al cerrar se cobra y cae en el camino "pago aprobado sin reserva" (la rama fix/martin-externos lo convierte en reembolso)
+      // Lock de la salida (mismo orden que la compra, CU-32 y CU-39): una compra o un reemplazo en paralelo se detecta acá
       const [fila] = await tx.$queryRaw<{ estado: string; stockLocalAlojamiento: number | null }[]>`
         SELECT estado, "stockLocalAlojamiento" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
       const vendidos = p.salida.reservas.reduce((t, r) => t + r.pasajeros.length, 0);
       const confirmados = await tx.reservaPasajero.count({ where: { reserva: { idsalida, estado: ESTADO_RESERVA.CONFIRMADA } } });
-      if (!fila || !ESTADOS_ASIGNABLES.includes(fila.estado) || confirmados !== vendidos) {
-        throw CustomError.conflict("La salida cambió mientras se asignaba (se confirmó una compra o ya se asignó). Volvé a cargar el panel");
-      }
-
-      if ((await this.personalOcupado(tx, p.salida, p.personalIds)).length) {
-        throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar el panel");
-      }
-      const motivo = await new LogisticaRepository().motivoTransporteNoDisponible(tx, p.idtransporte, p.salida, vendidos);
-      if (motivo) throw CustomError.conflict(motivo);
-
-      await tx.asignacionPersonal.createMany({
-        data: p.personalIds.map((idpersonal) => ({ idsalida, idpersonal })),
-      });
-
-      await ocupar(tx, { idservicio: p.idtransporte, idsalida, tipo: TIPO_SERVICIO.TRANSPORTE, rangos: rangosDe(TIPO_SERVICIO.TRANSPORTE, p.salida), cantidad: 1 });
-
-      // A1: cada equipo se bloquea y se mira lo disponible en sus fechas, con el reacondicionamiento (FA2).
-      // En orden de id: dos cierres con los mismos artículos los bloquean en el mismo orden
-      const rangosEquipo = rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, p.salida);
-      for (const item of [...p.itemsCamping].sort((a, b) => a.idservicio - b.idservicio)) {
-        if ((await disponible(tx, item.idservicio, rangosEquipo)) < item.cantidad) {
-          throw CustomError.badRequest(`No hay stock suficiente del artículo ${item.idservicio}`);
-        }
-        await ocupar(tx, { idservicio: item.idservicio, idsalida, tipo: TIPO_SERVICIO.EQUIPAMIENTO, rangos: rangosEquipo, cantidad: item.cantidad });
+      const personal = await tx.asignacionPersonal.findMany({ where: { idsalida }, select: { idpersonal: true } });
+      const mismoPersonal =
+        personal.length === p.salida.personalAsignado.length &&
+        personal.every((a) => p.salida.personalAsignado.some((b) => b.idpersonal === a.idpersonal));
+      if (fila?.estado !== ESTADO_SALIDA.PUBLICADA || confirmados !== vendidos || !mismoPersonal) {
+        throw CustomError.conflict("La salida cambió mientras se confirmaba. Volvé a cargar el panel");
       }
 
       for (const permiso of p.permisos) {
@@ -155,14 +134,11 @@ export class AsignacionRepository {
         });
       }
 
-      // Con el personal asignado y los permisos emitidos, la venta queda cerrada
+      // Confirmada (decisión 1): ya no se vende
       return tx.salida.update({
         where: { idsalida },
-        data: { estado: "CERRADA", stockLocal: 0, stockLocalAlojamiento: 0, lugaresPorLiberar: p.lugaresPorLiberar },
-        include: {
-          personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
-          ocupaciones: { include: { servicio: { select: { nombreServicio: true } } } },
-        },
+        data: { estado: ESTADO_SALIDA.CERRADA, stockLocal: 0, stockLocalAlojamiento: 0, lugaresPorLiberar: p.lugaresPorLiberar },
+        select: { idsalida: true, nroSalida: true, estado: true },
       });
     });
   }

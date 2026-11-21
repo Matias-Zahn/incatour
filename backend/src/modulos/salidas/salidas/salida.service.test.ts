@@ -8,7 +8,10 @@ import { SalidaService, resumirSalida } from "./salida.service";
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
 const { repo, actual } = vi.hoisted(() => ({
   // Repositorio falso: sin base de datos, controlamos qué devuelve y si falla
-  repo: { buscarPaquete: vi.fn(), buscarAlojamientosConBloqueo: vi.fn(), crearSalida: vi.fn() },
+  repo: {
+    buscarPaquete: vi.fn(), buscarAlojamientosConBloqueo: vi.fn(), crearSalida: vi.fn(), buscarTransportes: vi.fn(),
+    buscarPersonalLibre: vi.fn(), buscarPersonal: vi.fn(), cargarEquipoDe: vi.fn(),
+  },
   actual: { autoridad: null as unknown },
 }));
 vi.mock("./salida.repository", () => ({
@@ -35,7 +38,30 @@ const paquete = {
   diasDisponibles: null as string | null,
   diasCierreVenta: 2,
 };
-const dto = (extra = {}) => CrearSalidaDto.create({ idpaquete: 1, fechaInicio: FECHA, tamanoMaximo: 16, ...extra })[1]!;
+// B3: 16 pasajeros piden 2 guías y 8 porteadores; el transporte 7 tiene 30 asientos
+const persona = (id: number, extra: Record<string, unknown> = {}) => ({
+  idpersonal: id, nombreCompleto: `Persona ${id}`, rol: id <= 2 ? "Guía" : "Porteador", estado: "ACTIVO",
+  fechaVencimientoPasaporte: enDias(400), salidasEnElMes: 0,
+  guia: id <= 2 ? { fechaHabilitacion: enDias(400), usuario: { estado: "ACTIVO" } } : null,
+  ...extra,
+});
+const PERSONAL = Array.from({ length: 10 }, (_, i) => persona(i + 1));
+const dto = (extra = {}) =>
+  CrearSalidaDto.create({ idpaquete: 1, fechaInicio: FECHA, tamanoMaximo: 16, idtransporte: 7, personalIds: PERSONAL.map((p) => p.idpersonal), ...extra }, true)[1]!;
+// Lo que devuelve el repositorio al crear: la salida con la forma del listado
+const creada = {
+  idsalida: 9, estado: "PUBLICADA", fechaInicio: enDias(20), fechaFin: enDias(23), tamanoMaximo: 16, diasCierreVenta: 2,
+  definicionPaquete: null, avances: [], permisos: [], reservas: [], personalAsignado: [], ocupaciones: [],
+  paquete: { circuito: { duracionDias: 4, _count: { etapas: 0 } } },
+};
+const equipoVacio = { totales: new Map(), filas: [] };
+const mocksDeAlta = () => {
+  repo.buscarTransportes.mockResolvedValue([{ idservicio: 7, nombreServicio: "Bus", capacidadVehiculo: 30, libre: true }]);
+  repo.buscarPersonalLibre.mockResolvedValue(PERSONAL);
+  repo.buscarPersonal.mockResolvedValue(PERSONAL);
+  repo.cargarEquipoDe.mockResolvedValue(equipoVacio);
+  repo.crearSalida.mockResolvedValue(creada);
+};
 
 describe("SalidaService.crearSalida (CU-36)", () => {
   beforeEach(() => {
@@ -43,15 +69,63 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     autoridad = actual.autoridad = new AutoridadMock();
     repo.buscarPaquete.mockResolvedValue(paquete);
     repo.buscarAlojamientosConBloqueo.mockResolvedValue([]); // FA3: ninguno confirma por bloqueo
+    mocksDeAlta();
   });
 
-  it("bloquea tamaño máximo + dotación (16 + 2 guías + 8 porteadores = 26)", async () => {
-    repo.crearSalida.mockResolvedValue({ idsalida: 9 });
-
+  it("bloquea tamaño máximo + personal elegido (16 + 2 guías + 8 porteadores = 26) y asigna el personal y el transporte", async () => {
     const r = await new SalidaService().crearSalida(dto());
 
     expect(r.totalLugares).toBe(26);
-    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ fechaFin: enDias(23) }));
+    expect(r.salida).toMatchObject({ idsalida: 9, ventaAbierta: true, alertas: ["FALTA_RECURSO"] }); // el mock no trae el transporte
+    expect(repo.crearSalida).toHaveBeenCalledWith(
+      expect.objectContaining({ fechaFin: enDias(23), idtransporte: 7, personalIds: PERSONAL.map((p) => p.idpersonal) })
+    );
+  });
+
+  it("B3: se aceptan extras; el cupo se pide por el máximo más todo el personal (decisión 5)", async () => {
+    repo.buscarPersonalLibre.mockResolvedValue([...PERSONAL, persona(11)]);
+    repo.buscarPersonal.mockResolvedValue([...PERSONAL, persona(11)]);
+    const r = await new SalidaService().crearSalida(dto({ personalIds: [...PERSONAL.map((p) => p.idpersonal), 11] }));
+    expect(r.totalLugares).toBe(27);
+  });
+
+  it("B3: rechaza personal que no cubre la dotación, uno no apto (12.3) y uno ocupado en esas fechas", async () => {
+    repo.buscarPersonal.mockResolvedValueOnce(PERSONAL.slice(0, 3));
+    await expect(new SalidaService().crearSalida(dto({ personalIds: [1, 2, 3] }))).rejects.toThrow("al menos 2 guías y 8 porteadores (elegiste 2 y 1)");
+
+    repo.buscarPersonal.mockResolvedValue([persona(1, { guia: { fechaHabilitacion: enDias(21), usuario: { estado: "ACTIVO" } } }), ...PERSONAL.slice(1)]);
+    await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("Persona 1: la habilitación vence el");
+
+    repo.buscarPersonal.mockResolvedValue(PERSONAL);
+    repo.buscarPersonalLibre.mockResolvedValue(PERSONAL.slice(1));
+    await expect(new SalidaService().crearSalida(dto())).rejects.toMatchObject({ statusCode: 409 });
+    expect(repo.crearSalida).not.toHaveBeenCalled();
+  });
+
+  it("12.4: el transporte tiene que llevar a los pasajeros y al personal", async () => {
+    repo.buscarTransportes.mockResolvedValue([{ idservicio: 7, nombreServicio: "Van", capacidadVehiculo: 20, libre: true }]);
+    await expect(new SalidaService().crearSalida(dto())).rejects.toThrow(
+      "El transporte elegido tiene 20 asientos y la salida necesita 26 lugares (16 pasajeros y 10 del personal)"
+    );
+    repo.buscarTransportes.mockResolvedValue([{ idservicio: 7, nombreServicio: "Bus", capacidadVehiculo: 30, libre: false }]);
+    await expect(new SalidaService().crearSalida(dto())).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("A2b: equipo bajo el 50 % no crea (409 con detalle); entre 50 y 100 % crea con advertencia", async () => {
+    const carpa = { servicio: { idservicio: 5, nombreServicio: "Carpa", equipamiento: { tipoEquipamiento: "Carpa" } }, idservicio: 5, cantidad: 1, cadaPasajeros: 2 };
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, servicios: [carpa] });
+    // 16 pasajeros necesitan 8 carpas: con 3 libres no se crea, y se sugiere un máximo de 6
+    repo.cargarEquipoDe.mockResolvedValue({ totales: new Map([[5, 3]]), filas: [] });
+    await expect(new SalidaService().crearSalida(dto())).rejects.toMatchObject({
+      statusCode: 409,
+      detalle: { faltantes: [{ idservicio: 5, libre: 3, necesitaMinimo: 4 }], tamanoMaximoSugerido: 6 },
+    });
+    expect(repo.crearSalida).not.toHaveBeenCalled();
+
+    repo.cargarEquipoDe.mockResolvedValue({ totales: new Map([[5, 5]]), filas: [] });
+    const r = await new SalidaService().crearSalida(dto());
+    expect(r.advertencias).toEqual([expect.stringMatching(/^Si se vende completa faltarían hasta 3 de Carpa el /)]);
+    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ equipos: [5] }));
   });
 
   it("FA1: sin cupo suficiente no crea la salida y dice cuántos lugares hay", async () => {
@@ -72,7 +146,10 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date(2026, 9, 25, 23, 30)); // 25/10 23:30 hora local
-      repo.crearSalida.mockResolvedValue({ idsalida: 9 });
+      // el personal tiene que ser apto hasta el fin de esas fechas, no las de hoy + 20
+      const vigente = PERSONAL.map((p) => ({ ...p, fechaVencimientoPasaporte: new Date("2030-01-01"), guia: p.guia && { ...p.guia, fechaHabilitacion: new Date("2030-01-01") } }));
+      repo.buscarPersonal.mockResolvedValue(vigente);
+      repo.buscarPersonalLibre.mockResolvedValue(vigente);
       const paqueteVigente = { ...paquete, tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: new Date("2026-01-01"), fechaFin: new Date("2026-12-31") } }] };
       repo.buscarPaquete.mockResolvedValue(paqueteVigente);
 
@@ -98,7 +175,6 @@ describe("SalidaService.crearSalida (CU-36)", () => {
   it("A1: el hotel se mira y se ocupa solo en las noches previas y posteriores del paquete", async () => {
     repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 2 });
     repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 16 }]);
-    repo.crearSalida.mockResolvedValue({ idsalida: 9 });
 
     await new SalidaService().crearSalida(dto({ idalojamiento: 4 }));
 
@@ -125,7 +201,6 @@ describe("SalidaService.crearSalida (CU-36)", () => {
   });
 
   it("B4: guarda el corte del paquete, o 5 días si el hotel queda a solicitud; el admin lo puede cambiar", async () => {
-    repo.crearSalida.mockResolvedValue({ idsalida: 9 });
     await new SalidaService().crearSalida(dto());
     expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 2 }));
 
@@ -152,6 +227,21 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
     autoridad = actual.autoridad = new AutoridadMock();
     repo.buscarPaquete.mockResolvedValue(paquete);
     repo.buscarAlojamientosConBloqueo.mockResolvedValue([]);
+    mocksDeAlta();
+  });
+
+  it("B3: lista solo el personal apto, por salidas en el mes y nombre, y si cada transporte alcanza (12.4)", async () => {
+    repo.buscarPersonalLibre.mockResolvedValue([
+      persona(1, { nombreCompleto: "Zoe", salidasEnElMes: 0 }),
+      persona(2, { nombreCompleto: "Ana", salidasEnElMes: 2 }),
+      persona(3, { nombreCompleto: "Beto", fechaVencimientoPasaporte: enDias(10) }), // vence antes del fin
+      persona(4, { nombreCompleto: "Ceci", salidasEnElMes: 1 }),
+    ]);
+    const r = await new SalidaService().consultarOpcionesSalida(dto());
+    expect(r.personal.guias.map((p) => p.nombreCompleto)).toEqual(["Zoe", "Ana"]);
+    expect(r.personal.porteadores.map((p) => p.nombreCompleto)).toEqual(["Ceci"]);
+    expect(r.transportes).toEqual([{ idservicio: 7, nombreServicio: "Bus", capacidadVehiculo: 30, delPaquete: false, libre: true, alcanza: true }]);
+    expect(r.fechaFin).toBe(enDias(23).toISOString().slice(0, 10));
   });
 
   it("informa los lugares libres de la autoridad ese día y si alcanzan", async () => {
@@ -206,8 +296,10 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       avances: [],
       paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, _count: { etapas: 4 } } },
       diasCierreVenta: 2,
+      tamanoMaximo: 8,
+      definicionPaquete: null,
       personalAsignado: [],
-      ocupaciones: [],
+      ocupaciones: [{ idsalida: 1, idservicio: 5, tipo: "TRANSPORTE", comprobanteReserva: null, servicio: { nombreServicio: "Bus", transporte: { capacidadVehiculo: 20 } } }],
       permisos: [],
       reservas: [{ _count: { pasajeros: 3 }, permisos: [], solicitudes: [], ...reserva }],
       ...extra,
@@ -292,5 +384,46 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
     const enCurso = { estado: "EN_CURSO", fechaInicio: new Date("2026-11-10"), fechaHoraInicioReal: new Date("2026-11-10T08:00:00Z"), avances: [{ fechaHoraLlegada: new Date("2026-11-10T12:00:00Z") }] };
     expect(resumirSalida(listada({ ...enCurso, fechaFin: new Date("2026-11-13") }), AHORA).alertas).toEqual(["SIN_FINALIZAR"]);
     expect(resumirSalida(listada({ ...enCurso, fechaFin: new Date("2026-11-14") }), AHORA).alertas).toEqual([]);
+  });
+
+  const guia = (extra: Record<string, unknown> = {}) => ({
+    personal: {
+      idpersonal: 1, nombreCompleto: "Rosa", rol: "Guía", estado: "ACTIVO", fechaVencimientoPasaporte: new Date("2030-01-01"),
+      guia: { fechaHabilitacion: new Date("2027-01-01"), usuario: { estado: "ACTIVO" } }, ...extra,
+    },
+  });
+
+  it("12.3: PERSONAL_NO_APTO apenas vence una habilitación, con el detalle en avisos", () => {
+    const vencida = guia({ guia: { fechaHabilitacion: new Date("2026-11-21"), usuario: { estado: "ACTIVO" } } });
+    expect(resumirSalida(listada({ personalAsignado: [guia()] }), AHORA).alertas).not.toContain("PERSONAL_NO_APTO");
+    expect(resumirSalida(listada({ personalAsignado: [vencida] }), AHORA)).toMatchObject({
+      alertas: expect.arrayContaining(["PERSONAL_NO_APTO"]),
+      avisos: [{ alerta: "PERSONAL_NO_APTO", mensaje: "Rosa: la habilitación vence el 21/11/2026" }],
+    });
+  });
+
+  it("B4: PENDIENTE_CONFIRMAR y puedeConfirmar después del corte, mientras siga PUBLICADA", () => {
+    const cerro = resumirSalida(listada({ diasCierreVenta: 5 }), AHORA);
+    expect(cerro).toMatchObject({ puedeConfirmar: true, alertas: expect.arrayContaining(["PENDIENTE_CONFIRMAR"]) });
+    expect(cerro.avisos[0]!.mensaje).toBe("La venta cerró el 14/11/2026: falta confirmar la salida");
+    expect(resumirSalida(listada(), AHORA).puedeConfirmar).toBe(false);
+    expect(resumirSalida(listada({ diasCierreVenta: 5, estado: "CERRADA" }), AHORA).alertas).not.toContain("PENDIENTE_CONFIRMAR");
+  });
+
+  it("FALTA_RECURSO sin transporte o si no alcanza para pasajeros y personal; RIESGO_STOCK si faltaría vendida completa", () => {
+    expect(resumirSalida(listada({ ocupaciones: [] }), AHORA).avisos).toEqual([{ alerta: "FALTA_RECURSO", mensaje: "Falta el transporte" }]);
+    const chico = [{ idsalida: 1, idservicio: 5, tipo: "TRANSPORTE", comprobanteReserva: null, servicio: { nombreServicio: "Van", transporte: { capacidadVehiculo: 8 } } }];
+    expect(resumirSalida(listada({ ocupaciones: chico, personalAsignado: [guia()] }), AHORA).avisos).toEqual([
+      { alerta: "FALTA_RECURSO", mensaje: "El transporte Van tiene 8 asientos y la salida necesita 9 lugares" },
+    ]);
+
+    // 1 carpa cada 2: vendidos 3 → 2 ocupadas de 3; completa (8) necesitaría 4
+    const definicionPaquete = { servicios: [{ idservicio: 7, nombreServicio: "Carpa", tipo: "EQUIPAMIENTO", cantidad: 1, cadaPasajeros: 2 }] };
+    const fila = { idsalida: 1, idservicio: 7, desde: new Date("2026-11-20"), hasta: new Date("2026-11-25"), cantidad: 2, proyectada: 4 };
+    const r = resumirSalida(listada({ definicionPaquete }), AHORA, { totales: new Map([[7, 3]]), filas: [fila] });
+    expect(r.avisos).toEqual([{ alerta: "RIESGO_STOCK", mensaje: "Si se vende completa faltarían hasta 1 de Carpa el 20/11/2026" }]);
+    const otra = { ...fila, idsalida: 2, cantidad: 2, proyectada: 2 };
+    const falta = resumirSalida(listada({ definicionPaquete }), AHORA, { totales: new Map([[7, 3]]), filas: [fila, otra] });
+    expect(falta.avisos).toContainEqual({ alerta: "FALTA_RECURSO", mensaje: "Faltan 1 de Carpa el 20/11/2026" });
   });
 });

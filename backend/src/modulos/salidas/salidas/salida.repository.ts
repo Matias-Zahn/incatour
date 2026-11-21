@@ -1,10 +1,15 @@
 import { db } from "../../../config/postgresDatabase";
 import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import {
+  DIAS_REACONDICIONAMIENTO, ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS,
+  SALIDAS_NO_INICIADAS, TIPO_SERVICIO,
+} from "../../../shared/constantes";
 import { DefinicionPaquete } from "../../../shared/definicionPaquete";
-import { Rango } from "../../../shared/ocupacion";
-import { disponible, disponibles, ocupar } from "../../../shared/ocupacion.repository";
+import { reglasEquipo } from "../../../shared/equipo";
+import { Rango, rangosDe, sumarDias } from "../../../shared/ocupacion";
+import { cargarEquipo, disponible, disponibles, ocupar } from "../../../shared/ocupacion.repository";
+import { AsignacionRepository } from "../asignacion/asignacion.repository";
 import { ConsultarSalidasDto } from "./salida.dto";
 
 export type SalidaListada = Awaited<ReturnType<SalidaRepository["buscar"]>>[number];
@@ -17,15 +22,20 @@ export interface DatosNuevaSalida {
   tamanoMaximo: number;
   idbloqueo: string;
   idalojamiento: number | undefined;
+  nombreHotel: string | undefined;
+  idtransporte: number; // B3
+  personalIds: number[]; // B3: guías y porteadores
+  equipos: number[]; // B3: los equipos con regla, que quedan en 0 hasta la primera compra
   diasCierreVenta: number; // B4
   rangosAlojamiento: Rango[]; // A1: noches previas y posteriores
   definicionPaquete: DefinicionPaquete; // CAT-05
 }
 
 export class SalidaRepository {
-  async buscar(dto: ConsultarSalidasDto) {
+  async buscar(dto: Partial<ConsultarSalidasDto>, idsalida?: number) {
     return db.salida.findMany({
       where: {
+        ...(idsalida && { idsalida }),
         ...(dto.idpaquete && { idpaquete: dto.idpaquete }),
         ...(dto.estado && { estado: dto.estado }),
         ...((dto.desde || dto.hasta) && {
@@ -51,7 +61,17 @@ export class SalidaRepository {
             },
           },
         },
-        personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
+        // 12.3: lo necesario para volver a controlar la aptitud
+        personalAsignado: {
+          include: {
+            personal: {
+              select: {
+                idpersonal: true, nombreCompleto: true, rol: true, estado: true, fechaVencimientoPasaporte: true,
+                guia: { select: { fechaHabilitacion: true, usuario: { select: { estado: true } } } },
+              },
+            },
+          },
+        },
         // RF-50 y RF-61: lo necesario para contar pasajeros, permisos y solicitudes pendientes
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },
@@ -67,7 +87,10 @@ export class SalidaRepository {
         // Decisión 12 del contrato: servicios del listado (hotel y transporte), desde Ocupacion
         ocupaciones: {
           where: { tipo: { in: [TIPO_SERVICIO.ALOJAMIENTO, TIPO_SERVICIO.TRANSPORTE] } },
-          select: { idsalida: true, idservicio: true, tipo: true, comprobanteReserva: true, servicio: { select: { nombreServicio: true } } },
+          select: {
+            idsalida: true, idservicio: true, tipo: true, comprobanteReserva: true,
+            servicio: { select: { nombreServicio: true, transporte: { select: { capacidadVehiculo: true } } } },
+          },
           orderBy: { idocupacion: "asc" },
         },
       },
@@ -112,15 +135,66 @@ export class SalidaRepository {
     return hoteles.map((h) => ({ ...h, disponible: libres.get(h.idservicio)! }));
   }
 
+  /** A2b: el equipo de las salidas que todavía no empezaron, en una sola consulta (listado y alta). */
+  async cargarEquipoDe(salidas: { estado: string; fechaInicio: Date; fechaFin: Date; definicionPaquete: unknown }[]) {
+    const activas = salidas.filter((s) => SALIDAS_NO_INICIADAS.includes(s.estado));
+    const ids = [...new Set(activas.flatMap((s) => reglasEquipo(s.definicionPaquete as DefinicionPaquete | null).map((r) => r.idservicio)))];
+    if (!ids.length) return cargarEquipo(db, [], new Date(), new Date());
+    const desde = new Date(Math.min(...activas.map((s) => s.fechaInicio.getTime())));
+    const hasta = sumarDias(new Date(Math.max(...activas.map((s) => s.fechaFin.getTime()))), DIAS_REACONDICIONAMIENTO);
+    return cargarEquipo(db, ids, desde, hasta);
+  }
+
+  // B3: los transportes activos y si están libres en esas fechas
+  async buscarTransportes(fechas: { fechaInicio: Date; fechaFin: Date }) {
+    const transportes = await db.servicioBase.findMany({
+      where: { estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, transporte: { isNot: null } },
+      select: { idservicio: true, nombreServicio: true, transporte: { select: { capacidadVehiculo: true } } },
+      orderBy: { nombreServicio: "asc" },
+    });
+    const libres = await disponibles(db, transportes, rangosDe(TIPO_SERVICIO.TRANSPORTE, fechas));
+    return transportes.map((t) => ({ ...t, capacidadVehiculo: t.transporte!.capacidadVehiculo, libre: libres.get(t.idservicio)! > 0 }));
+  }
+
+  // B3: personal activo y libre en esas fechas (el de CU-38), con las salidas no canceladas que empiezan en ese mes
+  async buscarPersonalLibre(fechas: { fechaInicio: Date; fechaFin: Date }) {
+    const libres = await new AsignacionRepository().personalLibre({ idsalida: 0, ...fechas });
+    const inicioMes = new Date(Date.UTC(fechas.fechaInicio.getUTCFullYear(), fechas.fechaInicio.getUTCMonth(), 1));
+    const finMes = new Date(Date.UTC(fechas.fechaInicio.getUTCFullYear(), fechas.fechaInicio.getUTCMonth() + 1, 1));
+    const delMes = await db.asignacionPersonal.groupBy({
+      by: ["idpersonal"],
+      where: {
+        idpersonal: { in: libres.map((p) => p.idpersonal) },
+        salida: { estado: { not: ESTADO_SALIDA.CANCELADA }, fechaInicio: { gte: inicioMes, lt: finMes } },
+      },
+      _count: true,
+    });
+    const cuenta = new Map(delMes.map((g) => [g.idpersonal, g._count]));
+    return libres.map((p) => ({ ...p, salidasEnElMes: cuenta.get(p.idpersonal) ?? 0 }));
+  }
+
+  buscarPersonal(ids: number[]) {
+    return new AsignacionRepository().buscarPersonal(ids);
+  }
+
   /**
-   * CU-36 pasos 10 y 11, en una transacción: bloquear las plazas del hotel (si se eligió uno)
-   * y registrar la salida publicada. El bloqueo ante la autoridad ya se pidió antes, afuera.
+   * CU-36 pasos 10 y 11, en una transacción: asignar el personal (B3), ocupar el hotel y el transporte para el máximo,
+   * dejar el equipo en 0 (lo ocupa cada compra) y registrar la salida publicada. La autoridad ya bloqueó el cupo, afuera.
+   * Orden de bloqueos: Personal → ServicioBase (hotel, transporte), el mismo de CU-38 y CU-39.
    */
   async crearSalida(d: DatosNuevaSalida) {
-    return db.$transaction(async (tx) => {
+    const idsalida = await db.$transaction(async (tx) => {
+      const fechas = { idsalida: 0, fechaInicio: d.fechaInicio, fechaFin: d.fechaFin };
+      if ((await new AsignacionRepository().personalOcupado(tx, fechas, d.personalIds)).length) {
+        throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar las opciones");
+      }
       // A1: con el hotel bloqueado se vuelve a mirar lo disponible en esas noches: otra salida pudo llevárselo en el medio
       if (d.idalojamiento && (await disponible(tx, d.idalojamiento, d.rangosAlojamiento)) < d.tamanoMaximo) {
-        throw CustomError.badRequest("El alojamiento ya no tiene plazas suficientes");
+        throw CustomError.conflict(`El hotel ${d.nombreHotel} ya no tiene plazas suficientes en esas noches. Volvé a cargar las opciones`);
+      }
+      const rangosTransporte = rangosDe(TIPO_SERVICIO.TRANSPORTE, d);
+      if ((await disponible(tx, d.idtransporte, rangosTransporte)) < 1) {
+        throw CustomError.conflict("El transporte elegido ya está ocupado en esas fechas. Volvé a cargar las opciones");
       }
 
       // Limitación: número correlativo por año; dos altas simultáneas chocan con el @unique y una falla (se compensa)
@@ -141,15 +215,19 @@ export class SalidaRepository {
           fechaFin: d.fechaFin,
           estado: ESTADO_SALIDA.PUBLICADA,
           definicionPaquete: d.definicionPaquete,
+          personalAsignado: { create: d.personalIds.map((idpersonal) => ({ idpersonal })) },
         },
       });
+      const base = { idsalida: salida.idsalida };
       if (d.idalojamiento) {
-        await ocupar(tx, { idservicio: d.idalojamiento, idsalida: salida.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO, rangos: d.rangosAlojamiento, cantidad: d.tamanoMaximo });
+        await ocupar(tx, { ...base, idservicio: d.idalojamiento, tipo: TIPO_SERVICIO.ALOJAMIENTO, rangos: d.rangosAlojamiento, cantidad: d.tamanoMaximo });
       }
-      return tx.salida.findUniqueOrThrow({
-        where: { idsalida: salida.idsalida },
-        include: { ocupaciones: { include: { servicio: { select: { nombreServicio: true } } } } },
-      });
-    });
+      await ocupar(tx, { ...base, idservicio: d.idtransporte, tipo: TIPO_SERVICIO.TRANSPORTE, rangos: rangosTransporte, cantidad: 1 });
+      for (const idservicio of d.equipos) {
+        await ocupar(tx, { ...base, idservicio, tipo: TIPO_SERVICIO.EQUIPAMIENTO, rangos: rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, d), cantidad: 0 });
+      }
+      return salida.idsalida;
+    }, { timeout: 15000 });
+    return (await this.buscar({}, idsalida))[0]!;
   }
 }

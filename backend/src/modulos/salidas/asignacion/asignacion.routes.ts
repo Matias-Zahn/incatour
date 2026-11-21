@@ -11,11 +11,12 @@ export class AsignacionRoutes {
      * @swagger
      * /api/salidas/{idsalida}/asignacion:
      *   get:
-     *     summary: Panel de asignación de recursos (CU-40, pasos 2 y 3)
+     *     summary: Panel para confirmar la salida (CU-40, pasos 2 y 3)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación definitiva según los pasajeros confirmados y los
-     *       lugares sobrantes del bloqueo, y lista el personal, los transportes y el equipamiento disponibles.
-     *       Responde 409 si alguna reserva tiene el alojamiento pendiente (FA5, se resuelve con el CU-34).
+     *       **RESTRINGIDO A ADMINISTRADOR.** Funciona en cualquier momento antes del inicio. Muestra los pasajeros, el personal
+     *       asignado con su aptitud (12.3), el hotel, el transporte, el equipo (necesita, ocupado y falta), los porteadores que
+     *       sobran, las reservas con el alojamiento pendiente y los faltantes. `puedeConfirmar` es true después del corte de venta
+     *       y sin faltantes; si no, `motivoNoConfirmable` dice por qué. Forma completa en docs/contratos-viernes.md, sección 9.1.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -28,23 +29,26 @@ export class AsignacionRoutes {
      *           application/json:
      *             example:
      *               data:
-     *                 salida: { idsalida: 2, nroSalida: SAL-2026-002 }
+     *                 salida: { idsalida: 2, nroSalida: SAL-2026-002, estado: PUBLICADA, ultimoDiaVenta: "2026-11-17", ventaAbierta: false }
+     *                 puedeConfirmar: true
+     *                 motivoNoConfirmable: null
      *                 pasajerosConfirmados: 3
      *                 dotacionRequerida: { guias: 2, porteadores: 2 }
+     *                 personal: [{ idpersonal: 1, nombreCompleto: Carlos Mamani, rol: Guía, apto: true, motivo: null }]
+     *                 porteadoresSobrantes: 2
+     *                 transporte: { idservicio: 3, nombreServicio: Minibus Sprinter, capacidadVehiculo: 15, alcanza: true }
+     *                 equipo: [{ idservicio: 5, nombreServicio: Carpas, tipoEquipamiento: Carpa, necesita: 2, ocupado: 2, falta: 0 }]
+     *                 faltantes: []
      *                 bloqueoInicial: 14
-     *                 lugaresSobrantes: 7
-     *                 personalDisponible: [{ idpersonal: 1, nombreCompleto: Carlos Mamani, rol: Guía }]
-     *                 transportesDisponibles: [{ idservicio: 3, nombreServicio: Minibus Sprinter, capacidadVehiculo: 15 }]
-     *                 stockCamping: [{ idservicio: 5, nombreServicio: Carpas, tipoEquipamiento: Carpa, cantidadDisponible: 20 }]
-     *       400: { description: Salida en un estado que no admite asignación, sin bloqueo, ya asignada o sin pasajeros. }
+     *                 lugaresSobrantes: 5
+     *       400: { description: Salida que ya inició o no está activa, o sin bloqueo. }
      *       404: { description: La salida no existe. }
-     *       409: { description: Hay reservas con el alojamiento pendiente (FA5). }
      *   post:
-     *     summary: Confirmar asignación de recursos y emitir permisos (CU-40)
+     *     summary: Confirmar la salida y emitir permisos (CU-40)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Asigna personal, transporte y equipamiento, emite los permisos de
-     *       toda la nómina (pasajeros y personal), devuelve al hotel las plazas no vendidas, libera los lugares
-     *       sobrantes del bloqueo y cierra la venta. Si la base falla después de emitir, los permisos se dan de baja.
+     *       **RESTRINGIDO A ADMINISTRADOR.** Body vacío: no asigna nada (todo se asignó al crear la salida). Solo después del
+     *       corte de venta y sin faltantes. Emite los permisos de toda la nómina (pasajeros y personal), devuelve al hotel las
+     *       plazas no vendidas, libera los lugares sobrantes del bloqueo y pasa la salida a CERRADA. Si la base falla después de emitir, los permisos se dan de baja.
      *       Si la autoridad rechaza a alguien (RF-47), la asignación se confirma igual: ese permiso queda registrado como
      *       "Rechazado", sin número, y la respuesta lo informa en `rechazados`. El lugar de un pasajero rechazado se libera
      *       con los sobrantes; el de un personal rechazado queda reservado para su reemplazo (CU-38).
@@ -53,28 +57,11 @@ export class AsignacionRoutes {
      *       - BearerAuth: []
      *     parameters:
      *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: object
-     *             required: [personalIds, idtransporte]
-     *             properties:
-     *               personalIds: { type: array, items: { type: integer }, example: [1, 2, 4, 5] }
-     *               idtransporte: { type: integer, example: 3 }
-     *               itemsCamping:
-     *                 type: array
-     *                 items:
-     *                   type: object
-     *                   properties:
-     *                     idservicio: { type: integer, example: 5 }
-     *                     cantidad: { type: integer, example: 4 }
      *     responses:
      *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados (`rechazados`: tipo, id, nombreCompleto y motivo), que son los que rechazó la autoridad y los pasajeros con el pasaporte vencido antes del fin del recorrido (SAL-21), y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
-     *       400: { description: Personal ocupado, dado de baja o sin habilitación (FA1), stock insuficiente (FA2), transporte sin cupo (FA3), pasaportes del personal vencidos (FA4) o dotación incompleta. }
+     *       400: { description: La venta sigue abierta, la salida ya está confirmada, ya inició o no tiene pasajeros. }
      *       404: { description: La salida no existe. }
-     *       409: { description: Hay reservas con el alojamiento pendiente (FA5), o la salida, el personal o el transporte cambiaron mientras se asignaba. }
+     *       409: { description: "Hay reservas con el alojamiento pendiente (FA5) o faltantes (equipo, transporte, personal no apto o dotación), con detalle: { reservasSinAlojamiento, faltantes }; o la salida cambió mientras se confirmaba." }
      *       503: { description: La autoridad no pudo emitir los permisos. No se modificó nada. }
      *
      * /api/salidas/{idsalida}/asignacion/liberar-sobrantes:

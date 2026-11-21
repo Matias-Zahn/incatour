@@ -35,7 +35,7 @@ export class SalidaController {
   // CU-36: POST /api/salidas (confirmarCreacionSalida)
   confirmarCreacionSalida = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [error, dto] = CrearSalidaDto.create(req.body);
+      const [error, dto] = CrearSalidaDto.create(req.body, true);
       if (error) throw CustomError.badRequest(error);
 
       const resultado = await salidaService.crearSalida(dto!);

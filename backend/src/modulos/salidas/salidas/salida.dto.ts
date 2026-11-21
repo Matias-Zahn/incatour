@@ -54,7 +54,7 @@ const aFecha = (valor: unknown, campo: string): [string | undefined, Date?] => {
   return [undefined, fecha];
 };
 
-// CU-36: llega por body (números) en POST y por query (texto) en GET /opciones
+// CU-36: llega por body (números) en POST y por query (texto) en GET /opciones. El alta (POST) suma transporte y personal (B3)
 export class CrearSalidaDto {
   private constructor(
     public idpaquete: number,
@@ -62,9 +62,11 @@ export class CrearSalidaDto {
     public tamanoMaximo: number,
     public idalojamiento: number | undefined,
     public diasCierreVenta: number | undefined,
+    public idtransporte: number = 0, // solo en el alta
+    public personalIds: number[] = [],
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string | undefined, CrearSalidaDto?] {
+  public static create(obj: { [key: string]: any }, alta = false): [string | undefined, CrearSalidaDto?] {
     const idpaquete = entero(obj.idpaquete);
     if (!idpaquete) return ["idpaquete es requerido y debe ser un entero positivo"];
 
@@ -80,7 +82,12 @@ export class CrearSalidaDto {
       return ["fechaInicio es requerida y debe ser una fecha válida (AAAA-MM-DD)"];
     }
 
-    const idalojamiento = obj.idalojamiento == null ? undefined : entero(obj.idalojamiento);
+    // B10: el contrato manda alojamientos (lista). ponytail: un solo hotel por salida hasta el bloque 10; idalojamiento sigue valiendo
+    if (obj.alojamientos != null && (!Array.isArray(obj.alojamientos) || !obj.alojamientos.every((a: unknown) => entero(a)))) {
+      return ["alojamientos debe ser una lista de ids de servicio"];
+    }
+    if (obj.alojamientos?.length > 1) return ["Por ahora la salida lleva un solo hotel: elegí uno"];
+    const idalojamiento = (obj.alojamientos?.[0] ?? obj.idalojamiento) == null ? undefined : entero(obj.alojamientos?.[0] ?? obj.idalojamiento);
     if (idalojamiento === null) return ["idalojamiento debe ser un entero positivo"];
 
     // B4: sin él, rige el corte sugerido (el del paquete, o 5 días con un hotel a solicitud)
@@ -88,8 +95,17 @@ export class CrearSalidaDto {
     if (diasCierreVenta === null || (diasCierreVenta ?? 0) > TOPES.diasCierreVenta) {
       return [`diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}`];
     }
+    if (!alta) return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta)];
 
-    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta)];
+    const idtransporte = entero(obj.idtransporte);
+    if (!idtransporte) return ["idtransporte es requerido y debe ser un entero positivo"];
+    const { personalIds } = obj;
+    if (!Array.isArray(personalIds) || personalIds.length === 0 || !personalIds.every((id) => typeof id === "number" && entero(id))) {
+      return ["personalIds debe ser una lista de ids de personal"];
+    }
+    if (new Set(personalIds).size !== personalIds.length) return ["personalIds tiene ids repetidos"];
+
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta, idtransporte, personalIds)];
   }
 }
 

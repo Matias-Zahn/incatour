@@ -1,62 +1,104 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
-import { codigoDia, diasDe, hoyUTC } from "../../../shared/fechas";
-import { rangosDe, unaPorServicio } from "../../../shared/ocupacion";
-import { armarDefinicionPaquete } from "../../../shared/definicionPaquete";
+import { COBERTURA_MINIMA_STOCK, ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { codigoDia, diasDe, fechaCorta, hoyUTC } from "../../../shared/fechas";
+import { claveDia, rangosDe, unaPorServicio } from "../../../shared/ocupacion";
+import { armarDefinicionPaquete, DefinicionPaquete } from "../../../shared/definicionPaquete";
+import { controlEquipo, FilaEquipo, reglasEquipo, tamanoQueAlcanza } from "../../../shared/equipo";
+import { motivoNoApto } from "../../../shared/aptitud";
 import { corteDeVenta, datosVenta, motivoFechaInvalida } from "../../../shared/ventaAbierta";
-import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
+import { ROL_GUIA, ROL_PORTEADOR } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
 import { ConsultarSalidasDto, CrearSalidaDto } from "./salida.dto";
 import { SalidaListada, SalidaRepository } from "./salida.repository";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
+const fecha = (clave: string) => fechaCorta(new Date(clave));
+export type DatosEquipo = { totales: Map<number, number>; filas: FilaEquipo[] };
 
 export class SalidaService {
   private repository = new SalidaRepository();
 
   // CU-35: Consultar salidas
   async consultarSalidas(dto: ConsultarSalidasDto) {
-    const ahora = new Date();
-    return (await this.repository.buscar(dto)).map((s) => resumirSalida(s, ahora));
+    return this.listar(await this.repository.buscar(dto));
   }
 
-  // CU-36 pasos 4 a 7: dotación, total de lugares y alojamientos que se pueden bloquear
+  private async listar(salidas: SalidaListada[]) {
+    const equipo = await this.repository.cargarEquipoDe(salidas);
+    const ahora = new Date();
+    return salidas.map((s) => resumirSalida(s, ahora, equipo));
+  }
+
+  // CU-36 pasos 4 a 7: dotación, total de lugares y lo que se puede elegir (hotel, transporte, personal), con el equipo controlado
   async consultarOpcionesSalida(dto: CrearSalidaDto) {
-    const { paquete, dotacion, totalLugares, alojamientos, tren } = await this.prepararSalida(dto);
+    const p = await this.prepararSalida(dto);
+    const { paquete, totalLugares } = p;
     // Informativo: si la autoridad no responde, la consulta sigue y el cupo queda sin informar
     const libres = await obtenerAutoridad().consultarDisponibilidad(dto.fechaInicio).catch(() => null);
+    const idtransporte = paquete.servicios.find((s) => s.servicio.transporte)?.idservicio ?? null;
+    const personal = (rol: string) =>
+      p.personal
+        .filter((x) => x.rol === rol)
+        .sort((a, b) => a.salidasEnElMes - b.salidasEnElMes || a.nombreCompleto.localeCompare(b.nombreCompleto))
+        .map((x) => ({ idpersonal: x.idpersonal, nombreCompleto: x.nombreCompleto, rol: x.rol, salidasEnElMes: x.salidasEnElMes }));
     return {
-      paquete: { idpaquete: paquete.idpaquete, nombrePaquete: paquete.nombrePaquete, diasCierreVenta: paquete.diasCierreVenta },
+      paquete: { idpaquete: paquete.idpaquete, nombrePaquete: paquete.nombrePaquete, idtransporte, diasCierreVenta: paquete.diasCierreVenta },
+      fechaFin: claveDia(p.fechaFin),
       // B9: si el tren no operara ese día, prepararSalida ya lo rechazó
-      tren: tren && {
-        idservicio: tren.idservicio,
-        nombreServicio: tren.nombreServicio,
-        horarioSalida: tren.tren.horarioSalida,
-        horarioLlegada: tren.tren.horarioLlegada,
-        diasOperacion: tren.tren.diasOperacion,
-        operaEseDia: diasDe(tren.tren.diasOperacion).includes(codigoDia(dto.fechaInicio)),
+      tren: p.tren && {
+        idservicio: p.tren.idservicio,
+        nombreServicio: p.tren.nombreServicio,
+        horarioSalida: p.tren.tren.horarioSalida,
+        horarioLlegada: p.tren.tren.horarioLlegada,
+        diasOperacion: p.tren.tren.diasOperacion,
+        operaEseDia: diasDe(p.tren.tren.diasOperacion).includes(codigoDia(dto.fechaInicio)),
       },
       tamanoMaximo: dto.tamanoMaximo,
-      dotacion,
+      dotacion: p.dotacion,
       totalLugares,
       cupoAutoridad: libres === null ? null : { lugaresDisponibles: libres, alcanza: libres >= totalLugares },
-      alojamientos: alojamientos.map((a) => ({
+      tarifa: { idtemporada: p.tarifa.idtemporada, temporada: p.tarifa.temporada.nombre, monto: p.tarifa.monto, moneda: p.tarifa.moneda },
+      plazasNecesarias: p.rangosAlojamiento.length ? dto.tamanoMaximo : 0,
+      alojamientos: p.alojamientos.map((a) => ({
         idservicio: a.idservicio,
         nombreServicio: a.nombreServicio,
         localidad: a.localidad,
         categoria: a.alojamiento?.categoria,
+        modalidadConfirmacion: a.alojamiento?.modalidadConfirmacion, // ponytail: solo los de bloqueo hasta el bloque 10
         capacidadDisponible: a.disponible, // A1: lo disponible en las noches de la salida
         alcanza: a.disponible >= dto.tamanoMaximo,
+      })),
+      transportes: p.transportes.map((t) => ({
+        idservicio: t.idservicio,
+        nombreServicio: t.nombreServicio,
+        capacidadVehiculo: t.capacidadVehiculo,
+        delPaquete: t.idservicio === idtransporte,
+        libre: t.libre,
+        alcanza: t.capacidadVehiculo >= totalLugares, // 12.4
+      })),
+      personal: { guias: personal(ROL_GUIA), porteadores: personal(ROL_PORTEADOR) },
+      equipo: p.equipo.map((e) => ({
+        idservicio: e.idservicio,
+        nombreServicio: e.nombreServicio,
+        tipoEquipamiento: e.tipoEquipamiento,
+        cantidad: e.cantidad,
+        cadaPasajeros: e.cadaPasajeros,
+        necesitaCompleta: e.necesitaCompleta,
+        libre: e.libre,
+        fechaCritica: e.fechaCritica,
+        nivel: e.nivel,
       })),
     };
   }
 
-  // CU-36 pasos 9 a 12: bloquear el cupo ante la autoridad y registrar la salida publicada
+  // CU-36 pasos 8 a 12: controlar lo elegido, bloquear el cupo ante la autoridad y registrar la salida publicada
   async crearSalida(dto: CrearSalidaDto) {
-    const { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento } = await this.prepararSalida(dto);
+    const p = await this.prepararSalida(dto);
+    const { paquete, dotacion, alojamientos, fechaFin, rangosAlojamiento } = p;
 
     const conPlazas = alojamientos.filter((a) => a.disponible >= dto.tamanoMaximo);
+    const hotel = alojamientos.find((a) => a.idservicio === dto.idalojamiento);
     if (dto.idalojamiento && !conPlazas.some((a) => a.idservicio === dto.idalojamiento)) {
       throw CustomError.badRequest(
         "El alojamiento elegido no cumple la garantía del paquete, no confirma por bloqueo de plazas o no tiene capacidad suficiente"
@@ -67,13 +109,69 @@ export class SalidaService {
       throw CustomError.badRequest("Hay alojamientos que confirman por bloqueo de plazas: elegí uno (idalojamiento)");
     }
 
+    // B3 y 12.3: personal que existe, apto hasta el fin y que cubre la dotación por el máximo; se aceptan extras (decisión 5)
+    const elegidos = await this.repository.buscarPersonal(dto.personalIds);
+    const noAptos = dto.personalIds.flatMap((id) => {
+      const persona = elegidos.find((e) => e.idpersonal === id);
+      if (!persona) return [`El personal ${id} no existe`];
+      const motivo = motivoNoApto(persona, fechaFin);
+      return motivo ? [`${persona.nombreCompleto}: ${motivo}`] : [];
+    });
+    if (noAptos.length) throw CustomError.badRequest(noAptos.join(". "));
+    const guias = elegidos.filter((e) => e.rol === ROL_GUIA).length;
+    const porteadores = elegidos.filter((e) => e.rol === ROL_PORTEADOR).length;
+    if (guias < dotacion.guias || porteadores < dotacion.porteadores) {
+      throw CustomError.badRequest(
+        `La salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (elegiste ${guias} y ${porteadores})`
+      );
+    }
+    if (dto.personalIds.some((id) => !p.personal.some((x) => x.idpersonal === id))) {
+      throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar las opciones");
+    }
+
+    // B3 y 12.4: el vehículo lleva a los pasajeros y al personal
+    const totalLugares = dto.tamanoMaximo + dto.personalIds.length;
+    const transporte = p.transportes.find((t) => t.idservicio === dto.idtransporte);
+    if (!transporte) throw CustomError.badRequest("El transporte elegido no existe o no está activo");
+    if (transporte.capacidadVehiculo < totalLugares) {
+      throw CustomError.badRequest(
+        `El transporte elegido tiene ${transporte.capacidadVehiculo} asientos y la salida necesita ${totalLugares} lugares ` +
+          `(${dto.tamanoMaximo} pasajeros y ${dto.personalIds.length} del personal)`
+      );
+    }
+    if (!transporte.libre) throw CustomError.conflict("El transporte elegido ya está ocupado en esas fechas. Volvé a cargar las opciones");
+
+    // A2b: por debajo del 50 % no se crea; entre el 50 y el 100 % se crea con aviso
+    const noAlcanza = p.equipo.filter((e) => e.nivel === "NO_ALCANZA");
+    if (noAlcanza.length) {
+      const sugerido = Math.min(...noAlcanza.map((e) => tamanoQueAlcanza(e.libre, e)));
+      const faltantes = noAlcanza.map((e) => ({
+        idservicio: e.idservicio,
+        nombreServicio: e.nombreServicio,
+        fecha: e.fechaCritica,
+        libre: e.libre,
+        necesitaMinimo: Math.ceil(e.necesitaCompleta * COBERTURA_MINIMA_STOCK),
+      }));
+      const textos = noAlcanza.map(
+        (e, i) => `el ${fecha(e.fechaCritica)} hay ${e.libre} libres de ${e.nombreServicio} y la salida necesita al menos ${faltantes[i]!.necesitaMinimo} (${e.necesitaCompleta} si se vende completa)`
+      );
+      throw CustomError.conflict(
+        `No alcanza el equipo: ${textos.join("; ")}.${sugerido > 0 ? ` Probá con un máximo de ${sugerido} pasajeros` : ""}`,
+        { faltantes, tamanoMaximoSugerido: sugerido }
+      );
+    }
+    const advertencias = p.equipo
+      .filter((e) => e.nivel === "RIESGO")
+      .map((e) => `Si se vende completa faltarían hasta ${e.necesitaCompleta - e.libre} de ${e.nombreServicio} el ${fecha(e.fechaCritica)}`);
+
     // B4: sin hotel con bloqueo, las compras van a solicitud y el corte es más largo. 12.6: con el corte final,
     // la salida no puede nacer con la venta cerrada
     const diasCierreVenta = dto.diasCierreVenta ?? corteDeVenta(paquete.diasCierreVenta, rangosAlojamiento.length > 0 && !dto.idalojamiento);
     const motivo = motivoFechaInvalida(dto.fechaInicio, { diasDisponibles: null, diasCierreVenta });
     if (motivo) throw CustomError.badRequest(motivo);
 
-    // Paso 9: la autoridad va ANTES de la transacción, porque no se puede deshacer con un rollback
+    // Paso 9: la autoridad va ANTES de la transacción, porque no se puede deshacer con un rollback.
+    // Decisión 5: el cupo es por el máximo de pasajeros más el personal elegido (con los extras)
     const autoridad = obtenerAutoridad();
     let bloqueo;
     try {
@@ -99,11 +197,16 @@ export class SalidaService {
         tamanoMaximo: dto.tamanoMaximo,
         idbloqueo: bloqueo.idBloqueo,
         idalojamiento: dto.idalojamiento,
+        nombreHotel: hotel?.nombreServicio,
+        idtransporte: dto.idtransporte,
+        personalIds: dto.personalIds,
+        equipos: p.equipo.map((e) => e.idservicio),
         diasCierreVenta,
         rangosAlojamiento,
-        definicionPaquete: armarDefinicionPaquete(paquete),
+        definicionPaquete: p.definicion,
       });
-      return { salida, dotacion, totalLugares };
+      const [resumen] = await this.listar([salida]);
+      return { salida: resumen!, dotacion, totalLugares, advertencias };
     } catch (error) {
       // Compensación: la base falló después de bloquear, así que se devuelven los lugares
       await autoridad
@@ -130,13 +233,13 @@ export class SalidaService {
     });
     if (motivo) throw CustomError.badRequest(motivo);
 
-    const tarifaVigente = paquete.tarifas.some(
+    const tarifa = paquete.tarifas.find(
       (t) =>
         t.temporada.estado === ESTADO.ACTIVO &&
         t.temporada.fechaInicio <= dto.fechaInicio &&
         dto.fechaInicio <= t.temporada.fechaFin
     );
-    if (!tarifaVigente) {
+    if (!tarifa) {
       throw CustomError.badRequest("El paquete no tiene un precio vigente para la temporada de esa fecha");
     }
 
@@ -154,10 +257,66 @@ export class SalidaService {
     const totalLugares = dto.tamanoMaximo + dotacion.guias + dotacion.porteadores;
     // A1: el hotel se ocupa solo en las noches previas y posteriores del paquete
     const fechaFin = new Date(dto.fechaInicio.getTime() + (paquete.circuito.duracionDias - 1) * DIA_MS);
-    const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, { fechaInicio: dto.fechaInicio, fechaFin }, paquete);
-    const alojamientos = await this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento);
-    return { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento, tren: tren?.tren ? { ...tren, tren: tren.tren } : null };
+    const fechas = { fechaInicio: dto.fechaInicio, fechaFin };
+    const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, fechas, paquete);
+    const definicion = armarDefinicionPaquete(paquete);
+    const salidaNueva = { ...fechas, estado: ESTADO_SALIDA.PUBLICADA, tamanoMaximo: dto.tamanoMaximo, definicionPaquete: definicion };
+    const [alojamientos, transportes, libres, datosEquipo] = await Promise.all([
+      this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento),
+      this.repository.buscarTransportes(fechas),
+      this.repository.buscarPersonalLibre(fechas),
+      this.repository.cargarEquipoDe([salidaNueva]),
+    ]);
+    // A2b: cada equipo con regla, contra la demanda proyectada de las otras salidas
+    const equipo = reglasEquipo(definicion).map((r) => ({
+      ...controlEquipo(r, datosEquipo.totales.get(r.idservicio) ?? 0, datosEquipo.filas, salidaNueva, 0),
+      tipoEquipamiento: paquete.servicios.find((s) => s.idservicio === r.idservicio)?.servicio.equipamiento?.tipoEquipamiento ?? null,
+    }));
+    return {
+      paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento, tarifa, transportes, equipo, definicion,
+      personal: libres.filter((x) => !motivoNoApto(x, fechaFin)), // 12.3: los que no son aptos no se listan
+      tren: tren?.tren ? { ...tren, tren: tren.tren } : null,
+    };
   }
+}
+
+type SalidaRevisable = Pick<SalidaListada, "idsalida" | "estado" | "fechaInicio" | "fechaFin" | "tamanoMaximo" | "definicionPaquete"> & {
+  personalAsignado: { personal: Parameters<typeof motivoNoApto>[0] & { idpersonal: number; nombreCompleto: string } }[];
+  ocupaciones: { tipo: string; idservicio: number; servicio: { nombreServicio: string; transporte?: { capacidadVehiculo: number } | null } }[];
+};
+
+/**
+ * B4 y 12.3: lo que le falta a una salida, para el listado (alertas) y para confirmarla (CU-40).
+ * - personal: cada asignado con su motivo de no apto (12.3);
+ * - transporte: si alcanza para los pasajeros (el máximo mientras se vende, los vendidos después) más el personal (12.4);
+ * - equipo: cada equipo de la copia, contra lo vendido y el stock (FALTA_RECURSO) y contra la venta completa (RIESGO_STOCK).
+ */
+export function revisarRecursos(s: SalidaRevisable, equipo: DatosEquipo, vendidos: number) {
+  const personal = s.personalAsignado.map(({ personal: x }) => ({ ...x, motivo: motivoNoApto(x, s.fechaFin) }));
+  const lugares = (s.estado === ESTADO_SALIDA.PUBLICADA ? s.tamanoMaximo : vendidos) + personal.length;
+  const t = s.ocupaciones.find((o) => o.tipo === TIPO_SERVICIO.TRANSPORTE);
+  const transporte = t && {
+    idservicio: t.idservicio,
+    nombreServicio: t.servicio.nombreServicio,
+    capacidadVehiculo: t.servicio.transporte?.capacidadVehiculo ?? 0,
+    alcanza: (t.servicio.transporte?.capacidadVehiculo ?? 0) >= lugares,
+  };
+  const equipos = reglasEquipo(s.definicionPaquete as DefinicionPaquete | null).map((r) =>
+    controlEquipo(r, equipo.totales.get(r.idservicio) ?? 0, equipo.filas, s, vendidos)
+  );
+  const faltas = [
+    ...equipos.filter((e) => e.falta > 0).map((e) => `Faltan ${e.falta} de ${e.nombreServicio} el ${fecha(e.fechaFalta)}`),
+    ...(!transporte
+      ? ["Falta el transporte"]
+      : transporte.alcanza
+        ? []
+        : [`El transporte ${transporte.nombreServicio} tiene ${transporte.capacidadVehiculo} asientos y la salida necesita ${lugares} lugares`]),
+  ];
+  const riesgos = equipos
+    .filter((e) => e.libre < e.necesitaCompleta)
+    .map((e) => `Si se vende completa faltarían hasta ${e.necesitaCompleta - e.libre} de ${e.nombreServicio} el ${fecha(e.fechaCritica)}`);
+  const noAptos = personal.filter((x) => x.motivo).map((x) => `${x.nombreCompleto}: ${x.motivo}`);
+  return { personal, transporte: transporte ?? null, equipos, faltas, riesgos, noAptos };
 }
 
 // RF-61: una salida está "próxima" si empieza dentro de estos días (supuesto del grupo, ver ERS)
@@ -175,13 +334,15 @@ const HORA_MS = 60 * 60 * 1000;
  *   además, la que llegó a su fecha y el guía no inició, la iniciada sin avances después de HORAS_ALERTA_PRIMER_AVANCE
  *   y la que sigue en curso pasado el día siguiente a su fin.
  */
-export function resumirSalida(s: SalidaListada, ahora: Date) {
+export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo = { totales: new Map(), filas: [] }) {
   const { reservas, permisos, avances, ocupaciones, ...salida } = s;
   const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
   const cantidadPersonal = salida.personalAsignado.length;
   const emitidos = permisos.length + reservas.reduce((t, r) => t + r.permisos.length, 0);
   const permisosFaltantes = Math.max(0, pasajerosConfirmados + cantidadPersonal - emitidos);
   const guias = salida.personalAsignado.filter((a) => a.personal.rol === ROL_GUIA).map((a) => a.personal.nombreCompleto);
+  const hoy = hoyUTC(ahora);
+  const venta = datosVenta(salida, hoy); // B4
 
   let etapaEsperada: number | null = null;
   const { duracionDias, _count } = salida.paquete.circuito;
@@ -198,7 +359,6 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
     if (reservas.some((r) => r.solicitudes.length > 0)) alertas.push("SOLICITUD_PENDIENTE");
     if (permisosFaltantes > 0) alertas.push("PERMISOS_SIN_CONFIRMAR");
   }
-  const hoy = hoyUTC(ahora);
   const primerAvance = avances[0]?.fechaHoraLlegada ?? null;
   if (porEmpezar && salida.fechaInicio <= hoy) alertas.push("SIN_INICIAR");
   if (salida.estado === ESTADO_SALIDA.EN_CURSO) {
@@ -207,9 +367,24 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
     if (hoy.getTime() > salida.fechaFin.getTime() + DIA_MS) alertas.push("SIN_FINALIZAR");
   }
 
+  // B4, A2b y 12.3: aparecen apenas pasa, sin esperar DIAS_ALERTA. avisos lleva el detalle legible
+  const avisos: { alerta: string; mensaje: string }[] = [];
+  const puedeConfirmar = salida.estado === ESTADO_SALIDA.PUBLICADA && !venta.ventaAbierta && salida.fechaInicio > hoy;
+  if (SALIDAS_NO_INICIADAS.includes(salida.estado)) {
+    const r = revisarRecursos(s, equipo, pasajerosConfirmados);
+    avisos.push(...r.faltas.map((mensaje) => ({ alerta: "FALTA_RECURSO", mensaje })));
+    if (venta.ventaAbierta) avisos.push(...r.riesgos.map((mensaje) => ({ alerta: "RIESGO_STOCK", mensaje })));
+    avisos.push(...r.noAptos.map((mensaje) => ({ alerta: "PERSONAL_NO_APTO", mensaje })));
+  }
+  if (puedeConfirmar) {
+    avisos.push({ alerta: "PENDIENTE_CONFIRMAR", mensaje: `La venta cerró el ${fecha(venta.ultimoDiaVenta)}: falta confirmar la salida` });
+  }
+  alertas.push(...new Set(avisos.map((a) => a.alerta)));
+
   return {
     ...salida,
-    ...datosVenta(salida, hoy), // B4
+    ...venta,
+    puedeConfirmar,
     // Decisión 12 del contrato: la forma de SalidaServicio, armada desde Ocupacion (el hotel, una vez aunque ocupe dos tramos)
     servicios: unaPorServicio(ocupaciones).map((o) => ({
       idsalida: o.idsalida,
@@ -231,5 +406,6 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
       ((etapaInformada ?? 0) < etapaEsperada - 1 || (etapaInformada ?? 0) > etapaEsperada),
     primerAvance,
     alertas,
+    avisos,
   };
 }

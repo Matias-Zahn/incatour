@@ -1,6 +1,6 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
-import { SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { UsuarioAutenticado } from "../../reservas/gestion-reservas/gestion-reserva.service";
 import { ModificarLogisticaDto, TipoRecursoDto } from "./logistica.dto";
 import { LogisticaRepository } from "./logistica.repository";
@@ -41,7 +41,8 @@ export class LogisticaService {
     }
 
     const pasajeros = await this.repository.pasajerosConfirmados(idsalida);
-    const servicios = await this.repository.disponiblesTransporte(salida, pasajeros);
+    const lugares = lugaresVehiculo(salida, pasajeros);
+    const servicios = await this.repository.disponiblesTransporte(salida, lugares);
     return servicios.map((s) => ({
       idservicio: s.idservicio,
       nombreServicio: s.nombreServicio,
@@ -51,6 +52,7 @@ export class LogisticaService {
       disponibilidad: {
         capacidadVehiculo: s.transporte?.capacidadVehiculo,
         pasajerosConfirmados: pasajeros,
+        lugaresNecesarios: lugares, // 12.4: pasajeros más personal
       },
     }));
   }
@@ -62,7 +64,7 @@ export class LogisticaService {
 
     const resultado = await this.repository.aplicarCambios({
       salida,
-      pasajeros,
+      lugares: lugaresVehiculo(salida, pasajeros),
       itemsDesasignar: dto.itemsDesasignar,
       itemsNuevos: dto.itemsNuevos,
       motivo: dto.motivo,
@@ -79,16 +81,11 @@ export class LogisticaService {
   }
 
   // ---- helpers ----
-  // Precondición: la salida tiene recursos ya asignados (CERRADA) y no empezó (CU-39 / SAL-07)
+  // Precondición: la salida no empezó (CU-39 / SAL-07). Decisión 16: también PUBLICADA, porque los recursos se asignan al crearla
   private async buscarModificableOFallar(idsalida: number) {
     const salida = await this.repository.findSalida(idsalida);
     if (!salida) throw CustomError.notFound(`No se encontró la salida con ID ${idsalida}.`);
-    if (salida.estado === "PUBLICADA") {
-      throw CustomError.badRequest(
-        "La salida todavía no tiene recursos asignados (CU-40). La logística solo se modifica sobre salidas con asignación previa."
-      );
-    }
-    if (salida.estado !== "CERRADA" || salida.fechaInicio <= hoyUTC()) {
+    if (!SALIDAS_NO_INICIADAS.includes(salida.estado) || salida.fechaInicio <= hoyUTC()) {
       throw CustomError.badRequest(
         "La logística solo puede modificarse en salidas que no hayan comenzado y no estén canceladas ni finalizadas."
       );
@@ -124,3 +121,7 @@ export class LogisticaService {
     };
   }
 }
+
+/** 12.4: el vehículo lleva al personal además de los pasajeros: el máximo mientras se vende, los vendidos después. */
+const lugaresVehiculo = (s: { estado: string; tamanoMaximo: number; _count: { personalAsignado: number } }, pasajeros: number) =>
+  (s.estado === ESTADO_SALIDA.PUBLICADA ? s.tamanoMaximo : pasajeros) + s._count.personalAsignado;

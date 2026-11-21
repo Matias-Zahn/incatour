@@ -6,7 +6,7 @@ import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.inter
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { AsignacionRepository } from "../asignacion/asignacion.repository";
-import { habilitacionVigente } from "../asignacion/asignacion.service";
+import { habilitacionVigente } from "../../../shared/aptitud";
 import { ConfirmarReemplazoDto } from "./reemplazo.dto";
 import { ReemplazoRepository } from "./reemplazo.repository";
 
