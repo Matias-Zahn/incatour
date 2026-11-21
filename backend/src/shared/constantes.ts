@@ -21,7 +21,7 @@ export const ESTADO_PERMISO = { EMITIDO: "Emitido", PERDIDO: "Perdido", DADO_DE_
 
 export const ESTADO_SALIDA = {
   PUBLICADA: "PUBLICADA",
-  CERRADA: "CERRADA", // venta cerrada al asignar los recursos (CU-40): lista para salir
+  CERRADA: "CERRADA", // confirmada por el admin (CU-40): lista para salir. El fin de la venta es por fecha (ventaAbierta)
   EN_CURSO: "EN_CURSO", // desde que el guía la inicia (CU-49)
   FINALIZADA: "FINALIZADA",
   CANCELADA: "CANCELADA",
@@ -32,6 +32,11 @@ export const SALIDAS_ACTIVAS = ["PUBLICADA", "CERRADA", "EN_CURSO"];
 
 /** A1: días que el equipo queda en lavado y revisión después del fin de la salida, antes de volver a usarse. */
 export const DIAS_REACONDICIONAMIENTO = 2;
+
+/** B4: la venta de una salida termina estos días antes del inicio (por defecto del paquete). */
+export const DIAS_CIERRE_VENTA_DEFECTO = 2;
+/** B4: con un hotel a solicitud hay que gestionarlo, así que el corte es más largo. */
+export const DIAS_CIERRE_SOLICITUD = 5;
 
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];
@@ -50,6 +55,8 @@ export const TOPES = {
   diasMinimosReintegro: 365,
   montoTarifa: 10_000_000, // igual que costoBase
   tamanoSalida: 100,
+  diasCierreVenta: 30,
+  reglaEquipo: 100, // cantidad y cadaPasajeros de cada equipo del paquete
 } as const;
 
 export const TIPO_SERVICIO = {
