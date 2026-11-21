@@ -438,7 +438,9 @@ function FormularioServicio({
                                             : undefined
                                 }
                                 max={
-                                    nombreCampo === "pesoEquipajeIncluido"
+                                    nombreCampo === "capacidadVehiculo"
+                                        ? 60
+                                        : nombreCampo === "pesoEquipajeIncluido"
                                         ? 20
                                         : undefined
                                 }
