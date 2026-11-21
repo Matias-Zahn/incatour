@@ -8,6 +8,8 @@ const fechaRelativa = (dias: number, horaUtc = 8): string => {
     return f.toISOString();
 };
 
+const isoFechaRelativa = (dias: number): string => fechaRelativa(dias, 8).slice(0, 10);
+
 export const salidasMockIniciales: SalidaApi[] = [
     {
         idsalida: 1,
@@ -17,11 +19,15 @@ export const salidasMockIniciales: SalidaApi[] = [
         stockLocal: 4,
         stockLocalAlojamiento: 4,
         tamanoMaximo: 8,
-        fechaInicio: fechaRelativa(3),
-        fechaFin: fechaRelativa(6, 18),
+        fechaInicio: fechaRelativa(2),
+        fechaFin: fechaRelativa(5, 18),
         estado: "PUBLICADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(-1),
+        ventaAbierta: false,
+        puedeConfirmar: true,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
@@ -49,6 +55,14 @@ export const salidasMockIniciales: SalidaApi[] = [
                     rol: "Porteador",
                 },
             },
+            {
+                idsalida: 1,
+                idpersonal: 4,
+                personal: {
+                    nombreCompleto: "Pedro Condori",
+                    rol: "Porteador",
+                },
+            },
         ],
         servicios: [
             {
@@ -60,15 +74,30 @@ export const salidasMockIniciales: SalidaApi[] = [
                     nombreServicio: "Hotel Montaña",
                 },
             },
+            {
+                idsalida: 1,
+                idservicio: 3,
+                tipo: "TRANSPORTE",
+                comprobanteReserva: null,
+                servicio: {
+                    nombreServicio: "Bus Cusco - Km 82",
+                },
+            },
         ],
         pasajerosConfirmados: 4,
-        cantidadPersonal: 2,
+        cantidadPersonal: 3,
         guias: ["Carlos Mamani"],
-        permisosFaltantes: 2,
+        permisosFaltantes: 0,
         etapaEsperada: null,
         etapaInformada: null,
         etapaDesfasada: false,
-        alertas: ["SOLICITUD_PENDIENTE", "PERMISOS_SIN_CONFIRMAR"],
+        alertas: ["PENDIENTE_CONFIRMAR"],
+        avisos: [
+            {
+                alerta: "PENDIENTE_CONFIRMAR",
+                mensaje: "La venta cerró ayer: falta confirmar la salida",
+            },
+        ],
     },
     {
         idsalida: 2,
@@ -83,6 +112,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "FINALIZADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: 4,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(-18),
+        ventaAbierta: false,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
@@ -130,6 +163,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         etapaInformada: 4,
         etapaDesfasada: false,
         alertas: [],
+        avisos: [],
     },
     {
         idsalida: 3,
@@ -144,6 +178,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "EN_CURSO",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: 1,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(-5),
+        ventaAbierta: false,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-INC-02",
             nombrePaquete: "Inca VIP Hotel Montaña",
@@ -191,6 +229,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         etapaInformada: 1,
         etapaDesfasada: true,
         alertas: [],
+        avisos: [],
     },
     {
         idsalida: 4,
@@ -205,6 +244,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "CERRADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(2),
+        ventaAbierta: false,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
@@ -225,7 +268,17 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
-        servicios: [],
+        servicios: [
+            {
+                idsalida: 4,
+                idservicio: 3,
+                tipo: "TRANSPORTE",
+                comprobanteReserva: "BUS-003",
+                servicio: {
+                    nombreServicio: "Bus Cusco - Km 82",
+                },
+            },
+        ],
         pasajerosConfirmados: 8,
         cantidadPersonal: 1,
         guias: ["Carlos Mamani"],
@@ -234,6 +287,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         etapaInformada: null,
         etapaDesfasada: false,
         alertas: ["PERMISOS_SIN_CONFIRMAR"],
+        avisos: [],
     },
     {
         idsalida: 5,
@@ -248,6 +302,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "CANCELADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(37),
+        ventaAbierta: false,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-INC-01",
             nombrePaquete: "Inca Clásico Standard",
@@ -268,6 +326,7 @@ export const salidasMockIniciales: SalidaApi[] = [
         etapaInformada: null,
         etapaDesfasada: false,
         alertas: [],
+        avisos: [],
     },
     {
         idsalida: 6,
@@ -282,6 +341,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "PUBLICADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
+        diasCierreVenta: 2,
+        ultimoDiaVenta: isoFechaRelativa(22),
+        ventaAbierta: true,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-INC-02",
             nombrePaquete: "Inca VIP Hotel Montaña",
@@ -312,6 +375,15 @@ export const salidasMockIniciales: SalidaApi[] = [
                     nombreServicio: "Hotel Valle Sagrado",
                 },
             },
+            {
+                idsalida: 6,
+                idservicio: 3,
+                tipo: "TRANSPORTE",
+                comprobanteReserva: null,
+                servicio: {
+                    nombreServicio: "Bus Cusco - Km 82",
+                },
+            },
         ],
         pasajerosConfirmados: 4,
         cantidadPersonal: 1,
@@ -320,7 +392,13 @@ export const salidasMockIniciales: SalidaApi[] = [
         etapaEsperada: null,
         etapaInformada: null,
         etapaDesfasada: false,
-        alertas: [],
+        alertas: ["RIESGO_STOCK"],
+        avisos: [
+            {
+                alerta: "RIESGO_STOCK",
+                mensaje: "Si se vende completa faltarían hasta 2 carpas el día de inicio",
+            },
+        ],
     },
     {
         idsalida: 7,
@@ -335,6 +413,10 @@ export const salidasMockIniciales: SalidaApi[] = [
         estado: "PUBLICADA",
         lugaresPorLiberar: 0,
         ultimaEtapaAlcanzada: null,
+        diasCierreVenta: 5,
+        ultimoDiaVenta: isoFechaRelativa(8),
+        ventaAbierta: true,
+        puedeConfirmar: false,
         paquete: {
             nroPaquete: "PAQ-SAL-01",
             nombrePaquete: "Salkantay Aventura",
@@ -355,31 +437,59 @@ export const salidasMockIniciales: SalidaApi[] = [
                 },
             },
         ],
-        servicios: [],
+        servicios: [
+            {
+                idsalida: 7,
+                idservicio: 5,
+                tipo: "ALOJAMIENTO",
+                comprobanteReserva: null,
+                servicio: {
+                    nombreServicio: "Hotel Sol Andino",
+                },
+            },
+        ],
         pasajerosConfirmados: 6,
         cantidadPersonal: 1,
         guias: ["Rosa Huamán"],
-        permisosFaltantes: 2,
+        permisosFaltantes: 0,
         etapaEsperada: null,
         etapaInformada: null,
         etapaDesfasada: false,
-        alertas: [],
+        alertas: ["SOLICITUD_PENDIENTE"],
+        avisos: [],
     },
 ];
 
-export const alojamientosSalidaMock = [
+export const alojamientosSalidaMock: {
+    idservicio: number;
+    nombreServicio: string;
+    localidad: string;
+    categoria: string | null;
+    modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD";
+    capacidadDisponible: number | null;
+}[] = [
     {
         idservicio: 1,
         nombreServicio: "Hotel Montaña",
         localidad: "Cusco",
         categoria: "3 Estrellas",
-        capacidadDisponible: 15,
+        modalidadConfirmacion: "BLOQUEO_PLAZAS",
+        capacidadDisponible: 10,
     },
     {
-        idservicio: 4,
-        nombreServicio: "Hospedaje Andino",
+        idservicio: 2,
+        nombreServicio: "Hotel Valle Sagrado",
+        localidad: "Cusco",
+        categoria: "4 Estrellas",
+        modalidadConfirmacion: "BLOQUEO_PLAZAS",
+        capacidadDisponible: 8,
+    },
+    {
+        idservicio: 5,
+        nombreServicio: "Hotel Sol Andino",
         localidad: "Cusco",
         categoria: "3 Estrellas",
-        capacidadDisponible: 4,
+        modalidadConfirmacion: "A_SOLICITUD",
+        capacidadDisponible: null,
     },
 ];

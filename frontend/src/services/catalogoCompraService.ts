@@ -29,6 +29,10 @@ export type SalidaDisponibleCatalogo = {
     precioPersona: number | null;
     moneda: string | null;
     temporadaNombre: string | null;
+    // B4 / 12.7 (§7)
+    ventaAbierta?: boolean;
+    ultimoDiaVenta?: string;
+    fechaLimiteReintegro?: string | null;
     // CAT-29 / CAT-30: lo que se vende en esta salida (la foto congelada al crearla, CAT-05)
     garantia?: string;
     nochesPrevias?: number;
@@ -40,6 +44,7 @@ export type PaqueteCatalogoPublico = {
     id: number;
     codigo: string;
     nombre: string;
+    saleDesde?: string;
     imagenPrincipal?: string;
     imagenes?: string[];
     tieneImagenesPropias?: boolean;
@@ -57,6 +62,7 @@ export type PaqueteCatalogoPublico = {
         tipoGarantia?: string;
     };
     serviciosAdicionales: string[];
+    serviciosIncluidos?: string[];
     condiciones?: string | null;
     diasDisponibles?: string | null;
     precios: TarifaCatalogoPublico[];
@@ -89,6 +95,7 @@ export type ResultadoReservaConfirmada = {
     nroReserva: string;
     estado: string;
     estadoAlojamiento: "CONFIRMADO" | "PENDIENTE" | string;
+    hotel?: { idservicio: number; nombreServicio: string } | null;
     cantidadPasajeros: number;
     precioCongelado: number;
     moneda: string;

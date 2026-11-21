@@ -5,6 +5,8 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioServicio from "../../components/FormularioServicio";
+import Modal from "../../components/Modal";
+import ModalOcupacionServicio from "../../components/ModalOcupacionServicio";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import { useProveedor } from "../../services/proveedorService";
@@ -91,6 +93,7 @@ function ServiciosPage() {
     const [formularioAbierto, setFormularioAbierto] = useState(false);
     const [servicioBaseEdicion, setServicioBaseEdicion] = useState<Servicio | null>(null);
     const [seleccionado, setSeleccionado] = useState<Servicio | null>(null);
+    const [servicioOcupacion, setServicioOcupacion] = useState<Servicio | null>(null);
     const [errorFormulario, setErrorFormulario] = useState("");
 
     // CU-20 paso 1: consulta GET /api/servicios/:id para traer el bloque `edicion` y la disponibilidad actualizada.
@@ -260,18 +263,27 @@ function ServiciosPage() {
             ) : null}
 
             {formularioAbierto ? (
-                <FormularioServicio
-                    tipoProveedor={tipoProveedor}
-                    localidadPredeterminada={proveedor?.localidad ?? ""}
-                    servicioEnEdicion={servicioEnEdicion}
-                    cargandoEdicion={
-                        Boolean(servicioBaseEdicion) && cargandoDetalleEdicion
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={guardando}
+                    tamano="lg"
+                    etiqueta={
+                        servicioBaseEdicion ? "Editar servicio" : "Nuevo servicio"
                     }
-                    alGuardar={guardar}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                >
+                    <FormularioServicio
+                        tipoProveedor={tipoProveedor}
+                        localidadPredeterminada={proveedor?.localidad ?? ""}
+                        servicioEnEdicion={servicioEnEdicion}
+                        cargandoEdicion={
+                            Boolean(servicioBaseEdicion) && cargandoDetalleEdicion
+                        }
+                        alGuardar={guardar}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {darDeBaja.isError ? (
@@ -404,6 +416,16 @@ function ServiciosPage() {
                                 titulo: "Acciones",
                                 renderizar: (servicio) => (
                                     <div className="flex flex-wrap gap-2">
+                                        {servicio.tipo !== "TREN" ? (
+                                            <Boton
+                                                variante="fantasma"
+                                                className="px-3 py-1.5 text-xs"
+                                                aria-label={`Ver ocupación de ${servicio.nombreServicio}`}
+                                                onClick={() => setServicioOcupacion(servicio)}
+                                            >
+                                                Ocupación
+                                            </Boton>
+                                        ) : null}
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
@@ -438,6 +460,13 @@ function ServiciosPage() {
                     paginaActual={paginaActual}
                     totalPaginas={totalPaginas}
                     onCambiarPagina={setPaginaActual}
+                />
+            ) : null}
+
+            {servicioOcupacion ? (
+                <ModalOcupacionServicio
+                    servicio={servicioOcupacion}
+                    onCerrar={() => setServicioOcupacion(null)}
                 />
             ) : null}
 

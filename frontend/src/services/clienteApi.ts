@@ -4,11 +4,13 @@ const URL_BASE: string = import.meta.env.VITE_API_URL ?? "/api";
 
 export class ErrorApi extends Error {
     readonly estado: number;
+    readonly detalle?: unknown;
 
-    constructor(estado: number, mensaje: string) {
+    constructor(estado: number, mensaje: string, detalle?: unknown) {
         super(mensaje);
         this.name = "ErrorApi";
         this.estado = estado;
+        this.detalle = detalle;
     }
 }
 
@@ -82,17 +84,25 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
             }
         }
         let mensaje = "Ocurrió un error inesperado.";
+        let detalle: unknown;
         try {
-            const cuerpo = (await respuesta.json()) as { error?: string; mensaje?: string };
+            const cuerpo = (await respuesta.json()) as {
+                error?: string;
+                mensaje?: string;
+                detalle?: unknown;
+            };
             if (cuerpo.error) {
                 mensaje = cuerpo.error;
             } else if (cuerpo.mensaje) {
                 mensaje = cuerpo.mensaje;
             }
+            if (cuerpo.detalle !== undefined) {
+                detalle = cuerpo.detalle;
+            }
         } catch {
             // respuesta sin cuerpo JSON
         }
-        throw new ErrorApi(respuesta.status, mensaje);
+        throw new ErrorApi(respuesta.status, mensaje, detalle);
     }
 
     if (respuesta.status === 204) {

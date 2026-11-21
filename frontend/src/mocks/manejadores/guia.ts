@@ -88,7 +88,13 @@ export const manejadoresGuia = [
             if (!detalle) {
                 return HttpResponse.json({ error: "La salida no existe." }, { status: 404 });
             }
-            if (detalle.salida.estado === "PUBLICADA" || detalle.salida.estado === "CERRADA") {
+            if (detalle.salida.estado === "PUBLICADA") {
+                return HttpResponse.json(
+                    { error: "La salida todavía no está confirmada por la agencia" },
+                    { status: 400 },
+                );
+            }
+            if (detalle.salida.estado === "CERRADA") {
                 detalle.salida.estado = "EN_CURSO";
                 const salidaEnLista = salidas.find((s) => s.idsalida === idsalida);
                 if (salidaEnLista) salidaEnLista.estado = "EN_CURSO";

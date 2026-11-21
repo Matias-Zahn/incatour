@@ -5,6 +5,7 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioTemporada from "../../components/FormularioTemporada";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import { fechaLocalHoy } from "../../services/guiaService";
@@ -188,13 +189,22 @@ function TemporadasPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioTemporada
-                    temporadaEnEdicion={temporadaEnEdicion}
-                    alGuardar={guardarTemporada}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={guardando}
+                    tamano="md"
+                    etiqueta={
+                        temporadaEnEdicion ? "Editar temporada" : "Nueva temporada"
+                    }
+                >
+                    <FormularioTemporada
+                        temporadaEnEdicion={temporadaEnEdicion}
+                        alGuardar={guardarTemporada}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {errorBaja ? (

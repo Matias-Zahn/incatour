@@ -19,6 +19,10 @@ import {
 
 let servicios: Servicio[] = [...serviciosSemilla];
 
+export function obtenerServiciosMock(): Servicio[] {
+    return servicios;
+}
+
 const CAMPOS_BASE_EDITABLES = ["nombreServicio", "descripcion", "costoBase", "localidad"];
 
 const CAMPOS_MODIFICAR_POR_TIPO: Record<TipoServicio, string[]> = {
@@ -394,6 +398,107 @@ export const manejadoresServicios = [
         return HttpResponse.json({
             mensaje: "Servicio modificado exitosamente",
             data: respuestaServicio(actualizado),
+        });
+    }),
+
+    // GET /api/servicios/:id/ocupacion (B1 — §1)
+    http.get(construirUrl("/servicios/:id/ocupacion"), async ({ params, request }) => {
+        await delay();
+        const sinPermiso = exigirRol(request, "ADMIN");
+        if (sinPermiso) return sinPermiso;
+
+        const id = leerId(params.id);
+        if (id === null) {
+            return respuestaInvalida("El id del servicio debe ser un entero positivo");
+        }
+        const existente = servicios.find((s) => s.idservicio === id);
+        if (!existente) {
+            return HttpResponse.json(
+                { error: `No se encontró el servicio con ID ${id}.` },
+                { status: 404 },
+            );
+        }
+        if (existente.tipo === "TREN") {
+            return respuestaInvalida("El tren no lleva ocupación por fechas");
+        }
+
+        const url = new URL(request.url);
+        const hoy = new Date();
+        const isoHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+        const sumar = (iso: string, dias: number) => {
+            const d = new Date(iso + "T12:00:00Z");
+            d.setUTCDate(d.getUTCDate() + dias);
+            return d.toISOString().slice(0, 10);
+        };
+
+        const desde = url.searchParams.get("desde") || isoHoy;
+        const hasta = url.searchParams.get("hasta") || sumar(desde, 30);
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+            return respuestaInvalida("desde debe ser una fecha válida (AAAA-MM-DD)");
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+            return respuestaInvalida("hasta debe ser una fecha válida (AAAA-MM-DD)");
+        }
+        if (desde > hasta) {
+            return respuestaInvalida("desde no puede ser posterior a hasta");
+        }
+
+        const total: number | null =
+            existente.tipo === "EQUIPAMIENTO"
+                ? (existente.inventarioTotal ?? existente.cantidadDisponible ?? 10)
+                : existente.tipo === "ALOJAMIENTO"
+                  ? existente.modalidadConfirmacion === "A_SOLICITUD"
+                      ? null
+                      : (existente.capacidadDisponible ?? 10)
+                  : 1;
+
+        const ocupaciones = [
+            {
+                idsalida: 1,
+                nroSalida: "SAL-2026-001",
+                desde: sumar(isoHoy, 2),
+                hasta: sumar(isoHoy, 5),
+                cantidad: existente.tipo === "TRANSPORTE" ? 1 : 4,
+                estadoSalida: "PUBLICADA" as const,
+            },
+            {
+                idsalida: 4,
+                nroSalida: "SAL-2026-003",
+                desde: sumar(isoHoy, 5),
+                hasta: sumar(isoHoy, 8),
+                cantidad: existente.tipo === "TRANSPORTE" ? 1 : 6,
+                estadoSalida: "CERRADA" as const,
+            },
+            {
+                idsalida: 2,
+                nroSalida: "SAL-2026-000",
+                desde: sumar(isoHoy, -15),
+                hasta: sumar(isoHoy, -12),
+                cantidad: existente.tipo === "TRANSPORTE" ? 1 : 5,
+                estadoSalida: "FINALIZADA" as const,
+            },
+        ];
+
+        const activas = ocupaciones.filter((o) => o.estadoSalida !== "FINALIZADA");
+        const dias: { fecha: string; ocupado: number; disponible: number | null }[] = [];
+        let cursor = desde;
+        let contador = 0;
+        while (cursor <= hasta && contador < 366) {
+            const ocupado = activas
+                .filter((o) => o.desde <= cursor && cursor <= o.hasta)
+                .reduce((acc, o) => acc + o.cantidad, 0);
+            dias.push({
+                fecha: cursor,
+                ocupado,
+                disponible: total === null ? null : total - ocupado,
+            });
+            cursor = sumar(cursor, 1);
+            contador++;
+        }
+
+        return HttpResponse.json({
+            data: { total, dias, ocupaciones },
         });
     }),
 

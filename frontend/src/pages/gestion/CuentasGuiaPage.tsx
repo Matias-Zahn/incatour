@@ -5,6 +5,7 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioCuentaGuia from "../../components/FormularioCuentaGuia";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
@@ -145,14 +146,21 @@ function CuentasGuiaPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioCuentaGuia
-                    guiasDisponibles={guiasDisponibles}
-                    cargandoGuias={cargandoPersonal}
-                    alCrear={manejarCrearCuenta}
-                    alCancelar={cerrarFormulario}
-                    guardando={crearCuenta.isPending}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={crearCuenta.isPending}
+                    tamano="md"
+                    etiqueta="Nueva cuenta de guía"
+                >
+                    <FormularioCuentaGuia
+                        guiasDisponibles={guiasDisponibles}
+                        cargandoGuias={cargandoPersonal}
+                        alCrear={manejarCrearCuenta}
+                        alCancelar={cerrarFormulario}
+                        guardando={crearCuenta.isPending}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {ultimaCuentaCreada ? (

@@ -38,9 +38,12 @@ export function formatearEstadoSalida(estado?: string | null): string {
     return etiquetasEstadoSalida[normalizado] ?? estado;
 }
 
-/** En el portal del guía "Cerrada" (cerrada a la venta) se lee como lo que es para él: lista para salir */
+/** En el portal del guía "Cerrada" se lee como lista para salir, y "Publicada" como pendiente de confirmación */
 export function formatearEstadoSalidaGuia(estado?: string | null): string {
-    return estado?.trim().toUpperCase() === "CERRADA" ? "Lista para salir" : formatearEstadoSalida(estado);
+    const norm = estado?.trim().toUpperCase();
+    if (norm === "CERRADA") return "Lista para salir";
+    if (norm === "PUBLICADA") return "En venta (pendiente de confirmar)";
+    return formatearEstadoSalida(estado);
 }
 
 export function estilosEstadoSalida(estado?: string | null): string {
@@ -67,9 +70,9 @@ const ESTADOS_PENDIENTES = ["PUBLICADA", "CERRADA", "EN_CURSO"];
 /** El back acepta avances e incidentes solo con la salida iniciada (EN_CURSO) */
 export const admiteRegistros = (estado?: string) => estado === "EN_CURSO";
 
-/** El guía la puede iniciar desde el día de inicio, mientras no haya empezado */
+/** El guía la puede iniciar recién cuando fue confirmada por la agencia (CERRADA) y llegó la fecha de inicio (§10) */
 export function puedeIniciarSalida(s?: { estado: string; fechaInicio?: string } | null): boolean {
-    return !!s?.fechaInicio && (s.estado === "PUBLICADA" || s.estado === "CERRADA") && s.fechaInicio.slice(0, 10) <= fechaLocalHoy();
+    return !!s?.fechaInicio && s.estado === "CERRADA" && s.fechaInicio.slice(0, 10) <= fechaLocalHoy();
 }
 
 /** Lo que falta operar va primero, por fecha; después el historial, de lo más reciente a lo más viejo */
@@ -151,6 +154,11 @@ export type DetalleSalidaGuia = {
     personal: PersonalSalida[];
     servicios: ServicioSalida[];
     equipamiento: EquipamientoSalida[];
+    tren?: {
+        nombreServicio: string;
+        horarioSalida: string;
+        horarioLlegada: string;
+    } | null;
 };
 
 // ==========================================

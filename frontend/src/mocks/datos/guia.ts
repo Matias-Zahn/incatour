@@ -102,6 +102,11 @@ export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
                 cantidad: 2,
             },
         ],
+        tren: {
+            nombreServicio: "IncaRail Expedition",
+            horarioSalida: "06:10",
+            horarioLlegada: "07:45",
+        },
     },
     2: {
         salida: {

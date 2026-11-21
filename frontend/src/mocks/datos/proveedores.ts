@@ -28,6 +28,15 @@ export const proveedoresSemilla: Proveedor[] = [
         canalComunicacion: "Correo electrónico",
         estado: "ACTIVO",
     },
+    {
+        idproveedor: 4,
+        tipoProveedor: "TREN",
+        razonSocial: "IncaRail Perú",
+        localidad: "Cusco",
+        datosContacto: "operaciones@incarail.pe",
+        canalComunicacion: "Correo electrónico",
+        estado: "ACTIVO",
+    },
 ];
 
 /** Proveedores con solicitudes de alojamiento pendientes (bloquean la baja, CU-17). */

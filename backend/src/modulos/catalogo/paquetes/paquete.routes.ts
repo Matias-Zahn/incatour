@@ -286,6 +286,9 @@ export class PaqueteRoutes {
     // Consultar paquete por ID
     router.get("/:id", controller.consultarPaquetePorId);
 
+    // B5: Simular costo por pasajero de un paquete sin guardarlo
+    router.post("/costos/simular", controller.simularCosto);
+
     // CU-11: Crear Paquete Turístico
     router.post("/", controller.confirmarCreacion);
 

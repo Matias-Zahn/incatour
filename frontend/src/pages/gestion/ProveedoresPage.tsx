@@ -5,6 +5,7 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioProveedor from "../../components/FormularioProveedor";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
@@ -176,13 +177,22 @@ function ProveedoresPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioProveedor
-                    proveedorEnEdicion={proveedorEnEdicion}
-                    alGuardar={guardarProveedor}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={guardando}
+                    tamano="lg"
+                    etiqueta={
+                        proveedorEnEdicion ? "Editar proveedor" : "Nuevo proveedor"
+                    }
+                >
+                    <FormularioProveedor
+                        proveedorEnEdicion={proveedorEnEdicion}
+                        alGuardar={guardarProveedor}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {darDeBaja.isError ? (

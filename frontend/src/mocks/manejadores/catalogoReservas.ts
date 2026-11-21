@@ -22,37 +22,60 @@ const salidasPorPaqueteMock: Record<number, SalidaDisponibleCatalogo[]> = {
         {
             idsalida: 1,
             nroSalida: "SAL-2026-001",
-            fechaInicio: "2026-11-15T00:00:00.000Z",
-            fechaFin: "2026-11-18T00:00:00.000Z",
+            fechaInicio: "2026-12-15T00:00:00.000Z",
+            fechaFin: "2026-12-18T00:00:00.000Z",
             stockLocal: 16,
             tamanoMaximo: 16,
             precioPersona: 650,
             moneda: "USD",
             temporadaNombre: "Alta 2026",
+            ventaAbierta: true,
+            ultimoDiaVenta: "2026-12-12",
+            fechaLimiteReintegro: "2026-12-01",
         },
         {
             idsalida: 2,
             nroSalida: "SAL-2026-002",
-            fechaInicio: "2026-12-05T00:00:00.000Z",
-            fechaFin: "2026-12-08T00:00:00.000Z",
+            fechaInicio: "2026-11-28T00:00:00.000Z",
+            fechaFin: "2026-12-01T00:00:00.000Z",
             stockLocal: 8,
             tamanoMaximo: 12,
             precioPersona: 650,
             moneda: "USD",
             temporadaNombre: "Alta 2026",
+            ventaAbierta: true,
+            ultimoDiaVenta: "2026-11-25",
+            fechaLimiteReintegro: "2026-11-18",
+        },
+        {
+            idsalida: 9,
+            nroSalida: "SAL-2026-009",
+            fechaInicio: "2026-11-23T00:00:00.000Z",
+            fechaFin: "2026-11-26T00:00:00.000Z",
+            stockLocal: 4,
+            tamanoMaximo: 12,
+            precioPersona: 650,
+            moneda: "USD",
+            temporadaNombre: "Alta 2026",
+            ventaAbierta: false,
+            ultimoDiaVenta: "2026-11-20",
+            fechaLimiteReintegro: "2026-11-13",
         },
     ],
     2: [
         {
             idsalida: 3,
             nroSalida: "SAL-2026-003",
-            fechaInicio: "2026-11-22T00:00:00.000Z",
-            fechaFin: "2026-11-25T00:00:00.000Z",
+            fechaInicio: "2026-12-22T00:00:00.000Z",
+            fechaFin: "2026-12-25T00:00:00.000Z",
             stockLocal: 10,
             tamanoMaximo: 10,
             precioPersona: 980,
             moneda: "USD",
             temporadaNombre: "Alta 2026",
+            ventaAbierta: true,
+            ultimoDiaVenta: "2026-12-19",
+            fechaLimiteReintegro: "2026-12-08",
         },
     ],
 };
@@ -62,6 +85,7 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
         id: 1,
         codigo: "PAQ-INC-01",
         nombre: "Inca Clásico Standard",
+        saleDesde: "Cusco",
         imagenPrincipal: "/imagenes/catalogo/machu-picchu.jpg",
         imagenes: [
             "/imagenes/catalogo/machu-picchu.jpg",
@@ -94,7 +118,16 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             garantia: "3 Estrellas en Cusco · Hab. Doble",
             tipoGarantia: "POR_CATEGORIA",
         },
-        serviciosAdicionales: ["Hotel Montaña", "Minibus Sprinter"],
+        serviciosAdicionales: [
+            "Minibus Sprinter",
+            "IncaRail Expedition (sale 06:10, llega 07:45)",
+            "Carpa de alta montaña 4 estaciones",
+        ],
+        serviciosIncluidos: [
+            "Minibus Sprinter",
+            "IncaRail Expedition (sale 06:10, llega 07:45)",
+            "Carpa de alta montaña 4 estaciones",
+        ],
         condiciones: "Incluye traslados desde Cusco y pensión completa en ruta.",
         diasDisponibles: "L-M-X-J-V-S-D",
         precios: [
@@ -113,6 +146,7 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
         id: 2,
         codigo: "PAQ-INC-02",
         nombre: "Inca VIP Hotel Montaña",
+        saleDesde: "Cusco",
         imagenPrincipal: "/imagenes/catalogo/valle-sagrado.jpg",
         imagenes: ["/imagenes/catalogo/valle-sagrado.jpg"],
         tieneImagenesPropias: false,
@@ -142,7 +176,14 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             garantia: "Hotel Montaña (Cusco)",
             tipoGarantia: "POR_ESTABLECIMIENTO",
         },
-        serviciosAdicionales: ["Hotel Montaña", "IncaRail Voyager"],
+        serviciosAdicionales: [
+            "Bus Cusco - Km 82",
+            "IncaRail Voyager (sale 06:10, llega 07:45)",
+        ],
+        serviciosIncluidos: [
+            "Bus Cusco - Km 82",
+            "IncaRail Voyager (sale 06:10, llega 07:45)",
+        ],
         condiciones: "Garantía directa en Hotel Montaña con tren panorámico.",
         diasDisponibles: "L-M-X-J-V-S-D",
         precios: [
@@ -999,6 +1040,15 @@ export const manejadoresCatalogoReservas = [
             );
         }
 
+        if (salida.ventaAbierta === false) {
+            return HttpResponse.json(
+                {
+                    error: `La venta de esta salida cerró el ${salida.ultimoDiaVenta ?? "corte"}.`,
+                },
+                { status: 400 },
+            );
+        }
+
         if (body.pasajeros.length > salida.stockLocal) {
             return HttpResponse.json(
                 {
@@ -1162,6 +1212,12 @@ export const manejadoresCatalogoReservas = [
             nroReserva,
             estado: "CONFIRMADA",
             estadoAlojamiento,
+            hotel:
+                (paquete?.nochesAlojamiento.previas ?? 0) +
+                    (paquete?.nochesAlojamiento.posteriores ?? 0) >
+                0
+                    ? { idservicio: 1, nombreServicio: "Hotel Montaña" }
+                    : null,
             cantidadPasajeros: body.pasajeros.length,
             precioCongelado,
             moneda: salida.moneda,

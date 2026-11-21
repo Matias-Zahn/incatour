@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioCircuito from "../../components/FormularioCircuito";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
+    clavesCircuitos,
+    guardarSecuenciaEtapas,
     nivelesDificultad,
     useCircuitos,
     useDarDeBajaCircuito,
@@ -15,6 +19,7 @@ import {
     useRegistrarCircuito,
     type Circuito,
     type DatosCircuito,
+    type DatosEtapaCircuito,
 } from "../../services/circuitoService";
 import { etiquetaEstadoRegistro } from "../../services/formato";
 
@@ -62,7 +67,9 @@ function CircuitosPage() {
     const registrar = useRegistrarCircuito();
     const modificar = useModificarCircuito();
     const darDeBaja = useDarDeBajaCircuito();
-    const guardando = registrar.isPending || modificar.isPending;
+    const clienteConsultas = useQueryClient();
+    const [guardandoEtapas, setGuardandoEtapas] = useState(false);
+    const guardando = registrar.isPending || modificar.isPending || guardandoEtapas;
 
     const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
@@ -93,27 +100,47 @@ function CircuitosPage() {
         setErrorFormulario("");
     }
 
-    function guardarCircuito(datos: DatosCircuito) {
-        const opciones = {
-            onSuccess: cerrarFormulario,
-            onError: (e: Error) => setErrorFormulario(e.message),
-        };
-
-        if (circuitoEnEdicion) {
-            // El back compara por valor: solo se manda si cambió (null, undefined y "" son lo mismo)
-            const { parametrosPorteadores, ...resto } = datos;
-            const cambioParametros =
-                (parametrosPorteadores ?? "").trim() !==
-                (circuitoEnEdicion.parametrosPorteadores ?? "").trim();
-            modificar.mutate(
-                {
+    async function guardarCircuito(
+        datos: DatosCircuito,
+        etapas: DatosEtapaCircuito[] | null,
+    ) {
+        setErrorFormulario("");
+        try {
+            let circuitoGuardado: Circuito;
+            if (circuitoEnEdicion) {
+                // El back compara por valor: solo se manda si cambió (null, undefined y "" son lo mismo)
+                const { parametrosPorteadores, ...resto } = datos;
+                const cambioParametros =
+                    (parametrosPorteadores ?? "").trim() !==
+                    (circuitoEnEdicion.parametrosPorteadores ?? "").trim();
+                circuitoGuardado = await modificar.mutateAsync({
                     id: circuitoEnEdicion.idcircuito,
                     datos: cambioParametros ? datos : resto,
-                },
-                opciones,
+                });
+            } else {
+                circuitoGuardado = await registrar.mutateAsync(datos);
+            }
+
+            if (etapas && etapas.length > 0) {
+                setGuardandoEtapas(true);
+                try {
+                    await guardarSecuenciaEtapas(circuitoGuardado.idcircuito, etapas);
+                    await clienteConsultas.invalidateQueries({
+                        queryKey: clavesCircuitos.todos,
+                    });
+                    await clienteConsultas.invalidateQueries({
+                        queryKey: clavesCircuitos.etapas(circuitoGuardado.idcircuito),
+                    });
+                } finally {
+                    setGuardandoEtapas(false);
+                }
+            }
+
+            cerrarFormulario();
+        } catch (e) {
+            setErrorFormulario(
+                e instanceof Error ? e.message : "No se pudo guardar el circuito.",
             );
-        } else {
-            registrar.mutate(datos, opciones);
         }
     }
 
@@ -223,13 +250,25 @@ function CircuitosPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioCircuito
-                    circuitoEnEdicion={circuitoEnEdicion}
-                    alGuardar={guardarCircuito}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={guardando}
+                    tamano="lg"
+                    etiqueta={
+                        circuitoEnEdicion
+                            ? "Editar circuito turístico"
+                            : "Registrar circuito turístico"
+                    }
+                >
+                    <FormularioCircuito
+                        key={circuitoEnEdicion?.idcircuito ?? "nuevo"}
+                        circuitoEnEdicion={circuitoEnEdicion}
+                        alGuardar={guardarCircuito}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {errorBaja ? (

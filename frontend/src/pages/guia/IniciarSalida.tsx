@@ -18,6 +18,14 @@ export function IniciarSalida({ salida, motivo }: IniciarSalidaProps) {
 
     if (!salida || (salida.estado !== "PUBLICADA" && salida.estado !== "CERRADA")) return null;
 
+    if (salida.estado === "PUBLICADA") {
+        return (
+            <Alerta tipo="informacion">
+                La salida todavía no está confirmada por la agencia. Podrás iniciarla una vez que se confirme y se emitan los permisos.
+            </Alerta>
+        );
+    }
+
     if (!puedeIniciarSalida(salida)) {
         return (
             <Alerta tipo="informacion">

@@ -5,6 +5,7 @@ import { CustomError } from "../../../error/CustomError";
 import { esArchivoTemporal, nombreArchivoFoto, obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 import { CrearPaqueteDto, FiltrosPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
 import { PaqueteService } from "./paquete.service";
+import { SimularCostoDto, simularCostoPaquete } from "./costoPaquete";
 import { leerIdUrl } from "../../../shared/validaciones";
 
 const paqueteService = new PaqueteService();
@@ -52,6 +53,19 @@ export class PaqueteController {
 
       const paquete = await paqueteService.consultarPaquetePorId(id, true);
       return res.json({ data: enriquecerPaqueteConImagenes(paquete) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // POST /api/paquetes/costos/simular — B5: estimar costo por pasajero sin guardar
+  simularCosto = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const [error, dto] = SimularCostoDto.create(req.body);
+      if (error) throw CustomError.badRequest(error);
+
+      const resultado = await simularCostoPaquete(dto!.datos);
+      return res.json({ data: resultado });
     } catch (error) {
       next(error);
     }
