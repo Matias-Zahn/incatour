@@ -23,7 +23,7 @@ const CAMPOS_BASE_EDITABLES = ["nombreServicio", "descripcion", "costoBase", "lo
 
 const CAMPOS_MODIFICAR_POR_TIPO: Record<TipoServicio, string[]> = {
     ALOJAMIENTO: ["categoria", "tipoHabitacion", "capacidadDisponible", "modalidadConfirmacion"],
-    TRANSPORTE: ["capacidadVehiculo", "pesoEquipajeIncluido", "costoPorKgExcedente"],
+    TRANSPORTE: ["capacidadVehiculo"],
     TREN: ["horarioSalida", "horarioLlegada", "diasOperacion"],
     EQUIPAMIENTO: ["tipoEquipamiento", "inventarioTotal"],
 };
@@ -61,14 +61,15 @@ function respuestaServicio(servicio: Servicio, incluirEdicion = false) {
         idproveedor,
     } = servicio;
 
+    const esASolicitud = tipo === "ALOJAMIENTO" && servicio.modalidadConfirmacion === "A_SOLICITUD";
+    const plazasAlojamiento = esASolicitud ? null : (servicio.capacidadDisponible ?? null);
+
     const campos = {
         categoria: servicio.categoria,
         tipoHabitacion: servicio.tipoHabitacion,
-        capacidadDisponible: servicio.capacidadDisponible,
+        capacidadDisponible: tipo === "ALOJAMIENTO" ? plazasAlojamiento : undefined,
         modalidadConfirmacion: servicio.modalidadConfirmacion,
         capacidadVehiculo: servicio.capacidadVehiculo,
-        pesoEquipajeIncluido: servicio.pesoEquipajeIncluido,
-        costoPorKgExcedente: servicio.costoPorKgExcedente,
         horarioSalida: servicio.horarioSalida,
         horarioLlegada: servicio.horarioLlegada,
         diasOperacion: servicio.diasOperacion,
@@ -91,7 +92,7 @@ function respuestaServicio(servicio: Servicio, incluirEdicion = false) {
               }
             : tipo === "ALOJAMIENTO"
               ? {
-                    capacidadDisponible: servicio.capacidadDisponible ?? 0,
+                    capacidadDisponible: plazasAlojamiento,
                     modalidadConfirmacion: servicio.modalidadConfirmacion ?? "",
                 }
               : tipo === "TRANSPORTE"
@@ -190,8 +191,36 @@ export const manejadoresServicios = [
                 );
             }
 
-            const cuerpo = (await request.json()) as DatosServicio;
-            const validacion = esquemaServicio.safeParse(cuerpo);
+            const cuerpo = { ...((await request.json()) as Record<string, unknown>) };
+            // B6: si llegan campos de equipaje en transporte, se ignoran
+            delete cuerpo.pesoEquipajeIncluido;
+            delete cuerpo.costoPorKgExcedente;
+
+            // B8: validaciones de capacidadDisponible según modalidad de alojamiento (contratos-viernes §2)
+            if (cuerpo.tipo === "ALOJAMIENTO") {
+                if (cuerpo.modalidadConfirmacion === "A_SOLICITUD") {
+                    if (cuerpo.capacidadDisponible !== undefined && cuerpo.capacidadDisponible !== null) {
+                        return respuestaInvalida(
+                            "capacidadDisponible no corresponde a un alojamiento a solicitud: el hotel confirma cada pedido.",
+                        );
+                    }
+                } else if (cuerpo.modalidadConfirmacion === "BLOQUEO_PLAZAS") {
+                    if (cuerpo.capacidadDisponible === undefined || cuerpo.capacidadDisponible === null) {
+                        return respuestaInvalida("capacidadDisponible es requerido con BLOQUEO_PLAZAS.");
+                    }
+                    if (
+                        typeof cuerpo.capacidadDisponible !== "number" ||
+                        !Number.isInteger(cuerpo.capacidadDisponible) ||
+                        cuerpo.capacidadDisponible < 1
+                    ) {
+                        return respuestaInvalida(
+                            "capacidadDisponible debe ser un número entero mayor o igual a 1.",
+                        );
+                    }
+                }
+            }
+
+            const validacion = esquemaServicio.safeParse(cuerpo as DatosServicio);
             if (!validacion.success) {
                 return respuestaInvalida(
                     validacion.error.issues[0]?.message ?? "Datos inválidos.",
@@ -264,7 +293,11 @@ export const manejadoresServicios = [
             );
         }
 
-        const datos = (await request.json()) as ServicioModificar;
+        const resto = { ...((await request.json()) as Record<string, unknown>) };
+        // B6: si llegan campos de equipaje en transporte, se ignoran
+        delete resto.pesoEquipajeIncluido;
+        delete resto.costoPorKgExcedente;
+        const datos = resto as ServicioModificar;
         if (!datos || Object.keys(datos).length === 0) {
             return respuestaInvalida("Debe enviar al menos un campo para modificar.");
         }
@@ -278,6 +311,32 @@ export const manejadoresServicios = [
             return respuestaInvalida(
                 `Los campos ${ajenos.join(", ")} no corresponden a un servicio de tipo ${existente.tipo}.`,
             );
+        }
+
+        // B8: reglas de modalidadConfirmacion y capacidadDisponible en PUT (contratos-viernes §2)
+        if (existente.tipo === "ALOJAMIENTO") {
+            const modalidadFinal = datos.modalidadConfirmacion ?? existente.modalidadConfirmacion;
+            if (modalidadFinal === "A_SOLICITUD") {
+                if (datos.capacidadDisponible !== undefined) {
+                    return respuestaInvalida(
+                        "capacidadDisponible no corresponde a un alojamiento a solicitud: el hotel confirma cada pedido.",
+                    );
+                }
+            } else if (modalidadFinal === "BLOQUEO_PLAZAS") {
+                const capacidadFinal = datos.capacidadDisponible ?? existente.capacidadDisponible;
+                if (capacidadFinal === undefined) {
+                    return respuestaInvalida("capacidadDisponible es requerido con BLOQUEO_PLAZAS.");
+                }
+                if (
+                    typeof capacidadFinal !== "number" ||
+                    !Number.isInteger(capacidadFinal) ||
+                    capacidadFinal < 1
+                ) {
+                    return respuestaInvalida(
+                        "capacidadDisponible debe ser un número entero mayor o igual a 1.",
+                    );
+                }
+            }
         }
 
         if (existente.tipo === "EQUIPAMIENTO" && datos.inventarioTotal !== undefined) {
@@ -314,9 +373,14 @@ export const manejadoresServicios = [
         }
 
         const comprometida = existente.cantidadComprometida ?? 0;
+        const modalidadFinal =
+            existente.tipo === "ALOJAMIENTO"
+                ? (datos.modalidadConfirmacion ?? existente.modalidadConfirmacion)
+                : undefined;
         const actualizado: Servicio = {
             ...existente,
             ...datos,
+            ...(modalidadFinal === "A_SOLICITUD" ? { capacidadDisponible: undefined } : {}),
             ...(existente.tipo === "EQUIPAMIENTO" && datos.inventarioTotal !== undefined
                 ? {
                       inventarioTotal: datos.inventarioTotal,

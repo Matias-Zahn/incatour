@@ -95,10 +95,6 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             tipoGarantia: "POR_CATEGORIA",
         },
         serviciosAdicionales: ["Hotel Montaña", "Minibus Sprinter"],
-        equipajeTransporte: {
-            pesoEquipajeIncluido: 15,
-            costoPorKgExcedente: 2.5,
-        },
         condiciones: "Incluye traslados desde Cusco y pensión completa en ruta.",
         diasDisponibles: "L-M-X-J-V-S-D",
         precios: [
@@ -147,7 +143,6 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             tipoGarantia: "POR_ESTABLECIMIENTO",
         },
         serviciosAdicionales: ["Hotel Montaña", "IncaRail Voyager"],
-        equipajeTransporte: null,
         condiciones: "Garantía directa en Hotel Montaña con tren panorámico.",
         diasDisponibles: "L-M-X-J-V-S-D",
         precios: [
@@ -1066,19 +1061,6 @@ export const manejadoresCatalogoReservas = [
             );
         }
 
-        // Calcular precio base + excedente de equipaje
-        let extraEquipaje = 0;
-        const eqTrans = paquete?.equipajeTransporte;
-        if (eqTrans && body.equipaje) {
-            for (const eq of body.equipaje) {
-                const exceso =
-                    (eq.pesoDeclarado || 0) - eqTrans.pesoEquipajeIncluido;
-                if (exceso > 0) {
-                    extraEquipaje += exceso * eqTrans.costoPorKgExcedente;
-                }
-            }
-        }
-
         if (salida.precioPersona == null || salida.moneda == null) {
             return HttpResponse.json(
                 { error: "La salida no tiene una tarifa vigente." },
@@ -1087,10 +1069,8 @@ export const manejadoresCatalogoReservas = [
         }
 
         const precioCongelado =
-            Math.round(
-                (salida.precioPersona * body.pasajeros.length + extraEquipaje) *
-                    100,
-            ) / 100;
+            Math.round(salida.precioPersona * body.pasajeros.length * 100) /
+            100;
 
         // Descontar stockLocal
         salida.stockLocal -= body.pasajeros.length;

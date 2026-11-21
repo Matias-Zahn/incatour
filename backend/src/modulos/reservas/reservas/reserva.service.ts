@@ -5,7 +5,7 @@ import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interfa
 import { PasarelaMock } from "../../../integraciones/pasarela/pasarela.mock";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
-import { DefinicionPaquete, definicionEfectiva } from "../../../shared/definicionPaquete";
+import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaRepository } from "./reserva.repository";
 
@@ -112,7 +112,7 @@ export class ReservaService {
     const definicion = definicionEfectiva(salida);
 
     // 4. El precio lo calcula el servidor
-    const precio = this.calcularPrecio(salida, definicion, dto);
+    const precio = this.calcularPrecio(salida, dto);
     const nroReserva = `RES-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
     // 5. Reservar cupos (atómico). Si no alcanzan, se corta sin cobrar.
@@ -154,7 +154,6 @@ export class ReservaService {
         precioCongelado: precio.total,
         temporadaAplicada: precio.temporadaAplicada,
         precioPaquetePorPersona: precio.precioPaquetePorPersona,
-        adicionalesEquipaje: precio.adicionalesEquipaje,
         moneda: precio.moneda,
         diasMinimosReintegro: definicion.diasMinimosReintegro,
         condicionesComerciales: definicion.condiciones ?? "",
@@ -205,8 +204,8 @@ export class ReservaService {
     };
   }
 
-  // Tarifa de la temporada vigente en la fecha de inicio + exceso de equipaje
-  private calcularPrecio(salida: SalidaCompra, definicion: DefinicionPaquete, dto: CrearReservaDto) {
+  // Tarifa de la temporada vigente en la fecha de inicio por la cantidad de pasajeros
+  private calcularPrecio(salida: SalidaCompra, dto: CrearReservaDto) {
     const tarifa = salida.paquete.tarifas.find(
       (t) =>
         t.temporada.estado === "ACTIVO" &&
@@ -217,24 +216,12 @@ export class ReservaService {
       throw CustomError.badRequest("El paquete no tiene una tarifa vigente para la fecha de la salida.");
     }
 
-    // CAT-33: la franquicia sale solo de la foto del paquete (el transporte asignado no la redefine)
-    const transporte = definicion.servicios.map((s) => s.transporte).find((t) => t !== null);
-
-    let extra = 0;
-    if (transporte) {
-      for (const e of dto.equipaje) {
-        const exceso = e.pesoDeclarado - transporte.pesoEquipajeIncluido;
-        if (exceso > 0) extra += exceso * transporte.costoPorKgExcedente;
-      }
-    }
-
     // RES-07: se devuelve el desglose para congelarlo en la reserva
     return {
-      total: redondear2(tarifa.monto * dto.pasajeros.length + extra),
+      total: redondear2(tarifa.monto * dto.pasajeros.length),
       moneda: tarifa.moneda,
       temporadaAplicada: tarifa.temporada.nombre,
       precioPaquetePorPersona: tarifa.monto,
-      adicionalesEquipaje: redondear2(extra),
     };
   }
 

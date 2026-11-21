@@ -26,6 +26,12 @@ type Props = {
     errorServidor?: string;
 };
 
+const numeroOpcional = (valor: unknown): number | undefined => {
+    if (valor === "" || valor === null || valor === undefined) return undefined;
+    const numero = Number(valor);
+    return Number.isNaN(numero) ? undefined : numero;
+};
+
 const valoresIniciales = (
     tipo: Props["tipoProveedor"],
     localidad = "",
@@ -88,6 +94,12 @@ function FormularioServicio({
     const diasOperacion = useWatch({ control, name: "diasOperacion" });
     const aSolicitud = tipoProveedor === "ALOJAMIENTO" && modalidad === "A_SOLICITUD";
 
+    useEffect(() => {
+        if (aSolicitud) {
+            setValue("capacidadDisponible", undefined, { shouldValidate: true });
+        }
+    }, [aSolicitud, setValue]);
+
     function esCampoEditable(campo: string): boolean {
         if (!edicion?.camposEditables) return true;
         return edicion.camposEditables.includes(campo);
@@ -107,8 +119,13 @@ function FormularioServicio({
             });
             return;
         }
-        // El back exige la columna al crear; a solicitud no se usa
-        alGuardar(aSolicitud ? { ...datos, capacidadDisponible: datos.capacidadDisponible ?? 0 } : datos);
+        if (aSolicitud) {
+            const sinPlazas = { ...datos };
+            delete sinPlazas.capacidadDisponible;
+            alGuardar(sinPlazas);
+            return;
+        }
+        alGuardar(datos);
     }
 
     const campos: Record<
@@ -137,16 +154,6 @@ function FormularioServicio({
             {
                 nombre: "capacidadVehiculo",
                 etiqueta: "Capacidad del vehículo",
-                tipo: "number",
-            },
-            {
-                nombre: "pesoEquipajeIncluido",
-                etiqueta: "Peso de equipaje incluido (kg)",
-                tipo: "number",
-            },
-            {
-                nombre: "costoPorKgExcedente",
-                etiqueta: "Costo por kg excedente",
                 tipo: "number",
             },
         ],
@@ -254,7 +261,7 @@ function FormularioServicio({
                                 disabled={deshabilitado}
                                 {...register(
                                     nombre,
-                                    nombre === "costoBase" ? { valueAsNumber: true } : undefined,
+                                    nombre === "costoBase" ? { setValueAs: numeroOpcional } : undefined,
                                 )}
                                 className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
                             />
@@ -433,23 +440,26 @@ function FormularioServicio({
                                 min={
                                     nombreCampo === "inventarioTotal"
                                         ? comprometidaEquipamiento
-                                        : nombreCampo === "capacidadVehiculo"
+                                        : nombreCampo === "capacidadVehiculo" ||
+                                            nombreCampo === "capacidadDisponible"
                                           ? 1
                                           : campo.tipo === "number"
                                             ? 0
                                             : undefined
                                 }
                                 max={
-                                    nombreCampo === "pesoEquipajeIncluido"
-                                        ? 20
-                                        : undefined
+                                    nombreCampo === "capacidadVehiculo"
+                                        ? 60
+                                        : nombreCampo === "capacidadDisponible"
+                                          ? 5000
+                                          : undefined
                                 }
                                 placeholder={campo.placeholder}
                                 disabled={deshabilitado}
                                 {...register(
                                     nombreCampo,
                                     campo.tipo === "number"
-                                        ? { valueAsNumber: true }
+                                        ? { setValueAs: numeroOpcional }
                                         : undefined,
                                 )}
                                 className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
