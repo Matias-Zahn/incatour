@@ -36,8 +36,7 @@ const salida = (extra = {}) => ({
   reservas: [],
   permisos: [],
   personalAsignado: [],
-  equipamientos: [],
-  servicios: [],
+  ocupaciones: [],
   ...extra,
 });
 

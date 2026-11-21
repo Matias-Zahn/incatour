@@ -2,7 +2,7 @@ import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
-import { ESTADO_PERMISO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, redondear2 } from "../../../shared/constantes";
+import { ESTADO_PERMISO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO, redondear2 } from "../../../shared/constantes";
 import { UsuarioAutenticado } from "../../reservas/gestion-reservas/gestion-reserva.service";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { CancelarSalidaDto } from "./cancelacion-salida.dto";
@@ -37,8 +37,9 @@ export class CancelacionSalidaService {
       permisosQuePasanAPerdido: permisosEmitidos,
       recursosQueSeLiberan: {
         personal: salida.personalAsignado.length,
-        equipamiento: salida.equipamientos.length,
-        servicios: salida.servicios.length,
+        equipamiento: salida.ocupaciones.filter((o) => o.tipo === TIPO_SERVICIO.EQUIPAMIENTO).length,
+        // el hotel puede tener dos tramos: se cuenta una vez
+        servicios: new Set(salida.ocupaciones.filter((o) => o.tipo !== TIPO_SERVICIO.EQUIPAMIENTO).map((o) => o.idservicio)).size,
       },
       notificaAClientes: salida.reservas.length > 0,
     };

@@ -14,7 +14,7 @@ vi.mock("../../../integraciones/notificador/notificador.mock", () => ({ Notifica
 const salida = {
   idsalida: 2, nroSalida: "SAL-2026-002", estado: "CERRADA", fechaInicio: new Date(), fechaFin: new Date(),
   paquete: { nombrePaquete: "Inca", circuito: { nombreCircuito: "Camino", duracionDias: 4, etapas: [] } },
-  avances: [], incidentes: [], servicios: [], equipamientos: [], reservas: [],
+  avances: [], incidentes: [], ocupaciones: [], reservas: [],
   personalAsignado: [{ idpersonal: 7, personal: { idpersonal: 7, nombreCompleto: "Rosa", rol: "Guía" } }],
 };
 

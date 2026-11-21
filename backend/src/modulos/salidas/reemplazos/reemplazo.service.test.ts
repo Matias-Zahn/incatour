@@ -30,7 +30,7 @@ describe("ReemplazoService.confirmarReemplazo (CU-38)", () => {
     idsalida: 2, nroSalida: "SAL-2030-001", estado: "CERRADA", idbloqueo: idBloqueo, fechaInicio: INICIO, fechaFin: FIN,
     personalAsignado: [{ idpersonal: 1, personal: persona(1) }],
     permisos: [{ idpermisopersonal: 50, idpersonal: 1, nroPermiso, estadoTramite }],
-    servicios: [], equipamientos: [],
+    ocupaciones: [],
   });
 
   beforeEach(async () => {
