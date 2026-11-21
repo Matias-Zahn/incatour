@@ -1,3 +1,4 @@
+import { TOPES } from "../../../shared/constantes";
 import { enteroOpcional } from "../../../shared/filtros";
 import { textoRequerido } from "../../../shared/validaciones";
 
@@ -25,8 +26,8 @@ export class CrearCircuitoDto {
     if (typeof nombreCircuito !== "string") return ["nombreCircuito debe ser un texto"];
 
     if (duracionDias == null) return ["duracionDias es requerido"];
-    if (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0) {
-      return ["duracionDias debe ser un número entero mayor a 0"];
+    if (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0 || duracionDias > TOPES.duracionDias) {
+      return [`duracionDias debe ser un número entero entre 1 y ${TOPES.duracionDias}`];
     }
 
     if (!dificultad) return ["dificultad es requerido"];
@@ -37,8 +38,8 @@ export class CrearCircuitoDto {
     }
 
     if (minimoGuias == null) return ["minimoGuias es requerido"];
-    if (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0) {
-      return ["minimoGuias debe ser un número entero mayor a 0"];
+    if (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0 || minimoGuias > TOPES.minimoGuias) {
+      return [`minimoGuias debe ser un número entero entre 1 y ${TOPES.minimoGuias}`];
     }
 
     if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") {
@@ -84,12 +85,12 @@ export class ModificarCircuitoDto {
       dificultad = dificultadNormalizada;
     }
 
-    if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0)) {
-      return ["duracionDias debe ser un número entero mayor a 0"];
+    if (duracionDias !== undefined && (typeof duracionDias !== "number" || !Number.isInteger(duracionDias) || duracionDias <= 0 || duracionDias > TOPES.duracionDias)) {
+      return [`duracionDias debe ser un número entero entre 1 y ${TOPES.duracionDias}`];
     }
 
-    if (minimoGuias !== undefined && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0)) {
-      return ["minimoGuias debe ser un número entero mayor a 0"];
+    if (minimoGuias !== undefined && (typeof minimoGuias !== "number" || !Number.isInteger(minimoGuias) || minimoGuias <= 0 || minimoGuias > TOPES.minimoGuias)) {
+      return [`minimoGuias debe ser un número entero entre 1 y ${TOPES.minimoGuias}`];
     }
 
     if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") {

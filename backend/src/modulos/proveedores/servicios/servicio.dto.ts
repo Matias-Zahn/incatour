@@ -1,4 +1,4 @@
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio, TOPES } from "../../../shared/constantes";
 
 export const MODALIDADES_CONFIRMACION = [MODALIDAD_BLOQUEO_PLAZAS, "A_SOLICITUD"];
 const DIAS_VALIDOS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -12,8 +12,11 @@ const vTexto = (max: number): Validador => (v, c) =>
     ? [undefined, v.trim()]
     : [`${c} es requerido y no puede superar los ${max} caracteres.`];
 
-const vEntero = (min: number): Validador => (v, c) =>
-  Number.isInteger(v) && v >= min ? [undefined, v] : [`${c} debe ser un número entero mayor o igual a ${min}.`];
+const vEntero = (min: number, max?: number): Validador => (v, c) => {
+  if (!Number.isInteger(v) || v < min) return [`${c} debe ser un número entero mayor o igual a ${min}.`];
+  if (max !== undefined && v > max) return [`${c} no puede superar el máximo de ${max}.`];
+  return [undefined, v];
+};
 
 const vNumero = (min: number, max?: number): Validador => (v, c) => {
   if (typeof v !== "number" || !Number.isFinite(v) || v < min) {
@@ -50,13 +53,13 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
   ALOJAMIENTO: {
     categoria: vTexto(40),
     tipoHabitacion: vTexto(40),
-    capacidadDisponible: vEntero(0),
+    capacidadDisponible: vEntero(0, TOPES.plazasAlojamiento),
     modalidadConfirmacion: vModalidad,
   },
   TRANSPORTE: {
-    capacidadVehiculo: vEntero(1),
+    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo),
     pesoEquipajeIncluido: vNumero(0, PESO_MAXIMO_DECLARADO_KG),
-    costoPorKgExcedente: vNumero(0),
+    costoPorKgExcedente: vNumero(0, TOPES.costoPorKgExcedente),
   },
   TREN: {
     horarioSalida: vHora,
@@ -65,7 +68,7 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
   },
   EQUIPAMIENTO: {
     tipoEquipamiento: vTexto(60),
-    cantidadDisponible: vEntero(0),
+    cantidadDisponible: vEntero(0, TOPES.unidadesEquipamiento),
   },
 };
 
@@ -74,7 +77,7 @@ export const CAMPOS_MODIFICAR: { [tipo in TipoServicio]: { [campo: string]: Vali
   ALOJAMIENTO: { ...CAMPOS_CREAR.ALOJAMIENTO },
   TRANSPORTE: { ...CAMPOS_CREAR.TRANSPORTE },
   TREN: { ...CAMPOS_CREAR.TREN },
-  EQUIPAMIENTO: { tipoEquipamiento: vTexto(60), inventarioTotal: vEntero(0) },
+  EQUIPAMIENTO: { tipoEquipamiento: vTexto(60), inventarioTotal: vEntero(0, TOPES.unidadesEquipamiento) },
 };
 
 /** Valida los campos de `campos` presentes en `obj`. Si `exigirTodos`, todos son obligatorios. */
