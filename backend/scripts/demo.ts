@@ -3,9 +3,11 @@
  * Uso, desde backend, con Docker levantado: npm run demo   (resetea DEMO_DB, por defecto incatour_demo)
  * Después levantar el back contra esa base (DATABASE_URL apuntando a incatour_demo).
  *
- * Todo pasa por la API real: catálogo, proveedores, personal, compras, solicitudes, cancelaciones, asignación,
- * avances, incidentes, reseñas y evaluaciones. Solo toca la base directo en lo que la API no puede hacer:
+ * Todo pasa por la API real: catálogo, proveedores, personal, salidas con su personal y transporte, compras (que ocupan
+ * el equipo del paquete), solicitudes, cancelaciones, confirmación, avances, incidentes, reseñas y evaluaciones.
+ * Solo toca la base directo en lo que la API no puede hacer:
  *  - crear el administrador (no hay alta de administradores);
+ *  - que pase el corte de venta de una salida operada en el futuro, para confirmarla (CU-40 solo confirma después del corte);
  *  - viajar en el tiempo: la API no opera sobre el pasado, así que cada salida histórica se opera a fecha + 3 años
  *    (misma temporada y misma tarifa) y al final se la lleva a su fecha real junto con todas sus marcas de tiempo.
  * Al terminar corre verificar(): si un dato queda inconsistente, el script falla.
@@ -142,7 +144,7 @@ const INCIDENTES = [
 
 type Persona = { nombre: string; apellido: string; pais: Pais; pasaporte: string; vence: string };
 type Cliente = Persona & { idcliente: number; idusuario: number; token: string; primeraCompra?: string };
-type Etapa = "historica" | "encurso" | "cerrada" | "publicada";
+type Etapa = "historica" | "encurso" | "cerrada" | "publicada" | "pendiente";
 type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; carlos?: boolean; cancelada?: boolean; deHoy?: boolean; juan?: boolean };
 
 /** Calendario de salidas: desde hace dos años hasta cinco meses adelante. En febrero el Camino Inca cierra */
@@ -174,6 +176,8 @@ function armarCalendario(hoy: string) {
   planes.push({ virtual: sumarDias(hoy, -1), paquete: clasico, etapa: "encurso" });
   planes.push({ virtual: hoy, paquete: clasico, etapa: "cerrada", carlos: true, deHoy: true });
   planes.push({ virtual: sumarDias(hoy, 12), paquete: clasico, etapa: "cerrada", carlos: true });
+  // B4: terminó la venta y falta confirmarla, para hacerlo en vivo (se opera en el futuro y se trae a su fecha)
+  planes.push({ virtual: sumarDias(hoy, 2), paquete: clasico, etapa: "pendiente" });
   const historicas = planes.filter((p) => p.etapa === "historica");
   for (const i of [7, 25, 44]) historicas[i]!.cancelada = true;
   planes.sort((a, b) => a.virtual.localeCompare(b.virtual));
@@ -239,13 +243,13 @@ async function main() {
       }
     }
 
-    const transportes: { idservicio: number; idproveedor: number; ocupado: [string, string][] }[] = [];
+    const transportes: { idservicio: number; idproveedor: number; asientos: number; ocupado: [string, string][] }[] = [];
     for (const [empresa, vehiculo, asientos, costo, kg, canal] of TRANSPORTES) {
       const contacto = canal === "Email" ? `operaciones@${correo(empresa).replace(/\./g, "")}.com.pe` : `+51 984 ${digitos(3)} ${digitos(3)}`;
       const prov = await api("POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `${empresa} E.I.R.L.`, localidad: "Cusco", datosContacto: contacto, canalComunicacion: canal });
       const idproveedor = idDe(prov, "idproveedor")!;
       const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `${empresa} · ${vehiculo}`, localidad: "Cusco", costoBase: costo, capacidadVehiculo: asientos, pesoEquipajeIncluido: kg, costoPorKgExcedente: 2.5 });
-      transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, ocupado: [] });
+      transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, asientos, ocupado: [] });
     }
 
     // Tren de vuelta desde Aguas Calientes
@@ -273,6 +277,10 @@ async function main() {
         nochesPrevias: p.previas, nochesPosteriores: p.posteriores, diasMinimosReintegro: 15,
         matrizPrecios: tarifasPorFactor.map((t) => ({ idtemporada: t.idtemporada, monto: Math.round(p.tarifa * t.factor), moneda: "USD" })),
         idtransporte: transportes[p.transporte]!.idservicio, ...(p.tren !== null && { idtren: trenes[p.tren]! }), // B2
+        // B2: el equipo con su regla; la compra lo ocupa sobre el total vendido. El Camino corto no acampa
+        ...(p.circuito !== "corto" && {
+          equipo: [["Carpa", 1, 2], ["Bolsa de dormir", 1, 1], ["Colchoneta", 1, 1], ["Carpa comedor", 1, 100]].map(([tipo, cantidad, cadaPasajeros]) => ({ idservicio: equipos[tipo as string]!, cantidad, cadaPasajeros })),
+        }),
       });
       paquetes.set(p.nombre, idDe(pq, "idpaquete")!);
     }
@@ -342,19 +350,28 @@ async function main() {
       const { paquete, virtual, etapa } = plan;
       const dias = CIRCUITOS[paquete.circuito].dias;
       const viaja = etapa === "historica" || etapa === "encurso";
-      // La de hoy también se opera en el futuro: la API no crea salidas que empiezan hoy
-      const adelantada = viaja || !!plan.deHoy;
+      // La de hoy y la que espera confirmación también se operan en el futuro: la API no crea salidas que empiezan tan pronto
+      const adelantada = viaja || !!plan.deHoy || etapa === "pendiente";
       const real = adelantada ? masAnios(virtual, ANIOS_DE_VIAJE) : virtual;
       const fin = sumarDias(virtual, dias - 1);
       const realFin = sumarDias(real, dias - 1);
       const mover = (inicio: string, hasta: string) => db.salida.update({ where: { idsalida }, data: { fechaInicio: new Date(inicio), fechaFin: new Date(hasta) } });
       if (n % 10 === 0) console.log(`  ${n}/${calendario.length} (${virtual})`);
 
-      // CU-36
+      // CU-36 (B3): guía, porteadores y transporte se eligen al crear, con la dotación del máximo (1 porteador cada 2)
       const zona = ZONAS[paquete.zona]!;
       const hotel = zona.modalidad === "BLOQUEO_PLAZAS" ? elegir(hoteles[paquete.zona]!) : undefined;
-      const creada = await api("POST", "/salidas", { idpaquete: paquetes.get(paquete.nombre), fechaInicio: real, tamanoMaximo: paquete.cupo, ...(hotel && { idalojamiento: hotel.idservicio }) });
+      const equipoGuias = plan.carlos ? [guias[0]!] : libres(guias.slice(1), real, realFin, 1);
+      const equipoPorteadores = libres(porteadores, real, realFin, Math.ceil(paquete.cupo / 2));
+      // 12.4: el vehículo lleva a los pasajeros y al personal
+      const lugares = paquete.cupo + equipoGuias.length + equipoPorteadores.length;
+      const transporte = libres(transportes.filter((t) => t.asientos >= lugares), real, realFin, 1)[0]!;
+      const creada = await api("POST", "/salidas", {
+        idpaquete: paquetes.get(paquete.nombre), fechaInicio: real, tamanoMaximo: paquete.cupo, ...(hotel && { idalojamiento: hotel.idservicio }),
+        idtransporte: transporte.idservicio, personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal),
+      });
       const idsalida = idDe(creada, "idsalida")!;
+      for (const r of [...equipoGuias, ...equipoPorteadores, transporte]) r.ocupado.push([real, realFin]);
 
       // CU-30: compras de clientes distintos hasta llenar lo que pide la temporada
       const avance = etapa === "publicada" ? 0.45 : 1;
@@ -375,7 +392,7 @@ async function main() {
           tarjeta: { numero: "4242424242424242", titular: `${c.cliente.nombre} ${c.cliente.apellido}`.toUpperCase(), vencimiento: "12/30", cvv: "123" },
         }, c.cliente.token);
         const idreserva = idDe(r, "idreserva")!;
-        const base = viaja || etapa === "cerrada" ? virtual : hoy;
+        const base = viaja || etapa === "cerrada" || etapa === "pendiente" ? virtual : hoy;
         const compra = sumarDias(base, -c.anticipacion);
         const marca: (typeof marcas.reservas)[number] = { idreserva, viajo: adelantada, compra: compra > hoy ? sumarDias(hoy, -1) : compra };
         marcas.reservas.push(marca);
@@ -428,23 +445,16 @@ async function main() {
         vigentes.splice(vigentes.indexOf(v), 1);
       }
 
-      // CU-40
-      if (etapa === "publicada") {
+      // CU-40: solo después del corte. Las que se operan en el futuro (salvo la que espera confirmación) se confirman
+      // llevando el corte a hoy y devolviéndolo después; las de fechas reales siguen a la venta (PUBLICADA)
+      if (!adelantada || etapa === "pendiente") {
         marcas.salidas.push({ idsalida, virtual, real, fin, idbloqueo: null, cancelada: false });
         continue;
       }
-      const panel = await api("GET", `/salidas/${idsalida}/asignacion`);
-      const equipoGuias = plan.carlos ? [guias[0]!, ...libres(guias.slice(1), real, realFin, panel.dotacionRequerida.guias - 1)] : libres(guias.slice(1), real, realFin, panel.dotacionRequerida.guias);
-      const equipoPorteadores = libres(porteadores, real, realFin, panel.dotacionRequerida.porteadores);
-      const transporte = libres(transportes, real, realFin, 1)[0]!;
-      // Los circuitos que acampan llevan carpas, bolsas y colchonetas para los pasajeros, y una carpa comedor
-      const pasajerosSalida = vigentes.reduce((a, v) => a + v.pasajeros.length, 0);
-      const acampa = paquete.circuito !== "corto";
-      const itemsCamping = acampa
-        ? [["Carpa", Math.ceil(pasajerosSalida / 2)], ["Bolsa de dormir", pasajerosSalida], ["Colchoneta", pasajerosSalida], ["Carpa comedor", 1]].map(([tipo, cantidad]) => ({ idservicio: equipos[tipo as string]!, cantidad: cantidad as number }))
-        : [];
-      await api("POST", `/salidas/${idsalida}/asignacion`, { personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal), idtransporte: transporte.idservicio, itemsCamping });
-      for (const r of [...equipoGuias, ...equipoPorteadores, transporte]) r.ocupado.push([real, realFin]);
+      const { diasCierreVenta } = await db.salida.findUniqueOrThrow({ where: { idsalida } });
+      await db.salida.update({ where: { idsalida }, data: { diasCierreVenta: Math.ceil((new Date(real).getTime() - new Date(hoy).getTime()) / (24 * H)) } });
+      await api("POST", `/salidas/${idsalida}/asignacion`, {});
+      await db.salida.update({ where: { idsalida }, data: { diasCierreVenta } });
 
       if (viaja) {
         // CU-49/50: la salida "empezó ayer" para el guía
@@ -464,11 +474,12 @@ async function main() {
         }
       }
 
-      if (etapa === "historica" && itemsCamping.length) {
-        // CU-41: el equipo vuelve al depósito; de vez en cuando algo vuelve roto
+      const asignado: { idservicio: number; cantidadAsignada: number }[] = etapa === "historica" ? (await api("GET", `/salidas/${idsalida}/equipamiento-asignado`)).equipamientos : [];
+      if (asignado.length) {
+        // CU-41: el equipo que ocuparon las compras vuelve al depósito; de vez en cuando algo vuelve roto
         const roto = azar() < 0.15 ? elegir([equipos["Bolsa de dormir"], equipos["Colchoneta"], equipos["Carpa"]]) : undefined;
         await api("POST", `/salidas/${idsalida}/devolucion-equipamiento`, {
-          items: itemsCamping.map((i) => ({ idservicio: i.idservicio, cantidadBuenEstado: i.cantidad - (i.idservicio === roto ? 1 : 0), cantidadDaniada: i.idservicio === roto ? 1 : 0 })),
+          items: asignado.map((i) => ({ idservicio: i.idservicio, cantidadBuenEstado: i.cantidadAsignada - (i.idservicio === roto ? 1 : 0), cantidadDaniada: i.idservicio === roto ? 1 : 0 })),
         });
       }
 
@@ -675,11 +686,13 @@ async function mostrarPresentacion(db: PrismaClient, hoy: string) {
   const enCurso = await db.salida.findMany({ where: { estado: "EN_CURSO" }, orderBy: { fechaInicio: "desc" } });
   const juan = await db.reserva.findMany({ where: { cliente: { usuario: { email: "juan@test.com" } } }, include: { salida: true }, orderBy: { salida: { fechaInicio: "asc" } } });
   const pendientes = await db.solicitud.count({ where: { estado: "PENDIENTE" } });
+  const paraConfirmar = await db.salida.findFirst({ where: { fechaInicio: new Date(sumarDias(hoy, 2)), estado: "PUBLICADA" } });
   console.log(`
 Para la presentación (${hoy}):`);
   console.log(`  Carlos inicia en vivo: ${deHoy.nroSalida} (${deHoy.estado})`);
   console.log(`  En curso al día: ${enCurso[0]?.nroSalida} · atrasada (Desfasada): ${enCurso[1]?.nroSalida}`);
   console.log(`  Solicitudes de alojamiento pendientes: ${pendientes}`);
+  console.log(`  Terminó la venta, para confirmar en vivo (CU-40): ${paraConfirmar?.nroSalida}`);
   for (const r of juan) console.log(`  Juan: ${r.nroReserva} en ${r.salida.nroSalida} (${r.salida.estado}, ${r.estado})`);
 }
 

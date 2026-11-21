@@ -124,12 +124,16 @@ async function faseC() {
   const tokCliente = await login(emailCliente, "clienteHumo123");
   await paso("Modificar cliente (CU-28)", "PUT", `/clientes/${idDe(cliente, "idcliente")}`, { nombre: "Carla María" }, tokCliente);
 
-  // Salida y compra
-  const opcSalida = await paso("Opciones de salida (CU-36)", "GET", `/salidas/opciones?idpaquete=${idDe(paquete, "idpaquete")}&fechaInicio=2027-06-10&tamanoMaximo=8`);
-  const idalojamiento = opcSalida?.alojamientos?.find((a: any) => a.alcanza)?.idservicio;
-  const nuevaSalida = (fechaInicio: string, tamanoMaximo: number) =>
-    ({ idpaquete: idDe(paquete, "idpaquete"), fechaInicio, tamanoMaximo, ...(idalojamiento && { idalojamiento }) });
-  const salida = await paso("Crear salida (CU-36)", "POST", "/salidas", nuevaSalida("2027-06-10", 8));
+  // Salida y compra. B3: el alta lleva el transporte y el personal que ofrecen las opciones (el guía recién creado primero)
+  const nuevaSalida = async (fechaInicio: string, tamanoMaximo: number) => {
+    const o = await paso(`Opciones de salida del ${fechaInicio} (CU-36)`, "GET", `/salidas/opciones?idpaquete=${idDe(paquete, "idpaquete")}&fechaInicio=${fechaInicio}&tamanoMaximo=${tamanoMaximo}`);
+    const idalojamiento = o?.alojamientos?.find((a: any) => a.alcanza)?.idservicio;
+    const guias = [...(o?.personal?.guias ?? [])].sort((a: any) => (a.idpersonal === idDe(guia, "idpersonal") ? -1 : 0));
+    const personalIds = [...guias.slice(0, o?.dotacion?.guias), ...(o?.personal?.porteadores ?? []).slice(0, o?.dotacion?.porteadores)].map((p: any) => p.idpersonal);
+    const idtransporte = (o?.transportes ?? []).find((t: any) => t.libre && t.alcanza)?.idservicio ?? null;
+    return { idpaquete: idDe(paquete, "idpaquete"), fechaInicio, tamanoMaximo, idtransporte, personalIds, ...(idalojamiento && { idalojamiento }) };
+  };
+  const salida = await paso("Crear salida (CU-36)", "POST", "/salidas", await nuevaSalida("2027-06-10", 8));
   const idsalida = idDe(salida, "idsalida");
   const compra = (n: number, sal: number | null | undefined = idsalida) => ({
     idsalida: sal, medioPago: "TARJETA",
@@ -165,13 +169,16 @@ async function faseC() {
     if (segunda) await paso("Aceptar solicitud (CU-34)", "POST", `/solicitudes/${reintento?.idsolicitud}/resolver`, { servicioId: segunda.servicioId, resolucion: "ACEPTADA" });
   } else avisos.push("C No hay solicitudes pendientes: no se probó el CU-34");
 
-  // Asignación (CU-40)
-  const asig = await paso("Opciones de asignación (CU-40)", "GET", `/salidas/${idsalida}/asignacion`);
-  if (asig) console.log("    opciones de asignación:", JSON.stringify(asig).slice(0, 300));
-  const disponibles: any[] = asig?.personalDisponible ?? asig?.personal ?? [];
-  const elegidos = [idDe(guia, "idpersonal"), ...disponibles.filter((p) => p.rol === "Porteador").map((p) => p.idpersonal).slice(0, 2)].filter(Boolean);
-  const transporte = (asig?.transportes ?? asig?.transportesDisponibles ?? [])[0];
-  await paso("Asignar recursos (CU-40)", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: elegidos, idtransporte: transporte?.idservicio ?? null, itemsCamping: [] });
+  // Confirmar salida (CU-40): recién después del corte. Se corre el corte para que la venta ya haya cerrado
+  const dia = 24 * 3600 * 1000;
+  const db = new PrismaClient({ datasources: { db: { url: DB_URL } } });
+  if (idsalida) {
+    const s = await db.salida.findUniqueOrThrow({ where: { idsalida } });
+    await db.salida.update({ where: { idsalida }, data: { diasCierreVenta: Math.ceil((s.fechaInicio.getTime() - Date.now()) / dia) + 1 } });
+  }
+  const panel = await paso("Panel de confirmación (CU-40)", "GET", `/salidas/${idsalida}/asignacion`);
+  if (panel) console.log("    panel:", JSON.stringify(panel).slice(0, 300));
+  await paso("Confirmar salida (CU-40)", "POST", `/salidas/${idsalida}/asignacion`, {});
 
   // Logística (CU-39) y reemplazo (CU-38)
   await paso("Consultar logística (CU-39)", "GET", `/salidas/${idsalida}/logistica`);
@@ -187,18 +194,16 @@ async function faseC() {
   // Portal del guía (CU-48 a 50): los avances de todas las etapas finalizan la salida.
   // Una salida nueva empieza en el futuro y los avances no pueden ser futuros: se corre a "empezó ayer",
   // el guía la inicia y la partida se lleva a ayer, para que los avances de las últimas horas sean posteriores
-  const dia = 24 * 3600 * 1000;
   const hace = (ms: number) => new Date(Date.now() - ms).toISOString();
   const tokGuia = guia ? await login(emailGuia, "guiaHumo123") : "";
   if (idsalida) {
-    const db = new PrismaClient({ datasources: { db: { url: DB_URL } } });
     // Fechas date-only (00:00Z), como las guarda la API: con hora, "empezó ayer" puede caer hoy en UTC
     const soloDia = (ms: number) => new Date(new Date(Date.now() + ms).toISOString().slice(0, 10));
     await db.salida.update({ where: { idsalida }, data: { fechaInicio: soloDia(-2 * dia), fechaFin: soloDia(dia) } });
     await paso("Iniciar salida (CU-49)", "POST", `/guia/salidas/${idsalida}/iniciar`, undefined, tokGuia);
     await db.salida.update({ where: { idsalida }, data: { fechaHoraInicioReal: new Date(Date.now() - dia) } });
-    await db.$disconnect();
   }
+  await db.$disconnect();
   await paso("Salidas del guía (CU-48)", "GET", "/guia/salidas", undefined, tokGuia);
   await paso("Detalle para el guía (CU-48)", "GET", `/guia/salidas/${idsalida}`, undefined, tokGuia);
   const pasajeros: any[] = (await paso("Pasajeros (CU-50)", "GET", `/guia/salidas/${idsalida}/pasajeros`, undefined, tokGuia)) ?? [];
@@ -223,7 +228,7 @@ async function faseC() {
   await paso("Consultar reseñas y evaluaciones (CU-43)", "GET", "/resenias");
 
   // Cancelación de una salida de la empresa (CU-37)
-  const salida2 = await paso("Crear otra salida (CU-36)", "POST", "/salidas", nuevaSalida("2027-06-20", 2));
+  const salida2 = await paso("Crear otra salida (CU-36)", "POST", "/salidas", await nuevaSalida("2027-06-20", 2));
   await paso("Compra sobre la salida a cancelar", "POST", "/reservas", compra(3, idDe(salida2, "idsalida") ?? null), tokCliente);
   await paso("Liquidación de la cancelación (CU-37)", "GET", `/salidas/${idDe(salida2, "idsalida")}/cancelacion`);
   await paso("Cancelar salida (CU-37)", "POST", `/salidas/${idDe(salida2, "idsalida")}/cancelar`, { motivo: "Prueba de humo" });
@@ -287,47 +292,37 @@ async function faseD() {
     const negativo = await Promise.allSettled([autoridad.solicitarBloqueoCupo(new Date("2030-06-15"), -10)]);
     controlar("Bloquear -10 lugares se rechaza", negativo[0]!.status === "rejected");
 
-    // SAL-05 / SAL-06: asignaciones y compras contra el mismo recurso, con los locks reales de Postgres
+    // SAL-05 / SAL-06: altas y compras contra el mismo recurso, con los locks reales de Postgres
     const { AsignacionRepository } = await import("../src/modulos/salidas/asignacion/asignacion.repository.js");
+    const { SalidaRepository } = await import("../src/modulos/salidas/salidas/salida.repository.js");
     const { ReservaRepository } = await import("../src/modulos/reservas/reservas/reserva.repository.js");
     const { ESTADO } = await import("../src/shared/constantes.js");
     const paquete = await db.paquete.findUniqueOrThrow({ where: { nroPaquete: "PAQ-INC-01" } });
     const cliente = await db.usuario.findUniqueOrThrow({ where: { email: "juan@test.com" } });
     const transporte = await db.servicioTransporte.findFirstOrThrow();
     const sufijo = Date.now().toString(36).toUpperCase();
-    const crearSalida = (n: string, inicio: string, fin: string) => db.salida.create({
-      data: {
-        idpaquete: paquete.idpaquete, nroSalida: `SAL-D-${sufijo}-${n}`, idbloqueo: `BLQ-D-${sufijo}-${n}`,
-        stockLocal: 5, stockLocalAlojamiento: 0, tamanoMaximo: 5,
-        fechaInicio: new Date(inicio), fechaFin: new Date(fin), estado: "PUBLICADA",
-      },
-    });
     const personal = await db.personal.create({
       data: { nombreCompleto: `Humo D ${sufijo}`, nroPasaporte: `DP-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: new Date("2035-01-01"), estado: ESTADO.ACTIVO, rol: "Porteador" },
     });
-    const salidas: number[] = [];
+    const crearSalida = (n: string, inicio: string, fin: string) => new SalidaRepository().crearSalida({
+      idpaquete: paquete.idpaquete, fechaInicio: new Date(inicio), fechaFin: new Date(fin), tamanoMaximo: 5, idbloqueo: `BLQ-D-${sufijo}-${n}`,
+      idalojamiento: undefined, nombreHotel: undefined, idtransporte: transporte.idservicio, personalIds: [personal.idpersonal], equipos: [],
+      diasCierreVenta: 2, rangosAlojamiento: [], definicionPaquete: {} as never,
+    });
+    const salidas = async () => (await db.salida.findMany({ where: { idbloqueo: { startsWith: `BLQ-D-${sufijo}` } } })).map((s) => s.idsalida);
     try {
-      const repoAsig = new AsignacionRepository();
-      const confirmarAsignacion = async (idsalida: number) => repoAsig.confirmar({
-        salida: (await repoAsig.buscarSalida(idsalida))!, personalIds: [personal.idpersonal],
-        idtransporte: transporte.idservicio, itemsCamping: [], permisos: [], rechazados: [], reservaDePasajero: new Map(), lugaresPorLiberar: 0,
-      });
+      // a) dos altas superpuestas con el mismo personal y transporte: solo una se crea
+      const paralelas = await Promise.allSettled([crearSalida("A1", "2031-03-10", "2031-03-13"), crearSalida("A2", "2031-03-12", "2031-03-15")]);
+      controlar("Dos altas superpuestas con el mismo personal/transporte: solo una pasa", exactamenteUno(paralelas));
 
-      // a) dos salidas superpuestas con el mismo personal y transporte: solo una se asigna
-      const s1 = await crearSalida("A1", "2031-03-10", "2031-03-13");
-      const s2 = await crearSalida("A2", "2031-03-12", "2031-03-15");
-      salidas.push(s1.idsalida, s2.idsalida);
-      const paralelas = await Promise.allSettled([confirmarAsignacion(s1.idsalida), confirmarAsignacion(s2.idsalida)]);
-      controlar("Dos asignaciones superpuestas con el mismo personal/transporte: solo una pasa", exactamenteUno(paralelas));
-
-      // b) compra sobre una salida que se cierra: reserva cupo, la asignación cierra, el pago ya no confirma
+      // b) compra sobre una salida que se confirma: reserva cupo, la confirmación cierra, el pago ya no confirma
       const s3 = await crearSalida("B", "2031-06-10", "2031-06-13");
-      salidas.push(s3.idsalida);
+      const repoAsig = new AsignacionRepository();
       const repoReserva = new ReservaRepository();
       await repoReserva.reservarCupos(s3.idsalida, 1);
-      await confirmarAsignacion(s3.idsalida).then(
-        () => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", true),
-        (e) => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", false, String(e)),
+      await repoAsig.confirmar({ salida: (await repoAsig.buscarSalida(s3.idsalida))!, permisos: [], rechazados: [], reservaDePasajero: new Map(), lugaresPorLiberar: 0 }).then(
+        () => controlar("Confirmar una salida PUBLICADA sin reservas confirmadas", true),
+        (e) => controlar("Confirmar una salida PUBLICADA sin reservas confirmadas", false, String(e)),
       );
       const compra = await Promise.allSettled([repoReserva.confirmarReserva({
         idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100, temporadaAplicada: "Humo", precioPaquetePorPersona: 100, adicionalesEquipaje: 0, moneda: "USD", diasMinimosReintegro: null,
@@ -336,9 +331,10 @@ async function faseD() {
       })]);
       controlar("Confirmar una compra sobre una salida ya cerrada se rechaza", compra[0]!.status === "rejected");
     } finally {
-      await db.asignacionPersonal.deleteMany({ where: { idsalida: { in: salidas } } });
-      await db.ocupacion.deleteMany({ where: { idsalida: { in: salidas } } });
-      await db.salida.deleteMany({ where: { idsalida: { in: salidas } } });
+      const ids = await salidas();
+      await db.asignacionPersonal.deleteMany({ where: { idsalida: { in: ids } } });
+      await db.ocupacion.deleteMany({ where: { idsalida: { in: ids } } });
+      await db.salida.deleteMany({ where: { idsalida: { in: ids } } });
       await db.personal.delete({ where: { idpersonal: personal.idpersonal } });
     }
   } finally {

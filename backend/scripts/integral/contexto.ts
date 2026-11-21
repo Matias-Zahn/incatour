@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { Back, idDe, resumen } from "../lib-prueba";
 import { SALIDAS_ACTIVAS } from "../../src/shared/constantes";
 import { disponibleEnRango, totalDe } from "../../src/shared/ocupacion";
+import { calcularDotacion } from "../../src/modulos/salidas/salidas/salida.dotacion";
 
 export type Ctx = ReturnType<typeof crearContexto>;
 
@@ -97,6 +98,7 @@ export function crearContexto(p: {
   };
 
   type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string; equipajeKg?: number };
+  type PersonalSalida = { guias?: number[] | undefined; porteadores?: number[] | undefined; idtransporte?: number | undefined };
 
   // ==================== Fixtures ====================
   const f = {
@@ -181,10 +183,43 @@ export function crearContexto(p: {
       return { idpaquete: idDe(pq, "idpaquete")!, idcircuito, localidad, idtransporte };
     },
 
-    /** Salida PUBLICADA. Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
-    async salida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number) {
-      const s = await ctx.preparar("Crear salida", "POST", "/salidas", { idpaquete, fechaInicio, tamanoMaximo, ...(idalojamiento && { idalojamiento }) });
-      return idDe(s, "idsalida")!;
+    /**
+     * B3: body completo de POST /salidas. Sin guías, porteadores o transporte, arma los justos para la dotación del máximo
+     * (guías con cuenta, sin login) y un transporte propio de 60 asientos, así las salidas no se disputan nada
+     */
+    async cuerpoSalida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, o: PersonalSalida & { idalojamiento?: number | undefined } = {}) {
+      const pq = await db.paquete.findUnique({ where: { idpaquete }, include: { circuito: true } });
+      const dot = (pq && calcularDotacion(pq.circuito.minimoGuias, pq.circuito.parametrosPorteadores, tamanoMaximo)) ?? { guias: 1, porteadores: 0 };
+      const guias = o.guias ?? (await Promise.all(Array.from({ length: dot.guias }, () => f.guia({ sinLogin: true })))).map((g) => g.idpersonal);
+      const porteadores = o.porteadores ?? (await Promise.all(Array.from({ length: dot.porteadores }, () => f.porteador())));
+      const idtransporte = o.idtransporte ?? (await f.transporte(pq?.localidadGarantizada ?? "Loc T", 60)).idservicio;
+      return { idpaquete, fechaInicio, tamanoMaximo, idtransporte, personalIds: [...guias, ...porteadores], ...(o.idalojamiento && { idalojamiento: o.idalojamiento }) };
+    },
+
+    /** Salida PUBLICADA con su personal y transporte (B3). Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
+    async salida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number, o: PersonalSalida = {}) {
+      return (await f.altaSalida(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, o)).idsalida;
+    },
+
+    /** Como salida, pero devuelve también quiénes quedaron asignados y el transporte */
+    async altaSalida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number, o: PersonalSalida = {}) {
+      const body = await f.cuerpoSalida(idpaquete, fechaInicio, tamanoMaximo, { ...o, ...(idalojamiento && { idalojamiento }) });
+      const s = await ctx.preparar("Crear salida", "POST", "/salidas", body);
+      const personal = await db.personal.findMany({ where: { idpersonal: { in: body.personalIds } } });
+      const deRol = (rol: string) => body.personalIds.filter((id) => personal.find((p) => p.idpersonal === id)?.rol === rol);
+      return { idsalida: idDe(s, "idsalida")!, guias: deRol("Guía"), porteadores: deRol("Porteador"), idtransporte: body.idtransporte, data: s };
+    },
+
+    /** B4: lleva el corte de venta a hoy (la venta ya cerró) sin mover la salida, como si hubieran pasado los días */
+    async cerrarVenta(idsalida: number) {
+      const s = await db.salida.findUniqueOrThrow({ where: { idsalida } });
+      await db.salida.update({ where: { idsalida }, data: { diasCierreVenta: Math.max(0, Math.ceil((s.fechaInicio.getTime() - Date.now()) / DIA)) } });
+    },
+
+    /** CU-40: confirmar la salida después del corte (body vacío) */
+    async confirmar(idsalida: number) {
+      await f.cerrarVenta(idsalida);
+      return ctx.preparar("Confirmar salida", "POST", `/salidas/${idsalida}/asignacion`, {});
     },
 
     /** Body de compra: `n` pasajeros nuevos (o los que se pasen) */
@@ -208,14 +243,14 @@ export function crearContexto(p: {
       return { idreserva: idDe(r, "idreserva")!, data: r };
     },
 
-    async guia(o: { habilitacionVence?: string; pasaporteVence?: string } = {}) {
+    async guia(o: { habilitacionVence?: string; pasaporteVence?: string; sinLogin?: boolean } = {}) {
       const u = unico();
       const email = `guia.${u.toLowerCase()}@integral.com`;
       const g = await ctx.preparar("Registrar guía", "POST", "/personal", {
         nombre: "Guia", apellido: letras(u), nroPasaporte: `GI${u}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: o.pasaporteVence ?? "2035-01-01",
         rolOperativo: "Guía", email, contrasenia: "guiaInt123", nroHabilitacion: `HAB-${u}`, fechaHabilitacion: o.habilitacionVence ?? "2034-12-31",
       });
-      return { idpersonal: idDe(g, "idpersonal")!, idusuario: idDe(g, "idusuario"), email, token: await back.login(email, "guiaInt123") };
+      return { idpersonal: idDe(g, "idpersonal")!, idusuario: idDe(g, "idusuario"), email, token: o.sinLogin ? "" : await back.login(email, "guiaInt123") };
     },
 
     async porteador(o: { pasaporteVence?: string } = {}) {

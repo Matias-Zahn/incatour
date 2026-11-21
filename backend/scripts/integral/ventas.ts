@@ -30,13 +30,9 @@ export async function ventas(ctx: Ctx) {
     return { pq, localidad, hotel, idsalida, dias };
   }
 
-  /** Cierra la salida con la asignación real (CU-40): emite los permisos de los pasajeros vendidos */
-  async function cerrar(idsalida: number, localidad: string, vendidos: number) {
-    const guia = await f.guia();
-    const porteadores = [];
-    for (let i = 0; i < Math.ceil(vendidos / 2); i++) porteadores.push(await f.porteador());
-    const t = await f.transporte(localidad, 30);
-    await ctx.preparar("Cerrar salida", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: [guia.idpersonal, ...porteadores], idtransporte: t.idservicio });
+  /** Confirma la salida (CU-40) después del corte: emite los permisos de los pasajeros vendidos. El personal vino con el alta */
+  async function cerrar(idsalida: number, _localidad: string, _vendidos: number) {
+    await f.confirmar(idsalida);
   }
 
   const cancelacion = (tok: string, id: number) => ctx.back.llamar("GET", `/reservas/${id}/cancelacion`, undefined, tok);
@@ -273,7 +269,7 @@ export async function ventas(ctx: Ctx) {
     const { pq, idsalida } = await armar({ tamano: 3 });
     const cli = await f.cliente();
     // Sin temporada que cubra 2029 no se puede ni crear la salida
-    await ctx.esperar("Crear salida en fecha sin tarifa → 400", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: "2029-06-01", tamanoMaximo: 3 }, ctx.admin, 400);
+    await ctx.esperar("Crear salida en fecha sin tarifa → 400", "POST", "/salidas", await f.cuerpoSalida(pq.idpaquete, "2029-06-01", 3), ctx.admin, 400);
     // Salida existente cuya fecha queda sin tarifa (se mueve por base)
     await f.moverFechas(idsalida, "2029-06-01", "2029-06-03");
     await ctx.esperar("Compra en salida sin tarifa para su fecha → 400", "POST", "/reservas", f.compra(idsalida), cli.token, 400);
@@ -559,7 +555,8 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Solicitudes sin token → 401", "GET", "/solicitudes", undefined, "", 401);
 
     // CU-40 FA5: con alojamiento sin confirmar no se consolida la salida
-    await ctx.esperar("Cerrar la salida con alojamiento pendiente → 409", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: [1], idtransporte: 1 }, ctx.admin, 409);
+    await f.cerrarVenta(idsalida);
+    await ctx.esperar("Cerrar la salida con alojamiento pendiente → 409", "POST", `/salidas/${idsalida}/asignacion`, {}, ctx.admin, 409);
     igual("La salida sigue PUBLICADA", (await sal(idsalida)).estado, "PUBLICADA");
   });
 
@@ -567,7 +564,7 @@ export async function ventas(ctx: Ctx) {
     const localidad = `Loc ${ctx.unico()}`;
     const pq = await f.paquete({ localidad });
     const hotel = await f.hotel(localidad, 2);
-    await ctx.esperar("Crear salida eligiendo un hotel sin capacidad → 400", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: fecha(50), tamanoMaximo: 4, idalojamiento: hotel.idservicio }, ctx.admin, 400);
+    await ctx.esperar("Crear salida eligiendo un hotel sin capacidad → 400", "POST", "/salidas", await f.cuerpoSalida(pq.idpaquete, fecha(50), 4, { idalojamiento: hotel.idservicio }), ctx.admin, 400);
     const idsalida = await f.salida(pq.idpaquete, fecha(50), 4);
     const cli = await f.cliente();
     const r = await ctx.esperar("Comprar → 201", "POST", "/reservas", f.compra(idsalida, { n: 1 }), cli.token, 201);
