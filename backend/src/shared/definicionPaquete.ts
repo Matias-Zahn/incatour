@@ -1,10 +1,23 @@
 /**
  * CAT-05: foto de la definición del paquete que se guarda en cada salida al crearla.
  * Si cambia el paquete, las salidas ya creadas conservan lo que se les ofreció (condiciones, garantía,
- * servicios con la regla de cada equipo, noches, plazo de reintegro y corte de venta).
- * Las tarifas todavía siguen vivas (RF-14): 12.5 las congela en la foto en una etapa posterior.
+ * servicios con la regla de cada equipo, noches, plazo de reintegro, corte de venta y, desde 12.5, la tarifa de
+ * la temporada de su fecha de inicio: editar las tarifas del paquete solo cambia las salidas nuevas.
  */
-import { DIAS_CIERRE_VENTA_DEFECTO, tipoDeServicio } from "./constantes";
+import { DIAS_CIERRE_VENTA_DEFECTO, ESTADO, tipoDeServicio } from "./constantes";
+
+export type TarifaSalida = { idtemporada: number; temporada: string; monto: number; moneda: string };
+type TarifaPaquete = { monto: number; moneda: string; temporada: { idtemporada: number; nombre: string; estado: string; fechaInicio: Date; fechaFin: Date } };
+
+/** RF-14: la tarifa del paquete cuya temporada activa cubre la fecha, o null. */
+export function tarifaVigente(tarifas: TarifaPaquete[], fecha: Date): TarifaSalida | null {
+  const t = tarifas.find((t) => t.temporada.estado === ESTADO.ACTIVO && t.temporada.fechaInicio <= fecha && fecha <= t.temporada.fechaFin);
+  return t ? { idtemporada: t.temporada.idtemporada, temporada: t.temporada.nombre, monto: t.monto, moneda: t.moneda } : null;
+}
+
+/** 12.5: la tarifa congelada en la salida; las salidas anteriores, sin ella, siguen con la del paquete vivo. */
+export const tarifaDeSalida = (s: { fechaInicio: Date; definicionPaquete: unknown }, tarifas: TarifaPaquete[]) =>
+  (s.definicionPaquete as DefinicionPaquete | null)?.tarifa ?? tarifaVigente(tarifas, s.fechaInicio);
 
 export type DefinicionPaquete = {
   condiciones: string | null;
@@ -29,6 +42,7 @@ export type DefinicionPaquete = {
   diasDisponibles: string | null;
   diasMinimosReintegro: number | null;
   diasCierreVenta: number; // B4 (undefined en las fotos anteriores: rige Salida.diasCierreVenta)
+  tarifa?: TarifaSalida | null; // 12.5 (null o undefined en las fotos anteriores: rige el paquete vivo)
 };
 
 // Forma mínima del paquete que hace falta (la cumple el resultado de Prisma con los include del caso)
@@ -61,8 +75,8 @@ export interface PaqueteParaDefinicion {
   }[];
 }
 
-/** Arma la foto desde el paquete vivo (se usa al crear la salida). */
-export function armarDefinicionPaquete(p: PaqueteParaDefinicion): DefinicionPaquete {
+/** Arma la foto desde el paquete vivo (se usa al crear la salida, con la tarifa que se congela). */
+export function armarDefinicionPaquete(p: PaqueteParaDefinicion, tarifa: TarifaSalida | null = null): DefinicionPaquete {
   const est = p.garantiasEstablecimiento?.[0]?.servicio;
   return {
     condiciones: p.condiciones,
@@ -92,6 +106,7 @@ export function armarDefinicionPaquete(p: PaqueteParaDefinicion): DefinicionPaqu
     diasDisponibles: p.diasDisponibles,
     diasMinimosReintegro: p.diasMinimosReintegro,
     diasCierreVenta: p.diasCierreVenta ?? DIAS_CIERRE_VENTA_DEFECTO,
+    tarifa,
   };
 }
 

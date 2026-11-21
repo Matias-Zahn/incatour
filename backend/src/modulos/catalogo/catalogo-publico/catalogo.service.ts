@@ -2,7 +2,7 @@ import { hoyUTC } from "../../../shared/fechas";
 import { TIPO_SERVICIO, tipoDeServicio } from "../../../shared/constantes";
 import { claveDia, sumarDias } from "../../../shared/ocupacion";
 import { datosVenta } from "../../../shared/ventaAbierta";
-import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, textoGarantia } from "../../../shared/definicionPaquete";
+import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, tarifaDeSalida, textoGarantia } from "../../../shared/definicionPaquete";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 
@@ -76,14 +76,8 @@ export class CatalogoService {
       const salidasDisponibles = (paquete.salidas ?? [])
         .filter((s) => s.estado === "PUBLICADA" && new Date(s.fechaInicio) > hoy)
         .map((s) => {
-          const fechaSalida = new Date(s.fechaInicio);
           const definicion = definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete });
-          const tarifaSalida = paquete.tarifas.find(
-            (t) =>
-              t.temporada.estado === "ACTIVO" &&
-              new Date(t.temporada.fechaInicio) <= fechaSalida &&
-              fechaSalida <= new Date(t.temporada.fechaFin)
-          );
+          const tarifaSalida = tarifaDeSalida(s, paquete.tarifas); // 12.5: la congelada en la salida
 
           return {
             idsalida: s.idsalida,
@@ -95,7 +89,7 @@ export class CatalogoService {
             tamanoMaximo: s.tamanoMaximo,
             precioPersona: tarifaSalida ? tarifaSalida.monto : null,
             moneda: tarifaSalida ? tarifaSalida.moneda : null,
-            temporadaNombre: tarifaSalida ? tarifaSalida.temporada.nombre : null,
+            temporadaNombre: tarifaSalida ? tarifaSalida.temporada : null,
             ...datosVenta(s, hoy), // B4: las de venta cerrada se listan igual, para mostrar "Venta cerrada"
             // 12.7: después de esta fecha, cancelar ya no tiene reintegro (la regla de reintegro.ts)
             fechaLimiteReintegro:

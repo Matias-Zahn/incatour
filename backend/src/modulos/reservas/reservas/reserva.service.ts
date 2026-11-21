@@ -6,7 +6,7 @@ import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interfa
 import { PasarelaMock } from "../../../integraciones/pasarela/pasarela.mock";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
-import { DefinicionPaquete, definicionEfectiva } from "../../../shared/definicionPaquete";
+import { DefinicionPaquete, definicionEfectiva, tarifaDeSalida } from "../../../shared/definicionPaquete";
 import { CrearReservaDto } from "./reserva.dto";
 import { ReservaRepository } from "./reserva.repository";
 
@@ -207,14 +207,9 @@ export class ReservaService {
     };
   }
 
-  // Tarifa de la temporada vigente en la fecha de inicio + exceso de equipaje
+  // 12.5: la tarifa congelada en la salida (las anteriores, la del paquete vivo) + exceso de equipaje
   private calcularPrecio(salida: SalidaCompra, definicion: DefinicionPaquete, dto: CrearReservaDto) {
-    const tarifa = salida.paquete.tarifas.find(
-      (t) =>
-        t.temporada.estado === "ACTIVO" &&
-        t.temporada.fechaInicio <= salida.fechaInicio &&
-        salida.fechaInicio <= t.temporada.fechaFin
-    );
+    const tarifa = tarifaDeSalida(salida, salida.paquete.tarifas);
     if (!tarifa) {
       throw CustomError.badRequest("El paquete no tiene una tarifa vigente para la fecha de la salida.");
     }
@@ -234,7 +229,7 @@ export class ReservaService {
     return {
       total: redondear2(tarifa.monto * dto.pasajeros.length + extra),
       moneda: tarifa.moneda,
-      temporadaAplicada: tarifa.temporada.nombre,
+      temporadaAplicada: tarifa.temporada,
       precioPaquetePorPersona: tarifa.monto,
       adicionalesEquipaje: redondear2(extra),
     };

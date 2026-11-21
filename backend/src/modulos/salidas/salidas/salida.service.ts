@@ -2,7 +2,7 @@ import { CustomError } from "../../../error/CustomError";
 import { COBERTURA_MINIMA_STOCK, ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { codigoDia, diasDe, fechaCorta, hoyUTC } from "../../../shared/fechas";
 import { claveDia, rangosDe, unaPorServicio } from "../../../shared/ocupacion";
-import { armarDefinicionPaquete, DefinicionPaquete } from "../../../shared/definicionPaquete";
+import { armarDefinicionPaquete, DefinicionPaquete, tarifaVigente } from "../../../shared/definicionPaquete";
 import { controlEquipo, FilaEquipo, reglasEquipo, tamanoQueAlcanza } from "../../../shared/equipo";
 import { motivoNoApto } from "../../../shared/aptitud";
 import { corteDeVenta, datosVenta, motivoFechaInvalida } from "../../../shared/ventaAbierta";
@@ -58,7 +58,7 @@ export class SalidaService {
       dotacion: p.dotacion,
       totalLugares,
       cupoAutoridad: libres === null ? null : { lugaresDisponibles: libres, alcanza: libres >= totalLugares },
-      tarifa: { idtemporada: p.tarifa.idtemporada, temporada: p.tarifa.temporada.nombre, monto: p.tarifa.monto, moneda: p.tarifa.moneda },
+      tarifa: p.tarifa,
       plazasNecesarias: p.rangosAlojamiento.length ? dto.tamanoMaximo : 0,
       alojamientos: p.alojamientos.map((a) => ({
         idservicio: a.idservicio,
@@ -233,12 +233,7 @@ export class SalidaService {
     });
     if (motivo) throw CustomError.badRequest(motivo);
 
-    const tarifa = paquete.tarifas.find(
-      (t) =>
-        t.temporada.estado === ESTADO.ACTIVO &&
-        t.temporada.fechaInicio <= dto.fechaInicio &&
-        dto.fechaInicio <= t.temporada.fechaFin
-    );
+    const tarifa = tarifaVigente(paquete.tarifas, dto.fechaInicio); // 12.5: se congela en la copia del paquete
     if (!tarifa) {
       throw CustomError.badRequest("El paquete no tiene un precio vigente para la temporada de esa fecha");
     }
@@ -259,7 +254,7 @@ export class SalidaService {
     const fechaFin = new Date(dto.fechaInicio.getTime() + (paquete.circuito.duracionDias - 1) * DIA_MS);
     const fechas = { fechaInicio: dto.fechaInicio, fechaFin };
     const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, fechas, paquete);
-    const definicion = armarDefinicionPaquete(paquete);
+    const definicion = armarDefinicionPaquete(paquete, tarifa);
     const salidaNueva = { ...fechas, estado: ESTADO_SALIDA.PUBLICADA, tamanoMaximo: dto.tamanoMaximo, definicionPaquete: definicion };
     const [alojamientos, transportes, libres, datosEquipo] = await Promise.all([
       this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento),
