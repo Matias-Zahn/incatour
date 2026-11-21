@@ -42,7 +42,8 @@ export async function salidas(ctx: Ctx) {
     const inicio = o.inicio ?? proximoInicio();
     const fin = sumar(inicio, 2);
     const T = o.T ?? 6;
-    const alta = await f.altaSalida(pq.idpaquete, inicio, T, hotel?.idservicio);
+    // B10: el a solicitud entra como segundo hotel (cubre lo que falte)
+    const alta = await f.altaSalida(pq.idpaquete, inicio, T, undefined, { alojamientos: [hotel, hotelA].flatMap((h) => (h ? [h.idservicio] : [])) });
     const cliente = await f.cliente();
     const reservas = [];
     for (const n of o.pax ?? []) reservas.push(await f.comprar(cliente.token, alta.idsalida, { n }));
@@ -299,11 +300,11 @@ export async function salidas(ctx: Ctx) {
 
     // Solo un hotel a solicitud: las compras van a solicitud y el corte pasa a 5 (DIAS_CIERRE_SOLICITUD)
     const pqS = await f.paquete();
-    await f.hotel(pqS.localidad, 50, "A_SOLICITUD");
-    const r3 = await crearSalida(pqS.idpaquete, fecha(5));
+    const hS = await f.hotel(pqS.localidad, 50, "A_SOLICITUD");
+    const r3 = await crearSalida(pqS.idpaquete, fecha(5), hS.idservicio);
     ok("B4 a solicitud: empezar en hoy + 5 → 400 por el corte de 5 días",
       r3.status === 400 && r3.body?.error === `La salida tiene que empezar después del ${ddmm(fecha(5))}: la venta cierra 5 días antes del inicio`, `${r3.status} ${JSON.stringify(r3.body)}`);
-    const r4 = await crearSalida(pqS.idpaquete, fecha(6));
+    const r4 = await crearSalida(pqS.idpaquete, fecha(6), hS.idservicio);
     const idsalida = ctx.idDe(r4.body, "idsalida")!;
     ok("B4 a solicitud: hoy + 6 → 201 y la salida guarda diasCierreVenta 5", r4.status === 201 && (await salidaDb(idsalida)).diasCierreVenta === 5, `${r4.status} ${JSON.stringify(r4.body?.error)}`);
     const lista = await ctx.esperar("B4 listado del admin → 200", "GET", `/salidas?idpaquete=${pqS.idpaquete}`, undefined, admin, 200);
@@ -621,9 +622,9 @@ export async function salidas(ctx: Ctx) {
     const m = await montar({ pax: [], aSolicitud: true, T: 4 }); // 1 guía y 2 porteadores
     const original = 50;
     ok("CU-37 hotel con bloqueo: 50 → 46 al crear la salida", (await capacidad(m.hotel!.idservicio)) === 46);
-    // Solo 2 plazas del bloqueo quedan para la venta: la segunda compra no entra y pide solicitud (devolvemos las otras 2 al hotel)
+    // Solo 2 plazas del bloqueo quedan para la venta: la segunda compra no entra y va al hotel a solicitud (devolvemos las otras 2 al hotel)
     await db.salida.update({ where: { idsalida: m.idsalida }, data: { stockLocalAlojamiento: 2 } });
-    await db.ocupacion.updateMany({ where: { idsalida: m.idsalida, tipo: "ALOJAMIENTO" }, data: { cantidad: { decrement: 2 } } });
+    await db.ocupacion.updateMany({ where: { idsalida: m.idsalida, idservicio: m.hotel!.idservicio, tipo: "ALOJAMIENTO" }, data: { cantidad: { decrement: 2 }, plazasLibres: 2 } });
     const r1 = await f.comprar(m.cliente.token, m.idsalida, { n: 2 });
     const cli2 = await f.cliente();
     const r2 = await f.comprar(cli2.token, m.idsalida, { n: 2 });
@@ -748,7 +749,7 @@ export async function salidas(ctx: Ctx) {
     const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
     const pq = await ctx.preparar("Paquete con hotel garantizado", "POST", "/paquetes", {
       idcircuito: await f.circuito(), nombrePaquete: `Int ${ctx.unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
-      localidadGarantizada: loc, idtransporte: (await f.transporte(loc)).idservicio,
+      localidadGarantizada: loc, idtransporte: (await f.transporte(loc)).idservicio, nochesPrevias: 1, nochesPosteriores: 0, // con noches: sin hotel va a solicitud
       matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: 500, moneda: "USD" })),
     });
     const idsalida = await f.salida(ctx.idDe(pq, "idpaquete")!, proximoInicio(), 6); // FA3: el hotel (3) no alcanza, sin bloqueo
@@ -913,6 +914,123 @@ export async function salidas(ctx: Ctx) {
     await ctx.esperar("Bloque 8 pasarlo a bloqueo sin indicar plazas → 400", "PUT", `/servicios/${h.idservicio}`, { modalidadConfirmacion: "BLOQUEO_PLAZAS" }, admin, 400);
     const prov = await ctx.preparar("Alta proveedor", "POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `Int ${ctx.unico()}`, localidad: "Cusco", datosContacto: "int@test.com", canalComunicacion: "Email" });
     await ctx.esperar("Bloque 8 con bloqueo y sin plazas → 400", "POST", `/proveedores/${ctx.idDe(prov, "idproveedor")}/servicios`, { tipo: "ALOJAMIENTO", nombreServicio: `Int ${ctx.unico()}`, localidad: "Cusco", costoBase: 10, categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS" }, admin, 400);
+  });
+
+  // ======================================================================
+  ctx.seccion("Etapa 4: tarifa congelada (12.5) y varios hoteles (B10, 12.2)");
+  const hotelDe = (idreserva: number) => db.reserva.findUniqueOrThrow({ where: { idreserva } }).then((r) => r.idalojamiento);
+  const libresDe = async (idsalida: number, idservicio: number) =>
+    (await db.ocupacion.findFirst({ where: { idsalida, idservicio, tipo: "ALOJAMIENTO" } }))?.plazasLibres;
+  const enCatalogo = async (idpaquete: number, idsalida: number) =>
+    ((await ctx.preparar("Catálogo", "GET", "/catalogo", undefined, "")) as any[]).find((p) => p.idpaquete === idpaquete)?.salidasDisponibles?.find((s: any) => s.idsalida === idsalida);
+
+  await ctx.escenario("12.5 tarifa editada no cambia una salida existente", async () => {
+    const pq = await f.paquete({ monto: 500 });
+    const hotel = await f.hotel(pq.localidad, 50);
+    const vieja = await f.salida(pq.idpaquete, proximoInicio(), 4, hotel.idservicio);
+    const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
+    await ctx.esperar("12.5 subir la tarifa del paquete a 900 → 200", "PUT", `/paquetes/${pq.idpaquete}`, { matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: 900, moneda: "USD" })) }, admin, 200);
+    ok("12.5 el catálogo sigue mostrando 500 en la salida creada antes", (await enCatalogo(pq.idpaquete, vieja))?.precioPersona === 500, JSON.stringify(await enCatalogo(pq.idpaquete, vieja)));
+    const cli = await f.cliente();
+    const r = await ctx.esperar("12.5 comprar 2 en la salida vieja → 201", "POST", "/reservas", f.compra(vieja, { n: 2 }), cli.token, 201);
+    ok("12.5 la compra cobra la tarifa congelada (2 × 500)", r?.precioCongelado === 1000, JSON.stringify(r));
+    const nueva = await f.salida(pq.idpaquete, proximoInicio(), 4, hotel.idservicio);
+    ok("12.5 una salida nueva toma la tarifa nueva (900)", (await enCatalogo(pq.idpaquete, nueva))?.precioPersona === 900);
+    // Sin tarifas en el paquete, la salida vieja se sigue vendiendo con la suya
+    await db.tarifaPaquete.deleteMany({ where: { idpaquete: pq.idpaquete } });
+    const r2 = await ctx.esperar("12.5 sin tarifas en el paquete, la salida se sigue vendiendo → 201", "POST", "/reservas", f.compra(vieja, { n: 1 }), cli.token, 201);
+    ok("12.5 y cobra lo congelado (500)", r2?.precioCongelado === 500, JSON.stringify(r2));
+  });
+
+  await ctx.escenario("B10 salida con dos hoteles que suman el máximo", async () => {
+    const pq = await f.paquete();
+    const [hA, hB] = [await f.hotel(pq.localidad, 3), await f.hotel(pq.localidad, 3)];
+    const F = proximoInicio();
+    const op = await ctx.esperar("B10 opciones → 200", "GET", `/salidas/opciones?idpaquete=${pq.idpaquete}&fechaInicio=${F}&tamanoMaximo=6`, undefined, admin, 200);
+    ok("B10 opciones: los dos hoteles con 3 libres, ninguno alcanza solo", op?.alojamientos?.length === 2 && op.alojamientos.every((a: any) => a.capacidadDisponible === 3 && a.alcanza === false && a.modalidadConfirmacion === "BLOQUEO_PLAZAS"), JSON.stringify(op?.alojamientos));
+    const body = await f.cuerpoSalida(pq.idpaquete, F, 6);
+    const r1 = await ctx.back.llamar("POST", "/salidas", { ...body, alojamientos: [hA.idservicio] }, admin);
+    ok("B10 un hotel de 3 para 6 → 400 con lo cubierto", r1.status === 400 && r1.body?.error === "Los hoteles elegidos cubren 3 de 6 plazas en esas noches", `${r1.status} ${resumenDe(r1)}`);
+    const r = await ctx.esperar("B10 los dos hoteles → 201", "POST", "/salidas", { ...body, alojamientos: [hA.idservicio, hB.idservicio] }, admin, 201);
+    const idsalida = r?.salida?.idsalida;
+    if (!idsalida) return;
+    ok("B10 cada hotel queda ocupado por sus 3 plazas y la salida suma 6", (await capacidad(hA.idservicio)) === 0 && (await capacidad(hB.idservicio)) === 0 &&
+      (await libresDe(idsalida, hA.idservicio)) === 3 && (await libresDe(idsalida, hB.idservicio)) === 3 && (await salidaDb(idsalida)).stockLocalAlojamiento === 6);
+    ok("B10 el listado trae los dos hoteles en servicios", r.salida.servicios.filter((s: any) => s.tipo === "ALOJAMIENTO").length === 2, JSON.stringify(r.salida.servicios));
+
+    // 12.2: las compras llenan el primer hotel y pasan al segundo; un grupo no se parte
+    const cli = await f.cliente();
+    const c1 = await f.comprar(cli.token, idsalida, { n: 2 });
+    const c2 = await f.comprar(cli.token, idsalida, { n: 2 });
+    ok("12.2 el primer grupo va al primer hotel y el segundo, que ya no entra, al segundo",
+      (await hotelDe(c1.idreserva)) === hA.idservicio && (await hotelDe(c2.idreserva)) === hB.idservicio && c2.data?.hotel?.idservicio === hB.idservicio && c2.data?.estadoAlojamiento === "CONFIRMADO", JSON.stringify(c2.data));
+    const rechazo = await ctx.back.llamar("POST", "/reservas", f.compra(idsalida, { n: 2 }), cli.token);
+    ok("12.2 quedan 2 lugares, uno en cada hotel: el grupo de 2 → 400", rechazo.status === 400 && rechazo.body?.error === "Quedan 2 lugares, pero no en un mismo hotel.", `${rechazo.status} ${resumenDe(rechazo)}`);
+    ok("12.2 el rechazo no tocó nada", (await salidaDb(idsalida)).stockLocal === 2 && (await libresDe(idsalida, hA.idservicio)) === 1 && (await libresDe(idsalida, hB.idservicio)) === 1 && (await db.reserva.count({ where: { idsalida } })) === 2);
+    const c3 = await f.comprar(cli.token, idsalida, { n: 1 });
+    ok("12.2 uno solo entra en el primer hotel", (await hotelDe(c3.idreserva)) === hA.idservicio && (await libresDe(idsalida, hA.idservicio)) === 0);
+
+    // CU-32: la cancelación devuelve las plazas a su hotel
+    await ctx.esperar("12.2 cancelar el primer grupo → 200", "POST", `/reservas/${c1.idreserva}/cancelar`, { motivo: "Prueba" }, cli.token, 200);
+    ok("12.2 las 2 plazas vuelven al primer hotel", (await libresDe(idsalida, hA.idservicio)) === 2 && (await libresDe(idsalida, hB.idservicio)) === 1 && (await salidaDb(idsalida)).stockLocalAlojamiento === 3);
+
+    // CU-40: el panel cuenta por hotel y al confirmar cada uno recupera lo que le quedó libre
+    await f.cerrarVenta(idsalida);
+    const panel = await ctx.preparar("Panel", "GET", `/salidas/${idsalida}/asignacion`);
+    ok("12.2 el panel cuenta los pasajeros de cada hotel (1 y 2)", JSON.stringify(panel?.hoteles?.map((h: any) => [h.idservicio, h.pasajeros])) === JSON.stringify([[hA.idservicio, 1], [hB.idservicio, 2]]), JSON.stringify(panel?.hoteles));
+    await ctx.esperar("B10 confirmar la salida → 200", "POST", `/salidas/${idsalida}/asignacion`, {}, admin, 200);
+    ok("B10 al confirmar cada hotel recupera lo suyo (2 y 1 libres)", (await capacidad(hA.idservicio)) === 2 && (await capacidad(hB.idservicio)) === 1 && (await libresDe(idsalida, hA.idservicio)) === 0,
+      `libres ${await capacidad(hA.idservicio)} y ${await capacidad(hB.idservicio)}`);
+  });
+
+  await ctx.escenario("B10 corte de 5 días con uno a solicitud", async () => {
+    const pq = await f.paquete();
+    const hA = await f.hotel(pq.localidad, 2);
+    const hS = await f.hotel(pq.localidad, 20, "A_SOLICITUD");
+    const op = await ctx.esperar("B10 opciones con el a solicitud → 200", "GET", `/salidas/opciones?idpaquete=${pq.idpaquete}&fechaInicio=${fecha(10)}&tamanoMaximo=4`, undefined, admin, 200);
+    const s = op?.alojamientos?.find((a: any) => a.idservicio === hS.idservicio);
+    ok("B10 el a solicitud se lista sin plazas y cubre lo que falte", s?.modalidadConfirmacion === "A_SOLICITUD" && s.capacidadDisponible === null && s.alcanza === true, JSON.stringify(op?.alojamientos));
+    const r1 = await ctx.back.llamar("POST", "/salidas", { ...(await f.cuerpoSalida(pq.idpaquete, fecha(5), 4)), alojamientos: [hA.idservicio, hS.idservicio] }, admin);
+    ok("B10 con uno a solicitud, empezar en hoy + 5 → 400 por el corte de 5 días",
+      r1.status === 400 && r1.body?.error === `La salida tiene que empezar después del ${ddmm(fecha(5))}: la venta cierra 5 días antes del inicio`, `${r1.status} ${resumenDe(r1)}`);
+    const r = await ctx.esperar("B10 hotel con bloqueo y a solicitud en hoy + 6 → 201", "POST", "/salidas", { ...(await f.cuerpoSalida(pq.idpaquete, fecha(6), 4)), alojamientos: [hA.idservicio, hS.idservicio] }, admin, 201);
+    const idsalida = r?.salida?.idsalida;
+    if (!idsalida) return;
+    ok("B10 corte de 5 días; el de bloqueo pone 2 plazas y el a solicitud queda sin bloquear",
+      (await salidaDb(idsalida)).diasCierreVenta === 5 && (await libresDe(idsalida, hA.idservicio)) === 2 && (await libresDe(idsalida, hS.idservicio)) === null && (await capacidad(hA.idservicio)) === 0);
+    const cli = await f.cliente();
+    const c1 = await f.comprar(cli.token, idsalida, { n: 2 });
+    const c2 = await f.comprar(cli.token, idsalida, { n: 2 });
+    ok("12.2 el primer grupo al de bloqueo (confirmado) y el segundo al a solicitud (pendiente)",
+      c1.data?.hotel?.idservicio === hA.idservicio && c1.data?.estadoAlojamiento === "CONFIRMADO" && c2.data?.hotel?.idservicio === hS.idservicio && c2.data?.estadoAlojamiento === "PENDIENTE", JSON.stringify([c1.data, c2.data]));
+    const sol = await db.solicitud.findFirstOrThrow({ where: { idreserva: c2.idreserva } });
+    ok("12.2 la solicitud va a ese hotel", sol.criterios?.startsWith(`Hotel: `) === true && (await hotelDe(c2.idreserva)) === hS.idservicio, JSON.stringify(sol.criterios));
+    const ops = await ctx.esperar("12.2 opciones de la solicitud → 200", "GET", `/solicitudes/${sol.idsolicitud}/opciones`, undefined, admin, 200);
+    ok("12.2 la única opción de contacto es el hotel a solicitud de la salida", JSON.stringify(ops?.opcionesContacto?.map((o: any) => o.servicioId)) === JSON.stringify([hS.idservicio]), JSON.stringify(ops?.opcionesContacto));
+  });
+
+  await ctx.escenario("Salida vieja sin personal: confirmar con personalIds", async () => {
+    // Como las creadas antes de la etapa 3: sin personal ni transporte
+    const m = await montar({ pax: [1] });
+    await db.asignacionPersonal.deleteMany({ where: { idsalida: m.idsalida } });
+    await db.ocupacion.deleteMany({ where: { idsalida: m.idsalida, tipo: "TRANSPORTE" } });
+    await f.cerrarVenta(m.idsalida);
+    const panel = await ctx.preparar("Panel", "GET", `/salidas/${m.idsalida}/asignacion`);
+    ok("Vieja: el panel pide el personal y el transporte", panel?.personal?.length === 0 && panel.puedeConfirmar === false &&
+      panel.faltantes.includes("Sin personal asignado: la salida necesita al menos 1 guías y 1 porteadores (se eligen al confirmar)") && panel.faltantes.includes("Falta el transporte"), JSON.stringify(panel?.faltantes));
+    // El transporte, con CU-39 (acepta PUBLICADA)
+    const bus = await f.transporte(m.localidad, 30);
+    await ctx.esperar("Vieja: cargar el transporte con CU-39 → 200", "PUT", `/salidas/${m.idsalida}/logistica`, { itemsNuevos: [{ tipo: "TRANSPORTE", idservicio: bus.idservicio, comprobanteReserva: "VIEJA-1" }] }, admin, 200);
+    const vencido = (await f.guia({ sinLogin: true, habilitacionVence: "2027-06-30" })).idpersonal;
+    const porteador = await f.porteador();
+    const noApto = await ctx.back.llamar("POST", `/salidas/${m.idsalida}/asignacion`, { personalIds: [vencido, porteador] }, admin);
+    ok("Vieja: personal no apto → 400 y no queda asignado", noApto.status === 400 && /: la habilitación vence el /.test(noApto.body?.error ?? "") && (await asignados(m.idsalida)).length === 0, `${noApto.status} ${resumenDe(noApto)}`);
+    await ctx.esperar("Vieja: personalIds que no es una lista → 400", "POST", `/salidas/${m.idsalida}/asignacion`, { personalIds: "1" }, admin, 400);
+    const guia = (await f.guia({ sinLogin: true })).idpersonal;
+    const r = await ctx.esperar("Vieja: confirmar con personalIds → 200", "POST", `/salidas/${m.idsalida}/asignacion`, { personalIds: [guia, porteador] }, admin, 200);
+    ok("Vieja: queda CERRADA con ese personal y sus permisos", r?.salida?.estado === "CERRADA" && (await asignados(m.idsalida)).join() === [guia, porteador].sort((a, b) => a - b).join() && (await permisosPer(m.idsalida)).length === 2);
+    const otra = await ctx.back.llamar("POST", `/salidas/${m.idsalida}/asignacion`, { personalIds: [guia] }, admin);
+    ok("Vieja: personalIds en una salida con personal → 400", otra.status === 400 && /^La salida ya tiene personal/.test(otra.body?.error ?? ""), `${otra.status} ${resumenDe(otra)}`);
   });
 }
 

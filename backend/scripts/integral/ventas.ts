@@ -26,7 +26,8 @@ export async function ventas(ctx: Ctx) {
     const modo = o.hotel ?? "bloqueo";
     const hotel = modo === "ninguno" ? undefined : await f.hotel(localidad, o.capHotel ?? 50, modo === "solicitud" ? "A_SOLICITUD" : "BLOQUEO_PLAZAS");
     const dias = o.dias ?? 30 + (k++ % 30);
-    const idsalida = await f.salida(pq.idpaquete, fecha(dias), o.tamano ?? 4, modo === "bloqueo" ? hotel!.idservicio : undefined);
+    // B10: el a solicitud también se elige (cubre lo que falte); sin hotel es el FA3
+    const idsalida = await f.salida(pq.idpaquete, fecha(dias), o.tamano ?? 4, hotel?.idservicio);
     return { pq, localidad, hotel, idsalida, dias };
   }
 
@@ -272,6 +273,9 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Crear salida en fecha sin tarifa → 400", "POST", "/salidas", await f.cuerpoSalida(pq.idpaquete, "2029-06-01", 3), ctx.admin, 400);
     // Salida existente cuya fecha queda sin tarifa (se mueve por base)
     await f.moverFechas(idsalida, "2029-06-01", "2029-06-03");
+    // 12.5: como una salida anterior, sin la tarifa congelada (rige la del paquete vivo)
+    const s = await sal(idsalida);
+    await db.salida.update({ where: { idsalida }, data: { definicionPaquete: { ...(s.definicionPaquete as object), tarifa: null } } });
     await ctx.esperar("Compra en salida sin tarifa para su fecha → 400", "POST", "/reservas", f.compra(idsalida), cli.token, 400);
     igual("Sin tarifa: stock sin cambios", await foto(idsalida), "3/3/0");
     igual("Sin tarifa: ningún pago", await db.pago.count({ where: { reserva: { idsalida } } }), 0);
@@ -582,7 +586,7 @@ export async function ventas(ctx: Ctx) {
     const hoteles = (op: any) => (op?.opcionesContacto ?? []).map((o: any) => o.servicioId).sort();
 
     const op1 = await ctx.esperar("Opciones de la solicitud → 200", "GET", `/solicitudes/${sol.idsolicitud}/opciones`, undefined, ctx.admin, 200);
-    igual("Opciones: los dos hoteles", JSON.stringify(hoteles(op1)), JSON.stringify([A!.idservicio, B.idservicio].sort()));
+    igual("12.2 opciones: solo el hotel de la salida al que fue el grupo", JSON.stringify(hoteles(op1)), JSON.stringify([A!.idservicio]));
 
     await ctx.esperar("Rechazar sin motivo → 400", "POST", `/solicitudes/${sol.idsolicitud}/resolver`, { servicioId: A!.idservicio, resolucion: "RECHAZADA" }, ctx.admin, 400);
     await ctx.esperar("Resolución inválida → 400", "POST", `/solicitudes/${sol.idsolicitud}/resolver`, { servicioId: A!.idservicio, resolucion: "TAL VEZ" }, ctx.admin, 400);

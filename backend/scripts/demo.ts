@@ -60,11 +60,13 @@ const CIRCUITOS = {
 type Hotel = [string, number, number, number];
 type Zona = { localidad: string; categoria: string; modalidad: "BLOQUEO_PLAZAS" | "A_SOLICITUD"; hoteles: Hotel[] };
 const ZONAS: Record<string, Zona> = {
-  cusco3: { localidad: "Cusco", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Tikari Cusco", 0, 62, 22], ["Hostal Wayra San Blas", 0, 48, 12]] },
+  cusco3: { localidad: "Cusco", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hostal Wayra San Blas", 0, 48, 12], ["Hotel Tikari Cusco", 0, 62, 22]] },
   cusco4: { localidad: "Cusco", categoria: "4 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hotel Killa Imperial", 0.45, 118, 14], ["Ayllu Boutique Cusco", 0.2, 132, 8], ["Hotel Antawasi Plaza", 0.3, 104, 18]] },
   aguas: { localidad: "Aguas Calientes", categoria: "3 Estrellas", modalidad: "A_SOLICITUD", hoteles: [["Hostal Rumi Wasi", 0.5, 58, 10], ["Hotel Vilcanota Lodge", 0.25, 74, 16], ["Hostal Inti Pakarina", 0.15, 52, 6]] },
   ollanta: { localidad: "Ollantaytambo", categoria: "3 Estrellas", modalidad: "BLOQUEO_PLAZAS", hoteles: [["Hotel Tambo Ollanta", 0, 55, 20]] },
 };
+// B10: el hostal chico no cubre una salida solo, así las de Cusco reparten el grupo entre los dos hoteles
+const PLAZAS_PARA_OPERAR: Record<string, number> = { "Hostal Wayra San Blas": 8 };
 
 // [empresa, vehículo, asientos, costo del traslado, kg de equipaje incluidos, canal]
 const TRANSPORTES: [string, string, number, number, number, string][] = [
@@ -237,7 +239,7 @@ async function main() {
         // La historia se opera con capacidad de sobra (varias salidas pueden compartir noches) y al final
         // se deja lo que el hotel tiene libre hoy
         const s = await api("POST", `/proveedores/${idproveedor}/servicios`, {
-          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: 900, modalidadConfirmacion: z.modalidad,
+          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: PLAZAS_PARA_OPERAR[nombre] ?? 900, modalidadConfirmacion: z.modalidad,
         });
         hoteles[clave]!.push({ idservicio: idDe(s, "idservicio")!, idproveedor, rechazo, plazasHoy });
       }
@@ -360,14 +362,15 @@ async function main() {
 
       // CU-36 (B3): guía, porteadores y transporte se eligen al crear, con la dotación del máximo (1 porteador cada 2)
       const zona = ZONAS[paquete.zona]!;
-      const hotel = zona.modalidad === "BLOQUEO_PLAZAS" ? elegir(hoteles[paquete.zona]!) : undefined;
+      // B10: con bloqueo, los hoteles de la zona en orden (el primero que no alcanza le pasa el resto al siguiente); a solicitud, uno (corte de 5 días)
+      const alojamientos = zona.modalidad === "BLOQUEO_PLAZAS" ? hoteles[paquete.zona]!.map((h) => h.idservicio) : [elegir(hoteles[paquete.zona]!).idservicio];
       const equipoGuias = plan.carlos ? [guias[0]!] : libres(guias.slice(1), real, realFin, 1);
       const equipoPorteadores = libres(porteadores, real, realFin, Math.ceil(paquete.cupo / 2));
       // 12.4: el vehículo lleva a los pasajeros y al personal
       const lugares = paquete.cupo + equipoGuias.length + equipoPorteadores.length;
       const transporte = libres(transportes.filter((t) => t.asientos >= lugares), real, realFin, 1)[0]!;
       const creada = await api("POST", "/salidas", {
-        idpaquete: paquetes.get(paquete.nombre), fechaInicio: real, tamanoMaximo: paquete.cupo, ...(hotel && { idalojamiento: hotel.idservicio }),
+        idpaquete: paquetes.get(paquete.nombre), fechaInicio: real, tamanoMaximo: paquete.cupo, alojamientos,
         idtransporte: transporte.idservicio, personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal),
       });
       const idsalida = idDe(creada, "idsalida")!;
@@ -386,11 +389,13 @@ async function main() {
         compras.push({ cliente, pasajeros: nomina(cliente, cantidad), anticipacion: entre(viaja ? 30 : 1, maxima) });
         porVender -= cantidad;
       }
-      const vendidas = await Promise.all(compras.map(async (c) => {
+      const vendidas = (await Promise.all(compras.map(async (c) => {
+        // 12.2: un grupo no se parte entre hoteles; si ya no entra entero en ninguno, ese cliente no compra
         const r = await api("POST", "/reservas", {
           idsalida, medioPago: "TARJETA", pasajeros: c.pasajeros, equipaje: c.pasajeros.map(() => ({ pesoDeclarado: entre(6, 14) })),
           tarjeta: { numero: "4242424242424242", titular: `${c.cliente.nombre} ${c.cliente.apellido}`.toUpperCase(), vencimiento: "12/30", cvv: "123" },
-        }, c.cliente.token);
+        }, c.cliente.token).catch((e) => { if (/no en un mismo hotel/.test(String(e))) return null; throw e; });
+        if (!r) return null;
         const idreserva = idDe(r, "idreserva")!;
         const base = viaja || etapa === "cerrada" || etapa === "pendiente" ? virtual : hoy;
         const compra = sumarDias(base, -c.anticipacion);
@@ -398,7 +403,7 @@ async function main() {
         marcas.reservas.push(marca);
         if (!c.cliente.primeraCompra || marca.compra < c.cliente.primeraCompra) c.cliente.primeraCompra = marca.compra;
         return { ...c, idreserva, marca };
-      }));
+      }))).filter((v) => v !== null);
 
       // CU-33/34: en las salidas a la venta quedan solicitudes sin resolver
       const pendientes = (await api("GET", "/solicitudes")).filter((s: any) => s.reserva.idsalida === idsalida);
@@ -407,12 +412,15 @@ async function main() {
         if (etapa === "publicada") continue;
         const venta = vendidas.find((v) => v.idreserva === pendiente.idreserva)!;
         let idsolicitud: number = pendiente.idsolicitud;
+        let rechazos = 0;
         let dia = sumarDias(venta.marca.compra, 1);
         for (;;) {
           const { opcionesContacto } = await api("GET", `/solicitudes/${idsolicitud}/opciones`);
           const op = elegir<any>(opcionesContacto);
           const rechazo = hoteles[paquete.zona]!.find((h) => h.idservicio === op.servicioId)!.rechazo;
-          const rechaza = opcionesContacto.length > 1 && azar() < rechazo;
+          // 12.2: la primera va al hotel de la reserva; si la rechaza, la -R ofrece los otros de la zona. Siempre queda uno
+          const rechaza = rechazos < hoteles[paquete.zona]!.length - 1 && azar() < rechazo;
+          if (rechaza) rechazos++;
           const respuesta = await api("POST", `/solicitudes/${idsolicitud}/resolver`, { servicioId: op.servicioId, resolucion: rechaza ? "RECHAZADA" : "ACEPTADA", ...(rechaza && { motivo: elegir(MOTIVOS_RECHAZO) }) });
           marcas.gestiones.push({ idsolicitud, idservicio: op.servicioId, fecha: dia > hoy ? hoy : dia });
           if (!rechaza) break;
@@ -621,6 +629,8 @@ async function verificar(db: PrismaClient, hoy: string) {
       reservas: { include: { pagos: true, reembolsos: true, pasajeros: true, solicitudes: true, permisos: true } },
     },
   });
+  const dosHoteles: string[] = [];
+  const conASolicitud: string[] = [];
   for (const s of salidas) {
     // A1: la ocupación viaja con la salida y la de una cancelada se borra
     if (s.estado === "CANCELADA") exigir(s.ocupaciones.length === 0, `${s.nroSalida}: cancelada con ocupación`);
@@ -634,6 +644,17 @@ async function verificar(db: PrismaClient, hoy: string) {
       exigir(s.fechaInicio > hoyFin, `${s.nroSalida}: sigue a la venta y ya empezó`);
       exigir(s.stockLocal === s.tamanoMaximo - vendidos, `${s.nroSalida}: stock ${s.stockLocal}, vendidos ${vendidos}`);
     }
+    // B10 y 12.2: cada hotel con bloqueo tiene libre lo que bloqueó menos lo que la compra le mandó (confirmada, 0)
+    const conBloqueo = [...new Map(s.ocupaciones.filter((o) => o.tipo === "ALOJAMIENTO" && o.plazasLibres !== null).map((o) => [o.idservicio, o])).values()];
+    for (const h of conBloqueo) {
+      const enviados = confirmadas.filter((r) => r.idalojamiento === h.idservicio).reduce((a, r) => a + r.cantidadPasajeros, 0);
+      exigir(h.plazasLibres === (s.estado === "PUBLICADA" ? h.cantidad - enviados : 0), `${s.nroSalida}: el hotel ${h.idservicio} tiene ${h.plazasLibres} libres de ${h.cantidad} y le mandaron ${enviados}`);
+    }
+    if (s.estado === "PUBLICADA") {
+      exigir(s.stockLocalAlojamiento === conBloqueo.reduce((a, h) => a + h.plazasLibres!, 0), `${s.nroSalida}: stockLocalAlojamiento ${s.stockLocalAlojamiento} distinto de las plazas libres de sus hoteles`);
+    }
+    if (conBloqueo.length > 1) dosHoteles.push(s.nroSalida);
+    if (s.ocupaciones.some((o) => o.tipo === "ALOJAMIENTO" && o.plazasLibres === null)) conASolicitud.push(s.nroSalida);
     if (s.estado === "FINALIZADA") {
       exigir(s.fechaFin < hoyFin, `${s.nroSalida}: finalizada con fecha futura`);
       exigir(s.avances.length === s.paquete.circuito.etapas.length, `${s.nroSalida}: ${s.avances.length} avances`);
@@ -665,11 +686,13 @@ async function verificar(db: PrismaClient, hoy: string) {
   }
   const permisosFuturos = (await db.permisoPasajero.count({ where: { fechaEmision: { gte: hoyFin } } })) + (await db.permisoPersonal.count({ where: { fechaEmision: { gte: hoyFin } } }));
   exigir(permisosFuturos === 0, `${permisosFuturos} permisos emitidos en el futuro`);
+  exigir(dosHoteles.length > 0 && conASolicitud.length > 0, `Faltan salidas con dos hoteles (${dosHoteles.length}) o con un hotel a solicitud (${conASolicitud.length})`);
 
   if (problemas.length) throw new Error(`Base inconsistente (${problemas.length}):\n${problemas.slice(0, 30).join("\n")}`);
 
   const contar = async (nombre: string, n: Promise<number>) => console.log(`  ${nombre}: ${await n}`);
   console.log(`\nBase consistente. ${salidas.length} salidas:`);
+  console.log(`  Con dos hoteles (B10): ${dosHoteles.length}, p. ej. ${dosHoteles.slice(-3).join(", ")} · con hotel a solicitud: ${conASolicitud.length}, p. ej. ${conASolicitud.slice(-3).join(", ")}`);
   for (const estado of ["FINALIZADA", "EN_CURSO", "CERRADA", "PUBLICADA", "CANCELADA"]) console.log(`  ${estado}: ${salidas.filter((s) => s.estado === estado).length}`);
   await contar("Reservas", db.reserva.count());
   await contar("Canceladas", db.reserva.count({ where: { estado: "CANCELADA" } }));

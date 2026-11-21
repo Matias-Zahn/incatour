@@ -98,7 +98,7 @@ export function crearContexto(p: {
   };
 
   type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string; equipajeKg?: number };
-  type PersonalSalida = { guias?: number[] | undefined; porteadores?: number[] | undefined; idtransporte?: number | undefined };
+  type PersonalSalida = { guias?: number[] | undefined; porteadores?: number[] | undefined; idtransporte?: number | undefined; alojamientos?: number[] | undefined };
 
   // ==================== Fixtures ====================
   const f = {
@@ -193,7 +193,7 @@ export function crearContexto(p: {
       const guias = o.guias ?? (await Promise.all(Array.from({ length: dot.guias }, () => f.guia({ sinLogin: true })))).map((g) => g.idpersonal);
       const porteadores = o.porteadores ?? (await Promise.all(Array.from({ length: dot.porteadores }, () => f.porteador())));
       const idtransporte = o.idtransporte ?? (await f.transporte(pq?.localidadGarantizada ?? "Loc T", 60)).idservicio;
-      return { idpaquete, fechaInicio, tamanoMaximo, idtransporte, personalIds: [...guias, ...porteadores], ...(o.idalojamiento && { idalojamiento: o.idalojamiento }) };
+      return { idpaquete, fechaInicio, tamanoMaximo, idtransporte, personalIds: [...guias, ...porteadores], ...(o.idalojamiento && { idalojamiento: o.idalojamiento }), ...(o.alojamientos && { alojamientos: o.alojamientos }) };
     },
 
     /** Salida PUBLICADA con su personal y transporte (B3). Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
