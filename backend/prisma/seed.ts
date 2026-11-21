@@ -126,7 +126,7 @@ async function main() {
         create: {
           categoria: "3 Estrellas",
           tipoHabitacion: "Doble",
-          capacidadDisponible: 10,
+          plazasTotales: 10,
           modalidadConfirmacion: "BLOQUEO_PLAZAS",
         },
       },
@@ -144,7 +144,7 @@ async function main() {
         create: {
           categoria: "3 Estrellas",
           tipoHabitacion: "Doble",
-          capacidadDisponible: 5,
+          plazasTotales: 5,
           modalidadConfirmacion: "A_SOLICITUD",
         },
       },
@@ -195,7 +195,7 @@ async function main() {
       equipamiento: {
         create: {
           tipoEquipamiento: "Carpa 4 Estaciones",
-          cantidadDisponible: 50,
+          cantidadTotal: 50,
         },
       },
     },
@@ -212,7 +212,7 @@ async function main() {
         create: {
           categoria: "3 Estrellas",
           tipoHabitacion: "Doble",
-          capacidadDisponible: 20,
+          plazasTotales: 20,
           modalidadConfirmacion: "BLOQUEO_PLAZAS",
         },
       },
