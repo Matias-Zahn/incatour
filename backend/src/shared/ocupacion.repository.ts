@@ -1,10 +1,10 @@
 /**
- * A1: acceso común a Ocupacion. Solo cuentan las ocupaciones de salidas activas: las de salidas finalizadas
- * quedan como historial y las de canceladas se borran.
+ * A1: acceso común a Ocupacion. Cuentan las ocupaciones de las salidas no canceladas, hasta su `hasta`: una salida
+ * finalizada sigue ocupando sus noches posteriores de hotel y el reacondicionamiento del equipo. Las de canceladas se borran.
  * Concurrencia: quien va a ocupar bloquea antes el ServicioBase (orden Salida → Personal → ServicioBase).
  */
 import { Prisma } from "@prisma/client";
-import { SALIDAS_ACTIVAS } from "./constantes";
+import { ESTADO_SALIDA } from "./constantes";
 import { disponibleEnRango, Rango, totalDe } from "./ocupacion";
 
 type Cliente = Prisma.TransactionClient;
@@ -20,7 +20,7 @@ export function ocupacionesDe(tx: Cliente, idservicios: number[], desde: Date, h
       idservicio: { in: idservicios },
       desde: { lte: hasta },
       hasta: { gte: desde },
-      salida: { estado: { in: SALIDAS_ACTIVAS }, ...(excluirIdsalida && { idsalida: { not: excluirIdsalida } }) },
+      salida: { estado: { not: ESTADO_SALIDA.CANCELADA }, ...(excluirIdsalida && { idsalida: { not: excluirIdsalida } }) },
     },
   });
 }
