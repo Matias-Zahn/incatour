@@ -9,7 +9,7 @@ import { SalidaService, resumirSalida } from "./salida.service";
 const { repo, actual } = vi.hoisted(() => ({
   // Repositorio falso: sin base de datos, controlamos qué devuelve y si falla
   repo: {
-    buscarPaquete: vi.fn(), buscarAlojamientosConBloqueo: vi.fn(), crearSalida: vi.fn(), buscarTransportes: vi.fn(),
+    buscarPaquete: vi.fn(), buscarAlojamientos: vi.fn(), crearSalida: vi.fn(), buscarTransportes: vi.fn(),
     buscarPersonalLibre: vi.fn(), buscarPersonal: vi.fn(), cargarEquipoDe: vi.fn(),
   },
   actual: { autoridad: null as unknown },
@@ -68,7 +68,7 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     vi.clearAllMocks();
     autoridad = actual.autoridad = new AutoridadMock();
     repo.buscarPaquete.mockResolvedValue(paquete);
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([]); // FA3: ninguno confirma por bloqueo
+    repo.buscarAlojamientos.mockResolvedValue([]); // FA3: ninguno confirma por bloqueo
     mocksDeAlta();
   });
 
@@ -174,39 +174,61 @@ describe("SalidaService.crearSalida (CU-36)", () => {
 
   it("A1: el hotel se mira y se ocupa solo en las noches previas y posteriores del paquete", async () => {
     repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 2 });
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 16 }]);
+    repo.buscarAlojamientos.mockResolvedValue([{ idservicio: 4, nombreServicio: "Sol", disponible: 16 }]);
 
-    await new SalidaService().crearSalida(dto({ idalojamiento: 4 }));
+    await new SalidaService().crearSalida(dto({ alojamientos: [4] }));
 
     // Inicio en FECHA, 4 días: noche previa FECHA−1 y posteriores del último día (FECHA+3) al siguiente
     const rangos = [
       { desde: enDias(19), hasta: enDias(19) },
       { desde: enDias(23), hasta: enDias(24) },
     ];
-    expect(repo.buscarAlojamientosConBloqueo).toHaveBeenCalledWith(expect.anything(), rangos);
-    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ idalojamiento: 4, rangosAlojamiento: rangos }));
+    expect(repo.buscarAlojamientos).toHaveBeenCalledWith(expect.anything(), rangos);
+    expect(repo.crearSalida).toHaveBeenCalledWith(
+      expect.objectContaining({ hoteles: [{ idservicio: 4, nombreServicio: "Sol", plazas: 16 }], rangosAlojamiento: rangos })
+    );
   });
 
-  it("A1: rechaza el hotel si no le alcanza lo disponible en esas noches", async () => {
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 15 }]);
+  describe("B10: varios hoteles", () => {
+    const sol = { idservicio: 4, nombreServicio: "Sol", disponible: 10 };
+    const luna = { idservicio: 5, nombreServicio: "Luna", disponible: 8 };
+    const pedido = { idservicio: 6, nombreServicio: "Pedido", disponible: null };
+    beforeEach(() => {
+      repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 0 });
+      repo.buscarAlojamientos.mockResolvedValue([sol, luna, pedido]);
+    });
 
-    await expect(new SalidaService().crearSalida(dto({ idalojamiento: 4 }))).rejects.toThrow("capacidad suficiente");
-    expect(repo.crearSalida).not.toHaveBeenCalled();
+    it("dos con bloqueo que suman el máximo: el primero pone lo suyo y el segundo lo que falta; corte del paquete", async () => {
+      await new SalidaService().crearSalida(dto({ alojamientos: [4, 5] }));
+      expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({
+        hoteles: [{ idservicio: 4, nombreServicio: "Sol", plazas: 10 }, { idservicio: 5, nombreServicio: "Luna", plazas: 6 }],
+        diasCierreVenta: 2,
+      }));
+    });
+
+    it("no cubren el máximo → 400 con lo cubierto; uno fuera de la garantía → 400; sin elegir habiendo opciones → 400", async () => {
+      await expect(new SalidaService().crearSalida(dto({ alojamientos: [5] }))).rejects.toThrow("Los hoteles elegidos cubren 8 de 16 plazas en esas noches");
+      await expect(new SalidaService().crearSalida(dto({ alojamientos: [4, 9] }))).rejects.toThrow("El hotel con ID 9 no cumple la garantía del paquete");
+      await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("Elegí al menos un hotel");
+      expect(repo.crearSalida).not.toHaveBeenCalled();
+    });
+
+    it("uno a solicitud cubre lo que falte, va al final y pasa el corte a 5 días", async () => {
+      await new SalidaService().crearSalida(dto({ alojamientos: [6, 5] }));
+      expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({
+        hoteles: [{ idservicio: 5, nombreServicio: "Luna", plazas: 8 }, { idservicio: 6, nombreServicio: "Pedido", plazas: null }],
+        diasCierreVenta: 5,
+      }));
+    });
   });
 
-  it("exige elegir alojamiento si hay alguno que confirma por bloqueo", async () => {
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 20 }]);
-
-    await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("elegí uno");
-  });
-
-  it("B4: guarda el corte del paquete, o 5 días si el hotel queda a solicitud; el admin lo puede cambiar", async () => {
+  it("B4: guarda el corte del paquete, o 5 días si queda sin hotel con noches (FA3); el admin lo puede cambiar", async () => {
     await new SalidaService().crearSalida(dto());
     expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 2 }));
 
-    repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 0 }); // noches sin hotel con bloqueo
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 0 }); // noches y ningún hotel
     await new SalidaService().crearSalida(dto());
-    expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 5 }));
+    expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 5, hoteles: [] }));
 
     await new SalidaService().crearSalida(dto({ diasCierreVenta: 3 }));
     expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 3 }));
@@ -226,7 +248,7 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
     vi.clearAllMocks();
     autoridad = actual.autoridad = new AutoridadMock();
     repo.buscarPaquete.mockResolvedValue(paquete);
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([]);
+    repo.buscarAlojamientos.mockResolvedValue([]);
     mocksDeAlta();
   });
 

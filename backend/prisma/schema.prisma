@@ -553,6 +553,7 @@ model Ocupacion {
   desde              DateTime     @db.Date
   hasta              DateTime     @db.Date // inclusive
   cantidad           Int // plazas, unidades, o 1 para un vehículo
+  plazasLibres       Int? // B10/12.2: solo ALOJAMIENTO con bloqueo, las plazas que la venta todavía no asignó
   comprobanteReserva String? // solo TRANSPORTE (CU-39)
   creadaEn           DateTime     @default(now())
   servicio           ServicioBase @relation(fields: [idservicio], references: [idservicio])

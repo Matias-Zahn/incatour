@@ -46,15 +46,20 @@ export class SolicitudService {
       .filter(g => g.resultado === "Rechazada")
       .map(g => g.idservicio);
 
-    // RES-04: garantía por establecimiento (sin localidad/categoría): la única opción es ese hotel
+    // RES-04: garantía por establecimiento (sin localidad/categoría): la única opción es ese hotel.
+    // 12.2: si la compra mandó al grupo a un hotel a solicitud, la opción es ese, mientras no la haya rechazado
     const est = paquete.establecimiento;
-    if (est) {
-      const hotel = rechazadosIds.includes(est.idservicio) ? null : await this.repository.buscarServicio(est.idservicio);
+    const asignado = solicitud.reserva.idalojamiento;
+    const unico = (asignado && !rechazadosIds.includes(asignado) ? asignado : null) ?? est?.idservicio;
+    if (unico) {
+      const hotel = rechazadosIds.includes(unico) ? null : await this.repository.buscarServicio(unico);
       return {
         solicitudId: solicitud.idsolicitud,
         reserva: solicitud.reserva.nroReserva,
         cliente: solicitud.reserva.cliente.nroCliente,
-        criteriosGarantizados: { localidad: est.localidad, categoria: est.categoria, tipoHabitacion: paquete.tipoHabitacionGarantizada },
+        criteriosGarantizados: est
+          ? { localidad: est.localidad, categoria: est.categoria, tipoHabitacion: paquete.tipoHabitacionGarantizada }
+          : { localidad: paquete.localidadGarantizada, categoria: paquete.categoriaGarantizada, tipoHabitacion: paquete.tipoHabitacionGarantizada },
         opcionesContacto: hotel ? [this.opcionContacto(hotel)] : []
       };
     }

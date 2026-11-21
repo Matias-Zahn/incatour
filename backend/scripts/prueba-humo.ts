@@ -306,7 +306,7 @@ async function faseD() {
     });
     const crearSalida = (n: string, inicio: string, fin: string) => new SalidaRepository().crearSalida({
       idpaquete: paquete.idpaquete, fechaInicio: new Date(inicio), fechaFin: new Date(fin), tamanoMaximo: 5, idbloqueo: `BLQ-D-${sufijo}-${n}`,
-      idalojamiento: undefined, nombreHotel: undefined, idtransporte: transporte.idservicio, personalIds: [personal.idpersonal], equipos: [],
+      hoteles: [], idtransporte: transporte.idservicio, personalIds: [personal.idpersonal], equipos: [],
       diasCierreVenta: 2, rangosAlojamiento: [], definicionPaquete: {} as never,
     });
     const salidas = async () => (await db.salida.findMany({ where: { idbloqueo: { startsWith: `BLQ-D-${sufijo}` } } })).map((s) => s.idsalida);
@@ -326,7 +326,7 @@ async function faseD() {
       );
       const compra = await Promise.allSettled([repoReserva.confirmarReserva({
         idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100, temporadaAplicada: "Humo", precioPaquetePorPersona: 100, adicionalesEquipaje: 0, moneda: "USD", diasMinimosReintegro: null,
-        condicionesComerciales: "humo", medioPago: "TARJETA", estadoAlojamiento: "CONFIRMADO",
+        condicionesComerciales: "humo", medioPago: "TARJETA", estadoAlojamiento: "CONFIRMADO", idalojamiento: null,
         pasajeros: [{ nombreCompleto: "Humo D", nroPasaporte: `DPAS-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2035-01-01" }],
       })]);
       controlar("Confirmar una compra sobre una salida ya cerrada se rechaza", compra[0]!.status === "rejected");

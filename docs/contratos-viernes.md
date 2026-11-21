@@ -664,12 +664,31 @@ Lo que el back devuelve distinto de lo de arriba, o lo que el contrato no decía
 - **Sección 0:** `detalle` está en `CustomError.badRequest` y `CustomError.conflict` (los únicos que lo usan). Sin `detalle`, el cuerpo sigue siendo `{ error }`.
 - **5.1 opciones:**
   - `dotacion.porteadores` sigue saliendo de `parametrosPorteadores` ("1 por cada 2 pasajeros"). Los dos enteros de A2 necesitan una migración y el formulario del circuito: quedan para después.
-  - `alojamientos` lista solo los de `BLOQUEO_PLAZAS` (`modalidadConfirmacion` viene, pero siempre es esa). Los a solicitud se suman con el bloque 10.
   - `fechaCritica` viene siempre (el día con menos libre); nunca `null`.
-- **5.2 alta:** acepta `alojamientos` con **un solo** id (con dos responde 400 `Por ahora la salida lleva un solo hotel: elegí uno`) y sigue aceptando `idalojamiento`. Varios hoteles es el bloque 10. El equipo queda con su fila de ocupación en 0 hasta la primera compra.
+- **5.2 alta:** el equipo queda con su fila de ocupación en 0 hasta la primera compra.
 - **5.3:** el control de personal va en este orden: no apto (400), dotación (400), ocupado (409). El transporte: no existe (400), no alcanza (400), ocupado (409). Después, el equipo (409) y la fecha con el corte final (400).
 - **6 listado:** `FALTA_RECURSO`, `PERSONAL_NO_APTO` y `RIESGO_STOCK` solo se calculan en las salidas PUBLICADA y CERRADA, y `RIESGO_STOCK` solo mientras `ventaAbierta`. El transporte se compara contra el máximo más el personal mientras se vende, y contra los vendidos más el personal en una CERRADA (12.4).
-- **9.1 panel:** ya no responde 409 con alojamientos pendientes: los lista en `reservasSinAlojamiento` y `puedeConfirmar` queda en false. Responde 400 si la salida ya inició o no está activa. `hoteles[].pasajeros` cuenta las reservas con el alojamiento CONFIRMADO (un hotel por salida hasta el bloque 10). `faltantes` suma la dotación por los vendidos si alguien se quitó (`La salida necesita al menos 1 guías y 2 porteadores (tiene 1 y 1)`). `bloqueoInicial` es `tamanoMaximo + personal asignado` y `lugaresSobrantes` es `tamanoMaximo − vendidos`.
+- **9.1 panel:** ya no responde 409 con alojamientos pendientes: los lista en `reservasSinAlojamiento` y `puedeConfirmar` queda en false. Responde 400 si la salida ya inició o no está activa. `faltantes` suma la dotación por los vendidos si alguien se quitó (`La salida necesita al menos 1 guías y 2 porteadores (tiene 1 y 1)`). `bloqueoInicial` es `tamanoMaximo + personal asignado` y `lugaresSobrantes` es `tamanoMaximo − vendidos`.
 - **9.2 confirmar:** el orden de los rechazos es: inexistente (404), ya inició (400), ya confirmada (400), venta abierta (400), sin pasajeros (400), alojamientos pendientes (409) y faltantes (409). Los dos 409 traen `detalle: { reservasSinAlojamiento: string[]; faltantes: string[] }`. El pasaporte vencido del personal ya no es un 400 aparte: es un faltante (12.3).
 - **CU-39 en una salida PUBLICADA:** si se cambia la cantidad de un equipo con regla, la próxima compra la vuelve a calcular. Si se quita, la compra no lo vuelve a poner. ponytail: se ajusta si hace falta un equipo "a mano" que la compra respete.
 - **Salidas creadas antes de la etapa 3:** no tienen personal ni la fila del equipo. Muestran `FALTA_RECURSO` o no se pueden confirmar, y CU-40 ya no asigna: hay que recrearlas (la demo se regenera).
+
+## 14. Diferencias de la etapa 4 del back (22/11): tarifa congelada y varios hoteles
+
+- **12.5 tarifa:** `definicionPaquete.tarifa` se guarda al crear la salida (la de la temporada de `fechaInicio`, la misma que muestran las opciones). La compra (`precioCongelado`, `temporadaAplicada`) y el catálogo (`precioPersona`, `moneda`, `temporadaNombre`) la leen de ahí; las salidas sin ella siguen con la del paquete vivo. Editar o borrar una tarifa del paquete solo cambia las salidas nuevas.
+- **5.1 opciones:** `alojamientos` lista también los `A_SOLICITUD`, con `capacidadDisponible: null` y `alcanza: true`.
+- **5.2 alta (B10):**
+  - `alojamientos` admite varios ids, en el orden en que se llenan. `idalojamiento` (un id) se sigue aceptando como `alojamientos: [id]`. Un id repetido es 400 `alojamientos tiene ids repetidos`.
+  - Cada hotel con bloqueo ocupa en las noches del paquete lo que tiene libre hasta completar `tamanoMaximo`, en ese orden. Si los anteriores ya cubren el máximo, el que sobra no se ocupa ni aparece en la salida. Uno a solicitud cubre lo que falte (decisión 10): queda en la salida con ocupación 0 y la compra lo usa último.
+  - Sin noches de hotel, `alojamientos` se ignora. Con noches y sin hoteles elegidos, solo se acepta si ningún hotel de las opciones (ni la suma de los de bloqueo, ni uno a solicitud) cubre el máximo (el FA3 de hoy); si no, 400 `Elegí al menos un hotel`.
+  - El corte sugerido pasa a 5 días si alguno de los elegidos es `A_SOLICITUD`, o si el paquete tiene noches y la salida queda sin hotel.
+  - `stockLocalAlojamiento` del listado es la suma de lo que bloquearon los hoteles y baja con cada compra que va a uno de ellos.
+- **5.3:** el texto del hotel fuera de la garantía lleva el id, no el nombre: `El hotel con ID 7 no cumple la garantía del paquete`. Los demás quedan como están (`Los hoteles elegidos cubren 10 de 16 plazas en esas noches`, `Elegí al menos un hotel`, y el 409 por hotel `El hotel Tierra Viva ya no tiene plazas suficientes en esas noches. Volvé a cargar las opciones`).
+- **8 compra (12.2):**
+  - El grupo va entero al primer hotel con bloqueo donde entra (en el orden del alta) y, si ninguno, al a solicitud. La reserva lo guarda en `idalojamiento` y la respuesta lo devuelve en `hotel`.
+  - Con un hotel a solicitud, `estadoAlojamiento` es `PENDIENTE` y la solicitud lleva `Hotel: <nombre> | ` al principio de `criterios`. En CU-34 la única opción de contacto es ese hotel, mientras no la haya rechazado.
+  - Sin hotel: si el paquete no tiene noches, `estadoAlojamiento` es `CONFIRMADO`, sin solicitud y con `hotel: null`. Con noches (FA3), `PENDIENTE` con la solicitud por la garantía, como hoy.
+  - Si hay lugar en la salida pero ningún hotel tiene lugar para todo el grupo: 400 `Quedan 4 lugares, pero no en un mismo hotel.`, antes de cobrar.
+- **CU-32 cancelar:** las plazas vuelven al hotel de la reserva: a sus plazas libres mientras se vende, o a la ocupación del hotel si la salida ya está CERRADA. Las reservas sin hotel no devuelven plazas.
+- **9 CU-40:** `hoteles[].pasajeros` suma las reservas que la compra mandó a cada hotel. Al confirmar, cada hotel con bloqueo devuelve lo que le quedó libre.
+- **Base:** la migración `plazas_por_hotel` suma `Ocupacion.plazasLibres` (el contador de cada hotel con bloqueo), lo carga desde `stockLocalAlojamiento` en las salidas existentes, y completa `Reserva.idalojamiento` en las reservas que salieron de ese bloqueo.

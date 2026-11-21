@@ -51,7 +51,10 @@ export async function disponible(tx: Cliente, idservicio: number, rangos: Rango[
 
 export function ocupar(
   tx: Cliente,
-  o: { idservicio: number; idsalida: number; tipo: string; rangos: Rango[]; cantidad: number; comprobante?: string | undefined }
+  o: {
+    idservicio: number; idsalida: number; tipo: string; rangos: Rango[]; cantidad: number; comprobante?: string | undefined;
+    plazasLibres?: number | null; // B10: solo el hotel con bloqueo
+  }
 ) {
   return tx.ocupacion.createMany({
     data: o.rangos.map((r) => ({
@@ -62,7 +65,16 @@ export function ocupar(
       hasta: r.hasta,
       cantidad: o.cantidad,
       comprobanteReserva: o.comprobante ?? null,
+      plazasLibres: o.plazasLibres ?? null,
     })),
+  });
+}
+
+/** B10 y 12.2: las plazas de una reserva vuelven a su hotel en la salida (solo los de bloqueo llevan plazasLibres). */
+export function devolverPlazas(tx: Cliente, idsalida: number, idservicio: number, cantidad: number) {
+  return tx.ocupacion.updateMany({
+    where: { idsalida, idservicio, tipo: TIPO_SERVICIO.ALOJAMIENTO, plazasLibres: { not: null } },
+    data: { plazasLibres: { increment: cantidad } },
   });
 }
 

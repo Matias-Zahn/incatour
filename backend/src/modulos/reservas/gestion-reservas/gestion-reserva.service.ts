@@ -155,6 +155,7 @@ export class GestionReservaService {
       cantidadPasajeros: ev.reserva.cantidadPasajeros,
       permisosEmitidos: ev.permisosEmitidos,
       alojamientoPorStock: ev.alojamientoPorStock,
+      idalojamiento: ev.reserva.idalojamiento,
       salidaEnVenta: ev.salidaEnVenta,
     });
   }
@@ -190,8 +191,9 @@ export class GestionReservaService {
       ahora: new Date(),
     });
 
-    // El alojamiento salió del stock bloqueado de la salida solo si está Confirmado SIN solicitud confirmada
+    // El alojamiento salió de las plazas bloqueadas de su hotel (12.2) solo si está Confirmado SIN solicitud confirmada
     const alojamientoPorStock =
+      reserva.idalojamiento != null &&
       reserva.estadoAlojamiento === ESTADO_ALOJAMIENTO.CONFIRMADO &&
       !reserva.solicitudes.some((s) => s.estado === ESTADO_SOLICITUD.CONFIRMADA);
 

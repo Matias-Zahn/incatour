@@ -35,7 +35,7 @@ const cliente = { idusuario: 5, email: "a@b.com", rol: "CLIENTE" };
 const admin = { idusuario: 1, email: "x@y.com", rol: "ADMIN" };
 
 const reserva = (over: Record<string, unknown> = {}) => ({
-  idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: "CONFIRMADO", cantidadPasajeros: 2, diasMinimosReintegro: 15,
+  idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: "CONFIRMADO", idalojamiento: 4, cantidadPasajeros: 2, diasMinimosReintegro: 15,
   cliente: { idusuario: 5, usuario: { email: "a@b.com" } },
   salida: { idsalida: 7, estado: "PUBLICADA", fechaInicio: dias(30) },
   pagos: [{ monto: 1000 }], permisos: [], solicitudes: [],
@@ -155,6 +155,12 @@ describe("confirmarCancelacion: V(G) = 4", () => {
     await new GestionReservaService().confirmarCancelacion(1, { motivo: "Viaje" }, cliente);
     expect(espia).toHaveBeenCalledWith(expect.objectContaining({ alojamientoPorStock: false }));
   });
+  it("C8 sin hotel asignado (paquete sin noches) no hay plazas que devolver", async () => {
+    const espia = preparar({ idreembolso: 1, montoReembolsado: 1000 });
+    vi.mocked(GestionReservaRepository.prototype.findParaCancelacion).mockResolvedValue(reserva({ idalojamiento: null }) as never);
+    await new GestionReservaService().confirmarCancelacion(1, { motivo: "Viaje" }, cliente);
+    expect(espia).toHaveBeenCalledWith(expect.objectContaining({ alojamientoPorStock: false, idalojamiento: null }));
+  });
   it("C6 el administrador reintegra el 100% de una reserva ajena", async () => {
     const espia = preparar({ idreembolso: 1, montoReembolsado: 1000 });
     await new GestionReservaService().confirmarCancelacion(1, { motivo: "Viaje" }, admin);
@@ -165,7 +171,7 @@ describe("confirmarCancelacion: V(G) = 4", () => {
 describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solicitudes", () => {
   const datos = (over: Record<string, unknown> = {}) => ({
     idreserva: 1, idsalida: 7, idusuario: 5, motivo: "Viaje", montoReembolsado: 1000, condicionAplicada: "x", cantidadPasajeros: 2,
-    permisosEmitidos: false, alojamientoPorStock: false, salidaEnVenta: true, ...over,
+    permisosEmitidos: false, alojamientoPorStock: false, idalojamiento: 4 as number | null, salidaEnVenta: true, ...over,
   });
   const repository = new GestionReservaRepository();
 
@@ -201,6 +207,7 @@ describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solici
   it("P5 a la venta, alojamiento por stock: repone lugares y plazas de la salida", async () => {
     await repository.cancelarReserva(datos({ alojamientoPorStock: true }));
     expect(tx.salida.update).toHaveBeenCalledWith({ where: { idsalida: 7 }, data: { stockLocal: { increment: 2 }, stockLocalAlojamiento: { increment: 2 } } });
+    expect(tx.ocupacion.updateMany).toHaveBeenCalledWith({ where: { idsalida: 7, idservicio: 4, tipo: "ALOJAMIENTO", plazasLibres: { not: null } }, data: { plazasLibres: { increment: 2 } } });
   });
   it("P6 permisos emitidos a la venta: los pierde y solo repone plazas", async () => {
     tx.permisoPasajero.count.mockResolvedValue(2);
@@ -217,7 +224,7 @@ describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solici
     tx.$queryRaw.mockResolvedValue([{ estado: "CERRADA" }]);
     await repository.cancelarReserva(datos({ salidaEnVenta: false, alojamientoPorStock: true }));
     expect(tx.salida.update).not.toHaveBeenCalled();
-    expect(tx.ocupacion.updateMany).toHaveBeenCalledWith({ where: { idsalida: 7, tipo: "ALOJAMIENTO" }, data: { cantidad: { decrement: 2 } } });
+    expect(tx.ocupacion.updateMany).toHaveBeenCalledWith({ where: { idsalida: 7, tipo: "ALOJAMIENTO", idservicio: 4 }, data: { cantidad: { decrement: 2 } } });
   });
   it("P9 salida cerrada con alojamiento por solicitud: no toca la ocupación del hotel", async () => {
     tx.$queryRaw.mockResolvedValue([{ estado: "CERRADA" }]);

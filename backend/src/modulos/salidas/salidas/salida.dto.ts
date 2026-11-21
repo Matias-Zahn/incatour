@@ -60,7 +60,7 @@ export class CrearSalidaDto {
     public idpaquete: number,
     public fechaInicio: Date,
     public tamanoMaximo: number,
-    public idalojamiento: number | undefined,
+    public alojamientos: number[],
     public diasCierreVenta: number | undefined,
     public idtransporte: number = 0, // solo en el alta
     public personalIds: number[] = [],
@@ -82,20 +82,18 @@ export class CrearSalidaDto {
       return ["fechaInicio es requerida y debe ser una fecha válida (AAAA-MM-DD)"];
     }
 
-    // B10: el contrato manda alojamientos (lista). ponytail: un solo hotel por salida hasta el bloque 10; idalojamiento sigue valiendo
-    if (obj.alojamientos != null && (!Array.isArray(obj.alojamientos) || !obj.alojamientos.every((a: unknown) => entero(a)))) {
-      return ["alojamientos debe ser una lista de ids de servicio"];
-    }
-    if (obj.alojamientos?.length > 1) return ["Por ahora la salida lleva un solo hotel: elegí uno"];
-    const idalojamiento = (obj.alojamientos?.[0] ?? obj.idalojamiento) == null ? undefined : entero(obj.alojamientos?.[0] ?? obj.idalojamiento);
-    if (idalojamiento === null) return ["idalojamiento debe ser un entero positivo"];
+    // B10: uno o más hoteles, en el orden en que se llenan. idalojamiento (un id) sigue valiendo, por los clientes viejos
+    const lista = obj.alojamientos ?? (obj.idalojamiento == null ? [] : [obj.idalojamiento]);
+    if (!Array.isArray(lista) || !lista.every((a: unknown) => entero(a))) return ["alojamientos debe ser una lista de ids de servicio"];
+    const alojamientos = lista.map((a) => entero(a)!);
+    if (new Set(alojamientos).size !== alojamientos.length) return ["alojamientos tiene ids repetidos"];
 
     // B4: sin él, rige el corte sugerido (el del paquete, o 5 días con un hotel a solicitud)
     const diasCierreVenta = obj.diasCierreVenta == null ? undefined : entero(obj.diasCierreVenta, 0);
     if (diasCierreVenta === null || (diasCierreVenta ?? 0) > TOPES.diasCierreVenta) {
       return [`diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}`];
     }
-    if (!alta) return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta)];
+    if (!alta) return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta)];
 
     const idtransporte = entero(obj.idtransporte);
     if (!idtransporte) return ["idtransporte es requerido y debe ser un entero positivo"];
@@ -105,7 +103,7 @@ export class CrearSalidaDto {
     }
     if (new Set(personalIds).size !== personalIds.length) return ["personalIds tiene ids repetidos"];
 
-    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta, idtransporte, personalIds)];
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta, idtransporte, personalIds)];
   }
 }
 

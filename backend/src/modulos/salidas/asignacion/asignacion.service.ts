@@ -35,12 +35,12 @@ export class AsignacionService {
       dotacionRequerida: dotacion,
       personal: recursos.personal.map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol, apto: !p.motivo, motivo: p.motivo })),
       porteadoresSobrantes: Math.max(0, recursos.personal.filter((p) => p.rol === ROL_PORTEADOR).length - dotacion.porteadores), // decisión 5: solo avisa
-      // ponytail: un hotel por salida hasta el bloque 10; los pasajeros con el alojamiento confirmado son de ese hotel
+      // 12.2: los pasajeros que la compra mandó a cada hotel
       hoteles: ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
         idservicio: o.idservicio,
         nombreServicio: o.servicio.nombreServicio,
         modalidadConfirmacion: o.servicio.alojamiento?.modalidadConfirmacion ?? null,
-        pasajeros: salida.reservas.filter((r) => r.estadoAlojamiento === ESTADO_ALOJAMIENTO.CONFIRMADO).reduce((t, r) => t + r.pasajeros.length, 0),
+        pasajeros: salida.reservas.filter((r) => r.idalojamiento === o.idservicio).reduce((t, r) => t + r.pasajeros.length, 0),
       })),
       transporte: recursos.transporte,
       equipo: recursos.equipos.map((e) => ({

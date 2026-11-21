@@ -114,8 +114,8 @@ export class SalidaRoutes {
      *       transporte (que tiene que llevar a pasajeros y personal) y publica la salida. El equipo del paquete se controla
      *       contra el stock proyectado: bajo el 50 % responde 409 con `detalle`, entre el 50 y el 100 % crea con `advertencias`;
      *       no se ocupa hasta la primera compra. Si la base falla después del bloqueo, el cupo se libera.
-     *       idalojamiento (o alojamientos con un id) es obligatorio si algún alojamiento confirma por bloqueo y alcanza;
-     *       si ninguno, la salida se crea sin alojamiento (FA3) y cada reserva generará su solicitud.
+     *       alojamientos (B10): uno o más hoteles de las opciones que entre todos cubran el máximo (uno a solicitud cubre lo
+     *       que falte); vacío solo si ninguno cubre (FA3), y entonces cada reserva generará su solicitud.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -130,8 +130,7 @@ export class SalidaRoutes {
      *               idpaquete: { type: integer, example: 1 }
      *               fechaInicio: { type: string, format: date, example: "2026-11-20" }
      *               tamanoMaximo: { type: integer, example: 8 }
-     *               idalojamiento: { type: integer, example: 1, description: Uno de los alojamientos de /api/salidas/opciones. }
-     *               alojamientos: { type: array, items: { type: integer }, example: [1], description: "Forma del contrato (B10). Por ahora, un solo hotel." }
+     *               alojamientos: { type: array, items: { type: integer }, example: [1, 2], description: "Hoteles de /api/salidas/opciones, en el orden en que se llenan. idalojamiento (un id) se acepta igual." }
      *               idtransporte: { type: integer, example: 3 }
      *               personalIds: { type: array, items: { type: integer }, example: [1, 4, 5, 6, 7] }
      *               diasCierreVenta: { type: integer, example: 2 }

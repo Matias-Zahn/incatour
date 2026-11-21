@@ -8,7 +8,7 @@ import { INotificador } from "../../../integraciones/notificador/notificador.int
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { DefinicionPaquete, definicionEfectiva, tarifaDeSalida } from "../../../shared/definicionPaquete";
 import { CrearReservaDto } from "./reserva.dto";
-import { ReservaRepository } from "./reserva.repository";
+import { HotelReserva, ReservaRepository } from "./reserva.repository";
 
 // Tipo derivado del repositorio: el servicio no importa Prisma
 type SalidaCompra = NonNullable<Awaited<ReturnType<ReservaRepository["obtenerSalidaParaCompra"]>>>;
@@ -117,12 +117,15 @@ export class ReservaService {
     const precio = this.calcularPrecio(salida, definicion, dto);
     const nroReserva = `RES-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
-    // 5. Reservar cupos (atómico). Si no alcanzan, se corta sin cobrar.
+    // 5. Reservar cupos y el hotel del grupo (atómico, 12.2). Si no alcanzan, se corta sin cobrar.
     const cupos = await this.repository.reservarCupos(dto.idsalida, cantidad);
     if (!cupos) {
       throw CustomError.badRequest("No hay lugares suficientes en la salida.");
     }
-    const { alojamientoReservado } = cupos;
+    const { hotel } = cupos;
+    // Sin hotel: si el paquete no tiene noches no hay nada que gestionar; si las tiene (FA3), va a solicitud
+    const sinNoches = definicion.nochesPrevias + definicion.nochesPosteriores === 0;
+    const alojamientoReservado = hotel ? hotel.porStock : sinNoches;
 
     // 6. Cobrar. La pasarela se llama FUERA de la transacción de base de datos.
     let pago;
@@ -134,12 +137,12 @@ export class ReservaService {
         referenciaReserva: nroReserva,
       });
     } catch (error) {
-      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      await this.liberarSinFallar(dto.idsalida, cantidad, hotel);
       throw CustomError.serviceUnavailable("No se pudo contactar a la pasarela de pagos. Reintentá más tarde.");
     }
 
     if (!pago.aprobado) {
-      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      await this.liberarSinFallar(dto.idsalida, cantidad, hotel);
       this.notificador
         .enviarEmailRechazo(cliente.usuario.email, pago.mensaje)
         .catch((e) => console.error("Fallo al notificar el rechazo:", e));
@@ -163,11 +166,14 @@ export class ReservaService {
         medioPago: dto.medioPago,
         pasajeros: dto.pasajeros,
         estadoAlojamiento: alojamientoReservado ? "CONFIRMADO" : "PENDIENTE",
+        idalojamiento: hotel?.idservicio ?? null,
+        // 12.2: con un hotel a solicitud, la solicitud va a ese hotel
         solicitud: alojamientoReservado
           ? undefined
           : {
               nroSolicitud: `SOL-${nroReserva}`,
               criterios:
+                (hotel ? `Hotel: ${hotel.nombreServicio} | ` : "") +
                 `Localidad: ${definicion.localidadGarantizada ?? "-"} | ` +
                 `Categoría: ${definicion.categoriaGarantizada ?? "-"} | ` +
                 `Habitación: ${definicion.tipoHabitacionGarantizada ?? "-"}`,
@@ -175,7 +181,7 @@ export class ReservaService {
       });
     } catch (error) {
       // Cobramos pero no pudimos registrar: se devuelven los cupos y se anula el cobro
-      await this.liberarSinFallar(dto.idsalida, cantidad, alojamientoReservado);
+      await this.liberarSinFallar(dto.idsalida, cantidad, hotel);
       console.error(
         `[CU-30] Pago aprobado (${pago.transaccionId}) sin reserva registrada para ${nroReserva}:`,
         error
@@ -200,6 +206,7 @@ export class ReservaService {
       nroReserva: reserva.nroReserva,
       estado: reserva.estado,
       estadoAlojamiento: reserva.estadoAlojamiento,
+      hotel: hotel && { idservicio: hotel.idservicio, nombreServicio: hotel.nombreServicio }, // 12.2
       cantidadPasajeros: reserva.cantidadPasajeros,
       precioCongelado: reserva.precioCongelado,
       moneda: precio.moneda,
@@ -236,9 +243,9 @@ export class ReservaService {
   }
 
   // La compensación nunca debe tapar el error original
-  private async liberarSinFallar(idsalida: number, cantidad: number, alojamientoReservado: boolean) {
+  private async liberarSinFallar(idsalida: number, cantidad: number, hotel: HotelReserva | null) {
     try {
-      await this.repository.liberarCupos(idsalida, cantidad, alojamientoReservado);
+      await this.repository.liberarCupos(idsalida, cantidad, hotel);
     } catch (e) {
       console.error(`[CU-30] No se pudieron liberar los cupos de la salida ${idsalida}:`, e);
     }

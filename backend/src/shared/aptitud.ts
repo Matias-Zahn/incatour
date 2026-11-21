@@ -30,3 +30,12 @@ export function motivoNoApto(p: PersonalAptitud, fechaFin: Date): string | null 
   if (p.fechaVencimientoPasaporte <= fechaFin) return `el pasaporte vence el ${fechaCorta(p.fechaVencimientoPasaporte)}`;
   return null;
 }
+
+/** Los ids elegidos que no existen o no son aptos, como "Juan Pérez: motivo" (alta de la salida y CU-40). */
+export const noAptos = (ids: number[], encontrados: (PersonalAptitud & { idpersonal: number; nombreCompleto: string })[], fechaFin: Date) =>
+  ids.flatMap((id) => {
+    const persona = encontrados.find((e) => e.idpersonal === id);
+    if (!persona) return [`El personal ${id} no existe`];
+    const motivo = motivoNoApto(persona, fechaFin);
+    return motivo ? [`${persona.nombreCompleto}: ${motivo}`] : [];
+  });

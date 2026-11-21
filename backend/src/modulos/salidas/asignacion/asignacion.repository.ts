@@ -90,8 +90,8 @@ export class AsignacionRepository {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
       // Lock de la salida (mismo orden que la compra, CU-32 y CU-39): una compra o un reemplazo en paralelo se detecta acá
-      const [fila] = await tx.$queryRaw<{ estado: string; stockLocalAlojamiento: number | null }[]>`
-        SELECT estado, "stockLocalAlojamiento" FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
+      const [fila] = await tx.$queryRaw<{ estado: string }[]>`
+        SELECT estado FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
       const vendidos = p.salida.reservas.reduce((t, r) => t + r.pasajeros.length, 0);
       const confirmados = await tx.reservaPasajero.count({ where: { reserva: { idsalida, estado: ESTADO_RESERVA.CONFIRMADA } } });
       const personal = await tx.asignacionPersonal.findMany({ where: { idsalida }, select: { idpersonal: true } });
@@ -126,13 +126,10 @@ export class AsignacionRepository {
       }
 
       // Las plazas de hotel bloqueadas que no se vendieron vuelven al proveedor (regla 7 del CU-36): baja la ocupación
-      const plazasSobrantes = fila.stockLocalAlojamiento ?? 0;
-      if (plazasSobrantes > 0) {
-        await tx.ocupacion.updateMany({
-          where: { idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
-          data: { cantidad: { decrement: plazasSobrantes } },
-        });
-      }
+      // de cada hotel lo que le quedó libre (B10)
+      await tx.$executeRaw`
+        UPDATE public."Ocupacion" SET cantidad = cantidad - "plazasLibres", "plazasLibres" = 0
+        WHERE idsalida = ${idsalida} AND tipo = ${TIPO_SERVICIO.ALOJAMIENTO} AND "plazasLibres" > 0`;
 
       // Confirmada (decisión 1): ya no se vende
       return tx.salida.update({

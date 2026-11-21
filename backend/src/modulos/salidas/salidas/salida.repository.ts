@@ -15,14 +15,16 @@ import { ConsultarSalidasDto } from "./salida.dto";
 export type SalidaListada = Awaited<ReturnType<SalidaRepository["buscar"]>>[number];
 export type PaqueteParaSalida = NonNullable<Awaited<ReturnType<SalidaRepository["buscarPaquete"]>>>;
 
+/** B10: lo que la salida le bloquea a cada hotel; plazas null = a solicitud (cubre lo que falte, sin bloquear). */
+export type HotelSalida = { idservicio: number; nombreServicio: string; plazas: number | null };
+
 export interface DatosNuevaSalida {
   idpaquete: number;
   fechaInicio: Date;
   fechaFin: Date;
   tamanoMaximo: number;
   idbloqueo: string;
-  idalojamiento: number | undefined;
-  nombreHotel: string | undefined;
+  hoteles: HotelSalida[]; // B10: en el orden en que la compra los llena; los a solicitud, al final
   idtransporte: number; // B3
   personalIds: number[]; // B3: guías y porteadores
   equipos: number[]; // B3: los equipos con regla, que quedan en 0 hasta la primera compra
@@ -112,14 +114,13 @@ export class SalidaRepository {
     });
   }
 
-  // CU-36 paso 5: alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas,
-  // con lo que tienen disponible en las noches de la salida (A1)
-  async buscarAlojamientosConBloqueo(paquete: PaqueteParaSalida, rangos: Rango[]) {
+  // CU-36 paso 5: alojamientos que cumplen la garantía del paquete, con lo que tienen disponible en las noches de la
+  // salida (A1). B10: también los a solicitud, con disponible null
+  async buscarAlojamientos(paquete: PaqueteParaSalida, rangos: Rango[]) {
     const porEstablecimiento = paquete.garantiasEstablecimiento.length > 0;
     const where: Prisma.ServicioBaseWhereInput = {
       estado: ESTADO.ACTIVO,
       alojamiento: {
-        modalidadConfirmacion: MODALIDAD_BLOQUEO_PLAZAS,
         ...(!porEstablecimiento && paquete.categoriaGarantizada && { categoria: paquete.categoriaGarantizada }),
         ...(!porEstablecimiento && paquete.tipoHabitacionGarantizada && { tipoHabitacion: paquete.tipoHabitacionGarantizada }),
       },
@@ -132,7 +133,10 @@ export class SalidaRepository {
       orderBy: { nombreServicio: "asc" },
     });
     const libres = await disponibles(db, hoteles, rangos);
-    return hoteles.map((h) => ({ ...h, disponible: libres.get(h.idservicio)! }));
+    return hoteles.map((h) => ({
+      ...h,
+      disponible: h.alojamiento?.modalidadConfirmacion === MODALIDAD_BLOQUEO_PLAZAS ? libres.get(h.idservicio)! : null,
+    }));
   }
 
   /** A2b: el equipo de las salidas que todavía no empezaron, en una sola consulta (listado y alta). */
@@ -188,9 +192,11 @@ export class SalidaRepository {
       if ((await new AsignacionRepository().personalOcupado(tx, fechas, d.personalIds)).length) {
         throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar las opciones");
       }
-      // A1: con el hotel bloqueado se vuelve a mirar lo disponible en esas noches: otra salida pudo llevárselo en el medio
-      if (d.idalojamiento && (await disponible(tx, d.idalojamiento, d.rangosAlojamiento)) < d.tamanoMaximo) {
-        throw CustomError.conflict(`El hotel ${d.nombreHotel} ya no tiene plazas suficientes en esas noches. Volvé a cargar las opciones`);
+      // A1: con cada hotel bloqueado (en orden de id) se vuelve a mirar lo disponible en esas noches: otra salida pudo llevárselo
+      for (const h of d.hoteles.filter((h) => h.plazas !== null).sort((a, b) => a.idservicio - b.idservicio)) {
+        if ((await disponible(tx, h.idservicio, d.rangosAlojamiento)) < h.plazas!) {
+          throw CustomError.conflict(`El hotel ${h.nombreServicio} ya no tiene plazas suficientes en esas noches. Volvé a cargar las opciones`);
+        }
       }
       const rangosTransporte = rangosDe(TIPO_SERVICIO.TRANSPORTE, d);
       if ((await disponible(tx, d.idtransporte, rangosTransporte)) < 1) {
@@ -208,7 +214,7 @@ export class SalidaRepository {
           nroSalida,
           idbloqueo: d.idbloqueo,
           stockLocal: d.tamanoMaximo,
-          stockLocalAlojamiento: d.idalojamiento ? d.tamanoMaximo : 0,
+          stockLocalAlojamiento: d.hoteles.reduce((t, h) => t + (h.plazas ?? 0), 0), // la suma de las plazasLibres
           diasCierreVenta: d.diasCierreVenta,
           tamanoMaximo: d.tamanoMaximo,
           fechaInicio: d.fechaInicio,
@@ -219,8 +225,10 @@ export class SalidaRepository {
         },
       });
       const base = { idsalida: salida.idsalida };
-      if (d.idalojamiento) {
-        await ocupar(tx, { ...base, idservicio: d.idalojamiento, tipo: TIPO_SERVICIO.ALOJAMIENTO, rangos: d.rangosAlojamiento, cantidad: d.tamanoMaximo });
+      // B10: cada hotel con bloqueo ocupa sus plazas; el a solicitud queda en 0, para que la compra lo encuentre
+      for (const h of d.hoteles) {
+        const aloj = { ...base, idservicio: h.idservicio, tipo: TIPO_SERVICIO.ALOJAMIENTO, rangos: d.rangosAlojamiento };
+        await ocupar(tx, { ...aloj, cantidad: h.plazas ?? 0, plazasLibres: h.plazas });
       }
       await ocupar(tx, { ...base, idservicio: d.idtransporte, tipo: TIPO_SERVICIO.TRANSPORTE, rangos: rangosTransporte, cantidad: 1 });
       for (const idservicio of d.equipos) {

@@ -1,7 +1,12 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_SALIDA } from "../../../shared/constantes";
-import { recalcularEquipo } from "../../../shared/ocupacion.repository";
+import { CustomError } from "../../../error/CustomError";
+import { ESTADO_SALIDA, TIPO_SERVICIO } from "../../../shared/constantes";
+import { unaPorServicio } from "../../../shared/ocupacion";
+import { devolverPlazas, recalcularEquipo } from "../../../shared/ocupacion.repository";
 import { PasajeroInput } from "./reserva.dto";
+
+/** 12.2: el hotel al que la compra mandó al grupo; porStock = salió de las plazas bloqueadas (si no, a solicitud). */
+export type HotelReserva = { idservicio: number; nombreServicio: string; porStock: boolean };
 
 export interface DatosConfirmacionReserva {
   idcliente: number;
@@ -18,6 +23,7 @@ export interface DatosConfirmacionReserva {
   medioPago: string;
   pasajeros: PasajeroInput[];
   estadoAlojamiento: string;
+  idalojamiento: number | null; // 12.2
   // Solo si el alojamiento quedó pendiente (no había plazas bloqueadas)
   solicitud?:
     | {
@@ -72,29 +78,48 @@ export class ReservaRepository {
    */
   async reservarCupos(idsalida: number, cantidad: number) {
     return db.$transaction(async (tx) => {
+      // Este UPDATE deja bloqueada la fila de la salida hasta el commit: la elección del hotel queda serializada
       const cupos = await tx.salida.updateMany({
         where: { idsalida, estado: "PUBLICADA", stockLocal: { gte: cantidad } },
         data: { stockLocal: { decrement: cantidad } },
       });
       if (cupos.count === 0) return null;
 
-      // Plazas de alojamiento bloqueadas: si alcanzan se descuentan; si no, quedará solicitud
-      const aloj = await tx.salida.updateMany({
-        where: { idsalida, stockLocalAlojamiento: { gte: cantidad } },
-        data: { stockLocalAlojamiento: { decrement: cantidad } },
+      // 12.2: el grupo va entero al primer hotel con lugar, primero los de bloqueo (en el orden del alta) y después
+      // el a solicitud, que no tiene tope. Sin hoteles (sin noches, o FA3), hotel null
+      const ocupaciones = await tx.ocupacion.findMany({
+        where: { idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+        select: { idservicio: true, plazasLibres: true, servicio: { select: { nombreServicio: true } } },
+        orderBy: { idocupacion: "asc" },
       });
-      return { alojamientoReservado: aloj.count === 1 };
+      const hoteles = unaPorServicio(ocupaciones).map((o) => ({ idservicio: o.idservicio, nombreServicio: o.servicio.nombreServicio, porStock: o.plazasLibres !== null }));
+      if (!hoteles.length) return { hotel: null };
+      for (const h of hoteles.filter((h) => h.porStock)) {
+        const aloj = await tx.ocupacion.updateMany({
+          where: { idsalida, idservicio: h.idservicio, tipo: TIPO_SERVICIO.ALOJAMIENTO, plazasLibres: { gte: cantidad } },
+          data: { plazasLibres: { decrement: cantidad } },
+        });
+        if (aloj.count > 0) {
+          await tx.salida.update({ where: { idsalida }, data: { stockLocalAlojamiento: { decrement: cantidad } } });
+          return { hotel: h };
+        }
+      }
+      const aSolicitud = hoteles.find((h) => !h.porStock);
+      if (aSolicitud) return { hotel: aSolicitud };
+      // ponytail: un grupo no se parte entre hoteles; se parte si pasa seguido (bloque 12.2)
+      const { stockLocal } = (await tx.salida.findUnique({ where: { idsalida }, select: { stockLocal: true } }))!;
+      throw CustomError.badRequest(`Quedan ${stockLocal + cantidad} lugares, pero no en un mismo hotel.`);
     });
   }
 
-  // Compensación: si el pago falla o no se puede confirmar, los cupos vuelven a la venta
-  async liberarCupos(idsalida: number, cantidad: number, alojamientoReservado: boolean) {
-    await db.salida.update({
-      where: { idsalida },
-      data: {
-        stockLocal: { increment: cantidad },
-        ...(alojamientoReservado && { stockLocalAlojamiento: { increment: cantidad } }),
-      },
+  // Compensación: si el pago falla o no se puede confirmar, los cupos y las plazas del hotel vuelven a la venta
+  async liberarCupos(idsalida: number, cantidad: number, hotel: HotelReserva | null) {
+    await db.$transaction(async (tx) => {
+      await tx.salida.update({
+        where: { idsalida },
+        data: { stockLocal: { increment: cantidad }, ...(hotel?.porStock && { stockLocalAlojamiento: { increment: cantidad } }) },
+      });
+      if (hotel?.porStock) await devolverPlazas(tx, idsalida, hotel.idservicio, cantidad);
     });
   }
 
@@ -159,6 +184,7 @@ export class ReservaRepository {
           condicionesComerciales: d.condicionesComerciales,
           estado: "CONFIRMADA",
           estadoAlojamiento: d.estadoAlojamiento,
+          idalojamiento: d.idalojamiento,
           // Pasamos el array de IDs directamente a la tabla intermedia
           pasajeros: { 
             create: idsPasajeros.map(idpasajero => ({ idpasajero })) 

@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
-import { recalcularEquipo } from "../../../shared/ocupacion.repository";
+import { devolverPlazas, recalcularEquipo } from "../../../shared/ocupacion.repository";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 
 const INCLUDE_RESUMEN = {
@@ -154,6 +154,7 @@ export class GestionReservaRepository {
     cantidadPasajeros: number;
     permisosEmitidos: boolean;
     alojamientoPorStock: boolean;
+    idalojamiento: number | null; // 12.2: el hotel de la reserva, que recupera las plazas
     salidaEnVenta: boolean;
   }) {
     return db.$transaction(async (tx) => {
@@ -207,10 +208,12 @@ export class GestionReservaRepository {
           },
         });
       }
+      // B10: mientras se vende, las plazas vuelven a las libres del hotel de la reserva
+      if (reponerPlazas && p.idalojamiento) await devolverPlazas(tx, p.idsalida, p.idalojamiento, p.cantidadPasajeros);
       // A1: con la venta cerrada las plazas vuelven al hotel: baja la ocupación de la salida (si no tiene hotel, no hay filas)
       if (p.alojamientoPorStock && !p.salidaEnVenta) {
         await tx.ocupacion.updateMany({
-          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO, ...(p.idalojamiento && { idservicio: p.idalojamiento }) },
           data: { cantidad: { decrement: p.cantidadPasajeros } },
         });
       }

@@ -4,13 +4,13 @@ import { codigoDia, diasDe, fechaCorta, hoyUTC } from "../../../shared/fechas";
 import { claveDia, rangosDe, unaPorServicio } from "../../../shared/ocupacion";
 import { armarDefinicionPaquete, DefinicionPaquete, tarifaVigente } from "../../../shared/definicionPaquete";
 import { controlEquipo, FilaEquipo, reglasEquipo, tamanoQueAlcanza } from "../../../shared/equipo";
-import { motivoNoApto } from "../../../shared/aptitud";
+import { motivoNoApto, noAptos } from "../../../shared/aptitud";
 import { corteDeVenta, datosVenta, motivoFechaInvalida } from "../../../shared/ventaAbierta";
 import { ROL_GUIA, ROL_PORTEADOR } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
 import { ConsultarSalidasDto, CrearSalidaDto } from "./salida.dto";
-import { SalidaListada, SalidaRepository } from "./salida.repository";
+import { HotelSalida, SalidaListada, SalidaRepository } from "./salida.repository";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const fecha = (clave: string) => fechaCorta(new Date(clave));
@@ -65,9 +65,9 @@ export class SalidaService {
         nombreServicio: a.nombreServicio,
         localidad: a.localidad,
         categoria: a.alojamiento?.categoria,
-        modalidadConfirmacion: a.alojamiento?.modalidadConfirmacion, // ponytail: solo los de bloqueo hasta el bloque 10
-        capacidadDisponible: a.disponible, // A1: lo disponible en las noches de la salida
-        alcanza: a.disponible >= dto.tamanoMaximo,
+        modalidadConfirmacion: a.alojamiento?.modalidadConfirmacion,
+        capacidadDisponible: a.disponible, // A1: lo disponible en las noches de la salida; null a solicitud
+        alcanza: a.disponible === null || a.disponible >= dto.tamanoMaximo, // decisión 10: el a solicitud cubre lo que falte
       })),
       transportes: p.transportes.map((t) => ({
         idservicio: t.idservicio,
@@ -97,27 +97,12 @@ export class SalidaService {
     const p = await this.prepararSalida(dto);
     const { paquete, dotacion, alojamientos, fechaFin, rangosAlojamiento } = p;
 
-    const conPlazas = alojamientos.filter((a) => a.disponible >= dto.tamanoMaximo);
-    const hotel = alojamientos.find((a) => a.idservicio === dto.idalojamiento);
-    if (dto.idalojamiento && !conPlazas.some((a) => a.idservicio === dto.idalojamiento)) {
-      throw CustomError.badRequest(
-        "El alojamiento elegido no cumple la garantía del paquete, no confirma por bloqueo de plazas o no tiene capacidad suficiente"
-      );
-    }
-    // FA3: solo se crea sin alojamiento cuando ninguno confirma por bloqueo
-    if (!dto.idalojamiento && conPlazas.length > 0) {
-      throw CustomError.badRequest("Hay alojamientos que confirman por bloqueo de plazas: elegí uno (idalojamiento)");
-    }
+    const hoteles = elegirHoteles(dto, alojamientos, rangosAlojamiento.length > 0);
 
     // B3 y 12.3: personal que existe, apto hasta el fin y que cubre la dotación por el máximo; se aceptan extras (decisión 5)
     const elegidos = await this.repository.buscarPersonal(dto.personalIds);
-    const noAptos = dto.personalIds.flatMap((id) => {
-      const persona = elegidos.find((e) => e.idpersonal === id);
-      if (!persona) return [`El personal ${id} no existe`];
-      const motivo = motivoNoApto(persona, fechaFin);
-      return motivo ? [`${persona.nombreCompleto}: ${motivo}`] : [];
-    });
-    if (noAptos.length) throw CustomError.badRequest(noAptos.join(". "));
+    const rechazados = noAptos(dto.personalIds, elegidos, fechaFin);
+    if (rechazados.length) throw CustomError.badRequest(rechazados.join(". "));
     const guias = elegidos.filter((e) => e.rol === ROL_GUIA).length;
     const porteadores = elegidos.filter((e) => e.rol === ROL_PORTEADOR).length;
     if (guias < dotacion.guias || porteadores < dotacion.porteadores) {
@@ -164,9 +149,10 @@ export class SalidaService {
       .filter((e) => e.nivel === "RIESGO")
       .map((e) => `Si se vende completa faltarían hasta ${e.necesitaCompleta - e.libre} de ${e.nombreServicio} el ${fecha(e.fechaCritica)}`);
 
-    // B4: sin hotel con bloqueo, las compras van a solicitud y el corte es más largo. 12.6: con el corte final,
-    // la salida no puede nacer con la venta cerrada
-    const diasCierreVenta = dto.diasCierreVenta ?? corteDeVenta(paquete.diasCierreVenta, rangosAlojamiento.length > 0 && !dto.idalojamiento);
+    // B4 y B10: con algún hotel a solicitud (o ninguno, con noches) hay que gestionarlo con el hotel y el corte es más largo.
+    // 12.6: con el corte final, la salida no puede nacer con la venta cerrada
+    const aSolicitud = rangosAlojamiento.length > 0 && (!hoteles.length || hoteles.some((h) => h.plazas === null));
+    const diasCierreVenta = dto.diasCierreVenta ?? corteDeVenta(paquete.diasCierreVenta, aSolicitud);
     const motivo = motivoFechaInvalida(dto.fechaInicio, { diasDisponibles: null, diasCierreVenta });
     if (motivo) throw CustomError.badRequest(motivo);
 
@@ -196,8 +182,7 @@ export class SalidaService {
         fechaFin,
         tamanoMaximo: dto.tamanoMaximo,
         idbloqueo: bloqueo.idBloqueo,
-        idalojamiento: dto.idalojamiento,
-        nombreHotel: hotel?.nombreServicio,
+        hoteles,
         idtransporte: dto.idtransporte,
         personalIds: dto.personalIds,
         equipos: p.equipo.map((e) => e.idservicio),
@@ -257,7 +242,7 @@ export class SalidaService {
     const definicion = armarDefinicionPaquete(paquete, tarifa);
     const salidaNueva = { ...fechas, estado: ESTADO_SALIDA.PUBLICADA, tamanoMaximo: dto.tamanoMaximo, definicionPaquete: definicion };
     const [alojamientos, transportes, libres, datosEquipo] = await Promise.all([
-      this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento),
+      this.repository.buscarAlojamientos(paquete, rangosAlojamiento),
       this.repository.buscarTransportes(fechas),
       this.repository.buscarPersonalLibre(fechas),
       this.repository.cargarEquipoDe([salidaNueva]),
@@ -275,7 +260,42 @@ export class SalidaService {
   }
 }
 
-type SalidaRevisable = Pick<SalidaListada, "idsalida" | "estado" | "fechaInicio" | "fechaFin" | "tamanoMaximo" | "definicionPaquete"> & {
+/**
+ * B10: los hoteles elegidos, con lo que bloquea cada uno. Tienen que cumplir la garantía (estar en las opciones) y entre
+ * todos cubrir el máximo: cada uno con bloqueo pone lo libre hasta completar, en el orden elegido, y uno a solicitud
+ * cubre lo que falte (decisión 10). Sin noches de hotel no se ocupa ninguno. Sin hoteles solo si nada cubre (FA3).
+ */
+export function elegirHoteles(
+  dto: Pick<CrearSalidaDto, "alojamientos" | "tamanoMaximo">,
+  opciones: { idservicio: number; nombreServicio: string; disponible: number | null }[],
+  conNoches: boolean
+): HotelSalida[] {
+  if (!conNoches) return [];
+  const elegidos = dto.alojamientos.map((id) => {
+    const h = opciones.find((o) => o.idservicio === id);
+    if (!h) throw CustomError.badRequest(`El hotel con ID ${id} no cumple la garantía del paquete`);
+    return h;
+  });
+  const bloqueadas = (hs: typeof opciones) => hs.reduce((t, h) => t + (h.disponible ?? 0), 0);
+  const cubre = (hs: typeof opciones) => hs.some((h) => h.disponible === null) || bloqueadas(hs) >= dto.tamanoMaximo;
+  if (!elegidos.length) {
+    if (cubre(opciones)) throw CustomError.badRequest("Elegí al menos un hotel");
+    return [];
+  }
+  if (!cubre(elegidos)) {
+    throw CustomError.badRequest(`Los hoteles elegidos cubren ${bloqueadas(elegidos)} de ${dto.tamanoMaximo} plazas en esas noches`);
+  }
+  let faltan = dto.tamanoMaximo;
+  const conBloqueo = elegidos.filter((h) => h.disponible !== null).flatMap((h) => {
+    const plazas = Math.min(h.disponible!, faltan);
+    faltan -= plazas;
+    return plazas > 0 ? [{ idservicio: h.idservicio, nombreServicio: h.nombreServicio, plazas }] : []; // el que sobra no se ocupa
+  });
+  const aSolicitud = elegidos.filter((h) => h.disponible === null).map((h) => ({ idservicio: h.idservicio, nombreServicio: h.nombreServicio, plazas: null }));
+  return [...conBloqueo, ...aSolicitud];
+}
+
+type SalidaRevisable =Pick<SalidaListada, "idsalida" | "estado" | "fechaInicio" | "fechaFin" | "tamanoMaximo" | "definicionPaquete"> & {
   personalAsignado: { personal: Parameters<typeof motivoNoApto>[0] & { idpersonal: number; nombreCompleto: string } }[];
   ocupaciones: { tipo: string; idservicio: number; servicio: { nombreServicio: string; transporte?: { capacidadVehiculo: number } | null } }[];
 };
