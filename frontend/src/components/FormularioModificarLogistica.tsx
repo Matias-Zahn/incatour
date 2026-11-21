@@ -5,8 +5,8 @@ import DialogoConfirmacion from "./DialogoConfirmacion";
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
-    formatearFechaSalida,
 } from "../services/guiaService";
+import { formatearRangoFechasUtc } from "../services/formato";
 import {
     useRecursosDisponiblesLogistica,
     type PanelLogistica,
@@ -398,7 +398,7 @@ export function FormularioModificarLogistica({
                         Modificar Logística · Salida #{nroSalida}
                     </h2>
                     <p className="text-xs text-texto-suave mt-1">
-                        Fechas: {formatearFechaSalida(fechaInicio)} — {formatearFechaSalida(fechaFin)}
+                        Fechas: {formatearRangoFechasUtc(fechaInicio, fechaFin)}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">

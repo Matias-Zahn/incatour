@@ -19,6 +19,10 @@ import type {
     FiltrosProveedor,
     Proveedor,
 } from "../../services/proveedorService";
+import {
+    etiquetaEstadoRegistro,
+    etiquetaTipoServicio,
+} from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -228,7 +232,7 @@ function ProveedoresPage() {
                         <option value="">Todos los rubros</option>
                         {tiposProveedor.map((tipo) => (
                             <option key={tipo} value={tipo}>
-                                {tipo}
+                                {etiquetaTipoServicio(tipo)}
                             </option>
                         ))}
                     </select>
@@ -299,6 +303,8 @@ function ProveedoresPage() {
                             {
                                 clave: "tipoProveedor",
                                 titulo: "Rubro",
+                                renderizar: (proveedor) =>
+                                    etiquetaTipoServicio(proveedor.tipoProveedor),
                             },
                             {
                                 clave: "localidad",
@@ -307,6 +313,17 @@ function ProveedoresPage() {
                             {
                                 clave: "estado",
                                 titulo: "Estado",
+                                renderizar: (proveedor) => (
+                                    <span
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            proveedor.estado === "ACTIVO"
+                                                ? "bg-marca/10 text-marca"
+                                                : "bg-borde text-texto-suave"
+                                        }`}
+                                    >
+                                        {etiquetaEstadoRegistro(proveedor.estado)}
+                                    </span>
+                                ),
                             },
                             {
                                 clave: "idproveedor",
@@ -315,6 +332,7 @@ function ProveedoresPage() {
                                     <div className="flex flex-wrap gap-2">
                                         <Link
                                             to={`/gestion/proveedores/${proveedor.idproveedor}/servicios`}
+                                            aria-label={`Ver servicios de ${proveedor.razonSocial}`}
                                             className="inline-flex items-center justify-center rounded-control bg-transparent px-3 py-1.5 text-xs font-semibold text-texto hover:bg-fondo focus-visible:outline-2 focus-visible:outline-marca"
                                         >
                                             Servicios
@@ -322,6 +340,7 @@ function ProveedoresPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar proveedor ${proveedor.razonSocial}`}
                                             onClick={() =>
                                                 abrirFormulario(proveedor)
                                             }
@@ -332,6 +351,7 @@ function ProveedoresPage() {
                                             <Boton
                                                 variante="secundario"
                                                 className="px-3 py-1.5 text-xs"
+                                                aria-label={`Reactivar proveedor ${proveedor.razonSocial}`}
                                                 onClick={() => reactivarProveedor(proveedor)}
                                                 disabled={modificar.isPending}
                                             >
@@ -339,8 +359,9 @@ function ProveedoresPage() {
                                             </Boton>
                                         ) : (
                                             <Boton
-                                                variante="peligro"
+                                                variante="peligroSuave"
                                                 className="px-3 py-1.5 text-xs"
+                                                aria-label={`Dar de baja proveedor ${proveedor.razonSocial}`}
                                                 onClick={() =>
                                                     abrirDialogoBaja(proveedor)
                                                 }

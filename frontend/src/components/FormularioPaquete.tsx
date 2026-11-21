@@ -23,6 +23,7 @@ import {
     type TipoGarantiaPaquete,
 } from "../services/paqueteService";
 import { temporadaVencida, type Temporada } from "../services/temporadaService";
+import { formatearRangoFechasUtc } from "../services/formato";
 
 type FormularioPaqueteProps = {
     paqueteEnEdicion?: Paquete | null;
@@ -1221,14 +1222,9 @@ function FormularioPaquete({
                                                     value={temp.idtemporada}
                                                 >
                                                     {temp.nombre} (
-                                                    {temp.fechaInicio.slice(
-                                                        0,
-                                                        10,
-                                                    )}{" "}
-                                                    a{" "}
-                                                    {temp.fechaFin.slice(
-                                                        0,
-                                                        10,
+                                                    {formatearRangoFechasUtc(
+                                                        temp.fechaInicio,
+                                                        temp.fechaFin,
                                                     )}
                                                     )
                                                 </option>

@@ -7,6 +7,7 @@ import {
     type DatosCrearCuentaGuia,
 } from "../services/cuentaGuiaService";
 import type { Personal } from "../services/personalService";
+import { formatearFechaSalida } from "../services/formato";
 
 type FormularioCuentaGuiaProps = {
     guiasDisponibles: Personal[];
@@ -113,7 +114,7 @@ function FormularioCuentaGuia({
                     <div className="rounded-control border border-borde bg-fondo p-3 text-xs text-texto md:col-span-2">
                         <p className="font-semibold text-navegacion">Legajo seleccionado:</p>
                         <p className="mt-1 text-texto-suave">
-                            {guiaSeleccionado.nombreCompleto} · Pasaporte: {guiaSeleccionado.nroPasaporte} · Nacionalidad: {guiaSeleccionado.nacionalidad} · Vence pasaporte: {guiaSeleccionado.fechaVencimientoPasaporte}
+                            {guiaSeleccionado.nombreCompleto} · Pasaporte: {guiaSeleccionado.nroPasaporte} · Nacionalidad: {guiaSeleccionado.nacionalidad} · Vence pasaporte: {formatearFechaSalida(guiaSeleccionado.fechaVencimientoPasaporte)}
                         </p>
                     </div>
                 ) : null}

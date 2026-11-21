@@ -13,6 +13,7 @@ import {
     type TipoServicio,
 } from "../services/servicioService";
 import { DIAS_SEMANA, serializarDiasDisponibles, type CodigoDia } from "../services/paqueteService";
+import { etiquetaModalidad, etiquetaTipoServicio } from "../services/formato";
 
 type Props = {
     servicioEnEdicion?: Servicio | null;
@@ -189,7 +190,10 @@ function FormularioServicio({
                     {servicioEnEdicion ? "Editar servicio" : "Registrar servicio"}
                 </h2>
                 <p className="mt-1 text-sm text-texto-suave">
-                    Rubro del proveedor: <span className="font-semibold text-texto">{tipoProveedor}</span>
+                    Rubro del proveedor:{" "}
+                    <span className="font-semibold text-texto">
+                        {etiquetaTipoServicio(tipoProveedor)}
+                    </span>
                 </p>
             </div>
 
@@ -358,9 +362,7 @@ function FormularioServicio({
                                 >
                                     {modalidadesConfirmacion.map((modalidad) => (
                                         <option key={modalidad} value={modalidad}>
-                                            {modalidad === "BLOQUEO_PLAZAS"
-                                                ? "BLOQUEO_PLAZAS (Confirmación por bloqueo)"
-                                                : "A_SOLICITUD (Confirmación a solicitud)"}
+                                            {etiquetaModalidad(modalidad)}
                                         </option>
                                     ))}
                                 </select>

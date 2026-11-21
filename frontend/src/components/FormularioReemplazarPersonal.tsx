@@ -5,8 +5,8 @@ import DialogoConfirmacion from "./DialogoConfirmacion";
 import {
     estilosEstadoSalida,
     formatearEstadoSalida,
-    formatearFechaSalida,
 } from "../services/guiaService";
+import { formatearRangoFechasUtc } from "../services/formato";
 import {
     useReemplazantesDisponibles,
     type DatosPersonalSalida,
@@ -159,9 +159,6 @@ export function FormularioReemplazarPersonal({
                             Reemplazar personal de la salida {salida.nroSalida}
                         </h2>
                     </div>
-                    <span className="inline-flex items-center rounded bg-marca-suave px-2.5 py-1 text-xs font-semibold text-navegacion">
-                        Perfil: ADMIN
-                    </span>
                 </div>
                 <p className="mt-1 text-sm text-texto-suave">
                     Seleccioná a la persona asignada a reemplazar, elegí un reemplazante disponible del mismo rol
@@ -189,7 +186,7 @@ export function FormularioReemplazarPersonal({
                         Fechas de recorrido
                     </span>
                     <p className="font-medium text-texto">
-                        {formatearFechaSalida(salida.fechaInicio)} al {formatearFechaSalida(salida.fechaFin)}
+                        {formatearRangoFechasUtc(salida.fechaInicio, salida.fechaFin)}
                     </p>
                 </div>
                 <div>

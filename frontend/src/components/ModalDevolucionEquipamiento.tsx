@@ -5,7 +5,7 @@ import Alerta from "./Alerta";
 import Boton from "./Boton";
 import DialogoConfirmacion from "./DialogoConfirmacion";
 import { ErrorApi } from "../services/clienteApi";
-import { formatearFechaSalida } from "../services/guiaService";
+import { formatearFechaUtcCorta } from "../services/formato";
 import {
     claveMutacionDevolucion,
     useEquipamientoAsignado,
@@ -445,7 +445,7 @@ function FormularioDevolucionContenido({
             <DialogoConfirmacion
                 abierto={confirmacionAbierta}
                 titulo="Confirmar Devolución de Equipamiento"
-                descripcion={`¿Confirmás el registro de la devolución para la salida ${salida.nroSalida}? Se reintegrarán ${totalBuenEstado} unidades al stock del proveedor y ${totalDaniadas} unidades quedarán registradas como dañadas o extraviadas. Esta acción impactará el inventario y guardará el registro de trazabilidad en auditoría (RF-56).`}
+                descripcion={`¿Confirmás el registro de la devolución para la salida ${salida.nroSalida}? Se reintegrarán ${totalBuenEstado} unidades al stock del proveedor y ${totalDaniadas} unidades quedarán registradas como dañadas o extraviadas. Esta acción impactará el inventario y quedará registrada en auditoría.`}
                 textoConfirmar="Confirmar devolución"
                 textoCancelar="Revisar cantidades"
                 cargando={registrarMutation.isPending}
@@ -532,7 +532,7 @@ export function ModalDevolucionEquipamiento({
                         <p>
                             Fecha de finalización:{" "}
                             <span className="font-semibold text-texto">
-                                {formatearFechaSalida(salida.fechaFin)}
+                                {formatearFechaUtcCorta(salida.fechaFin)}
                             </span>
                         </p>
                     </div>
