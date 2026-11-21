@@ -25,7 +25,6 @@ import { descargarComprobantePdf } from "../../services/pdf";
 import { obtenerToken, obtenerUsuario } from "../../services/sesionService";
 import {
     crearEsquemaCompra,
-    PESO_MAXIMO_DECLARADO_KG,
     TARJETA_VACIA,
     type DatosCompra,
     type FormularioCompra,
@@ -72,44 +71,37 @@ function borrarCompraGuardada() {
     }
 }
 
-type PasajeroFormulario = PasajeroReservaInput & {
-    pesoDeclarado: number;
-};
+type PasajeroFormulario = PasajeroReservaInput;
 
 const PASAJEROS_PRUEBA: Array<{
     nombreCompleto: string;
     nroPasaporteBase: string;
     nacionalidad: string;
     fechaVencimientoPasaporte: string;
-    pesoDeclarado: number;
 }> = [
     {
         nombreCompleto: "Juan Ignacio Pérez",
         nroPasaporteBase: "ARG-401298",
         nacionalidad: "Argentina",
         fechaVencimientoPasaporte: "2031-08-15",
-        pesoDeclarado: 14,
     },
     {
         nombreCompleto: "María Sol Gómez",
         nroPasaporteBase: "ARG-428910",
         nacionalidad: "Argentina",
         fechaVencimientoPasaporte: "2032-04-20",
-        pesoDeclarado: 17,
     },
     {
         nombreCompleto: "Lucas Martín Rojas",
         nroPasaporteBase: "CHL-991042",
         nacionalidad: "Chilena",
         fechaVencimientoPasaporte: "2030-11-10",
-        pesoDeclarado: 12,
     },
     {
         nombreCompleto: "Camila Andrea Torres",
         nroPasaporteBase: "URU-552319",
         nacionalidad: "Uruguaya",
         fechaVencimientoPasaporte: "2033-02-28",
-        pesoDeclarado: 15,
     },
 ];
 
@@ -205,7 +197,6 @@ function crearPasajeroInicial(): PasajeroFormulario {
         nroPasaporte: "",
         nacionalidad: "Argentina",
         fechaVencimientoPasaporte: "",
-        pesoDeclarado: 12,
     };
 }
 
@@ -445,26 +436,12 @@ function CatalogoCompraPage() {
         clearErrors("tarjeta");
     }
 
-    // Cálculo en tiempo real de tarifa + exceso de equipaje (idéntico a ReservaService.calcularPrecio)
+    // Cálculo en tiempo real de la tarifa por cantidad de pasajeros (idéntico a ReservaService.calcularPrecio)
     const sinTarifa = salidaActiva?.precioPersona == null;
     const precioUnitario = salidaActiva?.precioPersona ?? 0;
     const monedaActiva = salidaActiva?.moneda ?? "USD";
     const subtotalPasajeros = precioUnitario * pasajeros.length;
-
-    const infoEquipaje = paqueteVendido?.equipajeTransporte ?? null;
-    const recargoEquipajeTotal = infoEquipaje
-        ? pasajeros.reduce((acum, p) => {
-              const exceso =
-                  (Number(p.pesoDeclarado) || 0) -
-                  infoEquipaje.pesoEquipajeIncluido;
-              return exceso > 0
-                  ? acum + exceso * infoEquipaje.costoPorKgExcedente
-                  : acum;
-          }, 0)
-        : 0;
-
-    const totalPagar =
-        Math.round((subtotalPasajeros + recargoEquipajeTotal) * 100) / 100;
+    const totalPagar = Math.round(subtotalPasajeros * 100) / 100;
 
     // Las reglas de cada campo están en esquemaCompra.ts: acá solo llegan datos válidos
     async function confirmarCompra(datos: DatosCompra) {
@@ -498,9 +475,6 @@ function CatalogoCompraPage() {
                     nroPasaporte: p.nroPasaporte,
                     nacionalidad: p.nacionalidad,
                     fechaVencimientoPasaporte: p.fechaVencimientoPasaporte,
-                })),
-                equipaje: datos.pasajeros.map((p) => ({
-                    pesoDeclarado: p.pesoDeclarado,
                 })),
                 tarjeta: datos.tarjeta,
             });
@@ -874,9 +848,6 @@ function CatalogoCompraPage() {
                                             {p.fechaVencimientoPasaporte}
                                         </p>
                                     </div>
-                                    <span className="rounded-full bg-marca-suave px-2.5 py-1 text-xs font-semibold text-marca-oscura">
-                                        Equipaje: {p.pesoDeclarado} kg
-                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -1039,8 +1010,7 @@ function CatalogoCompraPage() {
                                     </span>
                                     <div>
                                         <h2 className="text-base font-bold uppercase tracking-wide text-navegacion">
-                                            Pasajeros y declaración de equipaje (
-                                            {pasajeros.length})
+                                            Pasajeros ({pasajeros.length})
                                         </h2>
                                         <p className="text-xs text-texto-suave">
                                             Cada pasaporte debe ser único y
@@ -1079,22 +1049,6 @@ function CatalogoCompraPage() {
                                 </div>
                             </div>
 
-                            {infoEquipaje ? (
-                                <div className="rounded-control border border-marca/30 bg-marca-suave/50 px-3.5 py-2.5 text-xs text-texto">
-                                    <strong>Franquicia de transporte incluida:</strong>{" "}
-                                    hasta{" "}
-                                    <strong>
-                                        {infoEquipaje.pesoEquipajeIncluido} kg
-                                    </strong>{" "}
-                                    por pasajero sin cargo adicional. Excedente:{" "}
-                                    <strong>
-                                        {formatearMonto(infoEquipaje.costoPorKgExcedente, monedaActiva)}{" "}
-                                        por kg extra
-                                    </strong>
-                                    .
-                                </div>
-                            ) : null}
-
                             {errorNomina ? (
                                 <p role="alert" className="text-xs text-peligro">
                                     {errorNomina}
@@ -1103,20 +1057,7 @@ function CatalogoCompraPage() {
 
                             <div className="space-y-4">
                                 {camposPasajeros.map((campo, idx) => {
-                                    const pasajero = pasajeros[idx] ?? campo;
                                     const errorPasajero = errors.pasajeros?.[idx];
-                                    const excesoKg = infoEquipaje
-                                        ? Math.max(
-                                              0,
-                                              (Number(pasajero.pesoDeclarado) ||
-                                                  0) -
-                                                  infoEquipaje.pesoEquipajeIncluido,
-                                          )
-                                        : 0;
-                                    const costoExceso = infoEquipaje
-                                        ? excesoKg *
-                                          infoEquipaje.costoPorKgExcedente
-                                        : 0;
 
                                     return (
                                         <div
@@ -1157,7 +1098,7 @@ function CatalogoCompraPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 <CampoCompra
                                                     etiqueta="Nombre y apellido completo *"
                                                     id={`pasajero-${idx}-nombre`}
@@ -1190,33 +1131,6 @@ function CatalogoCompraPage() {
                                                     type="date"
                                                     error={errorPasajero?.fechaVencimientoPasaporte?.message}
                                                     {...register(`pasajeros.${idx}.fechaVencimientoPasaporte`)}
-                                                />
-                                                <CampoCompra
-                                                    etiqueta="Equipaje declarado (kg)"
-                                                    id={`pasajero-${idx}-equipaje`}
-                                                    type="number"
-                                                    inputMode="decimal"
-                                                    min={0}
-                                                    max={PESO_MAXIMO_DECLARADO_KG}
-                                                    step={0.5}
-                                                    error={errorPasajero?.pesoDeclarado?.message}
-                                                    {...register(`pasajeros.${idx}.pesoDeclarado`, { valueAsNumber: true })}
-                                                    ayuda={
-                                                        <>
-                                                            {excesoKg > 0 ? (
-                                                                <span className="text-xs font-semibold text-advertencia">
-                                                                    +{excesoKg} kg extra ({formatearMonto(costoExceso, monedaActiva)})
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-xs font-normal text-exito">
-                                                                    Dentro de franquicia
-                                                                </span>
-                                                            )}
-                                                            <span className="text-xs font-normal text-texto-suave">
-                                                                Máximo {PESO_MAXIMO_DECLARADO_KG} kg por pasajero
-                                                            </span>
-                                                        </>
-                                                    }
                                                 />
                                             </div>
                                         </div>
@@ -1452,17 +1366,6 @@ function CatalogoCompraPage() {
                                     {sinTarifa
                                         ? "—"
                                         : formatearMonto(subtotalPasajeros, monedaActiva)}
-                                </span>
-                            </div>
-
-                            <div className="flex justify-between text-xs">
-                                <span className="text-texto-suave">
-                                    Exceso de equipaje
-                                </span>
-                                <span className="font-semibold text-texto">
-                                    {recargoEquipajeTotal > 0
-                                        ? formatearMonto(recargoEquipajeTotal, monedaActiva)
-                                        : "Sin recargo"}
                                 </span>
                             </div>
 
@@ -1868,17 +1771,6 @@ function CatalogoCompraPage() {
                                                                 </span>
                                                             ),
                                                         )}
-                                                        {paquete.equipajeTransporte ? (
-                                                            <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
-                                                                🎒{" "}
-                                                                {
-                                                                    paquete
-                                                                        .equipajeTransporte
-                                                                        .pesoEquipajeIncluido
-                                                                }{" "}
-                                                                kg incluidos
-                                                            </span>
-                                                        ) : null}
                                                     </div>
                                                 ) : null}
                                             </div>
@@ -2234,10 +2126,10 @@ function CatalogoCompraPage() {
                                                 )}
                                             </div>
 
-                                            {/* SERVICIOS INCLUIDOS Y EQUIPAJE */}
+                                            {/* SERVICIOS INCLUIDOS */}
                                             <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
                                                 <p className="font-bold uppercase tracking-wide text-navegacion">
-                                                    Servicios y equipaje incluidos
+                                                    Servicios incluidos
                                                 </p>
                                                 {paqueteDetalle.serviciosAdicionales &&
                                                 paqueteDetalle.serviciosAdicionales.length > 0 ? (
@@ -2256,14 +2148,6 @@ function CatalogoCompraPage() {
                                                         Servicios base de trekking guiado incluidos.
                                                     </p>
                                                 )}
-                                                {paqueteDetalle.equipajeTransporte ? (
-                                                    <div className="mt-2 rounded-control border border-marca/30 bg-marca-suave/60 p-2.5 text-xs text-marca-oscura">
-                                                        <p className="font-bold">🎒 Franquicia de equipaje:</p>
-                                                        <p className="mt-0.5">
-                                                            Hasta <strong>{paqueteDetalle.equipajeTransporte.pesoEquipajeIncluido} kg</strong> incluidos por pasajero en el transporte. (Excedente: {tarifaMinimaDetalle?.moneda ?? "USD"} {paqueteDetalle.equipajeTransporte.costoPorKgExcedente}/kg).
-                                                        </p>
-                                                    </div>
-                                                ) : null}
                                             </div>
 
                                             {/* ALOJAMIENTO Y CONDICIONES */}

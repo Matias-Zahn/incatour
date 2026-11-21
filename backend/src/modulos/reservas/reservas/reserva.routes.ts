@@ -38,13 +38,6 @@ export class ReservaRoutes {
      *                     nroPasaporte: { type: string }
      *                     nacionalidad: { type: string }
      *                     fechaVencimientoPasaporte: { type: string, format: date }
-     *               equipaje:
-     *                 type: array
-     *                 description: Un elemento por pasajero, en el mismo orden.
-     *                 items:
-     *                   type: object
-     *                   properties:
-     *                     pesoDeclarado: { type: number }
      *               tarjeta:
      *                 type: object
      *                 properties:

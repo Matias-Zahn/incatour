@@ -41,18 +41,17 @@ async function abrirFormulario(page: Page) {
     }
 }
 
-type Datos = Partial<Record<"nombre" | "pasaporte" | "nacionalidad" | "vencimiento" | "equipaje" | "numero" | "titular" | "tarjetaVence" | "cvv", string>>;
+type Datos = Partial<Record<"nombre" | "pasaporte" | "nacionalidad" | "vencimiento" | "numero" | "titular" | "tarjetaVence" | "cvv", string>>;
 
 async function cargar(page: Page, datos: Datos) {
     const d = {
-        nombre: "Lucía Prueba", pasaporte: `CN${pasaportes++}`, nacionalidad: "Argentina", vencimiento: "2036-01-01", equipaje: "8",
+        nombre: "Lucía Prueba", pasaporte: `CN${pasaportes++}`, nacionalidad: "Argentina", vencimiento: "2036-01-01",
         numero: "4242424242424242", titular: "LUCIA PRUEBA", tarjetaVence: "12/30", cvv: "123", ...datos,
     };
     await page.locator("#pasajero-0-nombre").fill(d.nombre);
     await page.locator("#pasajero-0-pasaporte").fill(d.pasaporte);
     await page.locator("#pasajero-0-nacionalidad").fill(d.nacionalidad);
     await page.locator("#pasajero-0-vencimiento").fill(d.vencimiento);
-    await page.locator("#pasajero-0-equipaje").fill(d.equipaje);
     await page.locator("#tarjeta-numero").fill(d.numero);
     await page.locator("#tarjeta-titular").fill(d.titular);
     await page.locator("#tarjeta-vencimiento").fill(d.tarjetaVence);
@@ -73,9 +72,6 @@ const INVALIDOS: [string, string, () => Datos, string | RegExp][] = [
     ["CN-06", "PE pasaporte ya vencido", () => ({ vencimiento: "2020-01-01" }), /Tiene que vencer después/],
     ["CN-07", "VL vence el día anterior al fin", () => ({ vencimiento: sumarDias(finDeSalida(), -1) }), /Tiene que vencer después/],
     ["CN-08", "VL vence justo el último día", () => ({ vencimiento: finDeSalida() }), /Tiene que vencer después/],
-    ["CN-09", "PE equipaje vacío", () => ({ equipaje: "" }), "Indicá el peso del equipaje."],
-    ["CN-10", "VL equipaje -0.5 kg", () => ({ equipaje: "-0.5" }), "No puede ser negativo."],
-    ["CN-11", "VL equipaje 20.5 kg", () => ({ equipaje: "20.5" }), "El máximo es 20 kg por pasajero."],
     ["CN-12", "PE tarjeta vacía", () => ({ numero: "" }), "Ingresá un número de tarjeta válido."],
     ["CN-13", "VL tarjeta de 11 dígitos", () => ({ numero: "42424242424" }), "Ingresá un número de tarjeta válido."],
     ["CN-14", "VL tarjeta de 14 dígitos", () => ({ numero: "42424242424242" }), /Número de tarjeta inválido/],
@@ -95,8 +91,6 @@ const INVALIDOS: [string, string, () => Datos, string | RegExp][] = [
 const VALIDOS: [string, string, () => Datos][] = [
     ["CN-27", "PE todos los datos válidos", () => ({})],
     ["CN-28", "VL vence el día siguiente al fin", () => ({ vencimiento: sumarDias(finDeSalida(), 1) })],
-    ["CN-29", "VL equipaje 0 kg", () => ({ equipaje: "0" })],
-    ["CN-30", "VL equipaje 20 kg", () => ({ equipaje: "20" })],
     ["CN-31", "VL tarjeta de 15 dígitos", () => ({ numero: "424242424242424" })],
     ["CN-32", "VL CVV de 4 dígitos", () => ({ cvv: "1234" })],
     ["CN-33", "PE tarjeta con espacios", () => ({ numero: "4242 4242 4242 4242" })],
@@ -127,7 +121,6 @@ test.describe("Datos inválidos: no se compra", () => {
         await page.locator("#pasajero-1-pasaporte").fill("repetido1");
         await page.locator("#pasajero-1-nacionalidad").fill("Chilena");
         await page.locator("#pasajero-1-vencimiento").fill("2036-01-01");
-        await page.locator("#pasajero-1-equipaje").fill("5");
         await pagar(page);
         await expect(page.getByText("Este pasaporte está repetido en la nómina.")).toBeVisible();
     });

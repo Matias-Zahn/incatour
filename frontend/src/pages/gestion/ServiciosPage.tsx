@@ -32,8 +32,6 @@ const CAMPOS_COMPARABLES: (keyof ServicioModificar)[] = [
     "capacidadDisponible",
     "modalidadConfirmacion",
     "capacidadVehiculo",
-    "pesoEquipajeIncluido",
-    "costoPorKgExcedente",
     "horarioSalida",
     "horarioLlegada",
     "diasOperacion",
@@ -49,10 +47,15 @@ function describirDisponibilidad(servicio: Servicio): string {
             const total = servicio.inventarioTotal ?? libre + comprometida;
             return `${servicio.tipoEquipamiento ?? "Equipo"} · Libre: ${libre} / Comprometido: ${comprometida} / Total: ${total}`;
         }
-        case "ALOJAMIENTO":
-            return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${servicio.capacidadDisponible ?? 0} plazas (${servicio.modalidadConfirmacion ?? "-"})`;
+        case "ALOJAMIENTO": {
+            const plazas =
+                servicio.modalidadConfirmacion === "A_SOLICITUD"
+                    ? "A solicitud"
+                    : `${servicio.capacidadDisponible ?? 0} plazas (${servicio.modalidadConfirmacion ?? "-"})`;
+            return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${plazas}`;
+        }
         case "TRANSPORTE":
-            return `${servicio.capacidadVehiculo ?? 0} asientos · ${servicio.pesoEquipajeIncluido ?? 0} kg incl. (+$${servicio.costoPorKgExcedente ?? 0}/kg)`;
+            return `${servicio.capacidadVehiculo ?? 0} asientos`;
         case "TREN":
             return `${servicio.horarioSalida ?? "--:--"} a ${servicio.horarioLlegada ?? "--:--"} (${servicio.diasOperacion ?? "-"})`;
         default:

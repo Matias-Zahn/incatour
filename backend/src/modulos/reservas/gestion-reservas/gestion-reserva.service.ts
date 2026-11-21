@@ -237,14 +237,12 @@ export class GestionReservaService {
 
   private calcularDesglose(r: ReservaDetalle) {
     // RES-07: las reservas nuevas traen el desglose congelado al comprar
-    if (r.precioPaquetePorPersona != null && r.adicionalesEquipaje != null) {
+    if (r.precioPaquetePorPersona != null) {
       return {
         temporadaAplicada: r.temporadaAplicada,
         temporada: r.temporadaAplicada ? { nombre: r.temporadaAplicada } : null,
         precioUnitario: r.precioPaquetePorPersona,
         precioPaquete: redondear2(r.precioPaquetePorPersona * r.cantidadPasajeros),
-        adicionales: r.adicionalesEquipaje,
-        adicionalesEquipaje: r.adicionalesEquipaje,
       };
     }
 
@@ -263,15 +261,12 @@ export class GestionReservaService {
       ? Number(tarifaAplicada.monto)
       : (r.cantidadPasajeros > 0 ? redondear2(r.precioCongelado / r.cantidadPasajeros) : 0);
     const precioPaquete = redondear2(precioUnitario * r.cantidadPasajeros);
-    const adicionalesEquipaje = redondear2(Math.max(0, r.precioCongelado - precioPaquete));
 
     return {
       temporadaAplicada: temporadaNombre,
       temporada: tarifaAplicada?.temporada ?? (temporadaNombre ? { nombre: temporadaNombre } : null),
       precioUnitario,
       precioPaquete,
-      adicionales: adicionalesEquipaje,
-      adicionalesEquipaje,
     };
   }
 
@@ -291,8 +286,6 @@ export class GestionReservaService {
       temporada: desglose.temporada,
       precioUnitario: desglose.precioUnitario,
       precioPaquete: desglose.precioPaquete,
-      adicionales: desglose.adicionales,
-      adicionalesEquipaje: desglose.adicionalesEquipaje,
       condicionesComerciales: r.condicionesComerciales,
       pagado: sumar(r.pagos.map((p) => p.monto)),
       titular: r.cliente.usuario,
