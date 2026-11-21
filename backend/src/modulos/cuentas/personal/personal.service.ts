@@ -3,7 +3,8 @@ import { CustomError } from "../../../error/CustomError";
 import { PersonalRepository } from "./personal.repository";
 import { ConsultarPersonalDto, CrearPersonalDto, ModificarPersonalDto, ROL_GUIA } from "./personal.dto";
 import { ESTADO, ESTADO_PERMISO } from "../../../shared/constantes";
-import { hoyUTC } from "../../../shared/fechas";
+import { fechaCorta, hoyUTC } from "../../../shared/fechas";
+import { enLista } from "../../../shared/ventaAbierta";
 
 export class PersonalService {
   private repository = new PersonalRepository();
@@ -37,23 +38,27 @@ export class PersonalService {
     // FIX CTA-16 y CTA-17: Validaciones contra salidas y asignaciones activas
     const asignaciones = await this.repository.consultarAsignacionesActivas(idpersonal);
 
+    // 12.8: los rechazos por salidas asignadas son 409 y dicen cuáles, para ofrecer el reemplazo (CU-38)
     if (asignaciones.length > 0) {
-      // 1. Calculamos la fecha exacta en la que finaliza su última salida asignada
-      const maximaFechaFin = new Date(
-        Math.max(...asignaciones.map((a) => new Date(a.salida.fechaFin).getTime()))
-      );
+      const salidas = asignaciones.map((a) => a.salida).sort((a, b) => a.fechaFin.getTime() - b.fechaFin.getTime());
+      const terminanDespues = (f: Date) => salidas.filter((x) => x.fechaFin > f);
+      const ultima = (xs: typeof salidas) => xs[xs.length - 1]!;
 
       // CTA-16: El pasaporte debe cubrir toda la duración de las salidas activas
-      if (dto.fechaVencimientoPasaporte && new Date(dto.fechaVencimientoPasaporte) < maximaFechaFin) {
+      if (dto.fechaVencimientoPasaporte && terminanDespues(dto.fechaVencimientoPasaporte).length) {
+        const xs = terminanDespues(dto.fechaVencimientoPasaporte);
         throw CustomError.conflict(
-          `El pasaporte no puede vencer antes de que termine su última salida asignada (${maximaFechaFin.toISOString().split('T')[0]}).`
+          `El pasaporte no puede vencer antes de que termine ${ultima(xs).nroSalida} (${fechaCorta(ultima(xs).fechaFin)})`,
+          { salidas: xs.map(detalleSalida) }
         );
       }
 
       // CTA-17: La habilitación del guía debe cubrir toda la duración de las salidas activas
-      if (dto.fechaHabilitacion && new Date(dto.fechaHabilitacion) < maximaFechaFin) {
+      if (dto.fechaHabilitacion && terminanDespues(dto.fechaHabilitacion).length) {
+        const xs = terminanDespues(dto.fechaHabilitacion);
         throw CustomError.conflict(
-          `La habilitación no puede vencer antes de que termine su última salida asignada (${maximaFechaFin.toISOString().split('T')[0]}).`
+          `La habilitación no puede vencer antes de que termine ${ultima(xs).nroSalida} (${fechaCorta(ultima(xs).fechaFin)})`,
+          { salidas: xs.map(detalleSalida) }
         );
       }
 
@@ -61,17 +66,12 @@ export class PersonalService {
       const cambiaDatosNominales =
         (dto.nroPasaporte && dto.nroPasaporte !== personal.nroPasaporte) ||
         (dto.nombreCompleto && dto.nombreCompleto !== personal.nombreCompleto);
-
-      if (cambiaDatosNominales) {
-        const tienePermisoEmitido = asignaciones.some((a) =>
-          a.salida.permisos && a.salida.permisos.some((p) => p.estadoTramite === ESTADO_PERMISO.EMITIDO)
+      const conPermiso = salidas.filter((x) => x.permisos?.some((p) => p.estadoTramite === ESTADO_PERMISO.EMITIDO));
+      if (cambiaDatosNominales && conPermiso.length) {
+        throw CustomError.conflict(
+          `No se pueden modificar el nombre ni el pasaporte: tiene permiso emitido en ${enLista(conPermiso.map((x) => x.nroSalida))}`,
+          { salidas: conPermiso.map(detalleSalida) }
         );
-
-        if (tienePermisoEmitido) {
-          throw CustomError.conflict(
-            "No se pueden modificar datos nominales (nombre o pasaporte) porque el personal tiene un permiso emitido en salidas activas."
-          );
-        }
       }
     }
 
@@ -106,8 +106,11 @@ export class PersonalService {
 
     const resultado = await this.repository.darDeBaja(idpersonal, personal.guia?.idusuario ?? null);
     if ("bloqueadoPor" in resultado) {
-      throw CustomError.badRequest(
-        `No se puede dar de baja: está asignado a ${resultado.bloqueadoPor} salida(s) que todavía no finalizaron`
+      const salidas = resultado.bloqueadoPor;
+      throw CustomError.conflict(
+        `No se puede dar de baja: está asignado a ${enLista(salidas.map((x) => x.nroSalida))}, ` +
+          `que todavía ${salidas.length === 1 ? "no finalizó" : "no finalizaron"}`,
+        { salidas: salidas.map(detalleSalida) }
       );
     }
     return resultado.personal;
@@ -187,3 +190,8 @@ export class PersonalService {
     };
   }
 }
+
+// 12.8: la forma de detalle.salidas del contrato (sección 11)
+const detalleSalida = (x: { idsalida: number; nroSalida: string; fechaInicio: Date; fechaFin: Date; estado: string }) => ({
+  idsalida: x.idsalida, nroSalida: x.nroSalida, fechaInicio: x.fechaInicio, fechaFin: x.fechaFin, estado: x.estado,
+});

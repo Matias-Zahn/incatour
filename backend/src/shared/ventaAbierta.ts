@@ -35,7 +35,7 @@ type Calendario = { diasDisponibles: string | null; tren?: { nombreServicio: str
 export const diasHabilitados = (c: Calendario) =>
   diasDe(c.diasDisponibles).filter((d) => !c.tren || diasDe(c.tren.diasOperacion).includes(d));
 
-const enLista = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}` : xs.join(""));
+export const enLista = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}` : xs.join(""));
 
 /** B9 y 12.6: por qué una salida no puede empezar en esa fecha, o null si puede. */
 export function motivoFechaInvalida(fechaInicio: Date, c: Calendario & { diasCierreVenta: number }, hoy = hoyUTC()): string | null {

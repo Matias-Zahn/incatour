@@ -210,6 +210,13 @@ describe("GuiaService.iniciarSalida (CU-49)", () => {
     expect(r).toMatchObject({ estado: "EN_CURSO", fechaHoraInicioReal: expect.any(Date) });
   });
 
+  it("decisión 18: una salida PUBLICADA (sin confirmar por la agencia) no se inicia", async () => {
+    repo.detalleSalida.mockResolvedValue({ ...salida, estado: "PUBLICADA", fechaInicio: hoy() });
+
+    await expect(new GuiaService().iniciarSalida(1, 2)).rejects.toThrow("La salida todavía no está confirmada por la agencia");
+    expect(repo.iniciarSalida).not.toHaveBeenCalled();
+  });
+
   it("antes de la fecha de inicio no se puede", async () => {
     repo.detalleSalida.mockResolvedValue({ ...salida, estado: "CERRADA", fechaInicio: new Date(hoy().getTime() + DIA) });
 
