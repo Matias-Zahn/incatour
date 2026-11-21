@@ -15,13 +15,14 @@ const paquete = {
     { servicio: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", alojamiento: { categoria: "4 estrellas" } } },
   ],
   servicios: [
-    { servicio: { idservicio: 40, nombreServicio: "Hotel Sol", transporte: null } },
     { servicio: { idservicio: 41, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } } },
+    { servicio: { idservicio: 42, nombreServicio: "Expedition", tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } } },
+    { cantidad: 1, cadaPasajeros: 2, servicio: { idservicio: 43, nombreServicio: "Carpas", equipamiento: {} } },
   ],
 };
 
 describe("armarDefinicionPaquete (CAT-05)", () => {
-  it("copia condiciones, garantía, servicios con equipaje, noches, días y plazo de reintegro", () => {
+  it("copia condiciones, garantía, servicios por tipo con la regla del equipo, noches, días, reintegro y corte", () => {
     expect(armarDefinicionPaquete(paquete)).toEqual({
       condiciones: "Sin reembolso a menos de 30 días",
       tipoGarantia: "POR_ESTABLECIMIENTO",
@@ -30,13 +31,15 @@ describe("armarDefinicionPaquete (CAT-05)", () => {
       tipoHabitacionGarantizada: null,
       establecimiento: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", categoria: "4 estrellas" },
       servicios: [
-        { idservicio: 40, nombreServicio: "Hotel Sol", transporte: null },
-        { idservicio: 41, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } },
+        { idservicio: 41, nombreServicio: "Bus", tipo: "TRANSPORTE", cantidad: null, cadaPasajeros: null, tren: null, transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } },
+        { idservicio: 42, nombreServicio: "Expedition", tipo: "TREN", cantidad: null, cadaPasajeros: null, tren: { horarioSalida: "06:10", horarioLlegada: "07:45" }, transporte: null },
+        { idservicio: 43, nombreServicio: "Carpas", tipo: "EQUIPAMIENTO", cantidad: 1, cadaPasajeros: 2, tren: null, transporte: null },
       ],
       nochesPrevias: 1,
       nochesPosteriores: 2,
       diasDisponibles: "L-M-X",
       diasMinimosReintegro: 15,
+      diasCierreVenta: 2,
     });
   });
 

@@ -499,6 +499,7 @@ async function main() {
       nombrePaquete: "Inca VIP Hotel Montaña",
       estado: "ACTIVO",
       tipoGarantia: "Por Establecimiento",
+      localidadGarantizada: "Cusco", // B2: "Sale desde", la del hotel garantizado
       tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 980, moneda: "USD" }] },
       servicios: {
         create: [
