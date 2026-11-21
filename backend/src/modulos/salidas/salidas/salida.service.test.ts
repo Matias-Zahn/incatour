@@ -31,6 +31,9 @@ const paquete = {
   circuito: { estado: "ACTIVO", duracionDias: 4, minimoGuias: 2, parametrosPorteadores: "1 por cada 2 pasajeros" },
   tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: enDias(-30), fechaFin: enDias(365) } }],
   garantiasEstablecimiento: [],
+  servicios: [] as unknown[],
+  diasDisponibles: null as string | null,
+  diasCierreVenta: 2,
 };
 const dto = (extra = {}) => CrearSalidaDto.create({ idpaquete: 1, fechaInicio: FECHA, tamanoMaximo: 16, ...extra })[1]!;
 
@@ -65,7 +68,7 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     expect(repo.crearSalida).not.toHaveBeenCalled();
   });
 
-  it("BE-01: mañana se acepta y hoy se rechaza, a cualquier hora del día", async () => {
+  it("BE-01 y 12.6: tiene que empezar después de hoy + corte (2 días), a cualquier hora del día", async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date(2026, 9, 25, 23, 30)); // 25/10 23:30 hora local
@@ -73,8 +76,10 @@ describe("SalidaService.crearSalida (CU-36)", () => {
       const paqueteVigente = { ...paquete, tarifas: [{ temporada: { estado: "ACTIVO", fechaInicio: new Date("2026-01-01"), fechaFin: new Date("2026-12-31") } }] };
       repo.buscarPaquete.mockResolvedValue(paqueteVigente);
 
-      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-26" }))).resolves.toBeDefined();
-      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-25" }))).rejects.toMatchObject({ statusCode: 400 });
+      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-28" }))).resolves.toBeDefined();
+      await expect(new SalidaService().crearSalida(dto({ fechaInicio: "2026-10-27" }))).rejects.toThrow(
+        "La salida tiene que empezar después del 27/10/2026: la venta cierra 2 días antes del inicio"
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -118,6 +123,27 @@ describe("SalidaService.crearSalida (CU-36)", () => {
 
     await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("elegí uno");
   });
+
+  it("B4: guarda el corte del paquete, o 5 días si el hotel queda a solicitud; el admin lo puede cambiar", async () => {
+    repo.crearSalida.mockResolvedValue({ idsalida: 9 });
+    await new SalidaService().crearSalida(dto());
+    expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 2 }));
+
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 0 }); // noches sin hotel con bloqueo
+    await new SalidaService().crearSalida(dto());
+    expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 5 }));
+
+    await new SalidaService().crearSalida(dto({ diasCierreVenta: 3 }));
+    expect(repo.crearSalida).toHaveBeenLastCalledWith(expect.objectContaining({ diasCierreVenta: 3 }));
+  });
+
+  it("12.6: con el corte de 5 días a solicitud, rechaza una fecha que sí servía con 2", async () => {
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 0 });
+    await expect(new SalidaService().crearSalida(dto({ fechaInicio: enDias(4).toISOString().slice(0, 10) }))).rejects.toThrow(
+      "la venta cierra 5 días antes del inicio"
+    );
+    expect(repo.crearSalida).not.toHaveBeenCalled();
+  });
 });
 
 describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
@@ -143,6 +169,27 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
 
     expect(r.cupoAutoridad).toBeNull();
   });
+
+  // FECHA es hoy + 20: se arma un paquete que no sale ese día de la semana
+  const DIAS = ["D", "L", "M", "X", "J", "V", "S"];
+  const diaDe = (f: string) => DIAS[new Date(f).getUTCDay()]!;
+  const otroDia = (f: string) => DIAS[(new Date(f).getUTCDay() + 1) % 7]!;
+
+  it("B9: rechaza un día que el paquete no tiene habilitado", async () => {
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, diasDisponibles: otroDia(FECHA) });
+    await expect(new SalidaService().consultarOpcionesSalida(dto())).rejects.toThrow(/El paquete no sale los .*: los días habilitados son/);
+  });
+
+  it("B9: con tren, rechaza un día en que el tren no opera e informa el tren", async () => {
+    const tren = (dias: string) => ({ servicio: { idservicio: 7, nombreServicio: "Expedition", tren: { horarioSalida: "06:10", horarioLlegada: "07:45", diasOperacion: dias } } });
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, servicios: [tren(otroDia(FECHA))] });
+    await expect(new SalidaService().consultarOpcionesSalida(dto())).rejects.toThrow(`El tren Expedition no opera los`);
+
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, servicios: [tren(diaDe(FECHA))] });
+    const r = await new SalidaService().consultarOpcionesSalida(dto());
+    expect(r.tren).toMatchObject({ idservicio: 7, horarioSalida: "06:10", operaEseDia: true });
+    expect(r.paquete.diasCierreVenta).toBe(2);
+  });
 });
 
 describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
@@ -158,8 +205,9 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       ultimaEtapaAlcanzada: null,
       avances: [],
       paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, _count: { etapas: 4 } } },
+      diasCierreVenta: 2,
       personalAsignado: [],
-      servicios: [],
+      ocupaciones: [],
       permisos: [],
       reservas: [{ _count: { pasajeros: 3 }, permisos: [], solicitudes: [], ...reserva }],
       ...extra,
@@ -220,6 +268,24 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       AHORA
     );
     expect(conAvance).toMatchObject({ alertas: [], primerAvance: new Date("2026-11-14T15:00:00Z") });
+  });
+
+  it("B4: venta abierta hasta fechaInicio − diasCierreVenta − 1", () => {
+    // AHORA es 15/11 (hora local); inicio 20/11 con corte 2 → último día 17/11
+    expect(resumirSalida(listada(), AHORA)).toMatchObject({ diasCierreVenta: 2, ultimoDiaVenta: "2026-11-17", ventaAbierta: true });
+    expect(resumirSalida(listada({ diasCierreVenta: 5 }), AHORA)).toMatchObject({ ultimoDiaVenta: "2026-11-14", ventaAbierta: false });
+    expect(resumirSalida(listada({ estado: "CERRADA" }), AHORA).ventaAbierta).toBe(false);
+  });
+
+  it("servicios con la forma de SalidaServicio, desde Ocupacion: el hotel una vez aunque ocupe dos tramos", () => {
+    const ocupacion = (idservicio: number, tipo: string, comprobanteReserva: string | null = null) =>
+      ({ idsalida: 1, idservicio, tipo, comprobanteReserva, servicio: { nombreServicio: `S${idservicio}` } });
+    const r = resumirSalida(listada({ ocupaciones: [ocupacion(4, "ALOJAMIENTO"), ocupacion(4, "ALOJAMIENTO"), ocupacion(5, "TRANSPORTE", "C-1")] }), AHORA);
+    expect(r.servicios).toEqual([
+      { idsalida: 1, idservicio: 4, tipo: "ALOJAMIENTO", comprobanteReserva: null, servicio: { nombreServicio: "S4" } },
+      { idsalida: 1, idservicio: 5, tipo: "TRANSPORTE", comprobanteReserva: "C-1", servicio: { nombreServicio: "S5" } },
+    ]);
+    expect(r).not.toHaveProperty("ocupaciones");
   });
 
   it("SIN_FINALIZAR: sigue en curso pasado el día siguiente a su fin", () => {

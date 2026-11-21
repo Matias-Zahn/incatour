@@ -61,6 +61,7 @@ export class CrearSalidaDto {
     public fechaInicio: Date,
     public tamanoMaximo: number,
     public idalojamiento: number | undefined,
+    public diasCierreVenta: number | undefined,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearSalidaDto?] {
@@ -82,12 +83,18 @@ export class CrearSalidaDto {
     const idalojamiento = obj.idalojamiento == null ? undefined : entero(obj.idalojamiento);
     if (idalojamiento === null) return ["idalojamiento debe ser un entero positivo"];
 
-    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento)];
+    // B4: sin él, rige el corte sugerido (el del paquete, o 5 días con un hotel a solicitud)
+    const diasCierreVenta = obj.diasCierreVenta == null ? undefined : entero(obj.diasCierreVenta, 0);
+    if (diasCierreVenta === null || (diasCierreVenta ?? 0) > TOPES.diasCierreVenta) {
+      return [`diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}`];
+    }
+
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, diasCierreVenta)];
   }
 }
 
-// Acepta 5 o "5"; devuelve null si no es un entero positivo
-const entero = (valor: unknown): number | null => {
+// Acepta 5 o "5"; devuelve null si no es un entero >= minimo (por defecto, positivo)
+const entero = (valor: unknown, minimo = 1): number | null => {
   const n = typeof valor === "string" && valor.trim() !== "" ? Number(valor) : valor;
-  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : null;
+  return typeof n === "number" && Number.isInteger(n) && n >= minimo ? n : null;
 };

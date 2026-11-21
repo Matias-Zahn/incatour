@@ -17,6 +17,7 @@ export interface DatosNuevaSalida {
   tamanoMaximo: number;
   idbloqueo: string;
   idalojamiento: number | undefined;
+  diasCierreVenta: number; // B4
   rangosAlojamiento: Rango[]; // A1: noches previas y posteriores
   definicionPaquete: DefinicionPaquete; // CAT-05
 }
@@ -63,6 +64,12 @@ export class SalidaRepository {
         permisos: { where: { estadoTramite: ESTADO_PERMISO.EMITIDO }, select: { idpermisopersonal: true } },
         // Cuánto tardó el primer aviso del guía desde que salió
         avances: { select: { fechaHoraLlegada: true }, orderBy: { fechaHoraLlegada: "asc" }, take: 1 },
+        // Decisión 12 del contrato: servicios del listado (hotel y transporte), desde Ocupacion
+        ocupaciones: {
+          where: { tipo: { in: [TIPO_SERVICIO.ALOJAMIENTO, TIPO_SERVICIO.TRANSPORTE] } },
+          select: { idsalida: true, idservicio: true, tipo: true, comprobanteReserva: true, servicio: { select: { nombreServicio: true } } },
+          orderBy: { idocupacion: "asc" },
+        },
       },
       orderBy: { fechaInicio: "asc" },
     });
@@ -77,7 +84,7 @@ export class SalidaRepository {
         tarifas: { include: { temporada: true } },
         // CAT-05: lo necesario para armar la foto de la definición
         garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
-        servicios: { include: { servicio: { include: { transporte: true } } } },
+        servicios: { include: { servicio: { include: { transporte: true, tren: true, equipamiento: true } } } },
       },
     });
   }
@@ -128,6 +135,7 @@ export class SalidaRepository {
           idbloqueo: d.idbloqueo,
           stockLocal: d.tamanoMaximo,
           stockLocalAlojamiento: d.idalojamiento ? d.tamanoMaximo : 0,
+          diasCierreVenta: d.diasCierreVenta,
           tamanoMaximo: d.tamanoMaximo,
           fechaInicio: d.fechaInicio,
           fechaFin: d.fechaFin,

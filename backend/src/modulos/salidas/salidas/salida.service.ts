@@ -1,8 +1,9 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
-import { hoyUTC } from "../../../shared/fechas";
-import { rangosDe } from "../../../shared/ocupacion";
+import { codigoDia, diasDe, hoyUTC } from "../../../shared/fechas";
+import { rangosDe, unaPorServicio } from "../../../shared/ocupacion";
 import { armarDefinicionPaquete } from "../../../shared/definicionPaquete";
+import { corteDeVenta, datosVenta, motivoFechaInvalida } from "../../../shared/ventaAbierta";
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
 import { calcularDotacion } from "./salida.dotacion";
@@ -22,11 +23,20 @@ export class SalidaService {
 
   // CU-36 pasos 4 a 7: dotación, total de lugares y alojamientos que se pueden bloquear
   async consultarOpcionesSalida(dto: CrearSalidaDto) {
-    const { paquete, dotacion, totalLugares, alojamientos } = await this.prepararSalida(dto);
+    const { paquete, dotacion, totalLugares, alojamientos, tren } = await this.prepararSalida(dto);
     // Informativo: si la autoridad no responde, la consulta sigue y el cupo queda sin informar
     const libres = await obtenerAutoridad().consultarDisponibilidad(dto.fechaInicio).catch(() => null);
     return {
-      paquete: { idpaquete: paquete.idpaquete, nombrePaquete: paquete.nombrePaquete },
+      paquete: { idpaquete: paquete.idpaquete, nombrePaquete: paquete.nombrePaquete, diasCierreVenta: paquete.diasCierreVenta },
+      // B9: si el tren no operara ese día, prepararSalida ya lo rechazó
+      tren: tren && {
+        idservicio: tren.idservicio,
+        nombreServicio: tren.nombreServicio,
+        horarioSalida: tren.tren.horarioSalida,
+        horarioLlegada: tren.tren.horarioLlegada,
+        diasOperacion: tren.tren.diasOperacion,
+        operaEseDia: diasDe(tren.tren.diasOperacion).includes(codigoDia(dto.fechaInicio)),
+      },
       tamanoMaximo: dto.tamanoMaximo,
       dotacion,
       totalLugares,
@@ -57,6 +67,12 @@ export class SalidaService {
       throw CustomError.badRequest("Hay alojamientos que confirman por bloqueo de plazas: elegí uno (idalojamiento)");
     }
 
+    // B4: sin hotel con bloqueo, las compras van a solicitud y el corte es más largo. 12.6: con el corte final,
+    // la salida no puede nacer con la venta cerrada
+    const diasCierreVenta = dto.diasCierreVenta ?? corteDeVenta(paquete.diasCierreVenta, rangosAlojamiento.length > 0 && !dto.idalojamiento);
+    const motivo = motivoFechaInvalida(dto.fechaInicio, { diasDisponibles: null, diasCierreVenta });
+    if (motivo) throw CustomError.badRequest(motivo);
+
     // Paso 9: la autoridad va ANTES de la transacción, porque no se puede deshacer con un rollback
     const autoridad = obtenerAutoridad();
     let bloqueo;
@@ -83,6 +99,7 @@ export class SalidaService {
         tamanoMaximo: dto.tamanoMaximo,
         idbloqueo: bloqueo.idBloqueo,
         idalojamiento: dto.idalojamiento,
+        diasCierreVenta,
         rangosAlojamiento,
         definicionPaquete: armarDefinicionPaquete(paquete),
       });
@@ -104,7 +121,14 @@ export class SalidaService {
       throw CustomError.badRequest("El paquete o su circuito no están activos");
     }
 
-    if (dto.fechaInicio <= hoyUTC()) throw CustomError.badRequest("La fecha de inicio tiene que ser futura");
+    // B9 y 12.6: día habilitado del paquete, día en que opera el tren y fecha mínima por el corte de venta
+    const tren = paquete.servicios.map((s) => s.servicio).find((s) => s.tren);
+    const motivo = motivoFechaInvalida(dto.fechaInicio, {
+      diasDisponibles: paquete.diasDisponibles,
+      tren: tren?.tren && { nombreServicio: tren.nombreServicio, diasOperacion: tren.tren.diasOperacion },
+      diasCierreVenta: dto.diasCierreVenta ?? paquete.diasCierreVenta,
+    });
+    if (motivo) throw CustomError.badRequest(motivo);
 
     const tarifaVigente = paquete.tarifas.some(
       (t) =>
@@ -132,7 +156,7 @@ export class SalidaService {
     const fechaFin = new Date(dto.fechaInicio.getTime() + (paquete.circuito.duracionDias - 1) * DIA_MS);
     const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, { fechaInicio: dto.fechaInicio, fechaFin }, paquete);
     const alojamientos = await this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento);
-    return { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento };
+    return { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento, tren: tren?.tren ? { ...tren, tren: tren.tren } : null };
   }
 }
 
@@ -152,7 +176,7 @@ const HORA_MS = 60 * 60 * 1000;
  *   y la que sigue en curso pasado el día siguiente a su fin.
  */
 export function resumirSalida(s: SalidaListada, ahora: Date) {
-  const { reservas, permisos, avances, ...salida } = s;
+  const { reservas, permisos, avances, ocupaciones, ...salida } = s;
   const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
   const cantidadPersonal = salida.personalAsignado.length;
   const emitidos = permisos.length + reservas.reduce((t, r) => t + r.permisos.length, 0);
@@ -185,6 +209,15 @@ export function resumirSalida(s: SalidaListada, ahora: Date) {
 
   return {
     ...salida,
+    ...datosVenta(salida, hoy), // B4
+    // Decisión 12 del contrato: la forma de SalidaServicio, armada desde Ocupacion (el hotel, una vez aunque ocupe dos tramos)
+    servicios: unaPorServicio(ocupaciones).map((o) => ({
+      idsalida: o.idsalida,
+      idservicio: o.idservicio,
+      tipo: o.tipo,
+      comprobanteReserva: o.comprobanteReserva,
+      servicio: { nombreServicio: o.servicio.nombreServicio },
+    })),
     pasajerosConfirmados,
     cantidadPersonal,
     guias,
