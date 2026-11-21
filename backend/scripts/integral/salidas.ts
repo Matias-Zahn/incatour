@@ -162,6 +162,71 @@ export async function salidas(ctx: Ctx) {
     ok("CU-36 ninguna creó salida", (await db.salida.count({ where: { idpaquete: pq.idpaquete } })) === 0);
   });
 
+  // B9 y 12.6: el día de la semana sale de la fecha (getUTCDay: 0 = domingo)
+  const DIAS_SEMANA = ["D", "L", "M", "X", "J", "V", "S"];
+  const otroDia = (d: string) => DIAS_SEMANA[(new Date(d).getUTCDay() + 1) % 7]!;
+  const crearSalida = (idpaquete: number, fechaInicio: string, idalojamiento?: number) =>
+    ctx.back.llamar("POST", "/salidas", { idpaquete, fechaInicio, tamanoMaximo: 4, ...(idalojamiento && { idalojamiento }) }, admin);
+  const ddmm = (d: string) => d.split("-").reverse().join("/");
+
+  await ctx.escenario("CU-36 día no habilitado del paquete (B9)", async () => {
+    const F = proximoInicio();
+    const pq = await f.paquete({ diasDisponibles: otroDia(F) });
+    const hotel = await f.hotel(pq.localidad, 50);
+    const r = await crearSalida(pq.idpaquete, F, hotel.idservicio);
+    ok("B9 crear salida un día no habilitado → 400", r.status === 400 && /^El paquete no sale los .+: los días habilitados son /.test(r.body?.error ?? ""), `${r.status} ${JSON.stringify(r.body)}`);
+    await ctx.esperar("B9 las opciones también rechazan ese día → 400", "GET", `/salidas/opciones?idpaquete=${pq.idpaquete}&fechaInicio=${F}&tamanoMaximo=4`, undefined, admin, 400);
+    const det = await ctx.esperar("B9 detalle del paquete → 200", "GET", `/paquetes/${pq.idpaquete}`, undefined, admin, 200);
+    ok("B9 calendarioSalidas: el día habilitado y la fecha mínima hoy + corte + 1",
+      JSON.stringify(det?.calendarioSalidas) === JSON.stringify({ diasHabilitados: [otroDia(F)], fechaMinima: fecha(3) }), JSON.stringify(det?.calendarioSalidas));
+    ok("B9 no se creó la salida", (await db.salida.count({ where: { idpaquete: pq.idpaquete } })) === 0);
+  });
+
+  await ctx.escenario("CU-36 tren que no opera el día del inicio (B9)", async () => {
+    const F = proximoInicio();
+    const localidad = `Loc ${ctx.unico()}`;
+    const tren = await f.tren(localidad, otroDia(F));
+    const pq = await f.paquete({ localidad, idtren: tren.idservicio });
+    const hotel = await f.hotel(localidad, 50);
+    const r = await crearSalida(pq.idpaquete, F, hotel.idservicio);
+    ok("B9 crear salida un día en que el tren no opera → 400", r.status === 400 && / no opera los .+ \(opera [LMXJVSD]\)$/.test(r.body?.error ?? ""), `${r.status} ${JSON.stringify(r.body)}`);
+    const det = await ctx.esperar("B9 detalle del paquete con tren → 200", "GET", `/paquetes/${pq.idpaquete}`, undefined, admin, 200);
+    ok("B9 calendarioSalidas: solo los días del tren", JSON.stringify(det?.calendarioSalidas?.diasHabilitados) === JSON.stringify([otroDia(F)]), JSON.stringify(det?.calendarioSalidas));
+    ok("B9 sin salida con el tren parado", (await db.salida.count({ where: { idpaquete: pq.idpaquete } })) === 0);
+    const cat = await ctx.esperar("B9 catálogo público → 200", "GET", "/catalogo", undefined, "", 200);
+    const enCatalogo = (cat ?? []).find((p: any) => p.idpaquete === pq.idpaquete);
+    ok("B2 y B9 el catálogo dice Sale desde y el horario del tren en incluye",
+      enCatalogo?.saleDesde === localidad && enCatalogo?.serviciosIncluidos?.some((s: string) => s.endsWith("(sale 06:10, llega 07:45)")), JSON.stringify(enCatalogo?.serviciosIncluidos));
+  });
+
+  await ctx.escenario("CU-36 fecha mínima y corte de 5 días con hotel a solicitud (12.6, B4)", async () => {
+    // Con hotel con bloqueo rige el corte del paquete (2): la salida tiene que empezar después de hoy + 2
+    const pq = await f.paquete();
+    const hotel = await f.hotel(pq.localidad, 50);
+    const r1 = await crearSalida(pq.idpaquete, fecha(2), hotel.idservicio);
+    ok("12.6 empezar en hoy + 2 → 400 (nacería con la venta cerrada)",
+      r1.status === 400 && r1.body?.error === `La salida tiene que empezar después del ${ddmm(fecha(2))}: la venta cierra 2 días antes del inicio`, `${r1.status} ${JSON.stringify(r1.body)}`);
+    const r2 = await crearSalida(pq.idpaquete, fecha(3), hotel.idservicio);
+    ok("12.6 empezar en hoy + 3 → 201 con corte 2", r2.status === 201 && (await salidaDb(ctx.idDe(r2.body, "idsalida")!)).diasCierreVenta === 2, `${r2.status} ${JSON.stringify(r2.body?.error)}`);
+
+    // Solo un hotel a solicitud: las compras van a solicitud y el corte pasa a 5 (DIAS_CIERRE_SOLICITUD)
+    const pqS = await f.paquete();
+    await f.hotel(pqS.localidad, 50, "A_SOLICITUD");
+    const r3 = await crearSalida(pqS.idpaquete, fecha(5));
+    ok("B4 a solicitud: empezar en hoy + 5 → 400 por el corte de 5 días",
+      r3.status === 400 && r3.body?.error === `La salida tiene que empezar después del ${ddmm(fecha(5))}: la venta cierra 5 días antes del inicio`, `${r3.status} ${JSON.stringify(r3.body)}`);
+    const r4 = await crearSalida(pqS.idpaquete, fecha(6));
+    const idsalida = ctx.idDe(r4.body, "idsalida")!;
+    ok("B4 a solicitud: hoy + 6 → 201 y la salida guarda diasCierreVenta 5", r4.status === 201 && (await salidaDb(idsalida)).diasCierreVenta === 5, `${r4.status} ${JSON.stringify(r4.body?.error)}`);
+    const lista = await ctx.esperar("B4 listado del admin → 200", "GET", `/salidas?idpaquete=${pqS.idpaquete}`, undefined, admin, 200);
+    ok("B4 listado: venta abierta hasta hoy (fechaInicio − 5 − 1)", lista?.[0]?.ventaAbierta === true && lista?.[0]?.ultimoDiaVenta === fecha(0) && lista?.[0]?.diasCierreVenta === 5, JSON.stringify(lista?.[0] && { v: lista[0].ventaAbierta, u: lista[0].ultimoDiaVenta }));
+    const cli = await f.cliente();
+    await ctx.esperar("B4 a solicitud: comprar el último día de venta → 201", "POST", "/reservas", f.compra(idsalida), cli.token, 201);
+    await f.moverFechas(idsalida, fecha(5), fecha(7));
+    const r5 = await ctx.back.llamar("POST", "/reservas", f.compra(idsalida), cli.token);
+    ok("B4 a solicitud: a 5 días del inicio la compra → 400 venta cerrada", r5.status === 400 && /^La venta de esta salida cerró el /.test(r5.body?.error ?? ""), `${r5.status} ${JSON.stringify(r5.body)}`);
+  });
+
   // ======================================================================
   ctx.seccion("CU-40 Asignar recursos");
 
@@ -619,10 +684,12 @@ export async function salidas(ctx: Ctx) {
   });
 
   await ctx.escenario("CAT-32 garantía por establecimiento tras editar el hotel", async () => {
-    const hotel = await f.hotel(`Loc ${ctx.unico()}`, 3);
+    const loc = `Loc ${ctx.unico()}`;
+    const hotel = await f.hotel(loc, 3);
     const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
     const pq = await ctx.preparar("Paquete con hotel garantizado", "POST", "/paquetes", {
       idcircuito: await f.circuito(), nombrePaquete: `Int ${ctx.unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      localidadGarantizada: loc, idtransporte: (await f.transporte(loc)).idservicio,
       matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: 500, moneda: "USD" })),
     });
     const idsalida = await f.salida(ctx.idDe(pq, "idpaquete")!, proximoInicio(), 6); // FA3: el hotel (3) no alcanza, sin bloqueo

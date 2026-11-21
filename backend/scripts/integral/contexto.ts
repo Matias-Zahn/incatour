@@ -124,8 +124,8 @@ export function crearContexto(p: {
       return idcircuito;
     },
 
-    /** Proveedor con un servicio. tipo ALOJAMIENTO, TRANSPORTE o EQUIPAMIENTO; `campos` según servicio.dto.ts */
-    async servicio(tipo: "ALOJAMIENTO" | "TRANSPORTE" | "EQUIPAMIENTO", localidad: string, campos: Record<string, unknown>) {
+    /** Proveedor con un servicio. tipo ALOJAMIENTO, TRANSPORTE, TREN o EQUIPAMIENTO; `campos` según servicio.dto.ts */
+    async servicio(tipo: "ALOJAMIENTO" | "TRANSPORTE" | "TREN" | "EQUIPAMIENTO", localidad: string, campos: Record<string, unknown>) {
       const prov = await ctx.preparar("Alta proveedor", "POST", "/proveedores", {
         tipoProveedor: tipo, razonSocial: `Int ${tipo} ${unico()}`, localidad, datosContacto: "int@test.com", canalComunicacion: "Email",
       });
@@ -148,13 +148,23 @@ export function crearContexto(p: {
     equipamiento(localidad: string, cantidad = 10) {
       return f.servicio("EQUIPAMIENTO", localidad, { tipoEquipamiento: "Carpa", cantidadDisponible: cantidad });    },
 
+    /** B9: tren que opera los días `dias` ("L-X-V") */
+    tren(localidad: string, dias = "L-M-X-J-V-S-D") {
+      return f.servicio("TREN", localidad, { horarioSalida: "06:10", horarioLlegada: "07:45", diasOperacion: dias });
+    },
+
     /**
      * Paquete por categoría en una localidad propia (así solo ve los hoteles que arma el escenario).
      * Tarifa 500 USD en todas las temporadas activas (la del seed cubre hasta fin de 2026; setup agrega 2027-2028).
+     * B2: el transporte es obligatorio; si no se pasa, se crea uno en la localidad.
      */
-    async paquete(o: { idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; serviciosIncluidos?: number[]; monto?: number; nochesPrevias?: number; nochesPosteriores?: number } = {}) {
+    async paquete(o: {
+      idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; idtransporte?: number; idtren?: number; monto?: number;
+      nochesPrevias?: number; nochesPosteriores?: number; diasDisponibles?: string; diasCierreVenta?: number;
+    } = {}) {
       const localidad = o.localidad ?? `Loc ${unico()}`;
       const idcircuito = o.idcircuito ?? (await f.circuito());
+      const idtransporte = o.idtransporte ?? (await f.transporte(localidad)).idservicio;
       const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
       const pq = await ctx.preparar("Crear paquete", "POST", "/paquetes", {
         idcircuito, nombrePaquete: `Int ${unico()}`, condiciones: "Integral", tipoGarantia: "POR_CATEGORIA",
@@ -163,9 +173,12 @@ export function crearContexto(p: {
         nochesPrevias: o.nochesPrevias ?? 1, nochesPosteriores: o.nochesPosteriores ?? 1,
         matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: o.monto ?? 500, moneda: "USD" })),
         ...(o.diasMinimosReintegro !== undefined && { diasMinimosReintegro: o.diasMinimosReintegro }),
-        ...(o.serviciosIncluidos && { serviciosIncluidos: o.serviciosIncluidos }),
+        idtransporte,
+        ...(o.idtren && { idtren: o.idtren }),
+        ...(o.diasDisponibles && { diasDisponibles: o.diasDisponibles }),
+        ...(o.diasCierreVenta !== undefined && { diasCierreVenta: o.diasCierreVenta }),
       });
-      return { idpaquete: idDe(pq, "idpaquete")!, idcircuito, localidad };
+      return { idpaquete: idDe(pq, "idpaquete")!, idcircuito, localidad, idtransporte };
     },
 
     /** Salida PUBLICADA. Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
@@ -222,10 +235,10 @@ export function crearContexto(p: {
       await db.$executeRaw`UPDATE public."Ocupacion" SET desde = desde + ${dias}::int, hasta = hasta + ${dias}::int WHERE idsalida = ${idsalida}`;
     },
 
-    /** A1: lo libre del servicio en su día más ocupado: total − máximo diario de las salidas activas */
+    /** A1: lo libre del servicio en su día más ocupado: total − máximo diario (las finalizadas cuentan hasta su `hasta`) */
     async libre(idservicio: number) {
       const s = await db.servicioBase.findUniqueOrThrow({ where: { idservicio }, include: { alojamiento: true, equipamiento: true, transporte: true } });
-      const ocupaciones = await db.ocupacion.findMany({ where: { idservicio, salida: { estado: { in: SALIDAS_ACTIVAS } } } });
+      const ocupaciones = await db.ocupacion.findMany({ where: { idservicio, salida: { estado: { not: "CANCELADA" } } } });
       if (!ocupaciones.length) return totalDe(s);
       const desde = new Date(Math.min(...ocupaciones.map((o) => o.desde.getTime())));
       const hasta = new Date(Math.max(...ocupaciones.map((o) => o.hasta.getTime())));

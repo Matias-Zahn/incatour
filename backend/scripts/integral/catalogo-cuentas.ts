@@ -87,16 +87,18 @@ export async function catalogoCuentas(ctx: Ctx) {
     const antes = await db.paquete.count();
     await esperar("Crear paquete con circuito inactivo → 404", "POST", "/paquetes", {
       idcircuito: inactivo, nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_CATEGORIA", localidadGarantizada: "X", categoriaGarantizada: "3 Estrellas",
-      tipoHabitacionGarantizada: "Doble", matrizPrecios: await matriz(),
+      tipoHabitacionGarantizada: "Doble", idtransporte: 1, matrizPrecios: await matriz(),
     }, admin, 404);
     controlar("No se creó el paquete", (await db.paquete.count()) === antes);
   });
 
   await escenario("Paquete: garantía por establecimiento exige bloqueo de plazas (RF-06)", async () => {
-    const hotel = await f.hotel(`Loc ${unico()}`, 50, "A_SOLICITUD");
+    const loc = `Loc ${unico()}`;
+    const hotel = await f.hotel(loc, 50, "A_SOLICITUD");
     const antes = await db.paquete.count();
     await esperar("POR_ESTABLECIMIENTO con hotel A_SOLICITUD → 400", "POST", "/paquetes", {
-      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio, matrizPrecios: await matriz(),
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      localidadGarantizada: loc, idtransporte: (await f.transporte(loc)).idservicio, matrizPrecios: await matriz(),
     }, admin, 400);
     controlar("No se creó el paquete", (await db.paquete.count()) === antes);
   });
@@ -160,15 +162,17 @@ export async function catalogoCuentas(ctx: Ctx) {
   ctx.seccion("CU-14 a 21 Proveedores y servicios");
 
   await escenario("Baja de proveedor con hotel garantizado o servicio incluido en un paquete activo (CAT-26)", async () => {
-    const hotel = await f.hotel(`Loc ${unico()}`);
+    const locHotel = `Loc ${unico()}`;
+    const hotel = await f.hotel(locHotel);
     await preparar("Paquete con hotel garantizado", "POST", "/paquetes", {
-      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio, matrizPrecios: await matriz(),
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      localidadGarantizada: locHotel, idtransporte: (await f.transporte(locHotel)).idservicio, matrizPrecios: await matriz(),
     });
     await esperar("Baja de proveedor con hotel garantizado → 400", "PATCH", `/proveedores/${hotel.idproveedor}/baja`, undefined, admin, 400);
     controlar("Proveedor y servicio siguen ACTIVOS", (await estadoDe("proveedor", { idproveedor: hotel.idproveedor })) === "ACTIVO" && (await estadoDe("servicioBase", { idservicio: hotel.idservicio })) === "ACTIVO");
 
     const trans = await f.transporte(`Loc ${unico()}`);
-    await f.paquete({ serviciosIncluidos: [trans.idservicio] });
+    await f.paquete({ idtransporte: trans.idservicio });
     await esperar("Baja de proveedor con servicio incluido en un paquete activo → 400", "PATCH", `/proveedores/${trans.idproveedor}/baja`, undefined, admin, 400);
     controlar("Proveedor y servicio incluido siguen ACTIVOS", (await estadoDe("proveedor", { idproveedor: trans.idproveedor })) === "ACTIVO" && (await estadoDe("servicioBase", { idservicio: trans.idservicio })) === "ACTIVO");
     await esperar("Baja del servicio incluido en paquete activo (CAT-09) → 400", "PATCH", `/servicios/${trans.idservicio}/baja`, undefined, admin, 400);

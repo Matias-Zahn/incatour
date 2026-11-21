@@ -22,7 +22,7 @@ export async function ventas(ctx: Ctx) {
   async function armar(o: { tamano?: number; hotel?: "bloqueo" | "solicitud" | "ninguno"; capHotel?: number; dias?: number; reintegro?: number | null; transporte?: boolean } = {}) {
     const localidad = `Loc ${ctx.unico()}`;
     const transp = o.transporte ? await f.transporte(localidad) : undefined;
-    const pq = await f.paquete({ localidad, diasMinimosReintegro: o.reintegro === undefined ? 15 : o.reintegro, ...(transp && { serviciosIncluidos: [transp.idservicio] }) });
+    const pq = await f.paquete({ localidad, diasMinimosReintegro: o.reintegro === undefined ? 15 : o.reintegro, ...(transp && { idtransporte: transp.idservicio }) });
     const modo = o.hotel ?? "bloqueo";
     const hotel = modo === "ninguno" ? undefined : await f.hotel(localidad, o.capHotel ?? 50, modo === "solicitud" ? "A_SOLICITUD" : "BLOQUEO_PLAZAS");
     const dias = o.dias ?? 30 + (k++ % 30);
@@ -256,8 +256,17 @@ export async function ventas(ctx: Ctx) {
     await f.moverFechas(idsalida, fecha(0), fecha(2));
     await ctx.esperar("Compra en salida que empieza hoy → 400", "POST", "/reservas", f.compra(idsalida), cli.token, 400);
     igual("Salidas empezadas: stock sin cambios", await foto(idsalida), "3/3/0");
-    await f.moverFechas(idsalida, fecha(1), fecha(3));
-    await ctx.esperar("Compra en salida que empieza mañana → 201", "POST", "/reservas", f.compra(idsalida), cli.token, 201);
+    // B4: la venta cierra diasCierreVenta (2) días antes del inicio, sin tarea programada
+    await f.moverFechas(idsalida, fecha(2), fecha(4));
+    const cerrada = await ctx.back.llamar("POST", "/reservas", f.compra(idsalida), cli.token);
+    ctx.controlar("B4 compra en salida que empieza en 2 días (venta cerrada) → 400",
+      cerrada.status === 400 && cerrada.body?.error === `La venta de esta salida cerró el ${fecha(-1).split("-").reverse().join("/")}.`, `${cerrada.status} ${JSON.stringify(cerrada.body)}`);
+    const cat = await ctx.esperar("B4 catálogo con la venta cerrada → 200", "GET", "/catalogo", undefined, "", 200);
+    const enCat = (cat ?? []).flatMap((p: any) => p.salidasDisponibles).find((s: any) => s.idsalida === idsalida);
+    ctx.controlar("B4 el catálogo la lista igual, con ventaAbierta false", enCat?.ventaAbierta === false && enCat?.ultimoDiaVenta === fecha(-1), JSON.stringify(enCat && { v: enCat.ventaAbierta, u: enCat.ultimoDiaVenta }));
+    igual("Venta cerrada: stock sin cambios", await foto(idsalida), "3/3/0");
+    await f.moverFechas(idsalida, fecha(3), fecha(5));
+    await ctx.esperar("B4 compra el último día de venta (empieza en 3 días) → 201", "POST", "/reservas", f.compra(idsalida), cli.token, 201);
   });
 
   await ctx.escenario("Compra en salida sin tarifa vigente", async () => {

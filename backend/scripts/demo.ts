@@ -160,8 +160,9 @@ function armarCalendario(hoy: string) {
       const paquete = elegir(bolsa);
       const virtual = `${mes}-${String(dias[i]).padStart(2, "0")}`;
       const fin = sumarDias(virtual, CIRCUITOS[paquete.circuito].dias - 1);
-      // Las salidas alrededor de hoy se arman a mano abajo
-      if (fin >= sumarDias(hoy, -1) && virtual <= sumarDias(hoy, 3)) continue;
+      // Las salidas alrededor de hoy se arman a mano abajo. Hasta hoy + 5 no se pueden crear: la venta nacería
+      // cerrada con el corte a solicitud (DIAS_CIERRE_SOLICITUD, 12.6)
+      if (fin >= sumarDias(hoy, -1) && virtual <= sumarDias(hoy, 5)) continue;
       const etapa = fin < hoy ? "historica" : virtual <= sumarDias(hoy, 25) ? "cerrada" : "publicada";
       planes.push({ virtual, paquete, etapa });
     }
@@ -271,7 +272,7 @@ async function main() {
         tipoGarantia: "POR_CATEGORIA", localidadGarantizada: z.localidad, categoriaGarantizada: z.categoria, tipoHabitacionGarantizada: "Doble",
         nochesPrevias: p.previas, nochesPosteriores: p.posteriores, diasMinimosReintegro: 15,
         matrizPrecios: tarifasPorFactor.map((t) => ({ idtemporada: t.idtemporada, monto: Math.round(p.tarifa * t.factor), moneda: "USD" })),
-        serviciosIncluidos: [transportes[p.transporte]!.idservicio, ...(p.tren === null ? [] : [trenes[p.tren]!])],
+        idtransporte: transportes[p.transporte]!.idservicio, ...(p.tren !== null && { idtren: trenes[p.tren]! }), // B2
       });
       paquetes.set(p.nombre, idDe(pq, "idpaquete")!);
     }

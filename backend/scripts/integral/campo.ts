@@ -199,10 +199,13 @@ export async function campo(ctx: Ctx) {
     const plazasHotel = () => ctx.f.libre(a.hotel.idservicio);
     const plazasAntes = await plazasHotel();
     const r = await ctx.esperar("Avance 3 de 3 → 201", "POST", url, avance(3, hace(2 * H)), a.guia.token, 201);
-    // El hotel tenía 50: el bloqueo de 8 lo dejó en 42 y la asignación devolvió los 6 sin vender; al terminar,
-    // la ocupación de los 2 del grupo queda como historial y deja de contar (A1)
+    // El hotel tenía 50: el bloqueo de 8 lo dejó en 42 y la asignación devolvió los 6 sin vender. Al terminar,
+    // la ocupación de los 2 del grupo sigue contando hasta su `hasta`: la noche posterior (fin = mañana) sigue tomada
     const plazasDespues = await plazasHotel();
-    ctx.controlar("Al finalizar, el hotel recupera las 2 plazas del grupo (vuelve a 50)", plazasDespues === plazasAntes + 2 && plazasDespues === 50, `antes=${plazasAntes} después=${plazasDespues}`);
+    ctx.controlar("Al finalizar, el hotel sigue con las 2 plazas del grupo tomadas hasta la noche posterior (48)", plazasDespues === plazasAntes && plazasDespues === 48, `antes=${plazasAntes} después=${plazasDespues}`);
+    const oc = await ctx.esperar("Ocupación del hotel en la noche posterior → 200", "GET", `/servicios/${a.hotel.idservicio}/ocupacion?desde=${fecha(1)}&hasta=${fecha(2)}`, undefined, ctx.admin, 200);
+    ctx.controlar("La finalizada ocupa la noche posterior y la libera al día siguiente",
+      oc?.dias?.[0]?.ocupado === 2 && oc?.dias?.[1]?.ocupado === 0 && oc?.ocupaciones?.some((o: any) => o.estadoSalida === "FINALIZADA"), JSON.stringify(oc?.dias));
     ctx.controlar("Respuesta: salida FINALIZADA", r?.salida?.estado === "FINALIZADA" && r?.salida?.ultimaEtapaAlcanzada === 3, JSON.stringify(r?.salida));
     const s = await estadoSalida(a.idsalida);
     ctx.controlar("Base: salida FINALIZADA con ultimaEtapa 3 y 3 avances", s.estado === "FINALIZADA" && s.ultimaEtapaAlcanzada === 3 && (await avances(a.idsalida)) === 3, `estado=${s.estado} ultima=${s.ultimaEtapaAlcanzada}`);
