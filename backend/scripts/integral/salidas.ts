@@ -784,6 +784,15 @@ export async function salidas(ctx: Ctx) {
     const m2 = await montar({ pax: [2], inicio: m.inicio });
     ok("A1 otra salida en esas fechas usa las 10 carpas → 200", (await cerrar(m2.idsalida, 2, [{ idservicio: carpas, cantidad: 10 }])).status === 200);
   });
+
+  await ctx.escenario("Bloque 8 hotel a solicitud sin plazas", async () => {
+    const h = await f.servicio("ALOJAMIENTO", `Loc ${ctx.unico()}`, { categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "A_SOLICITUD" });
+    const a = await db.servicioAlojamiento.findUniqueOrThrow({ where: { idservicio: h.idservicio } });
+    ok("Bloque 8 se registra sin plazas (NULL)", a.plazasTotales === null, JSON.stringify(a));
+    await ctx.esperar("Bloque 8 pasarlo a bloqueo sin indicar plazas → 400", "PUT", `/servicios/${h.idservicio}`, { modalidadConfirmacion: "BLOQUEO_PLAZAS" }, admin, 400);
+    const prov = await ctx.preparar("Alta proveedor", "POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `Int ${ctx.unico()}`, localidad: "Cusco", datosContacto: "int@test.com", canalComunicacion: "Email" });
+    await ctx.esperar("Bloque 8 con bloqueo y sin plazas → 400", "POST", `/proveedores/${ctx.idDe(prov, "idproveedor")}/servicios`, { tipo: "ALOJAMIENTO", nombreServicio: `Int ${ctx.unico()}`, localidad: "Cusco", costoBase: 10, categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS" }, admin, 400);
+  });
 }
 
 const resumenDe = (r: { body: any }) => JSON.stringify(r.body?.error ?? r.body).slice(0, 200);
