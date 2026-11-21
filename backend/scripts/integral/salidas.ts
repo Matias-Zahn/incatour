@@ -17,8 +17,10 @@ export async function salidas(ctx: Ctx) {
   const suma = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
   // ---------- lecturas de la base ----------
-  const capacidad = async (id: number) => (await db.servicioAlojamiento.findUniqueOrThrow({ where: { idservicio: id } })).capacidadDisponible;
-  const stockEq = async (id: number) => (await db.servicioEquipamiento.findUniqueOrThrow({ where: { idservicio: id } })).cantidadDisponible;
+  // A1: lo libre en el día más ocupado (con una salida por servicio, el viejo contador)
+  const capacidad = ctx.f.libre;
+  const stockEq = ctx.f.libre;
+  const totalEq = async (id: number) => (await db.servicioEquipamiento.findUniqueOrThrow({ where: { idservicio: id } })).cantidadTotal;
   const salidaDb = (id: number) => db.salida.findUniqueOrThrow({ where: { idsalida: id } });
   const lugares = async (id: number) => {
     const s = await salidaDb(id);
@@ -121,7 +123,7 @@ export async function salidas(ctx: Ctx) {
     const id = sin?.salida?.idsalida;
     if (id) {
       const s = await salidaDb(id);
-      ok("CU-36 FA3 salida sin hotel: stockLocalAlojamiento 0 y hotel intacto", s.stockLocalAlojamiento === 0 && s.stockLocal === 6 && (await capacidad(chico.idservicio)) === 3 && (await db.salidaServicio.count({ where: { idsalida: id } })) === 0);
+      ok("CU-36 FA3 salida sin hotel: stockLocalAlojamiento 0 y hotel intacto", s.stockLocalAlojamiento === 0 && s.stockLocal === 6 && (await capacidad(chico.idservicio)) === 3 && (await db.ocupacion.count({ where: { idsalida: id } })) === 0);
     }
     // Con un hotel que alcanza, hay que elegirlo
     const grande = await f.hotel(pq.localidad, 50);
@@ -145,7 +147,7 @@ export async function salidas(ctx: Ctx) {
       s.estado === "PUBLICADA" && s.stockLocal === 6 && s.stockLocalAlojamiento === 6 && s.tamanoMaximo === 6 && s.fechaFin.toISOString().slice(0, 10) === sumar(F, 2), JSON.stringify(s));
     ok("CU-36 el bloqueo ante la autoridad es tamanoMaximo + dotación (6 + 1 + 3)", (await lugares(id)) === 10 && r.dotacion?.guias === 1 && r.dotacion?.porteadores === 3 && r.totalLugares === 10, `lugares ${await lugares(id)}`);
     ok("CU-36 el cupo del día suma los 10 lugares", (await ocupados(F)) === 10);
-    ok("CU-36 el hotel queda asociado a la salida", (await db.salidaServicio.count({ where: { idsalida: id, idservicio: hotel.idservicio, tipo: "ALOJAMIENTO" } })) === 1);
+    ok("CU-36 el hotel queda asociado a la salida (noche previa y posterior)", (await db.ocupacion.count({ where: { idsalida: id, idservicio: hotel.idservicio, tipo: "ALOJAMIENTO" } })) === 2);
   });
 
   await ctx.escenario("CU-36 datos inválidos", async () => {
@@ -237,7 +239,7 @@ export async function salidas(ctx: Ctx) {
     const chico = (await f.equipamiento("Loc E", 5)).idservicio;
     const ids = [p.guias[0]!, p.porteadores[0]!];
     await ctx.esperar("CU-40 FA2 equipamiento por encima del stock → 400", "POST", `/salidas/${m.idsalida}/asignacion`, cuerpo(p, ids, [{ idservicio: p.equipo, cantidad: 2 }, { idservicio: chico, cantidad: 6 }]), admin, 400);
-    ok("CU-40 FA2 ningún stock se descontó y no se asignó nada", (await stockEq(chico)) === 5 && (await stockEq(p.equipo)) === 10 && (await asignados(m.idsalida)).length === 0 && (await db.salidaEquipamiento.count({ where: { idsalida: m.idsalida } })) === 0);
+    ok("CU-40 FA2 ningún stock se descontó y no se asignó nada", (await stockEq(chico)) === 5 && (await stockEq(p.equipo)) === 10 && (await asignados(m.idsalida)).length === 0 && (await db.ocupacion.count({ where: { idsalida: m.idsalida, tipo: "EQUIPAMIENTO" } })) === 0);
     await ctx.esperar("CU-40 FA2 borde: justo el stock → 200", "POST", `/salidas/${m.idsalida}/asignacion`, cuerpo(p, ids, [{ idservicio: chico, cantidad: 5 }]), admin, 200);
     ok("CU-40 FA2 borde: el stock queda en 0", (await stockEq(chico)) === 0);
   });
@@ -248,7 +250,7 @@ export async function salidas(ctx: Ctx) {
     const chico = (await f.transporte("Loc T", 1)).idservicio; // 2 pasajeros no entran
     const ids = [p.guias[0]!, p.porteadores[0]!];
     await ctx.esperar("CU-40 FA3 transporte sin capacidad → 400", "POST", `/salidas/${m.idsalida}/asignacion`, { ...cuerpo(p, ids), idtransporte: chico }, admin, 400);
-    ok("CU-40 FA3 sin transporte asignado", (await db.salidaServicio.count({ where: { idsalida: m.idsalida, tipo: "TRANSPORTE" } })) === 0 && (await asignados(m.idsalida)).length === 0);
+    ok("CU-40 FA3 sin transporte asignado", (await db.ocupacion.count({ where: { idsalida: m.idsalida, tipo: "TRANSPORTE" } })) === 0 && (await asignados(m.idsalida)).length === 0);
     await ctx.esperar("CU-40 transporte inexistente → 400", "POST", `/salidas/${m.idsalida}/asignacion`, { ...cuerpo(p, ids), idtransporte: 99999999 }, admin, 400);
     await ctx.esperar("CU-40 asignar con el transporte correcto → 200", "POST", `/salidas/${m.idsalida}/asignacion`, cuerpo(p, ids), admin, 200);
     // Otra salida que se superpone no puede usar el mismo vehículo
@@ -311,7 +313,7 @@ export async function salidas(ctx: Ctx) {
     ok("CU-40 3 permisos de personal Emitido con número", per.length === 3 && per.every((x) => x.estadoTramite === "Emitido" && !!x.nroPermiso));
     ok("CU-40 permisos vigentes ante la autoridad = lugares", (await vigentes(m.idsalida)) === 6);
     ok("CU-40 personal, transporte y equipamiento asignados; stock 10 → 7",
-      (await asignados(m.idsalida)).join() === [...personalIds].sort((a, b) => a - b).join() && (await db.salidaServicio.count({ where: { idsalida: m.idsalida, idservicio: p.transporte, tipo: "TRANSPORTE" } })) === 1 && (await stockEq(p.equipo)) === 7);
+      (await asignados(m.idsalida)).join() === [...personalIds].sort((a, b) => a - b).join() && (await db.ocupacion.count({ where: { idsalida: m.idsalida, idservicio: p.transporte, tipo: "TRANSPORTE" } })) === 1 && (await stockEq(p.equipo)) === 7);
     await ctx.esperar("CU-40 repetir la asignación → 400", "POST", `/salidas/${m.idsalida}/asignacion`, cuerpo(p, personalIds), admin, 400);
     ok("CU-40 repetir no duplicó nada", (await permisosPer(m.idsalida)).length === 3 && (await stockEq(p.equipo)) === 7);
     const compra = f.compra(m.idsalida);
@@ -437,19 +439,21 @@ export async function salidas(ctx: Ctx) {
     ok("CU-39 el disponible informa el stock", (disp ?? []).find((x: any) => x.idservicio === chico)?.disponibilidad?.cantidadDisponible === 4);
 
     await ctx.esperar("CU-39 agregar equipamiento por encima del stock → 400", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: chico, cantidad: 5 }] }, admin, 400);
-    ok("CU-39 stock intacto y sin fila nueva", (await stockEq(chico)) === 4 && (await db.salidaEquipamiento.count({ where: { idsalida: a.idsalida, idservicio: chico } })) === 0);
+    ok("CU-39 stock intacto y sin fila nueva", (await stockEq(chico)) === 4 && (await db.ocupacion.count({ where: { idsalida: a.idsalida, idservicio: chico } })) === 0);
     await ctx.esperar("CU-39 agregar equipamiento justo el stock → 200", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: chico, cantidad: 4 }], motivo: "Más carpas" }, admin, 200);
-    ok("CU-39 stock descontado a 0 y auditado", (await stockEq(chico)) === 0 && (await db.salidaEquipamiento.count({ where: { idsalida: a.idsalida, idservicio: chico } })) === 1 && (await db.registroAuditoria.count({ where: { idsalida: a.idsalida, motivo: "Más carpas" } })) === 1);
+    ok("CU-39 stock descontado a 0 y auditado", (await stockEq(chico)) === 0 && (await db.ocupacion.count({ where: { idsalida: a.idsalida, idservicio: chico } })) === 1 && (await db.registroAuditoria.count({ where: { idsalida: a.idsalida, motivo: "Más carpas" } })) === 1);
 
-    await ctx.esperar("CU-39 asignar un equipamiento que ya está asignado → 400", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo, cantidad: 1 }] }, admin, 400);
+    // A1: asignar uno que ya está asignado cambia su cantidad en una sola operación
+    await ctx.esperar("CU-39 asignar un equipamiento ya asignado cambia la cantidad (3 → 1) → 200", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo, cantidad: 1 }] }, admin, 200);
+    ok("CU-39 una sola fila con la cantidad nueva: stock 10 − 1 = 9", (await stockEq(a.equipo)) === 9 && (await db.ocupacion.count({ where: { idsalida: a.idsalida, idservicio: a.equipo } })) === 1 && (await db.ocupacion.findFirstOrThrow({ where: { idsalida: a.idsalida, idservicio: a.equipo } })).cantidad === 1);
     await ctx.esperar("CU-39 quitar un equipamiento que no está asignado → 400", "PUT", url, { itemsDesasignar: [{ tipo: "EQUIPAMIENTO", idservicio: (await f.equipamiento("Loc E", 1)).idservicio }] }, admin, 400);
-    ok("CU-39 los rechazos no tocaron el stock", (await stockEq(a.equipo)) === 7);
+    ok("CU-39 el rechazo no tocó el stock", (await stockEq(a.equipo)) === 9);
 
     await ctx.esperar("CU-39 quitar equipamiento → 200", "PUT", url, { itemsDesasignar: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo }] }, admin, 200);
-    ok("CU-39 quitar devuelve el stock (7 → 10) y borra la fila", (await stockEq(a.equipo)) === 10 && (await db.salidaEquipamiento.count({ where: { idsalida: a.idsalida, idservicio: a.equipo } })) === 0);
+    ok("CU-39 quitar devuelve el stock (9 → 10) y borra la fila", (await stockEq(a.equipo)) === 10 && (await db.ocupacion.count({ where: { idsalida: a.idsalida, idservicio: a.equipo } })) === 0);
     // Cambiar cantidad: desasignar y asignar en la misma operación (sin quedar en un estado intermedio)
     await ctx.esperar("CU-39 cambiar la cantidad (quitar y agregar a la vez) → 200", "PUT", url, { itemsDesasignar: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo2 }], itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo2, cantidad: 6 }] }, admin, 200);
-    ok("CU-39 stock coherente tras cambiar la cantidad (10 − 6 = 4)", (await stockEq(a.equipo2)) === 4 && (await db.salidaEquipamiento.findFirstOrThrow({ where: { idsalida: a.idsalida, idservicio: a.equipo2 } })).cantidad === 6);
+    ok("CU-39 stock coherente tras cambiar la cantidad (10 − 6 = 4)", (await stockEq(a.equipo2)) === 4 && (await db.ocupacion.findFirstOrThrow({ where: { idsalida: a.idsalida, idservicio: a.equipo2 } })).cantidad === 6);
     await ctx.esperar("CU-39 cuerpo vacío → 400", "PUT", url, {}, admin, 400);
     await ctx.esperar("CU-39 cantidad 0 → 400", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: a.equipo, cantidad: 0 }] }, admin, 400);
   });
@@ -462,9 +466,9 @@ export async function salidas(ctx: Ctx) {
     await ctx.esperar("CU-39 transporte nuevo sin quitar el actual → 400", "PUT", url, { itemsNuevos: [{ tipo: "TRANSPORTE", idservicio: nuevo, comprobanteReserva: "CMP-1" }] }, admin, 400);
     await ctx.esperar("CU-39 transporte sin comprobante → 400", "PUT", url, { itemsDesasignar: [{ tipo: "TRANSPORTE", idservicio: a.transporte }], itemsNuevos: [{ tipo: "TRANSPORTE", idservicio: nuevo }] }, admin, 400);
     await ctx.esperar("CU-39 transporte sin capacidad → 400", "PUT", url, { itemsDesasignar: [{ tipo: "TRANSPORTE", idservicio: a.transporte }], itemsNuevos: [{ tipo: "TRANSPORTE", idservicio: chico, comprobanteReserva: "CMP-2" }] }, admin, 400);
-    ok("CU-39 los rechazos dejaron el transporte original (la transacción se revirtió)", (await db.salidaServicio.findFirst({ where: { idsalida: a.idsalida, tipo: "TRANSPORTE" } }))?.idservicio === a.transporte);
+    ok("CU-39 los rechazos dejaron el transporte original (la transacción se revirtió)", (await db.ocupacion.findFirst({ where: { idsalida: a.idsalida, tipo: "TRANSPORTE" } }))?.idservicio === a.transporte);
     await ctx.esperar("CU-39 cambiar de transporte → 200", "PUT", url, { itemsDesasignar: [{ tipo: "TRANSPORTE", idservicio: a.transporte }], itemsNuevos: [{ tipo: "TRANSPORTE", idservicio: nuevo, comprobanteReserva: "CMP-3" }] }, admin, 200);
-    const st = await db.salidaServicio.findFirst({ where: { idsalida: a.idsalida, tipo: "TRANSPORTE" } });
+    const st = await db.ocupacion.findFirst({ where: { idsalida: a.idsalida, tipo: "TRANSPORTE" } });
     ok("CU-39 el transporte nuevo queda con su comprobante", st?.idservicio === nuevo && st.comprobanteReserva === "CMP-3");
     const q = await ctx.esperar("CU-39 quitar el transporte → 200", "PUT", url, { itemsDesasignar: [{ tipo: "TRANSPORTE", idservicio: nuevo }] }, admin, 200);
     ok("CU-39 sin transporte: queda 'Sin asignar' con advertencia", (q?.advertencias ?? []).length === 1 && q.panel?.transporte === null, JSON.stringify(q?.advertencias));
@@ -476,7 +480,7 @@ export async function salidas(ctx: Ctx) {
     const url = `/salidas/${m.idsalida}/logistica`;
     await ctx.esperar("CU-39 salida sin asignación previa → 400", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: eq, cantidad: 1 }] }, admin, 400);
     await ctx.esperar("CU-39 disponibles de salida sin asignación previa → 400", "GET", `${url}/disponibles?tipo=EQUIPAMIENTO`, undefined, admin, 400);
-    ok("CU-39 sin asignación previa: stock intacto", (await stockEq(eq)) === 3 && (await db.salidaEquipamiento.count({ where: { idsalida: m.idsalida } })) === 0);
+    ok("CU-39 sin asignación previa: stock intacto", (await stockEq(eq)) === 3 && (await db.ocupacion.count({ where: { idsalida: m.idsalida, tipo: "EQUIPAMIENTO" } })) === 0);
     await ctx.esperar("CU-39 salida inexistente → 404", "PUT", `/salidas/99999999/logistica`, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: eq, cantidad: 1 }] }, admin, 404);
     await ctx.esperar("CU-39 tipo de recurso inválido → 400", "GET", `${url}/disponibles?tipo=ALOJAMIENTO`, undefined, admin, 400);
 
@@ -496,7 +500,7 @@ export async function salidas(ctx: Ctx) {
     ok("CU-37 hotel con bloqueo: 50 → 44 al crear la salida", (await capacidad(m.hotel!.idservicio)) === 44);
     // Solo 2 plazas del bloqueo quedan para la venta: la segunda compra no entra y pide solicitud (devolvemos las otras 4 al hotel)
     await db.salida.update({ where: { idsalida: m.idsalida }, data: { stockLocalAlojamiento: 2 } });
-    await db.servicioAlojamiento.update({ where: { idservicio: m.hotel!.idservicio }, data: { capacidadDisponible: { increment: 4 } } });
+    await db.ocupacion.updateMany({ where: { idsalida: m.idsalida, tipo: "ALOJAMIENTO" }, data: { cantidad: { decrement: 4 } } });
     const r1 = await f.comprar(m.cliente.token, m.idsalida, { n: 2 });
     const cli2 = await f.cliente();
     const r2 = await f.comprar(cli2.token, m.idsalida, { n: 2 });
@@ -609,9 +613,9 @@ export async function salidas(ctx: Ctx) {
     ok("CAT-31 hotel 30 con una salida de 10: queda 20", (await capacidad(hotel.idservicio)) === 20);
     const r = await ctx.esperar("CAT-31 editar capacidad del hotel en una salida activa → 200", "PUT", `/servicios/${hotel.idservicio}`, { capacidadDisponible: 25 }, admin, 200);
     ok("CAT-31 no versiona: mismo id, ACTIVO, sin versionado en la respuesta", r?.idservicio === hotel.idservicio && r.estado === "ACTIVO" && !("versionado" in (r ?? {})), JSON.stringify(r));
-    ok("CAT-31 el hotel quedó en 25 y sin copias", (await capacidad(hotel.idservicio)) === 25 && (await db.servicioBase.count({ where: { idproveedor: hotel.idproveedor } })) === 1);
+    ok("CAT-31 el total quedó en 25 (A1: libre 25 − 10 = 15) y sin copias", (await capacidad(hotel.idservicio)) === 15 && (await db.servicioBase.count({ where: { idproveedor: hotel.idproveedor } })) === 1);
     await ctx.esperar("CAT-31 cancelar la salida → 200", "POST", `/salidas/${idsalida}/cancelar`, { motivo: "Sin ventas" }, admin, 200);
-    ok("CAT-31 las plazas vuelven al MISMO hotel vigente (25 + 10 = 35)", (await capacidad(hotel.idservicio)) === 35, `capacidad ${await capacidad(hotel.idservicio)}`);
+    ok("CAT-31 las plazas vuelven al MISMO hotel vigente (libre 25)", (await capacidad(hotel.idservicio)) === 25, `capacidad ${await capacidad(hotel.idservicio)}`);
   });
 
   await ctx.escenario("CAT-32 garantía por establecimiento tras editar el hotel", async () => {
@@ -638,11 +642,11 @@ export async function salidas(ctx: Ctx) {
     ok("CAT-33 la salida quedó CERRADA", (await salidaDb(a.idsalida)).estado === "CERRADA");
     await ctx.esperar("CAT-33 bajar la capacidad por debajo de los pasajeros confirmados → 400", "PUT", `/servicios/${a.transporte}`, { capacidadVehiculo: 1 }, admin, 400);
     const r = await ctx.esperar("CAT-33 subir la capacidad del transporte asignado → 200", "PUT", `/servicios/${a.transporte}`, { capacidadVehiculo: 40 }, admin, 200);
-    ok("CAT-33 mismo id, ACTIVO y asignado a la salida", r?.idservicio === a.transporte && r.estado === "ACTIVO" && (await db.salidaServicio.count({ where: { idsalida: a.idsalida, idservicio: a.transporte } })) === 1, JSON.stringify(r));
+    ok("CAT-33 mismo id, ACTIVO y asignado a la salida", r?.idservicio === a.transporte && r.estado === "ACTIVO" && (await db.ocupacion.count({ where: { idsalida: a.idsalida, idservicio: a.transporte } })) === 1, JSON.stringify(r));
     const m2 = await montar({ pax: [1], inicio: sumar(a.inicio, 1) });
     const p2 = await plantel({ porteadores: 1 });
     await ctx.esperar("CAT-33 asignar el mismo transporte a una salida superpuesta → 400", "POST", `/salidas/${m2.idsalida}/asignacion`, { ...cuerpo(p2, [p2.guias[0]!, p2.porteadores[0]!]), idtransporte: a.transporte }, admin, 400);
-    ok("CAT-33 la salida superpuesta sigue sin transporte", (await db.salidaServicio.count({ where: { idsalida: m2.idsalida, tipo: "TRANSPORTE" } })) === 0);
+    ok("CAT-33 la salida superpuesta sigue sin transporte", (await db.ocupacion.count({ where: { idsalida: m2.idsalida, tipo: "TRANSPORTE" } })) === 0);
     // Hotel bloqueado en la salida activa: no cambia su criterio, pero sí su nombre
     await ctx.esperar("CU-20 cambiar la categoría de un hotel en una salida activa → 400", "PUT", `/servicios/${hotel}`, { categoria: "5 Estrellas" }, admin, 400);
     await ctx.esperar("CU-20 cambiar la localidad de un hotel en una salida activa → 400", "PUT", `/servicios/${hotel}`, { localidad: "Otra" }, admin, 400);
@@ -657,7 +661,8 @@ export async function salidas(ctx: Ctx) {
     const url = `/salidas/${a.idsalida}/devolucion-equipamiento`;
     const completa = [{ idservicio: a.equipo, cantidadBuenEstado: 2, cantidadDaniada: 1 }, { idservicio: a.equipo2, cantidadBuenEstado: 2 }];
     const asig = await ctx.esperar("CU-41 equipamiento asignado → 200", "GET", `/salidas/${a.idsalida}/equipamiento-asignado`, undefined, admin, 200);
-    ok("CU-41 lista lo asignado con su stock actual", asig?.equipamientos?.length === 2 && asig.equipamientos.find((e: any) => e.idservicio === a.equipo)?.cantidadAsignada === 3 && asig.equipamientos.find((e: any) => e.idservicio === a.equipo)?.stockActualDisponible === 7, JSON.stringify(asig?.equipamientos));
+    // A1: stockActualDisponible es lo libre hoy; la salida ocupa el equipo recién en sus fechas (2028)
+    ok("CU-41 lista lo asignado con su stock de hoy", asig?.equipamientos?.length === 2 && asig.equipamientos.find((e: any) => e.idservicio === a.equipo)?.cantidadAsignada === 3 && asig.equipamientos.find((e: any) => e.idservicio === a.equipo)?.stockActualDisponible === 10, JSON.stringify(asig?.equipamientos));
 
     // Antes del último día: la salida está en curso (termina mañana)
     await f.moverFechas(a.idsalida, fecha(-1), fecha(1));
@@ -675,12 +680,13 @@ export async function salidas(ctx: Ctx) {
     ok("CU-41 los rechazos no tocaron el stock", (await stockEq(a.equipo)) === 7 && (await stockEq(a.equipo2)) === 8 && (await stockEq(ajeno)) === 5);
 
     const r = await ctx.esperar("CU-41 devolución completa el último día → 200", "POST", url, { items: completa, observacionesGenerales: "Una carpa rota" }, admin, 200);
-    ok("CU-41 reintegra solo lo bueno: 7 + 2 = 9 (la dañada no) y 8 + 2 = 10", (await stockEq(a.equipo)) === 9 && (await stockEq(a.equipo2)) === 10, `equipo ${await stockEq(a.equipo)}, equipo2 ${await stockEq(a.equipo2)}`);
+    // A1: lo sano vuelve solo por fecha; lo dañado baja el total
+    ok("CU-41 la dañada baja el total: 10 → 9 y equipo2 sigue en 10", (await totalEq(a.equipo)) === 9 && (await totalEq(a.equipo2)) === 10, `equipo ${await totalEq(a.equipo)}, equipo2 ${await totalEq(a.equipo2)}`);
     ok("CU-41 el detalle informa lo reintegrado y lo dañado", r?.detalle?.find((d: any) => d.idservicio === a.equipo)?.cantidadReintegradaAlStock === 2 && r.detalle.find((d: any) => d.idservicio === a.equipo)?.cantidadDaniadaOExtraviada === 1, JSON.stringify(r?.detalle));
     ok("CU-41 queda una auditoría de la devolución", (await db.registroAuditoria.count({ where: { idsalida: a.idsalida, motivo: "Una carpa rota" } })) === 1);
 
     await ctx.esperar("CU-41 segunda devolución → 400", "POST", url, { items: completa }, admin, 400);
-    ok("CU-41 la segunda devolución no infló el stock", (await stockEq(a.equipo)) === 9 && (await stockEq(a.equipo2)) === 10);
+    ok("CU-41 la segunda devolución no volvió a bajar el total", (await totalEq(a.equipo)) === 9 && (await totalEq(a.equipo2)) === 10);
   });
 
   await ctx.escenario("CU-41 salida inexistente o cancelada", async () => {
@@ -692,4 +698,92 @@ export async function salidas(ctx: Ctx) {
     await ctx.esperar("CU-41 devolver en una salida cancelada → 400", "POST", `/salidas/${a.idsalida}/devolucion-equipamiento`, { items: [{ idservicio: a.equipo, cantidadBuenEstado: 3 }, { idservicio: a.equipo2, cantidadBuenEstado: 2 }] }, admin, 400);
     ok("CU-41 salida cancelada: el stock no se infló", (await stockEq(a.equipo)) === stock && stock === 10);
   });
+
+  // ======================================================================
+  ctx.seccion("A1 Ocupación por fechas");
+
+  /** Cierra la salida (CU-40) con personal y transporte propios y el equipo indicado */
+  const cerrar = async (idsalida: number, pax: number, items: { idservicio: number; cantidad: number }[]) => {
+    const p = await plantel({ porteadores: porteadoresPara(pax) });
+    return ctx.back.llamar("POST", `/salidas/${idsalida}/asignacion`, cuerpo(p, [p.guias[0]!, ...p.porteadores], items), admin);
+  };
+
+  await ctx.escenario("A1 dos salidas en fechas distintas usan las mismas 30 carpas", async () => {
+    const carpas = (await f.equipamiento("Loc E", 30)).idservicio;
+    const m1 = await montar({ pax: [2] });
+    const m2 = await montar({ pax: [2] }); // empieza 5 días después: 3 de recorrido + 2 de reacondicionamiento no se cruzan
+    ok("A1 primera salida con las 30 carpas → 200", (await cerrar(m1.idsalida, 2, [{ idservicio: carpas, cantidad: 30 }])).status === 200);
+    ok("A1 segunda salida con las mismas 30 carpas → 200", (await cerrar(m2.idsalida, 2, [{ idservicio: carpas, cantidad: 30 }])).status === 200);
+    const oc = await ctx.esperar("A1 ocupación de las carpas → 200", "GET", `/servicios/${carpas}/ocupacion?desde=${m1.inicio}&hasta=${sumar(m2.fin, 3)}`, undefined, admin, 200);
+    const dia = (d: string) => oc?.dias?.find((x: any) => x.fecha === d);
+    ok("A1 el día del reacondicionamiento de la primera está ocupado y el siguiente a él, por la segunda",
+      oc?.total === 30 && dia(sumar(m1.fin, 2))?.ocupado === 30 && dia(m2.inicio)?.ocupado === 30 && dia(sumar(m2.fin, 3))?.disponible === 30 && oc.ocupaciones.length === 2,
+      JSON.stringify(oc?.ocupaciones));
+  });
+
+  await ctx.escenario("A1 dos cierres simultáneos se disputan las últimas carpas", async () => {
+    const carpas = (await f.equipamiento("Loc E", 10)).idservicio;
+    const m1 = await montar({ pax: [2] });
+    const m2 = await montar({ pax: [2], inicio: sumar(m1.inicio, 1) });
+    const [r1, r2] = await Promise.all([cerrar(m1.idsalida, 2, [{ idservicio: carpas, cantidad: 8 }]), cerrar(m2.idsalida, 2, [{ idservicio: carpas, cantidad: 8 }])]);
+    ok("A1 entra una sola (200 y 400)", [r1.status, r2.status].sort().join() === "200,400", `${r1.status} ${resumenDe(r1)} / ${r2.status} ${resumenDe(r2)}`);
+    ok("A1 quedan 8 carpas ocupadas y 2 libres", (await db.ocupacion.count({ where: { idservicio: carpas } })) === 1 && (await stockEq(carpas)) === 2);
+  });
+
+  await ctx.escenario("A1 dos salidas superpuestas piden el mismo hotel", async () => {
+    const pq = await f.paquete();
+    const hotel = await f.hotel(pq.localidad, 10);
+    const F = proximoInicio();
+    await f.salida(pq.idpaquete, F, 6, hotel.idservicio);
+    const op = await ctx.esperar("A1 opciones de la segunda salida → 200", "GET", `/salidas/opciones?idpaquete=${pq.idpaquete}&fechaInicio=${F}&tamanoMaximo=6`, undefined, admin, 200);
+    const h = op?.alojamientos?.find((a: any) => a.idservicio === hotel.idservicio);
+    ok("A1 la segunda ve solo lo que queda (4) y no le alcanza", h?.capacidadDisponible === 4 && h.alcanza === false, JSON.stringify(op?.alojamientos));
+    await ctx.esperar("A1 crear la segunda con ese hotel → 400", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: F, tamanoMaximo: 6, idalojamiento: hotel.idservicio }, admin, 400);
+    ok("A1 el hotel sigue con 4 libres", (await capacidad(hotel.idservicio)) === 4);
+  });
+
+  await ctx.escenario("A1 el hotel no queda ocupado durante el trekking", async () => {
+    const pq = await f.paquete(); // 3 días, 1 noche previa y 1 posterior
+    const hotel = await f.hotel(pq.localidad, 8);
+    const F = proximoInicio();
+    await f.salida(pq.idpaquete, F, 8, hotel.idservicio); // ocupa F−1 y F+2
+    // La otra duerme F (el primer día de trekking de la primera) y F+3
+    const r = await ctx.esperar("A1 otra salida usa el hotel en esas noches → 201", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: sumar(F, 1), tamanoMaximo: 8, idalojamiento: hotel.idservicio }, admin, 201);
+    const oc = await ctx.esperar("A1 ocupación del hotel → 200", "GET", `/servicios/${hotel.idservicio}/ocupacion?desde=${sumar(F, -1)}&hasta=${sumar(F, 3)}`, undefined, admin, 200);
+    ok("A1 cada noche tiene 8 ocupadas y los días de trekking compartidos no suman", !!r && (oc?.dias ?? []).map((d: any) => d.ocupado).join() === "8,8,0,8,8", JSON.stringify(oc?.dias));
+  });
+
+  await ctx.escenario("A1 bajar el total por debajo de lo comprometido", async () => {
+    const carpas = (await f.equipamiento("Loc E", 10)).idservicio;
+    const m = await montar({ pax: [2] });
+    await cerrar(m.idsalida, 2, [{ idservicio: carpas, cantidad: 6 }]);
+    const r = await ctx.back.llamar("PUT", `/servicios/${carpas}`, { inventarioTotal: 5 }, admin);
+    ok("A1 bajar a 5 con 6 comprometidas → 400 y avisa el día", r.status === 400 && /Hay 6 unidades comprometidas el \d{2}\/\d{2}/.test(resumenDe(r)), `${r.status} ${resumenDe(r)}`);
+    await ctx.esperar("A1 bajar justo a lo comprometido (6) → 200", "PUT", `/servicios/${carpas}`, { inventarioTotal: 6 }, admin, 200);
+    ok("A1 el total quedó en 6", (await totalEq(carpas)) === 6);
+  });
+
+  await ctx.escenario("A1 devolución con 2 carpas dañadas", async () => {
+    const carpas = (await f.equipamiento("Loc E", 30)).idservicio;
+    const m = await montar({ pax: [2] });
+    await cerrar(m.idsalida, 2, [{ idservicio: carpas, cantidad: 10 }]);
+    await f.moverFechas(m.idsalida, fecha(-2), fecha(0));
+    await ctx.esperar("A1 devolución con 2 dañadas → 200", "POST", `/salidas/${m.idsalida}/devolucion-equipamiento`, { items: [{ idservicio: carpas, cantidadBuenEstado: 8, cantidadDaniada: 2 }] }, admin, 200);
+    const oc = await ctx.esperar("A1 ocupación después de la devolución → 200", "GET", `/servicios/${carpas}/ocupacion`, undefined, admin, 200);
+    ok("A1 el total queda en 28", (await totalEq(carpas)) === 28 && oc?.total === 28, JSON.stringify(oc?.total));
+  });
+
+  await ctx.escenario("A1 cancelar una salida libera todo de inmediato", async () => {
+    const carpas = (await f.equipamiento("Loc E", 10)).idservicio;
+    const m = await montar({ pax: [2] });
+    const r = await cerrar(m.idsalida, 2, [{ idservicio: carpas, cantidad: 10 }]);
+    ok("A1 antes de cancelar: hotel, transporte y carpas ocupados", r.status === 200 && (await stockEq(carpas)) === 0 && (await capacidad(m.hotel!.idservicio)) < 50);
+    await ctx.esperar("A1 cancelar la salida → 200", "POST", `/salidas/${m.idsalida}/cancelar`, { motivo: "Prueba A1" }, admin, 200);
+    ok("A1 sin ocupación y todo libre", (await db.ocupacion.count({ where: { idsalida: m.idsalida } })) === 0 && (await stockEq(carpas)) === 10 && (await capacidad(m.hotel!.idservicio)) === 50);
+    // Otra salida en las mismas fechas toma las 10 carpas
+    const m2 = await montar({ pax: [2], inicio: m.inicio });
+    ok("A1 otra salida en esas fechas usa las 10 carpas → 200", (await cerrar(m2.idsalida, 2, [{ idservicio: carpas, cantidad: 10 }])).status === 200);
+  });
 }
+
+const resumenDe = (r: { body: any }) => JSON.stringify(r.body?.error ?? r.body).slice(0, 200);
