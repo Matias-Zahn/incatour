@@ -671,7 +671,7 @@ Lo que el back devuelve distinto de lo de arriba, o lo que el contrato no decía
 - **9.1 panel:** ya no responde 409 con alojamientos pendientes: los lista en `reservasSinAlojamiento` y `puedeConfirmar` queda en false. Responde 400 si la salida ya inició o no está activa. `faltantes` suma la dotación por los vendidos si alguien se quitó (`La salida necesita al menos 1 guías y 2 porteadores (tiene 1 y 1)`). `bloqueoInicial` es `tamanoMaximo + personal asignado` y `lugaresSobrantes` es `tamanoMaximo − vendidos`.
 - **9.2 confirmar:** el orden de los rechazos es: inexistente (404), ya inició (400), ya confirmada (400), venta abierta (400), sin pasajeros (400), alojamientos pendientes (409) y faltantes (409). Los dos 409 traen `detalle: { reservasSinAlojamiento: string[]; faltantes: string[] }`. El pasaporte vencido del personal ya no es un 400 aparte: es un faltante (12.3).
 - **CU-39 en una salida PUBLICADA:** si se cambia la cantidad de un equipo con regla, la próxima compra la vuelve a calcular. Si se quita, la compra no lo vuelve a poner. ponytail: se ajusta si hace falta un equipo "a mano" que la compra respete.
-- **Salidas creadas antes de la etapa 3:** no tienen personal ni la fila del equipo. Muestran `FALTA_RECURSO` o no se pueden confirmar, y CU-40 ya no asigna: hay que recrearlas (la demo se regenera).
+- **Salidas creadas antes de la etapa 3:** no tienen personal ni la fila del equipo. La etapa 4 les da una salida (sección 14).
 
 ## 14. Diferencias de la etapa 4 del back (22/11): tarifa congelada y varios hoteles
 
@@ -691,4 +691,9 @@ Lo que el back devuelve distinto de lo de arriba, o lo que el contrato no decía
   - Si hay lugar en la salida pero ningún hotel tiene lugar para todo el grupo: 400 `Quedan 4 lugares, pero no en un mismo hotel.`, antes de cobrar.
 - **CU-32 cancelar:** las plazas vuelven al hotel de la reserva: a sus plazas libres mientras se vende, o a la ocupación del hotel si la salida ya está CERRADA. Las reservas sin hotel no devuelven plazas.
 - **9 CU-40:** `hoteles[].pasajeros` suma las reservas que la compra mandó a cada hotel. Al confirmar, cada hotel con bloqueo devuelve lo que le quedó libre.
+- **Salidas creadas antes de la etapa 3 (sin personal, y casi siempre sin transporte):**
+  - El panel (9.1) lista en `faltantes` `Sin personal asignado: la salida necesita al menos 1 guías y 2 porteadores (se eligen al confirmar)`, en lugar del texto de la dotación.
+  - El transporte se carga con CU-39 (`PUT /api/salidas/:id/logistica`, con `comprobanteReserva`), que ya acepta PUBLICADA. Su equipo no tiene regla en la copia del paquete, así que no aparece como faltante.
+  - `POST …/asignacion` acepta `{ personalIds: number[] }` **solo** si la salida no tiene personal: lo asigna (aptos hasta el fin y libres en esas fechas, los mismos textos del alta: 400 por no apto, 409 si alguien se ocupó) y sigue con la confirmación de siempre, que controla la dotación por los vendidos. Si la confirmación se frena por otro faltante, el personal queda asignado. Con personal ya asignado responde 400 `La salida ya tiene personal: personalIds es solo para una salida sin personal. Se cambia con los reemplazos`. Una lista vacía, con repetidos o con algo que no sea un id es 400 `personalIds debe ser una lista de ids de personal, sin repetidos`.
+  - El front puede mostrar el selector de personal del asistente de crear salida (las opciones de 5.1 sirven) cuando `personal` del panel viene vacío.
 - **Base:** la migración `plazas_por_hotel` suma `Ocupacion.plazasLibres` (el contador de cada hotel con bloqueo), lo carga desde `stockLocalAlojamiento` en las salidas existentes, y completa `Reserva.idalojamiento` en las reservas que salieron de ese bloqueo.

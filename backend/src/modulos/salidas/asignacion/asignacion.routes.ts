@@ -52,11 +52,19 @@ export class AsignacionRoutes {
      *       Si la autoridad rechaza a alguien (RF-47), la asignación se confirma igual: ese permiso queda registrado como
      *       "Rechazado", sin número, y la respuesta lo informa en `rechazados`. El lugar de un pasajero rechazado se libera
      *       con los sobrantes; el de un personal rechazado queda reservado para su reemplazo (CU-38).
+     *       Una salida creada sin personal (antes de la etapa 3) lo recibe en `personalIds` (aptos y libres); con personal, 400.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
      *     parameters:
      *       - { in: path, name: idsalida, required: true, schema: { type: integer } }
+     *     requestBody:
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               personalIds: { type: array, items: { type: integer }, example: [1, 4, 5], description: "Solo para una salida sin personal." }
      *     responses:
      *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados (`rechazados`: tipo, id, nombreCompleto y motivo), que son los que rechazó la autoridad y los pasajeros con el pasaporte vencido antes del fin del recorrido (SAL-21), y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
      *       400: { description: La venta sigue abierta, la salida ya está confirmada, ya inició o no tiene pasajeros. }

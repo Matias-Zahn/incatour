@@ -4,7 +4,7 @@ import { AsignacionService } from "./asignacion.service";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
 const { repo, salidas, actual } = vi.hoisted(() => ({
-  repo: { buscarSalida: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn() },
+  repo: { buscarSalida: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn(), buscarPersonal: vi.fn(), asignarPersonal: vi.fn() },
   salidas: { cargarEquipoDe: vi.fn() },
   actual: { autoridad: null as unknown },
 }));
@@ -85,6 +85,27 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
       porteadoresSobrantes: 1, transporte: { idservicio: 7, capacidadVehiculo: 20, alcanza: true }, faltantes: [], bloqueoInicial: 13, lugaresSobrantes: 5,
     });
     expect(panel.personal[0]).toEqual({ idpersonal: 1, nombreCompleto: "Persona 1", rol: "Guía", apto: true, motivo: null });
+  });
+
+  it("salida anterior a la etapa 3 sin personal: el panel lo pide y confirmar lo asigna con personalIds", async () => {
+    const vieja = salida(idBloqueo, undefined, { personalAsignado: [] });
+    repo.buscarSalida.mockResolvedValue(vieja);
+    expect((await new AsignacionService().obtenerPanelAsignacion(2)).faltantes).toEqual([
+      "Sin personal asignado: la salida necesita al menos 2 guías y 2 porteadores (se eligen al confirmar)",
+    ]);
+
+    repo.buscarPersonal.mockResolvedValue([equipo[0]!.personal, { ...equipo[1]!.personal, estado: "INACTIVO" }]);
+    await expect(new AsignacionService().confirmarAsignacion(2, [1, 2])).rejects.toThrow("Persona 2: está dado de baja");
+
+    repo.buscarPersonal.mockResolvedValue(equipo.map((e) => e.personal));
+    repo.asignarPersonal.mockImplementation(async () => repo.buscarSalida.mockResolvedValue(salida(idBloqueo)));
+    repo.confirmar.mockResolvedValue({ idsalida: 2, nroSalida: "SAL-2026-002", estado: "CERRADA" });
+    await new AsignacionService().confirmarAsignacion(2, [1, 2, 3, 4]);
+    expect(repo.asignarPersonal).toHaveBeenCalledWith(vieja, [1, 2, 3, 4]);
+    expect(repo.confirmar).toHaveBeenCalled();
+
+    // con personal ya asignado, personalIds no vale
+    await expect(new AsignacionService().confirmarAsignacion(2, [1])).rejects.toThrow("La salida ya tiene personal");
   });
 
   it("B4: sin transporte no se confirma: 409 con los faltantes en el detalle", async () => {

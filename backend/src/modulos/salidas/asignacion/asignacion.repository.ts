@@ -76,6 +76,22 @@ export class AsignacionRepository {
     return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: { include: { usuario: true } } } });
   }
 
+  /** CU-40 de una salida anterior a la etapa 3: le asigna el personal, si sigue sin personal y la gente está libre en esas fechas. */
+  async asignarPersonal(salida: { idsalida: number; fechaInicio: Date; fechaFin: Date }, ids: number[]) {
+    const { idsalida } = salida;
+    await db.$transaction(async (tx) => {
+      // Orden de bloqueos: Salida → Personal, el de CU-38 y CU-40
+      const [fila] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${idsalida} FOR UPDATE`;
+      if (fila?.estado !== ESTADO_SALIDA.PUBLICADA || (await tx.asignacionPersonal.count({ where: { idsalida } })) > 0) {
+        throw CustomError.conflict("La salida cambió mientras se confirmaba. Volvé a cargar el panel");
+      }
+      if ((await this.personalOcupado(tx, salida, ids)).length) {
+        throw CustomError.conflict("Parte del personal elegido se asignó a otra salida en esas fechas. Volvé a cargar las opciones");
+      }
+      await tx.asignacionPersonal.createMany({ data: ids.map((idpersonal) => ({ idsalida, idpersonal })) });
+    });
+  }
+
   /**
    * CU-40 pasos 11 y 14, en una transacción: registrar los permisos emitidos y los rechazados (RF-47), devolver al hotel
    * las plazas que no se vendieron y pasar la salida a CERRADA. Los permisos ya los emitió la autoridad antes de entrar acá.

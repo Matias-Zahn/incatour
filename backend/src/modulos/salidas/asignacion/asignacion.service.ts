@@ -1,6 +1,7 @@
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_ALOJAMIENTO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { fechaCorta, hoyUTC } from "../../../shared/fechas";
+import { noAptos } from "../../../shared/aptitud";
 import { unaPorServicio } from "../../../shared/ocupacion";
 import { datosVenta } from "../../../shared/ventaAbierta";
 import { PermisoEmitido, PermisoRechazado, TitularPermiso } from "../../../integraciones/autoridad/autoridad.interface";
@@ -58,8 +59,9 @@ export class AsignacionService {
     };
   }
 
-  // CU-40 pasos 4 a 15: confirmar (body vacío, decisión 15)
-  async confirmarAsignacion(idsalida: number) {
+  // CU-40 pasos 4 a 15: confirmar (body vacío, decisión 15). personalIds: solo para una salida sin personal (anterior a la etapa 3)
+  async confirmarAsignacion(idsalida: number, personalIds?: number[]) {
+    if (personalIds) await this.asignarPersonalFaltante(idsalida, personalIds);
     const { salida, sobrantes, motivoNoConfirmable, bloqueaPorRecursos, pendientes, faltantes } = await this.prepararConfirmacion(idsalida);
     if (motivoNoConfirmable) {
       // Los alojamientos pendientes y los faltantes son 409, con el detalle para el panel
@@ -146,6 +148,22 @@ export class AsignacionService {
     return { lugaresLiberados: n };
   }
 
+  /**
+   * Las salidas creadas antes de la etapa 3 no tienen personal y CU-40 ya no asigna: se les asigna acá, con los controles
+   * del alta (apto hasta el fin y libre en esas fechas). La dotación la controla la confirmación que sigue, por los vendidos.
+   * Queda asignado aunque la confirmación se frene después por otro faltante.
+   */
+  private async asignarPersonalFaltante(idsalida: number, personalIds: number[]) {
+    const salida = await this.repository.buscarSalida(idsalida);
+    if (!salida) throw CustomError.notFound("La salida no existe");
+    if (salida.personalAsignado.length) {
+      throw CustomError.badRequest("La salida ya tiene personal: personalIds es solo para una salida sin personal. Se cambia con los reemplazos");
+    }
+    const rechazados = noAptos(personalIds, await this.repository.buscarPersonal(personalIds), salida.fechaFin);
+    if (rechazados.length) throw CustomError.badRequest(rechazados.join(". "));
+    await this.repository.asignarPersonal(salida, personalIds);
+  }
+
   // true si quedaron liberados (o si otro pedido ya los tomó); false si la autoridad falló
   private async liberar(idbloqueo: string, idsalida: number, n: number) {
     if (!(await this.repository.tomarSobrantes(idsalida, n))) return true;
@@ -181,9 +199,11 @@ export class AsignacionService {
     const faltantes = [
       ...recursos.faltas,
       ...recursos.noAptos,
-      ...(guias < dotacion.guias || porteadores < dotacion.porteadores
-        ? [`La salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (tiene ${guias} y ${porteadores})`]
-        : []),
+      ...(!recursos.personal.length
+        ? [`Sin personal asignado: la salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (se eligen al confirmar)`]
+        : guias < dotacion.guias || porteadores < dotacion.porteadores
+          ? [`La salida necesita al menos ${dotacion.guias} guías y ${dotacion.porteadores} porteadores (tiene ${guias} y ${porteadores})`]
+          : []),
     ];
     // FA5: no se confirma con alojamientos sin confirmar (se resuelven con el CU-34)
     const pendientes = salida.reservas.filter((r) => r.estadoAlojamiento === ESTADO_ALOJAMIENTO.PENDIENTE).map((r) => r.nroReserva);
