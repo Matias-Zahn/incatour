@@ -37,6 +37,8 @@ export const DIAS_REACONDICIONAMIENTO = 2;
 export const DIAS_CIERRE_VENTA_DEFECTO = 2;
 /** B4: con un hotel a solicitud hay que gestionarlo, así que el corte es más largo. */
 export const DIAS_CIERRE_SOLICITUD = 5;
+/** A2b: al crear la salida, el equipo libre tiene que cubrir al menos esta parte de lo que necesitaría completa. */
+export const COBERTURA_MINIMA_STOCK = 0.5;
 
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];

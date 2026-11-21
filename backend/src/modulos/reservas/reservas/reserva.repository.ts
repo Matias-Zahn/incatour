@@ -1,5 +1,6 @@
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_SALIDA } from "../../../shared/constantes";
+import { recalcularEquipo } from "../../../shared/ocupacion.repository";
 import { PasajeroInput } from "./reserva.dto";
 
 export interface DatosConfirmacionReserva {
@@ -100,8 +101,9 @@ export class ReservaRepository {
  // Se ejecuta SOLO con el pago ya aprobado. Todo o nada.
   async confirmarReserva(d: DatosConfirmacionReserva) {
     return db.$transaction(async (tx) => {
-      // FOR SHARE: compras simultáneas siguen en paralelo, pero esperan el cierre
-      const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR SHARE`;
+      // FOR UPDATE: espera la confirmación (CU-40) y serializa las compras de la misma salida, porque cada una
+      // recalcula el equipo sobre el total vendido (B4). Orden de bloqueos: Salida → Pasajero
+      const [salida] = await tx.$queryRaw<{ estado: string }[]>`SELECT estado FROM public."Salida" WHERE idsalida = ${d.idsalida} FOR UPDATE`;
       if (salida?.estado !== ESTADO_SALIDA.PUBLICADA) throw new Error("La salida dejó de estar a la venta mientras se procesaba el pago");
 
       // FIX P2025 y RES-20: Desacoplamos la creación de pasajeros.
@@ -142,7 +144,7 @@ export class ReservaRepository {
       }
 
       // Ahora creamos la reserva conectando los IDs directamente
-      return tx.reserva.create({
+      const reserva = await tx.reserva.create({
         data: {
           idcliente: d.idcliente,
           idsalida: d.idsalida,
@@ -180,6 +182,9 @@ export class ReservaRepository {
           }),
         },
       });
+      // B4: el equipo se recalcula sobre el total vendido, con esta reserva incluida
+      await recalcularEquipo(tx, d.idsalida);
+      return reserva;
     });
   }
 

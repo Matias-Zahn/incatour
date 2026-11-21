@@ -16,7 +16,7 @@ const { tx, enviarEmail } = vi.hoisted(() => ({
     reserva: { updateMany: vi.fn(), findUnique: vi.fn() },
     reembolso: { create: vi.fn() },
     solicitud: { updateMany: vi.fn() },
-    salida: { update: vi.fn() },
+    salida: { update: vi.fn(), findUnique: vi.fn() }, // findUnique: recalcularEquipo (12.1), sin equipo en estos casos
     ocupacion: { updateMany: vi.fn() },
   },
   enviarEmail: vi.fn(),
