@@ -30,6 +30,9 @@ export const ESTADO_SALIDA = {
 /** "Activas o En curso" (CU-17, CU-20). */
 export const SALIDAS_ACTIVAS = ["PUBLICADA", "CERRADA", "EN_CURSO"];
 
+/** A1: días que el equipo queda en lavado y revisión después del fin de la salida, antes de volver a usarse. */
+export const DIAS_REACONDICIONAMIENTO = 2;
+
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];
 
