@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ServicioService } from "./servicio.service";
 import { ModificarServicioDto } from "./servicio.dto";
+import { hoyUTC } from "../../../shared/fechas";
 
 const { repo } = vi.hoisted(() => ({
   repo: {
     findById: vi.fn(), contarSolicitudesPendientes: vi.fn(), contarSalidasActivas: vi.fn(),
     contarGarantiasDePaquetesActivos: vi.fn(), contarPaquetesActivosQueLoIncluyen: vi.fn(), updateEstado: vi.fn(),
-    existeNombre: vi.fn(), maxPasajerosConfirmadosEnSalidasActivas: vi.fn(), updateEnSitio: vi.fn(),
+    existeNombre: vi.fn(), maxPasajerosConfirmadosEnSalidasActivas: vi.fn(), updateEnSitio: vi.fn(), ocupacionesDesdeHoy: vi.fn(),
   },
 }));
 vi.mock("./servicio.repository", () => ({ ServicioRepository: class { constructor() { return repo; } } }));
@@ -32,7 +33,7 @@ describe("ServicioService.darDeBaja (CU-21)", () => {
 describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
   const dto = (obj: Record<string, unknown>) => ModificarServicioDto.create(obj)[1]!;
   const transporte = { idservicio: 5, idproveedor: 1, estado: "ACTIVO", nombreServicio: "Bus", localidad: "Cusco", transporte: { idservicio: 5, capacidadVehiculo: 40 } };
-  const hotel = { idservicio: 6, idproveedor: 1, estado: "ACTIVO", nombreServicio: "Hotel", localidad: "Cusco", alojamiento: { idservicio: 6, categoria: "3 estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS", capacidadDisponible: 30 } };
+  const hotel = { idservicio: 6, idproveedor: 1, estado: "ACTIVO", nombreServicio: "Hotel", localidad: "Cusco", alojamiento: { idservicio: 6, categoria: "3 estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS", plazasTotales: 30 } };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,6 +42,7 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
     repo.contarGarantiasDePaquetesActivos.mockResolvedValue(0);
     repo.maxPasajerosConfirmadosEnSalidasActivas.mockResolvedValue(30);
     repo.updateEnSitio.mockImplementation(async () => repo.findById.mock.results[0]!.value);
+    repo.ocupacionesDesdeHoy.mockResolvedValue([]);
   });
 
   it("edita siempre en el lugar, sin versionar", async () => {
@@ -87,6 +89,33 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
     await new ServicioService().modificarServicio(6, dto({ nombreServicio: "Hotel Sol", capacidadDisponible: 25 }));
 
     expect(repo.updateEnSitio).toHaveBeenCalledWith(6, "ALOJAMIENTO", { nombreServicio: "Hotel Sol" }, { capacidadDisponible: 25 });
+  });
+
+  it("A1: rechaza bajar el total del equipo por debajo del día más comprometido y avisa la fecha", async () => {
+    const carpas = { idservicio: 7, idproveedor: 1, estado: "ACTIVO", nombreServicio: "Carpas", localidad: "Cusco", equipamiento: { idservicio: 7, tipoEquipamiento: "Carpa", cantidadTotal: 30 } };
+    repo.findById.mockResolvedValue(carpas);
+    const dia = (n: number) => new Date(hoyUTC().getTime() + n * 24 * 60 * 60 * 1000);
+    // Dos salidas que se tocan un día: 18 + 10 = 28 ese día
+    repo.ocupacionesDesdeHoy.mockResolvedValue([
+      { idservicio: 7, desde: dia(5), hasta: dia(10), cantidad: 18 },
+      { idservicio: 7, desde: dia(10), hasta: dia(14), cantidad: 10 },
+    ]);
+    const fecha = dia(10).toISOString();
+
+    await expect(new ServicioService().modificarServicio(7, dto({ inventarioTotal: 27 }))).rejects.toThrow(
+      `Hay 28 unidades comprometidas el ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`
+    );
+    await new ServicioService().modificarServicio(7, dto({ inventarioTotal: 28 }));
+    expect(repo.updateEnSitio).toHaveBeenCalledWith(7, "EQUIPAMIENTO", {}, { inventarioTotal: 28 });
+  });
+
+  it("bloque 8: un hotel a solicitud sin plazas no puede pasar a bloqueo sin indicarlas", async () => {
+    repo.findById.mockResolvedValue({ ...hotel, alojamiento: { ...hotel.alojamiento, modalidadConfirmacion: "A_SOLICITUD", plazasTotales: null } });
+    repo.contarSalidasActivas.mockResolvedValue(0);
+
+    await expect(new ServicioService().modificarServicio(6, dto({ modalidadConfirmacion: "BLOQUEO_PLAZAS" }))).rejects.toThrow("necesita la capacidad");
+    await new ServicioService().modificarServicio(6, dto({ modalidadConfirmacion: "BLOQUEO_PLAZAS", capacidadDisponible: 12 }));
+    expect(repo.updateEnSitio).toHaveBeenCalledOnce();
   });
 
   it("un alojamiento sin salidas activas puede cambiar su categoría", async () => {

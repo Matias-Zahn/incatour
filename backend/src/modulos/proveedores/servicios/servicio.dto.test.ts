@@ -22,6 +22,20 @@ describe("CU-19: CrearServicioDto", () => {
     expect(dto?.especifico.capacidadDisponible).toBe(12);
   });
 
+  it("bloque 8: crea un alojamiento a solicitud sin plazas (ausentes, vacías o null)", () => {
+    const base = { tipo: "ALOJAMIENTO", nombreServicio: "Hostal", costoBase: 40, localidad: "Cusco", categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "A_SOLICITUD" };
+    for (const plazas of [{}, { capacidadDisponible: "" }, { capacidadDisponible: null }]) {
+      const [error, dto] = CrearServicioDto.create({ ...base, ...plazas });
+      expect(error).toBeUndefined();
+      expect(dto?.especifico.capacidadDisponible).toBeNull();
+    }
+  });
+
+  it("bloque 8: con bloqueo de plazas la capacidad sigue siendo obligatoria", () => {
+    const [error] = CrearServicioDto.create({ tipo: "ALOJAMIENTO", nombreServicio: "Hotel", costoBase: 40, localidad: "Cusco", categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS" });
+    expect(error).toBe("capacidadDisponible es requerido.");
+  });
+
   it("valida servicio de tren y rechaza horarios iguales", () => {
     const [err] = CrearServicioDto.create({
       tipo: "TREN",
