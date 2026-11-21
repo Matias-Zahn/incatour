@@ -11,8 +11,7 @@ const proveedor = { idproveedor: 4, razonSocial: "Andes Travel" };
 const salida = (extra = {}) => ({
   idsalida: 1, nroSalida: "SAL-2026-001", estado: "FINALIZADA",
   personalAsignado: [{ idpersonal: 1, personal: { idpersonal: 1, nombreCompleto: "Carlos", rol: "Guía" } }],
-  servicios: [{ servicio: { proveedor } }],
-  equipamientos: [{ servicio: { proveedor } }], // el mismo proveedor dos veces: se cuenta una
+  ocupaciones: [{ servicio: { proveedor } }, { servicio: { proveedor } }], // el mismo proveedor dos veces: se cuenta una
   evaluacionesPersonal: [],
   evaluacionesProveedores: [],
   ...extra,

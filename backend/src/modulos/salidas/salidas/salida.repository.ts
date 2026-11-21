@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO, ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { DefinicionPaquete } from "../../../shared/definicionPaquete";
+import { Rango } from "../../../shared/ocupacion";
+import { disponible, disponibles, ocupar } from "../../../shared/ocupacion.repository";
 import { ConsultarSalidasDto } from "./salida.dto";
 
 export type SalidaListada = Awaited<ReturnType<SalidaRepository["buscar"]>>[number];
@@ -15,6 +17,7 @@ export interface DatosNuevaSalida {
   tamanoMaximo: number;
   idbloqueo: string;
   idalojamiento: number | undefined;
+  rangosAlojamiento: Rango[]; // A1: noches previas y posteriores
   definicionPaquete: DefinicionPaquete; // CAT-05
 }
 
@@ -48,7 +51,6 @@ export class SalidaRepository {
           },
         },
         personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
-        servicios: { include: { servicio: { select: { nombreServicio: true } } } },
         // RF-50 y RF-61: lo necesario para contar pasajeros, permisos y solicitudes pendientes
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },
@@ -80,8 +82,9 @@ export class SalidaRepository {
     });
   }
 
-  // CU-36 paso 5: alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas
-  async buscarAlojamientosConBloqueo(paquete: PaqueteParaSalida) {
+  // CU-36 paso 5: alojamientos que cumplen la garantía del paquete y confirman por bloqueo de plazas,
+  // con lo que tienen disponible en las noches de la salida (A1)
+  async buscarAlojamientosConBloqueo(paquete: PaqueteParaSalida, rangos: Rango[]) {
     const porEstablecimiento = paquete.garantiasEstablecimiento.length > 0;
     const where: Prisma.ServicioBaseWhereInput = {
       estado: ESTADO.ACTIVO,
@@ -93,11 +96,13 @@ export class SalidaRepository {
       ...(porEstablecimiento && { idservicio: { in: paquete.garantiasEstablecimiento.map((g) => g.idservicio) } }),
       ...(!porEstablecimiento && paquete.localidadGarantizada && { localidad: paquete.localidadGarantizada }),
     };
-    return db.servicioBase.findMany({
+    const hoteles = await db.servicioBase.findMany({
       where,
       select: { idservicio: true, nombreServicio: true, localidad: true, alojamiento: true },
       orderBy: { nombreServicio: "asc" },
     });
+    const libres = await disponibles(db, hoteles, rangos);
+    return hoteles.map((h) => ({ ...h, disponible: libres.get(h.idservicio)! }));
   }
 
   /**
@@ -106,13 +111,9 @@ export class SalidaRepository {
    */
   async crearSalida(d: DatosNuevaSalida) {
     return db.$transaction(async (tx) => {
-      if (d.idalojamiento) {
-        // Descuento condicional: si otra salida se llevó las plazas en el medio, no descuenta nada
-        const plazas = await tx.servicioAlojamiento.updateMany({
-          where: { idservicio: d.idalojamiento, capacidadDisponible: { gte: d.tamanoMaximo } },
-          data: { capacidadDisponible: { decrement: d.tamanoMaximo } },
-        });
-        if (plazas.count === 0) throw CustomError.badRequest("El alojamiento ya no tiene plazas suficientes");
+      // A1: con el hotel bloqueado se vuelve a mirar lo disponible en esas noches: otra salida pudo llevárselo en el medio
+      if (d.idalojamiento && (await disponible(tx, d.idalojamiento, d.rangosAlojamiento)) < d.tamanoMaximo) {
+        throw CustomError.badRequest("El alojamiento ya no tiene plazas suficientes");
       }
 
       // Limitación: número correlativo por año; dos altas simultáneas chocan con el @unique y una falla (se compensa)
@@ -120,7 +121,7 @@ export class SalidaRepository {
       const delAnio = await tx.salida.count({ where: { nroSalida: { startsWith: `SAL-${anio}-` } } });
       const nroSalida = `SAL-${anio}-${String(delAnio + 1).padStart(3, "0")}`;
 
-      return tx.salida.create({
+      const salida = await tx.salida.create({
         data: {
           idpaquete: d.idpaquete,
           nroSalida,
@@ -132,11 +133,14 @@ export class SalidaRepository {
           fechaFin: d.fechaFin,
           estado: ESTADO_SALIDA.PUBLICADA,
           definicionPaquete: d.definicionPaquete,
-          ...(d.idalojamiento && {
-            servicios: { create: { idservicio: d.idalojamiento, tipo: TIPO_SERVICIO.ALOJAMIENTO } },
-          }),
         },
-        include: { servicios: { include: { servicio: { select: { nombreServicio: true } } } } },
+      });
+      if (d.idalojamiento) {
+        await ocupar(tx, { idservicio: d.idalojamiento, idsalida: salida.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO, rangos: d.rangosAlojamiento, cantidad: d.tamanoMaximo });
+      }
+      return tx.salida.findUniqueOrThrow({
+        where: { idsalida: salida.idsalida },
+        include: { ocupaciones: { include: { servicio: { select: { nombreServicio: true } } } } },
       });
     });
   }

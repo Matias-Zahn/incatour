@@ -137,13 +137,7 @@ export class ProveedorRepository {
   // CU-17, flujo alternativo 2: servicios del proveedor asignados a salidas activas o en curso
   async tieneSalidasActivas(id: number, cliente: Prisma.TransactionClient = db): Promise<boolean> {
     const count = await cliente.salida.count({
-      where: {
-        estado: { in: SALIDAS_ACTIVAS },
-        OR: [
-          { servicios: { some: { servicio: { idproveedor: id } } } },
-          { equipamientos: { some: { servicio: { idproveedor: id } } } },
-        ],
-      },
+      where: { estado: { in: SALIDAS_ACTIVAS }, ocupaciones: { some: { servicio: { idproveedor: id } } } },
     });
     return count > 0;
   }

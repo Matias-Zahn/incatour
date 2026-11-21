@@ -1,4 +1,5 @@
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio, TOPES } from "../../../shared/constantes";
+import { sumarDias } from "../../../shared/ocupacion";
 
 export const MODALIDADES_CONFIRMACION = [MODALIDAD_BLOQUEO_PLAZAS, "A_SOLICITUD"];
 const DIAS_VALIDOS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -12,8 +13,11 @@ const vTexto = (max: number): Validador => (v, c) =>
     ? [undefined, v.trim()]
     : [`${c} es requerido y no puede superar los ${max} caracteres.`];
 
-const vEntero = (min: number): Validador => (v, c) =>
-  Number.isInteger(v) && v >= min ? [undefined, v] : [`${c} debe ser un número entero mayor o igual a ${min}.`];
+const vEntero = (min: number, max?: number): Validador => (v, c) => {
+  if (!Number.isInteger(v) || v < min) return [`${c} debe ser un número entero mayor o igual a ${min}.`];
+  if (max !== undefined && v > max) return [`${c} no puede superar el máximo de ${max}.`];
+  return [undefined, v];
+};
 
 const vNumero = (min: number, max?: number): Validador => (v, c) => {
   if (typeof v !== "number" || !Number.isFinite(v) || v < min) {
@@ -50,13 +54,13 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
   ALOJAMIENTO: {
     categoria: vTexto(40),
     tipoHabitacion: vTexto(40),
-    capacidadDisponible: vEntero(0),
+    capacidadDisponible: vEntero(0, TOPES.plazasAlojamiento),
     modalidadConfirmacion: vModalidad,
   },
   TRANSPORTE: {
-    capacidadVehiculo: vEntero(1),
+    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo),
     pesoEquipajeIncluido: vNumero(0, PESO_MAXIMO_DECLARADO_KG),
-    costoPorKgExcedente: vNumero(0),
+    costoPorKgExcedente: vNumero(0, TOPES.costoPorKgExcedente),
   },
   TREN: {
     horarioSalida: vHora,
@@ -65,16 +69,28 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
   },
   EQUIPAMIENTO: {
     tipoEquipamiento: vTexto(60),
-    cantidadDisponible: vEntero(0),
+    cantidadDisponible: vEntero(0, TOPES.unidadesEquipamiento),
   },
 };
+
+/**
+ * A1: la API conserva los nombres que usa el front (capacidadDisponible, cantidadDisponible, inventarioTotal),
+ * pero lo que se guarda es el total: plazasTotales y cantidadTotal.
+ */
+const COLUMNA: { [campo: string]: string } = {
+  capacidadDisponible: "plazasTotales",
+  cantidadDisponible: "cantidadTotal",
+  inventarioTotal: "cantidadTotal",
+};
+export const aColumnas = (especifico: { [k: string]: any }) =>
+  Object.fromEntries(Object.entries(especifico).map(([campo, valor]) => [COLUMNA[campo] ?? campo, valor]));
 
 // ---------- Campos modificables (CU-20). En equipamiento se edita el INVENTARIO TOTAL ----------
 export const CAMPOS_MODIFICAR: { [tipo in TipoServicio]: { [campo: string]: Validador } } = {
   ALOJAMIENTO: { ...CAMPOS_CREAR.ALOJAMIENTO },
   TRANSPORTE: { ...CAMPOS_CREAR.TRANSPORTE },
   TREN: { ...CAMPOS_CREAR.TREN },
-  EQUIPAMIENTO: { tipoEquipamiento: vTexto(60), inventarioTotal: vEntero(0) },
+  EQUIPAMIENTO: { tipoEquipamiento: vTexto(60), inventarioTotal: vEntero(0, TOPES.unidadesEquipamiento) },
 };
 
 /** Valida los campos de `campos` presentes en `obj`. Si `exigirTodos`, todos son obligatorios. */
@@ -120,8 +136,16 @@ export class CrearServicioDto {
     const [errDesc, descripcion] = validarDescripcion(obj.descripcion);
     if (errDesc) return [errDesc];
 
-    const [errEsp, especifico] = validarCampos(obj, CAMPOS_CREAR[tipo], true);
+    // Bloque 8: las plazas son obligatorias solo con bloqueo; a solicitud pueden venir vacías
+    let campos = CAMPOS_CREAR[tipo];
+    const sinPlazas = obj.capacidadDisponible === undefined || obj.capacidadDisponible === null || obj.capacidadDisponible === "";
+    if (tipo === TIPO_SERVICIO.ALOJAMIENTO && obj.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS && sinPlazas) {
+      const { capacidadDisponible, ...resto } = campos;
+      campos = resto;
+    }
+    const [errEsp, especifico] = validarCampos(obj, campos, true);
     if (errEsp) return [errEsp];
+    if (tipo === TIPO_SERVICIO.ALOJAMIENTO) especifico!.capacidadDisponible ??= null;
 
     if (tipo === TIPO_SERVICIO.TREN && especifico!.horarioSalida === especifico!.horarioLlegada) {
       return ["horarioSalida y horarioLlegada no pueden ser iguales."];
@@ -165,6 +189,31 @@ export class ModificarServicioDto {
       return ["Debe enviar al menos un campo para modificar."];
     }
     return [undefined, new ModificarServicioDto(baseFinal, especifico!)];
+  }
+}
+
+// A1: GET /api/servicios/:id/ocupacion?desde&hasta (AAAA-MM-DD). Por defecto, de hoy a 30 días; hasta un año
+export const DIAS_MAXIMOS_OCUPACION = 366;
+export class RangoOcupacionDto {
+  private constructor(public desde: Date, public hasta: Date) {}
+
+  public static create(query: { [key: string]: any }, hoy: Date): [string | undefined, RangoOcupacionDto?] {
+    const leer = (v: unknown, c: string): [string | undefined, Date?] => {
+      if (v === undefined) return [undefined];
+      const f = new Date(`${v}T00:00:00.000Z`);
+      return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(f.getTime())
+        ? [undefined, f]
+        : [`${c} debe ser una fecha válida (AAAA-MM-DD).`];
+    };
+    const [errDesde, desde = hoy] = leer(query.desde, "desde");
+    if (errDesde) return [errDesde];
+    const [errHasta, hasta = sumarDias(desde, 30)] = leer(query.hasta, "hasta");
+    if (errHasta) return [errHasta];
+    if (hasta < desde) return ["desde no puede ser posterior a hasta."];
+    if (hasta > sumarDias(desde, DIAS_MAXIMOS_OCUPACION - 1)) {
+      return [`El rango no puede superar los ${DIAS_MAXIMOS_OCUPACION} días.`];
+    }
+    return [undefined, new RangoOcupacionDto(desde, hasta)];
   }
 }
 

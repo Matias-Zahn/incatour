@@ -1,6 +1,7 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS } from "../../../shared/constantes";
+import { ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { hoyUTC } from "../../../shared/fechas";
+import { rangosDe } from "../../../shared/ocupacion";
 import { armarDefinicionPaquete } from "../../../shared/definicionPaquete";
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
@@ -35,17 +36,17 @@ export class SalidaService {
         nombreServicio: a.nombreServicio,
         localidad: a.localidad,
         categoria: a.alojamiento?.categoria,
-        capacidadDisponible: a.alojamiento?.capacidadDisponible,
-        alcanza: (a.alojamiento?.capacidadDisponible ?? 0) >= dto.tamanoMaximo,
+        capacidadDisponible: a.disponible, // A1: lo disponible en las noches de la salida
+        alcanza: a.disponible >= dto.tamanoMaximo,
       })),
     };
   }
 
   // CU-36 pasos 9 a 12: bloquear el cupo ante la autoridad y registrar la salida publicada
   async crearSalida(dto: CrearSalidaDto) {
-    const { paquete, dotacion, totalLugares, alojamientos } = await this.prepararSalida(dto);
+    const { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento } = await this.prepararSalida(dto);
 
-    const conPlazas = alojamientos.filter((a) => (a.alojamiento?.capacidadDisponible ?? 0) >= dto.tamanoMaximo);
+    const conPlazas = alojamientos.filter((a) => a.disponible >= dto.tamanoMaximo);
     if (dto.idalojamiento && !conPlazas.some((a) => a.idservicio === dto.idalojamiento)) {
       throw CustomError.badRequest(
         "El alojamiento elegido no cumple la garantía del paquete, no confirma por bloqueo de plazas o no tiene capacidad suficiente"
@@ -78,10 +79,11 @@ export class SalidaService {
       const salida = await this.repository.crearSalida({
         idpaquete: paquete.idpaquete,
         fechaInicio: dto.fechaInicio,
-        fechaFin: new Date(dto.fechaInicio.getTime() + (paquete.circuito.duracionDias - 1) * DIA_MS),
+        fechaFin,
         tamanoMaximo: dto.tamanoMaximo,
         idbloqueo: bloqueo.idBloqueo,
         idalojamiento: dto.idalojamiento,
+        rangosAlojamiento,
         definicionPaquete: armarDefinicionPaquete(paquete),
       });
       return { salida, dotacion, totalLugares };
@@ -126,8 +128,11 @@ export class SalidaService {
     }
 
     const totalLugares = dto.tamanoMaximo + dotacion.guias + dotacion.porteadores;
-    const alojamientos = await this.repository.buscarAlojamientosConBloqueo(paquete);
-    return { paquete, dotacion, totalLugares, alojamientos };
+    // A1: el hotel se ocupa solo en las noches previas y posteriores del paquete
+    const fechaFin = new Date(dto.fechaInicio.getTime() + (paquete.circuito.duracionDias - 1) * DIA_MS);
+    const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, { fechaInicio: dto.fechaInicio, fechaFin }, paquete);
+    const alojamientos = await this.repository.buscarAlojamientosConBloqueo(paquete, rangosAlojamiento);
+    return { paquete, dotacion, totalLugares, alojamientos, fechaFin, rangosAlojamiento };
   }
 }
 

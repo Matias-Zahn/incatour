@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { hoyUTC } from "../../../shared/fechas";
-import { ESTADO, ESTADO_RESERVA, SALIDAS_ACTIVAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO, ESTADO_RESERVA, TIPO_SERVICIO } from "../../../shared/constantes";
+import { rangosDe } from "../../../shared/ocupacion";
+import { bloquearServicio, disponible, disponibles, liberar, ocupacionesDe, ocupar } from "../../../shared/ocupacion.repository";
 import { ItemDesasignar, ItemNuevo } from "./logistica.dto";
 
 /** Regla de negocio violada dentro de la transacción: provoca el rollback y se informa como 400. */
@@ -33,9 +35,12 @@ export class LogisticaRepository {
         estado: true,
         fechaInicio: true,
         fechaFin: true,
-        equipamientos: {
+        ocupaciones: {
+          where: { tipo: { in: [TIPO_SERVICIO.EQUIPAMIENTO, TIPO_SERVICIO.TRANSPORTE] } },
           select: {
+            tipo: true,
             cantidad: true,
+            comprobanteReserva: true,
             servicio: {
               select: {
                 idservicio: true,
@@ -45,16 +50,7 @@ export class LogisticaRepository {
               },
             },
           },
-        },
-        servicios: {
-          where: { tipo: TIPO_SERVICIO.TRANSPORTE },
-          select: {
-            idservicio: true,
-            comprobanteReserva: true,
-            servicio: {
-              select: { nombreServicio: true, proveedor: { select: { idproveedor: true, razonSocial: true } } },
-            },
-          },
+          orderBy: { idocupacion: "asc" },
         },
       },
     });
@@ -69,48 +65,36 @@ export class LogisticaRepository {
     return r._sum.cantidadPasajeros ?? 0;
   }
 
-  // DCD consultarProveedoresDisponibles
-  async disponiblesEquipamiento() {
-    return db.servicioBase.findMany({
-      where: {
-        estado: ESTADO.ACTIVO,
-        proveedor: { estado: ESTADO.ACTIVO },
-        equipamiento: { is: { cantidadDisponible: { gt: 0 } } },
-      },
+  // DCD consultarProveedoresDisponibles. A1: lo disponible en las fechas de la salida, descontando también
+  // lo que ella ya tiene (es lo que se le puede sumar). Los que dan 0 no se listan
+  async disponiblesEquipamiento(salida: SalidaFechas) {
+    const equipos = await db.servicioBase.findMany({
+      where: { estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, equipamiento: { isNot: null } },
       include: { proveedor: { select: { idproveedor: true, razonSocial: true } }, equipamiento: true },
       orderBy: { nombreServicio: "asc" },
     });
+    const libres = await disponibles(db, equipos, rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, salida));
+    return equipos.map((e) => ({ ...e, disponible: libres.get(e.idservicio)! })).filter((e) => e.disponible > 0);
   }
 
   async disponiblesTransporte(salida: SalidaFechas, pasajeros: number) {
-    return db.servicioBase.findMany({
+    const transportes = await db.servicioBase.findMany({
       where: {
         estado: ESTADO.ACTIVO,
         proveedor: { estado: ESTADO.ACTIVO },
         transporte: { is: { capacidadVehiculo: { gte: pasajeros } } },
-        // sin otra salida activa cuyas fechas se superpongan con las de ésta
-        NOT: {
-          salidas: {
-            some: {
-              tipo: TIPO_SERVICIO.TRANSPORTE,
-              salida: {
-                idsalida: { not: salida.idsalida },
-                estado: { in: SALIDAS_ACTIVAS },
-                fechaInicio: { lte: salida.fechaFin },
-                fechaFin: { gte: salida.fechaInicio },
-              },
-            },
-          },
-        },
       },
       include: { proveedor: { select: { idproveedor: true, razonSocial: true } }, transporte: true },
       orderBy: { nombreServicio: "asc" },
     });
+    // sin otra salida activa que lo ocupe en las fechas de ésta
+    const libres = await disponibles(db, transportes, rangosDe(TIPO_SERVICIO.TRANSPORTE, salida), salida.idsalida);
+    return transportes.filter((t) => libres.get(t.idservicio)! > 0);
   }
 
   /**
-   * CU-39 pasos 8 a 12, atómico. Primero se desasigna (reintegrando stock) y recién después se asigna
-   * (descontando), de modo que "cambiar de proveedor" nunca deja el stock en un estado intermedio.
+   * CU-39 pasos 8 a 12, atómico. Primero se desasigna (se borra la ocupación) y recién después se asigna
+   * (con control de lo disponible en las fechas), de modo que "cambiar de proveedor" nunca queda a medias.
    * Devuelve { ok: false, error } si una regla de negocio falla: la transacción se revierte entera.
    */
   async aplicarCambios(p: {
@@ -134,35 +118,18 @@ export class LogisticaRepository {
 
           const antes = await this.instantanea(tx, idsalida);
 
-          // 1. Desasignar (SAL-08: atómico - deleteMany primero, solo reintegra si eliminó exactamente la fila)
+          // 1. Desasignar: A1, borrar la ocupación alcanza; lo liberado vuelve solo por fecha
           for (const item of p.itemsDesasignar) {
-            if (item.tipo === TIPO_SERVICIO.EQUIPAMIENTO) {
-              const fila = await tx.salidaEquipamiento.findFirst({ where: { idsalida, idservicio: item.idservicio } });
-              if (!fila) {
-                throw new ReglaLogisticaViolada(`El equipamiento ${item.idservicio} no está asignado a la salida.`);
-              }
-              const borrado = await tx.salidaEquipamiento.deleteMany({ where: { idsalida, idservicio: item.idservicio } });
-              if (borrado.count === 0) {
-                throw new ReglaLogisticaViolada(`El equipamiento ${item.idservicio} ya fue desasignado por otra operación.`);
-              }
-              await tx.servicioEquipamiento.update({
-                where: { idservicio: item.idservicio },
-                data: { cantidadDisponible: { increment: fila.cantidad } },
-              });
-            } else {
-              const baja = await tx.salidaServicio.deleteMany({
-                where: { idsalida, idservicio: item.idservicio, tipo: TIPO_SERVICIO.TRANSPORTE },
-              });
-              if (baja.count === 0) {
-                throw new ReglaLogisticaViolada(`El transporte ${item.idservicio} no está asignado a la salida.`);
-              }
+            if ((await liberar(tx, idsalida, item.idservicio)) === 0) {
+              const recurso = item.tipo === TIPO_SERVICIO.EQUIPAMIENTO ? "equipamiento" : "transporte";
+              throw new ReglaLogisticaViolada(`El ${recurso} ${item.idservicio} no está asignado a la salida.`);
             }
           }
 
-          // 2. Asignar
-          for (const item of p.itemsNuevos) {
+          // 2. Asignar, en orden de id: dos modificaciones con los mismos servicios los bloquean en el mismo orden
+          for (const item of [...p.itemsNuevos].sort((a, b) => a.idservicio - b.idservicio)) {
             if (item.tipo === TIPO_SERVICIO.EQUIPAMIENTO) {
-              await this.asignarEquipamiento(tx, idsalida, item);
+              await this.asignarEquipamiento(tx, p.salida, item);
             } else {
               await this.asignarTransporte(tx, p.salida, p.pasajeros, item);
             }
@@ -189,7 +156,7 @@ export class LogisticaRepository {
   }
 
   // ---------- internos (dentro de la transacción) ----------
-  private async asignarEquipamiento(tx: Cliente, idsalida: number, item: ItemNuevo) {
+  private async asignarEquipamiento(tx: Cliente, salida: SalidaFechas, item: ItemNuevo) {
     const cantidad = item.cantidad as number;
     const servicio = await tx.servicioBase.findUnique({
       where: { idservicio: item.idservicio },
@@ -201,28 +168,20 @@ export class LogisticaRepository {
     if (servicio.estado !== ESTADO.ACTIVO || servicio.proveedor.estado !== ESTADO.ACTIVO) {
       throw new ReglaLogisticaViolada(`"${servicio.nombreServicio}" o su proveedor están inactivos.`);
     }
-    const yaAsignado = await tx.salidaEquipamiento.findFirst({ where: { idsalida, idservicio: item.idservicio } });
-    if (yaAsignado) {
+    // A1: si ya estaba asignado, la cantidad nueva reemplaza a la anterior en una sola operación
+    const rangos = rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, salida);
+    const libre = await disponible(tx, item.idservicio, rangos, salida.idsalida);
+    if (libre < cantidad) {
       throw new ReglaLogisticaViolada(
-        `"${servicio.nombreServicio}" ya está asignado: para cambiar la cantidad desasignalo y volvé a asignarlo en la misma operación.`
+        `Stock insuficiente de "${servicio.nombreServicio}": se solicitaron ${cantidad} y hay ${libre} disponibles en las fechas de la salida.`
       );
     }
-
-    // Descuento condicional y atómico: nunca deja el stock negativo ni compromete dos veces la misma unidad
-    const descuento = await tx.servicioEquipamiento.updateMany({
-      where: { idservicio: item.idservicio, cantidadDisponible: { gte: cantidad } },
-      data: { cantidadDisponible: { decrement: cantidad } },
-    });
-    if (descuento.count === 0) {
-      throw new ReglaLogisticaViolada(
-        `Stock insuficiente de "${servicio.nombreServicio}": se solicitaron ${cantidad} y hay ${servicio.equipamiento.cantidadDisponible} disponibles.`
-      );
-    }
-    await tx.salidaEquipamiento.create({ data: { idsalida, idservicio: item.idservicio, cantidad } });
+    await liberar(tx, salida.idsalida, item.idservicio);
+    await ocupar(tx, { idservicio: item.idservicio, idsalida: salida.idsalida, tipo: TIPO_SERVICIO.EQUIPAMIENTO, rangos, cantidad });
   }
 
   private async asignarTransporte(tx: Cliente, salida: SalidaFechas, pasajeros: number, item: ItemNuevo) {
-    const existente = await tx.salidaServicio.findFirst({
+    const existente = await tx.ocupacion.findFirst({
       where: { idsalida: salida.idsalida, tipo: TIPO_SERVICIO.TRANSPORTE },
     });
     if (existente) {
@@ -232,13 +191,13 @@ export class LogisticaRepository {
     const motivo = await this.motivoTransporteNoDisponible(tx, item.idservicio, salida, pasajeros);
     if (motivo) throw new ReglaLogisticaViolada(motivo);
 
-    await tx.salidaServicio.create({
-      data: {
-        idsalida: salida.idsalida,
-        idservicio: item.idservicio,
-        tipo: TIPO_SERVICIO.TRANSPORTE,
-        comprobanteReserva: item.comprobanteReserva as string,
-      },
+    await ocupar(tx, {
+      idservicio: item.idservicio,
+      idsalida: salida.idsalida,
+      tipo: TIPO_SERVICIO.TRANSPORTE,
+      rangos: rangosDe(TIPO_SERVICIO.TRANSPORTE, salida),
+      cantidad: 1,
+      comprobante: item.comprobanteReserva,
     });
   }
 
@@ -250,7 +209,7 @@ export class LogisticaRepository {
     pasajeros: number
   ): Promise<string | null> {
     // Lock del servicio: dos asignaciones del mismo transporte se serializan (orden: Salida, Personal, ServicioBase)
-    await tx.$queryRaw`SELECT 1 FROM public."ServicioBase" WHERE idservicio = ${idservicio} FOR UPDATE`;
+    await bloquearServicio(tx, idservicio);
     const servicio = await tx.servicioBase.findUnique({
       where: { idservicio },
       include: { transporte: true, proveedor: { select: { estado: true } } },
@@ -262,27 +221,16 @@ export class LogisticaRepository {
     if (servicio.transporte.capacidadVehiculo < pasajeros) {
       return `"${servicio.nombreServicio}" no tiene capacidad: admite ${servicio.transporte.capacidadVehiculo} y la salida tiene ${pasajeros} pasajeros confirmados.`;
     }
-    const superpuesta = await tx.salidaServicio.findFirst({
-      where: {
-        idservicio,
-        tipo: TIPO_SERVICIO.TRANSPORTE,
-        salida: {
-          idsalida: { not: salida.idsalida },
-          estado: { in: SALIDAS_ACTIVAS },
-          fechaInicio: { lte: salida.fechaFin },
-          fechaFin: { gte: salida.fechaInicio },
-        },
-      },
-    });
-    if (superpuesta) return `"${servicio.nombreServicio}" no está disponible: ya está asignado a otra salida en esas fechas.`;
+    const superpuesta = await ocupacionesDe(tx, [idservicio], salida.fechaInicio, salida.fechaFin, salida.idsalida);
+    if (superpuesta.length) return `"${servicio.nombreServicio}" no está disponible: ya está asignado a otra salida en esas fechas.`;
     return null;
   }
 
   // Foto de la logística para el registro de auditoría (antes y después)
   private async instantanea(tx: Cliente, idsalida: number) {
     const [equipamiento, transporte] = await Promise.all([
-      tx.salidaEquipamiento.findMany({ where: { idsalida }, select: { idservicio: true, cantidad: true } }),
-      tx.salidaServicio.findFirst({
+      tx.ocupacion.findMany({ where: { idsalida, tipo: TIPO_SERVICIO.EQUIPAMIENTO }, select: { idservicio: true, cantidad: true } }),
+      tx.ocupacion.findFirst({
         where: { idsalida, tipo: TIPO_SERVICIO.TRANSPORTE },
         select: { idservicio: true, comprobanteReserva: true },
       }),

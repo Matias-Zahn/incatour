@@ -21,15 +21,17 @@ describe("CrearCircuitoDto", () => {
     [{ nombreCircuito: undefined }, "nombreCircuito es requerido"],
     [{ nombreCircuito: 5 }, "nombreCircuito debe ser un texto"],
     [{ duracionDias: undefined }, "duracionDias es requerido"],
-    [{ duracionDias: 0 }, "duracionDias debe ser un número entero mayor a 0"],
-    [{ duracionDias: 2.5 }, "duracionDias debe ser un número entero mayor a 0"],
-    [{ duracionDias: "4" }, "duracionDias debe ser un número entero mayor a 0"],
+    [{ duracionDias: 0 }, "duracionDias debe ser un número entero entre 1 y 30"],
+    [{ duracionDias: 2.5 }, "duracionDias debe ser un número entero entre 1 y 30"],
+    [{ duracionDias: "4" }, "duracionDias debe ser un número entero entre 1 y 30"],
+    [{ duracionDias: 31 }, "duracionDias debe ser un número entero entre 1 y 30"],
+    [{ minimoGuias: 11 }, "minimoGuias debe ser un número entero entre 1 y 10"],
     [{ dificultad: "" }, "dificultad es requerido"],
     [{ dificultad: "Moderada" }, "dificultad debe ser Baja, Media o Alta"],
     [{ dificultad: "Extrema" }, "dificultad debe ser Baja, Media o Alta"],
     [{ minimoGuias: undefined }, "minimoGuias es requerido"],
-    [{ minimoGuias: -1 }, "minimoGuias debe ser un número entero mayor a 0"],
-    [{ minimoGuias: 1.5 }, "minimoGuias debe ser un número entero mayor a 0"],
+    [{ minimoGuias: -1 }, "minimoGuias debe ser un número entero entre 1 y 10"],
+    [{ minimoGuias: 1.5 }, "minimoGuias debe ser un número entero entre 1 y 10"],
   ])("rechaza %o", (cambio, mensaje) => {
     expect(CrearCircuitoDto.create({ ...base, ...cambio })[0]).toBe(mensaje);
   });
@@ -55,13 +57,13 @@ describe("ModificarCircuitoDto", () => {
   });
 
   it("valida los números enteros cuando vienen (CAT-11)", () => {
-    expect(ModificarCircuitoDto.create({ duracionDias: 0 })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
-    expect(ModificarCircuitoDto.create({ duracionDias: 2.5 })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
-    expect(ModificarCircuitoDto.create({ minimoGuias: 0 })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
-    expect(ModificarCircuitoDto.create({ minimoGuias: 1.5 })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
+    expect(ModificarCircuitoDto.create({ duracionDias: 0 })[0]).toBe("duracionDias debe ser un número entero entre 1 y 30");
+    expect(ModificarCircuitoDto.create({ duracionDias: 2.5 })[0]).toBe("duracionDias debe ser un número entero entre 1 y 30");
+    expect(ModificarCircuitoDto.create({ minimoGuias: 0 })[0]).toBe("minimoGuias debe ser un número entero entre 1 y 10");
+    expect(ModificarCircuitoDto.create({ minimoGuias: 1.5 })[0]).toBe("minimoGuias debe ser un número entero entre 1 y 10");
     // CAT-11: null explícito no es "sin cambio" (terminaba en 500 de Prisma)
-    expect(ModificarCircuitoDto.create({ duracionDias: null })[0]).toBe("duracionDias debe ser un número entero mayor a 0");
-    expect(ModificarCircuitoDto.create({ nombreCircuito: "X", minimoGuias: null })[0]).toBe("minimoGuias debe ser un número entero mayor a 0");
+    expect(ModificarCircuitoDto.create({ duracionDias: null })[0]).toBe("duracionDias debe ser un número entero entre 1 y 30");
+    expect(ModificarCircuitoDto.create({ nombreCircuito: "X", minimoGuias: null })[0]).toBe("minimoGuias debe ser un número entero entre 1 y 10");
   });
 });
 

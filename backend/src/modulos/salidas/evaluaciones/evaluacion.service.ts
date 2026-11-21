@@ -77,5 +77,5 @@ export class EvaluacionService {
 // Proveedores sin repetir, a partir de los servicios y el equipamiento de la salida
 const proveedoresDe = (salida: SalidaEvaluable) =>
   new Map(
-    [...salida.servicios, ...salida.equipamientos].map(({ servicio: { proveedor } }) => [proveedor.idproveedor, proveedor])
+    salida.ocupaciones.map(({ servicio: { proveedor } }) => [proveedor.idproveedor, proveedor])
   );

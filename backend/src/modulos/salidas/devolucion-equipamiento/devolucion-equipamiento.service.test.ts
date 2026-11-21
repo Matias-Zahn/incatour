@@ -12,7 +12,7 @@ vi.mock("./devolucion-equipamiento.repository", () => ({
 // Salida del 10 al 13 de noviembre con 10 carpas asignadas
 const salida = (estado = "EN_CURSO") => ({
   idsalida: 2, nroSalida: "SAL-2", estado, fechaFin: new Date("2026-11-13"),
-  equipamientos: [{ idservicio: 5, cantidad: 10, servicio: { nombreServicio: "Carpa", equipamiento: null, proveedor: { razonSocial: "X" } } }],
+  ocupaciones: [{ idservicio: 5, cantidad: 10, servicio: { nombreServicio: "Carpa", equipamiento: null, proveedor: { razonSocial: "X" } } }],
 });
 const dto = (cantidadBuenEstado: number, cantidadDaniada = 0) =>
   DevolucionEquipamientoDto.create({ items: [{ idservicio: 5, cantidadBuenEstado, cantidadDaniada }] })[1]!;

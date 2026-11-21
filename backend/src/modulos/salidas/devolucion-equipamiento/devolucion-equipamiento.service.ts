@@ -15,18 +15,19 @@ export class DevolucionEquipamientoService {
       throw CustomError.notFound(`La salida #${idsalida} no existe.`);
     }
 
+    const hoy = await this.repository.disponiblesHoy(salida.ocupaciones.map((e) => e.servicio));
     return {
       idsalida: salida.idsalida,
       nroSalida: salida.nroSalida,
       estado: salida.estado,
       fechaFin: salida.fechaFin,
-      equipamientos: salida.equipamientos.map((e) => ({
+      equipamientos: salida.ocupaciones.map((e) => ({
         idservicio: e.idservicio,
         nombreServicio: e.servicio.nombreServicio,
         tipoEquipamiento: e.servicio.equipamiento?.tipoEquipamiento ?? "Sin especificar",
         proveedor: e.servicio.proveedor.razonSocial,
         cantidadAsignada: e.cantidad,
-        stockActualDisponible: e.servicio.equipamiento?.cantidadDisponible ?? 0,
+        stockActualDisponible: hoy.get(e.idservicio) ?? 0, // A1: disponible hoy
       })),
     };
   }
@@ -44,10 +45,10 @@ export class DevolucionEquipamientoService {
       throw CustomError.notFound(`La salida #${idsalida} no existe.`);
     }
 
-    // SAL-03: Salidas canceladas ya reintegraron su equipamiento al stock en CU-37
+    // SAL-03: Salidas canceladas ya liberaron su equipamiento en CU-37
     if (salida.estado === "CANCELADA") {
       throw CustomError.badRequest(
-        "No se puede registrar la devolución de una salida cancelada (el equipamiento ya fue reintegrado al cancelar)."
+        "No se puede registrar la devolución de una salida cancelada (el equipamiento ya se liberó al cancelar)."
       );
     }
 
@@ -67,13 +68,13 @@ export class DevolucionEquipamientoService {
       );
     }
 
-    if (salida.equipamientos.length === 0) {
+    if (salida.ocupaciones.length === 0) {
       throw CustomError.badRequest(`La salida #${idsalida} no tenía equipamiento de camping asignado.`);
     }
 
     // Mapa de equipamiento asignado a la salida
     const mapaAsignados = new Map<number, number>();
-    for (const e of salida.equipamientos) {
+    for (const e of salida.ocupaciones) {
       mapaAsignados.set(e.idservicio, e.cantidad);
     }
 
@@ -95,7 +96,7 @@ export class DevolucionEquipamientoService {
     }
 
     // SAL-15: la devolución cubre todo lo asignado; lo que no volvió se informa como dañado o extraviado
-    const faltantes = salida.equipamientos.flatMap((e) => {
+    const faltantes = salida.ocupaciones.flatMap((e) => {
       const item = dto.items.find((i) => i.idservicio === e.idservicio);
       const informado = item ? item.cantidadBuenEstado + item.cantidadDaniada : 0;
       return informado < e.cantidad ? [`${e.servicio.nombreServicio}: faltan ${e.cantidad - informado} de ${e.cantidad}`] : [];

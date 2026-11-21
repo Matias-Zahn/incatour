@@ -30,11 +30,27 @@ export const ESTADO_SALIDA = {
 /** "Activas o En curso" (CU-17, CU-20). */
 export const SALIDAS_ACTIVAS = ["PUBLICADA", "CERRADA", "EN_CURSO"];
 
+/** A1: días que el equipo queda en lavado y revisión después del fin de la salida, antes de volver a usarse. */
+export const DIAS_REACONDICIONAMIENTO = 2;
+
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];
 
 /** Tope de equipaje que puede declarar cada pasajero al comprar (RES, PR #138). */
 export const PESO_MAXIMO_DECLARADO_KG = 20;
+/** Topes de los campos numéricos: evitan valores absurdos y desbordar los Int de la base (máx. 2.147.483.647). */
+export const TOPES = {
+  capacidadVehiculo: 60, // un bus grande ronda los 60 asientos
+  plazasAlojamiento: 5000,
+  costoPorKgExcedente: 1000,
+  unidadesEquipamiento: 10000,
+  duracionDias: 30,
+  minimoGuias: 10,
+  noches: 30,
+  diasMinimosReintegro: 365,
+  montoTarifa: 10_000_000, // igual que costoBase
+  tamanoSalida: 100,
+} as const;
 
 export const TIPO_SERVICIO = {
   ALOJAMIENTO: "ALOJAMIENTO",

@@ -5,6 +5,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { Back, idDe, resumen } from "../lib-prueba";
+import { SALIDAS_ACTIVAS } from "../../src/shared/constantes";
+import { disponibleEnRango, totalDe } from "../../src/shared/ocupacion";
 
 export type Ctx = ReturnType<typeof crearContexto>;
 
@@ -144,21 +146,21 @@ export function crearContexto(p: {
     },
 
     equipamiento(localidad: string, cantidad = 10) {
-      return f.servicio("EQUIPAMIENTO", localidad, { tipoEquipamiento: "Carpa", cantidadDisponible: cantidad });
-    },
+      return f.servicio("EQUIPAMIENTO", localidad, { tipoEquipamiento: "Carpa", cantidadDisponible: cantidad });    },
 
     /**
      * Paquete por categoría en una localidad propia (así solo ve los hoteles que arma el escenario).
      * Tarifa 500 USD en todas las temporadas activas (la del seed cubre hasta fin de 2026; setup agrega 2027-2028).
      */
-    async paquete(o: { idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; serviciosIncluidos?: number[]; monto?: number } = {}) {
+    async paquete(o: { idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; serviciosIncluidos?: number[]; monto?: number; nochesPrevias?: number; nochesPosteriores?: number } = {}) {
       const localidad = o.localidad ?? `Loc ${unico()}`;
       const idcircuito = o.idcircuito ?? (await f.circuito());
       const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
       const pq = await ctx.preparar("Crear paquete", "POST", "/paquetes", {
         idcircuito, nombrePaquete: `Int ${unico()}`, condiciones: "Integral", tipoGarantia: "POR_CATEGORIA",
         localidadGarantizada: localidad, categoriaGarantizada: "3 Estrellas", tipoHabitacionGarantizada: "Doble",
-        nochesPrevias: 0, nochesPosteriores: 0,
+        // A1: el hotel se ocupa solo en estas noches; con 0 y 0 no ocuparía nada
+        nochesPrevias: o.nochesPrevias ?? 1, nochesPosteriores: o.nochesPosteriores ?? 1,
         matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: o.monto ?? 500, moneda: "USD" })),
         ...(o.diasMinimosReintegro !== undefined && { diasMinimosReintegro: o.diasMinimosReintegro }),
         ...(o.serviciosIncluidos && { serviciosIncluidos: o.serviciosIncluidos }),
@@ -213,7 +215,21 @@ export function crearContexto(p: {
 
     /** Corre las fechas de una salida (por ejemplo, "empezó ayer" = fecha(-1), fecha(+1)) */
     async moverFechas(idsalida: number, inicio: string, fin: string) {
+      const antes = await db.salida.findUniqueOrThrow({ where: { idsalida } });
       await db.salida.update({ where: { idsalida }, data: { fechaInicio: new Date(inicio), fechaFin: new Date(fin) } });
+      // A1: la ocupación viaja con la salida
+      const dias = Math.round((new Date(inicio).getTime() - antes.fechaInicio.getTime()) / DIA);
+      await db.$executeRaw`UPDATE public."Ocupacion" SET desde = desde + ${dias}::int, hasta = hasta + ${dias}::int WHERE idsalida = ${idsalida}`;
+    },
+
+    /** A1: lo libre del servicio en su día más ocupado: total − máximo diario de las salidas activas */
+    async libre(idservicio: number) {
+      const s = await db.servicioBase.findUniqueOrThrow({ where: { idservicio }, include: { alojamiento: true, equipamiento: true, transporte: true } });
+      const ocupaciones = await db.ocupacion.findMany({ where: { idservicio, salida: { estado: { in: SALIDAS_ACTIVAS } } } });
+      if (!ocupaciones.length) return totalDe(s);
+      const desde = new Date(Math.min(...ocupaciones.map((o) => o.desde.getTime())));
+      const hasta = new Date(Math.max(...ocupaciones.map((o) => o.hasta.getTime())));
+      return disponibleEnRango(totalDe(s), ocupaciones, desde, hasta);
     },
   };
 

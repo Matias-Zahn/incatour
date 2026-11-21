@@ -22,6 +22,20 @@ describe("CU-19: CrearServicioDto", () => {
     expect(dto?.especifico.capacidadDisponible).toBe(12);
   });
 
+  it("bloque 8: crea un alojamiento a solicitud sin plazas (ausentes, vacías o null)", () => {
+    const base = { tipo: "ALOJAMIENTO", nombreServicio: "Hostal", costoBase: 40, localidad: "Cusco", categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "A_SOLICITUD" };
+    for (const plazas of [{}, { capacidadDisponible: "" }, { capacidadDisponible: null }]) {
+      const [error, dto] = CrearServicioDto.create({ ...base, ...plazas });
+      expect(error).toBeUndefined();
+      expect(dto?.especifico.capacidadDisponible).toBeNull();
+    }
+  });
+
+  it("bloque 8: con bloqueo de plazas la capacidad sigue siendo obligatoria", () => {
+    const [error] = CrearServicioDto.create({ tipo: "ALOJAMIENTO", nombreServicio: "Hotel", costoBase: 40, localidad: "Cusco", categoria: "3 Estrellas", tipoHabitacion: "Doble", modalidadConfirmacion: "BLOQUEO_PLAZAS" });
+    expect(error).toBe("capacidadDisponible es requerido.");
+  });
+
   it("valida servicio de tren y rechaza horarios iguales", () => {
     const [err] = CrearServicioDto.create({
       tipo: "TREN",
@@ -77,6 +91,22 @@ describe("CU-19: CrearServicioDto", () => {
     });
 
     expect(error).toContain("no puede superar el máximo de 20");
+  });
+
+  it("capacidadVehiculo: rechaza 0, negativos y más de 60; acepta 60", () => {
+    const transporte = (capacidadVehiculo: number) =>
+      CrearServicioDto.create({ tipo: "TRANSPORTE", nombreServicio: "Bus", costoBase: 500, localidad: "Cusco", capacidadVehiculo, pesoEquipajeIncluido: 15, costoPorKgExcedente: 5 })[0];
+    expect(transporte(0)).toContain("mayor o igual a 1");
+    expect(transporte(-5)).toContain("mayor o igual a 1");
+    expect(transporte(61)).toContain("no puede superar el máximo de 60");
+    expect(transporte(60)).toBeUndefined();
+  });
+
+  it("alojamiento y equipamiento: rechazan plazas o unidades por encima del tope", () => {
+    const [e1] = CrearServicioDto.create({ tipo: "ALOJAMIENTO", nombreServicio: "Hotel", costoBase: 50, localidad: "Cusco", categoria: "3 Estrellas", tipoHabitacion: "Doble", capacidadDisponible: 5001, modalidadConfirmacion: "BLOQUEO_PLAZAS" });
+    const [e2] = CrearServicioDto.create({ tipo: "EQUIPAMIENTO", nombreServicio: "Carpas", costoBase: 5, localidad: "Cusco", tipoEquipamiento: "Carpa", cantidadDisponible: 10001 });
+    expect(e1).toContain("no puede superar el máximo de 5000");
+    expect(e2).toContain("no puede superar el máximo de 10000");
   });
 
   it("acepta pesoEquipajeIncluido de 20 kg y costoBase de 10.000.000", () => {
