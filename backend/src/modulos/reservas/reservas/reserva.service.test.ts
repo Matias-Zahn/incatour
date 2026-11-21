@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ReservaService } from "./reserva.service";
 import { CrearReservaDto } from "./reserva.dto";
+import { hoyUTC } from "../../../shared/fechas";
 
 // Repositorio, pasarela y notificador mockeados: el test no toca la base ni espera la latencia simulada
 const { repo, pasarela, notificador } = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ const salida = (over: Record<string, unknown> = {}) => ({
   fechaInicio: INICIO,
   fechaFin: FIN,
   stockLocal: 10,
+  diasCierreVenta: 2,
   servicios: [] as unknown[],
   paquete: {
     condiciones: "Sin reembolso a menos de 30 días",
@@ -223,7 +225,15 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     it("rechaza si la salida ya comenzó", async () => {
       repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ fechaInicio: new Date("2020-01-01") }));
 
-      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("ya comenzó");
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("La venta de esta salida cerró el 29/12/2019.");
+      sinEfectos();
+    });
+
+    it("B4: rechaza si la venta cerró por fecha (corte de la salida), aunque siga PUBLICADA", async () => {
+      const inicio = new Date(hoyUTC().getTime() + 3 * 86400000);
+      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ fechaInicio: inicio, diasCierreVenta: 5 }));
+
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("La venta de esta salida cerró el");
       sinEfectos();
     });
 

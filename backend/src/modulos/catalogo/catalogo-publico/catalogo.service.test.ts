@@ -53,6 +53,7 @@ const paqueteMock = (overrides: Record<string, any> = {}) => ({
       estado: "PUBLICADA",
       stockLocal: 10,
       tamanoMaximo: 16,
+      diasCierreVenta: 2,
     },
     {
       idsalida: 11,
@@ -62,6 +63,7 @@ const paqueteMock = (overrides: Record<string, any> = {}) => ({
       estado: "PUBLICADA",
       stockLocal: 12,
       tamanoMaximo: 16,
+      diasCierreVenta: 2,
     },
   ],
   ...overrides,
@@ -105,6 +107,26 @@ describe("CatalogoService (CU-26)", () => {
       moneda: null,
       temporadaNombre: null,
     });
+  });
+
+  it("B2 y B9: Sale desde, el incluye por tipo con el horario del tren, y venta y reintegro de cada salida", async () => {
+    const servicio = (nombreServicio: string, sub: Record<string, unknown>) => ({ servicio: { nombreServicio, estado: "ACTIVO", ...sub } });
+    repo.buscarPaquetesActivos.mockResolvedValue([
+      paqueteMock({
+        diasMinimosReintegro: 15,
+        servicios: [
+          servicio("Carpas", { equipamiento: {} }),
+          servicio("Expedition", { tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } }),
+          servicio("Hotel viejo", { alojamiento: {} }), // los paquetes viejos podían tener el hotel como servicio
+          servicio("Bus", { transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } }),
+        ],
+      }),
+    ]);
+
+    const [paquete] = await new CatalogoService().consultarCatalogo();
+
+    expect(paquete).toMatchObject({ saleDesde: "Cusco", serviciosIncluidos: ["Bus", "Expedition (sale 06:10, llega 07:45)", "Carpas"] });
+    expect(paquete!.salidasDisponibles[0]).toMatchObject({ ventaAbierta: true, ultimoDiaVenta: "2030-01-12", fechaLimiteReintegro: "2029-12-31" });
   });
 
   it("CAT-13: pasa los filtros recibidos al repositorio", async () => {

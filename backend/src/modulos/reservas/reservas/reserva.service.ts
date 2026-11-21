@@ -1,4 +1,5 @@
-import { hoyUTC } from "../../../shared/fechas";
+import { fechaCorta } from "../../../shared/fechas";
+import { ultimoDiaVenta, ventaAbierta } from "../../../shared/ventaAbierta";
 import crypto from "crypto";
 import { CustomError } from "../../../error/CustomError";
 import { IPasarelaPagos } from "../../../integraciones/pasarela/pasarela.interface";
@@ -33,8 +34,9 @@ export class ReservaService {
     if (salida.estado !== "PUBLICADA") {
       throw CustomError.badRequest("La salida no está disponible para la venta.");
     }
-    if (salida.fechaInicio <= hoyUTC()) {
-      throw CustomError.badRequest("La salida ya comenzó o está por comenzar.");
+    // B4: la venta termina sola diasCierreVenta días antes del inicio
+    if (!ventaAbierta(salida)) {
+      throw CustomError.badRequest(`La venta de esta salida cerró el ${fechaCorta(ultimoDiaVenta(salida))}.`);
     }
 
     const cantidad = dto.pasajeros.length;

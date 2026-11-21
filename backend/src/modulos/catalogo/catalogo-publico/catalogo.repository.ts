@@ -65,6 +65,9 @@ export class CatalogoRepository {
             servicio: {
               include: {
                 transporte: true,
+                tren: true,
+                equipamiento: true,
+                alojamiento: true,
               },
             },
           },
