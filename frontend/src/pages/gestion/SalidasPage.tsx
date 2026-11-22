@@ -2144,7 +2144,7 @@ function SalidasPage() {
             {salidasConAlertasOperativas.length > 0 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo="Advertencias operativas"
+                    titulo="Para resolver antes de salir"
                 >
                     <div className="space-y-2">
                         <p className="text-sm">

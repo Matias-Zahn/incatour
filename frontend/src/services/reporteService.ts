@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- la forma de cada reporte la define el back y estos armadores son su único lector */
 import { solicitarApi } from "./clienteApi";
 import { formatearFechaLocalCorta, formatearFechaUtcCorta, formatearMontoUsd } from "./clientePortalService";
+import { etiquetasTipoIncidente } from "./guiaService";
 
 export type TipoReporte = "ventas" | "ocupacion" | "cancelaciones" | "solicitudes" | "calidad";
 
@@ -257,7 +258,7 @@ const ARMADORES: Record<TipoReporte, (d: any) => ReporteArmado> = {
                 ["Medio", cantidadDe(d.incidentesPorGravedad, "MEDIO")],
                 ["Crítico", cantidadDe(d.incidentesPorGravedad, "CRITICO")],
             ], COLORES_GRAVEDAD),
-            barras("Incidentes por tipo", d.incidentesPorTipo.map((i: Fila) => ({ etiqueta: i.nombre, valor: i.cantidad, texto: String(i.cantidad) }))),
+            barras("Incidentes por tipo", d.incidentesPorTipo.map((i: Fila) => ({ etiqueta: etiquetasTipoIncidente[i.nombre as keyof typeof etiquetasTipoIncidente] ?? i.nombre, valor: i.cantidad, texto: String(i.cantidad) }))),
             barras("Proveedores", d.proveedores.map((p: Fila) => ({ etiqueta: p.nombre, valor: p.promedio, texto: nota(p.promedio) })), 5),
             barras("Personal", d.personal.map((p: Fila) => ({ etiqueta: p.nombre, valor: p.promedio, texto: nota(p.promedio) })), 5),
         ],

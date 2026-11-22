@@ -50,6 +50,7 @@ export class PaqueteRepository {
         circuito: true,
         tarifas: { include: { temporada: true } },
         servicios: SERVICIOS, // B2: faltaTransporte
+        garantiasEstablecimiento: DETALLE.garantiasEstablecimiento, // el hotel garantizado, para la lista
       },
       orderBy: { idpaquete: "asc" },
     });

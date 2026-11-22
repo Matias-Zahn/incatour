@@ -51,7 +51,7 @@ function describirDisponibilidad(servicio: Servicio): string {
             const libre = servicio.cantidadDisponible ?? 0;
             const comprometida = servicio.cantidadComprometida ?? 0;
             const total = servicio.inventarioTotal ?? libre + comprometida;
-            return `${servicio.tipoEquipamiento ?? "Equipo"} · Libre: ${libre} / Comprometido: ${comprometida} / Total: ${total}`;
+            return `${servicio.tipoEquipamiento ?? "Equipo"} · Libre hoy: ${libre} / Máximo comprometido: ${comprometida} / Total: ${total}`;
         }
         case "ALOJAMIENTO": {
             const plazas =

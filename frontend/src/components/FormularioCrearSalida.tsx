@@ -696,7 +696,7 @@ function FormularioCrearSalida({
                                     >
                                         {algunHotelASolicitud
                                             ? `Cubiertas ${plazasNecesarias} de ${plazasNecesarias} plazas (incluye hotel a solicitud)`
-                                            : `Cubiertas ${plazasCubiertasBloqueo} de ${plazasNecesarias} plazas`}
+                                            : `Cubiertas ${Math.min(plazasCubiertasBloqueo, plazasNecesarias)} de ${plazasNecesarias} plazas`}
                                     </span>
                                 ) : null}
                             </div>

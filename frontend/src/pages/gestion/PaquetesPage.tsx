@@ -689,6 +689,14 @@ function PaquetesPage() {
                                                         .join(" · ")}
                                                 </p>
                                             ) : null}
+                                            {porEst && paquete.garantiasEstablecimiento?.length ? (
+                                                <p className="mt-1 text-xs text-texto-suave">
+                                                    {paquete.garantiasEstablecimiento
+                                                        .map((g) => g.servicio?.nombreServicio)
+                                                        .filter(Boolean)
+                                                        .join(", ")}
+                                                </p>
+                                            ) : null}
                                         </div>
                                     );
                                 },
