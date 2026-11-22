@@ -3,7 +3,7 @@ import { PersonalService } from "./personal.service";
 import { CrearPersonalDto, ModificarPersonalDto } from "./personal.dto";
 
 const { repo } = vi.hoisted(() => ({
-  repo: { buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), checkHabilitacionExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn(), consultarAsignacionesActivas: vi.fn() },
+  repo: { darDeBaja: vi.fn(), buscarPorId: vi.fn(), modificar: vi.fn(), checkPasaporteExists: vi.fn(), checkHabilitacionExists: vi.fn(), crearPorteador: vi.fn(), crearGuia: vi.fn(), checkEmailExists: vi.fn(), consultarAsignacionesActivas: vi.fn() },
 }));
 vi.mock("./personal.repository", () => ({ PersonalRepository: class { constructor() { return repo; } } }));
 
@@ -51,6 +51,32 @@ describe("PersonalService.modificarPersonal (CU-24)", () => {
     await expect(new PersonalService().modificarPersonal(1, ModificarPersonalDto.create({ nroHabilitacion: "HAB-200" })[1]!))
       .rejects.toMatchObject({ statusCode: 409 });
     expect(repo.modificar).not.toHaveBeenCalled();
+  });
+});
+
+describe("PersonalService: 12.8, los rechazos por salidas asignadas son 409 y las listan", () => {
+  const salida = (nro: string, fin: string) => ({ idsalida: Number(nro.slice(-1)), nroSalida: nro, fechaInicio: new Date("2030-01-01"), fechaFin: new Date(fin), estado: "PUBLICADA", permisos: [] });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    repo.buscarPorId.mockResolvedValue({ estado: "ACTIVO", nroPasaporte: "X", guia: null });
+  });
+
+  it("baja: dice qué salidas la bloquean y las manda en detalle.salidas", async () => {
+    repo.darDeBaja.mockResolvedValue({ bloqueadoPor: [salida("SAL-2030-004", "2030-01-04"), salida("SAL-2030-007", "2030-01-07")] });
+    await expect(new PersonalService().darDeBaja(1)).rejects.toMatchObject({
+      statusCode: 409,
+      message: "No se puede dar de baja: está asignado a SAL-2030-004 y SAL-2030-007, que todavía no finalizaron",
+      detalle: { salidas: [expect.objectContaining({ idsalida: 4, nroSalida: "SAL-2030-004" }), expect.objectContaining({ nroSalida: "SAL-2030-007" })] },
+    });
+  });
+
+  it("pasaporte: nombra la última salida que no cubre", async () => {
+    repo.consultarAsignacionesActivas.mockResolvedValue([{ salida: salida("SAL-2030-007", "2030-03-15") }, { salida: salida("SAL-2030-004", "2030-01-04") }]);
+    await expect(new PersonalService().modificarPersonal(1, ModificarPersonalDto.create({ fechaVencimientoPasaporte: "2030-02-01" })[1]!)).rejects.toMatchObject({
+      statusCode: 409,
+      message: "El pasaporte no puede vencer antes de que termine SAL-2030-007 (15/03/2030)",
+      detalle: { salidas: [expect.objectContaining({ nroSalida: "SAL-2030-007" })] },
+    });
   });
 });
 

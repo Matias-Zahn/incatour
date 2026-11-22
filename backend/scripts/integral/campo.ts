@@ -8,13 +8,16 @@ const H = 3600 * 1000;
 
 type Opciones = { etapas?: number; pasajeros?: number; compradores?: number };
 
-/** Salida CERRADA (asignada) con 1 guía + porteadores, a fecha futura. Los clientes extra compran 1 pasajero cada uno */
+/** Salida CERRADA (confirmada) con 1 guía + porteadores, a fecha futura. Los clientes extra compran 1 pasajero cada uno */
 async function armar(ctx: Ctx, o: Opciones = {}) {
   const { f, db } = ctx;
   const idcircuito = await f.circuito({ etapas: o.etapas ?? 2 });
   const pq = await f.paquete({ idcircuito });
   const hotel = await f.hotel(pq.localidad, 50);
-  const idsalida = await f.salida(pq.idpaquete, fecha(400), 8, hotel.idservicio);
+  // B3: el guía (con su token) y los porteadores se asignan al crear la salida
+  const guia = await f.guia();
+  const alta = await f.altaSalida(pq.idpaquete, fecha(400), 8, hotel.idservicio, { guias: [guia.idpersonal] });
+  const { idsalida, porteadores } = alta;
   const cliente = await f.cliente();
   await f.comprar(cliente.token, idsalida, { n: o.pasajeros ?? 2 });
   const otros: Awaited<ReturnType<typeof f.cliente>>[] = [];
@@ -23,14 +26,7 @@ async function armar(ctx: Ctx, o: Opciones = {}) {
     await f.comprar(c.token, idsalida, { n: 1 });
     otros.push(c);
   }
-  const panel = await ctx.preparar("Panel de asignación", "GET", `/salidas/${idsalida}/asignacion`);
-  const guia = await f.guia();
-  const porteadores: number[] = [];
-  for (let i = 0; i < panel.dotacionRequerida.porteadores; i++) porteadores.push(await f.porteador());
-  const guias = [guia.idpersonal];
-  for (let i = 1; i < panel.dotacionRequerida.guias; i++) guias.push((await f.guia()).idpersonal);
-  const transporte = await f.transporte(pq.localidad);
-  await ctx.preparar("Asignar", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: [...guias, ...porteadores], idtransporte: transporte.idservicio, itemsCamping: [] });
+  await f.confirmar(idsalida);
   const pasajeros = (await db.reservaPasajero.findMany({ where: { reserva: { idsalida } } })).map((p) => p.idpasajero);
   return { idsalida, guia, porteadores, cliente, otros, pasajeros, idcircuito, hotel, etapas: o.etapas ?? 2 };
 }
@@ -139,6 +135,19 @@ export async function campo(ctx: Ctx) {
     ctx.controlar("Iniciar antes de tiempo: sigue CERRADA y sin hora de partida", (await estadoSalida(a.idsalida)).fechaHoraInicioReal === null);
   });
 
+  await ctx.escenario("B3 y decisión 18: el guía ve la salida PUBLICADA pero no la puede iniciar", async () => {
+    const guia = await f.guia();
+    const pq = await f.paquete();
+    const idsalida = await f.salida(pq.idpaquete, fecha(400), 2, undefined, { guias: [guia.idpersonal] });
+    const lista = await ctx.esperar("B3 GET /guia/salidas con una salida recién creada → 200", "GET", "/guia/salidas", undefined, guia.token, 200);
+    ctx.controlar("B3 el guía ve la salida PUBLICADA desde que se crea", (lista ?? []).some((s: any) => s.idsalida === idsalida && s.estado === "PUBLICADA"), JSON.stringify(lista));
+    await ctx.f.moverFechas(idsalida, fecha(0), fecha(2));
+    const r = await ctx.back.llamar("POST", `/guia/salidas/${idsalida}/iniciar`, undefined, guia.token);
+    ctx.controlar("Decisión 18 iniciar una PUBLICADA → 400 \"La salida todavía no está confirmada por la agencia\"",
+      r.status === 400 && r.body?.error === "La salida todavía no está confirmada por la agencia", `${r.status} ${JSON.stringify(r.body)}`);
+    ctx.controlar("Decisión 18 la salida sigue PUBLICADA", (await ctx.db.salida.findUniqueOrThrow({ where: { idsalida } })).estado === "PUBLICADA");
+  });
+
   await ctx.escenario("Iniciar la salida: el primer avance ya no la inicia", async () => {
     const a = await armar(ctx);
     await ctx.f.moverFechas(a.idsalida, fecha(-1), fecha(1));
@@ -199,10 +208,13 @@ export async function campo(ctx: Ctx) {
     const plazasHotel = () => ctx.f.libre(a.hotel.idservicio);
     const plazasAntes = await plazasHotel();
     const r = await ctx.esperar("Avance 3 de 3 → 201", "POST", url, avance(3, hace(2 * H)), a.guia.token, 201);
-    // El hotel tenía 50: el bloqueo de 8 lo dejó en 42 y la asignación devolvió los 6 sin vender; al terminar,
-    // la ocupación de los 2 del grupo queda como historial y deja de contar (A1)
+    // El hotel tenía 50: el bloqueo de 8 lo dejó en 42 y la asignación devolvió los 6 sin vender. Al terminar,
+    // la ocupación de los 2 del grupo sigue contando hasta su `hasta`: la noche posterior (fin = mañana) sigue tomada
     const plazasDespues = await plazasHotel();
-    ctx.controlar("Al finalizar, el hotel recupera las 2 plazas del grupo (vuelve a 50)", plazasDespues === plazasAntes + 2 && plazasDespues === 50, `antes=${plazasAntes} después=${plazasDespues}`);
+    ctx.controlar("Al finalizar, el hotel sigue con las 2 plazas del grupo tomadas hasta la noche posterior (48)", plazasDespues === plazasAntes && plazasDespues === 48, `antes=${plazasAntes} después=${plazasDespues}`);
+    const oc = await ctx.esperar("Ocupación del hotel en la noche posterior → 200", "GET", `/servicios/${a.hotel.idservicio}/ocupacion?desde=${fecha(1)}&hasta=${fecha(2)}`, undefined, ctx.admin, 200);
+    ctx.controlar("La finalizada ocupa la noche posterior y la libera al día siguiente",
+      oc?.dias?.[0]?.ocupado === 2 && oc?.dias?.[1]?.ocupado === 0 && oc?.ocupaciones?.some((o: any) => o.estadoSalida === "FINALIZADA"), JSON.stringify(oc?.dias));
     ctx.controlar("Respuesta: salida FINALIZADA", r?.salida?.estado === "FINALIZADA" && r?.salida?.ultimaEtapaAlcanzada === 3, JSON.stringify(r?.salida));
     const s = await estadoSalida(a.idsalida);
     ctx.controlar("Base: salida FINALIZADA con ultimaEtapa 3 y 3 avances", s.estado === "FINALIZADA" && s.ultimaEtapaAlcanzada === 3 && (await avances(a.idsalida)) === 3, `estado=${s.estado} ultima=${s.ultimaEtapaAlcanzada}`);

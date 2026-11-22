@@ -104,13 +104,13 @@ Muchas pantallas no son un solo endpoint: primero se consulta, y después se con
 | 5 | Etapas del circuito | `GET /api/circuitos/{idcircuito}/etapas` | `PUT` con **todas** las etapas: reemplaza la secuencia completa |
 | 49, 50 | Portal del guía | `GET /api/guia/salidas`, y después `GET /api/guia/salidas/{id}` | `POST …/avances` o `POST …/incidentes`. Para los afectados: `GET …/pasajeros` |
 
-**Compra (CU-30):** es un solo `POST /api/reservas` con los pasajeros, el equipaje, el medio de pago y la tarjeta. Si el pago se rechaza, responde 400 con el motivo y no queda nada reservado. Tarjetas de prueba del mock de la pasarela:
+**Compra (CU-30):** es un solo `POST /api/reservas` con los pasajeros, el medio de pago y la tarjeta (el equipaje se pesa y cobra en persona; si llega `equipaje`, se ignora). Si el pago se rechaza, responde 400 con el motivo y no queda nada reservado. Tarjetas de prueba del mock de la pasarela:
 - termina en `0000`: fondos insuficientes;
 - termina en `1111`: tarjeta robada;
 - CVV `999`: falla de seguridad;
 - cualquier otra: aprobada.
 
-La reserva guarda lo que vio el cliente al comprar: `precioCongelado`, `temporadaAplicada`, `precioPaquetePorPersona`, `adicionalesEquipaje`, `moneda`, `condicionesComerciales` y `diasMinimosReintegro`. Cada salida guarda la definición del paquete con la que se creó (`definicionPaquete`); modificar el paquete no cambia las salidas ya creadas, y su circuito no se puede cambiar mientras tenga salidas activas.
+La reserva guarda lo que vio el cliente al comprar: `precioCongelado`, `temporadaAplicada`, `precioPaquetePorPersona`, `moneda`, `condicionesComerciales` y `diasMinimosReintegro`. Cada salida guarda la definición del paquete con la que se creó (`definicionPaquete`); modificar el paquete no cambia las salidas ya creadas, y su circuito no se puede cambiar mientras tenga salidas activas.
 
 ---
 

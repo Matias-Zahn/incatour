@@ -87,16 +87,18 @@ export async function catalogoCuentas(ctx: Ctx) {
     const antes = await db.paquete.count();
     await esperar("Crear paquete con circuito inactivo → 404", "POST", "/paquetes", {
       idcircuito: inactivo, nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_CATEGORIA", localidadGarantizada: "X", categoriaGarantizada: "3 Estrellas",
-      tipoHabitacionGarantizada: "Doble", matrizPrecios: await matriz(),
+      tipoHabitacionGarantizada: "Doble", idtransporte: 1, matrizPrecios: await matriz(),
     }, admin, 404);
     controlar("No se creó el paquete", (await db.paquete.count()) === antes);
   });
 
   await escenario("Paquete: garantía por establecimiento exige bloqueo de plazas (RF-06)", async () => {
-    const hotel = await f.hotel(`Loc ${unico()}`, 50, "A_SOLICITUD");
+    const loc = `Loc ${unico()}`;
+    const hotel = await f.hotel(loc, 50, "A_SOLICITUD");
     const antes = await db.paquete.count();
     await esperar("POR_ESTABLECIMIENTO con hotel A_SOLICITUD → 400", "POST", "/paquetes", {
-      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio, matrizPrecios: await matriz(),
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      localidadGarantizada: loc, idtransporte: (await f.transporte(loc)).idservicio, matrizPrecios: await matriz(),
     }, admin, 400);
     controlar("No se creó el paquete", (await db.paquete.count()) === antes);
   });
@@ -160,15 +162,17 @@ export async function catalogoCuentas(ctx: Ctx) {
   ctx.seccion("CU-14 a 21 Proveedores y servicios");
 
   await escenario("Baja de proveedor con hotel garantizado o servicio incluido en un paquete activo (CAT-26)", async () => {
-    const hotel = await f.hotel(`Loc ${unico()}`);
+    const locHotel = `Loc ${unico()}`;
+    const hotel = await f.hotel(locHotel);
     await preparar("Paquete con hotel garantizado", "POST", "/paquetes", {
-      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio, matrizPrecios: await matriz(),
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${unico()}`, tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: hotel.idservicio,
+      localidadGarantizada: locHotel, idtransporte: (await f.transporte(locHotel)).idservicio, matrizPrecios: await matriz(),
     });
     await esperar("Baja de proveedor con hotel garantizado → 400", "PATCH", `/proveedores/${hotel.idproveedor}/baja`, undefined, admin, 400);
     controlar("Proveedor y servicio siguen ACTIVOS", (await estadoDe("proveedor", { idproveedor: hotel.idproveedor })) === "ACTIVO" && (await estadoDe("servicioBase", { idservicio: hotel.idservicio })) === "ACTIVO");
 
     const trans = await f.transporte(`Loc ${unico()}`);
-    await f.paquete({ serviciosIncluidos: [trans.idservicio] });
+    await f.paquete({ idtransporte: trans.idservicio });
     await esperar("Baja de proveedor con servicio incluido en un paquete activo → 400", "PATCH", `/proveedores/${trans.idproveedor}/baja`, undefined, admin, 400);
     controlar("Proveedor y servicio incluido siguen ACTIVOS", (await estadoDe("proveedor", { idproveedor: trans.idproveedor })) === "ACTIVO" && (await estadoDe("servicioBase", { idservicio: trans.idservicio })) === "ACTIVO");
     await esperar("Baja del servicio incluido en paquete activo (CAT-09) → 400", "PATCH", `/servicios/${trans.idservicio}/baja`, undefined, admin, 400);
@@ -200,13 +204,22 @@ export async function catalogoCuentas(ctx: Ctx) {
     const c = await conReserva();
     const guia = await f.guia();
     const porteador = await f.porteador();
-    const transporte = await f.transporte(c.localidad);
-    await preparar("Asignar guía, porteador y transporte", "POST", `/salidas/${c.idsalida}/asignacion`, { personalIds: [guia.idpersonal, porteador], idtransporte: transporte.idservicio, itemsCamping: [] });
-    await esperar("Baja de guía asignado a salida activa → 400", "PATCH", `/personal/${guia.idpersonal}/baja`, undefined, admin, 400);
+    // B3: el personal se asigna al crear la salida
+    const idsalida = await f.salida(c.idpaquete, fecha(401), 2, c.hotel.idservicio, { guias: [guia.idpersonal], porteadores: [porteador] });
+    const nro = (await db.salida.findUniqueOrThrow({ where: { idsalida } })).nroSalida;
+    const r = await ctx.back.llamar("PATCH", `/personal/${guia.idpersonal}/baja`, undefined, admin);
+    controlar("12.8 baja de guía asignado a salida activa → 409 con la salida en el mensaje y en detalle.salidas",
+      r.status === 409 && r.body?.error === `No se puede dar de baja: está asignado a ${nro}, que todavía no finalizó` &&
+        r.body?.detalle?.salidas?.length === 1 && r.body.detalle.salidas[0].idsalida === idsalida && r.body.detalle.salidas[0].nroSalida === nro,
+      `${r.status} ${JSON.stringify(r.body)}`);
     controlar("El guía sigue ACTIVO", (await db.personal.findUnique({ where: { idpersonal: guia.idpersonal } }))?.estado === "ACTIVO");
     await esperar("Baja de la cuenta del guía asignado → 400", "PATCH", `/cuentas-guia/${guia.idusuario}/baja`, undefined, admin, 400);
     controlar("La cuenta del guía sigue ACTIVA", (await db.usuario.findUnique({ where: { idusuario: guia.idusuario! } }))?.estado === "ACTIVO");
-    await esperar("Baja del porteador asignado → 400", "PATCH", `/personal/${porteador}/baja`, undefined, admin, 400);
+    await esperar("Baja del porteador asignado → 409 (12.8)", "PATCH", `/personal/${porteador}/baja`, undefined, admin, 409);
+    const pas = await ctx.back.llamar("PUT", `/personal/${porteador}`, { fechaVencimientoPasaporte: fecha(400) }, admin);
+    controlar("12.8 pasaporte que vence antes del fin de una salida asignada → 409 con detalle.salidas",
+      pas.status === 409 && pas.body?.error?.startsWith(`El pasaporte no puede vencer antes de que termine ${nro} (`) && pas.body?.detalle?.salidas?.[0]?.idsalida === idsalida,
+      `${pas.status} ${JSON.stringify(pas.body)}`);
   });
 
   await escenario("Cuenta de guía con habilitación vencida (CTA-07)", async () => {

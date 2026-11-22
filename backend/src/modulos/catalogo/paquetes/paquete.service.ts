@@ -1,14 +1,39 @@
 import { Prisma } from "@prisma/client";
 import { CustomError } from "../../../error/CustomError";
 import { db } from "../../../config/postgresDatabase";
-import { CrearPaqueteDto, ModificarPaqueteDto } from "./paquete.dto";
-import { FiltrosPaquete, PaqueteRepository } from "./paquete.repository";
+import { TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
+import { claveDia } from "../../../shared/ocupacion";
+import { diasHabilitados, fechaMinimaInicio } from "../../../shared/ventaAbierta";
+import { CrearPaqueteDto, ModificarPaqueteDto, ServiciosPaquete } from "./paquete.dto";
+import { FiltrosPaquete, PaqueteDetalle, PaqueteRepository, ReemplazoServicios } from "./paquete.repository";
+
+type ConServicios = { servicios: { servicio: Parameters<typeof tipoDeServicio>[0] }[] };
+
+/** B2: cada servicio con su tipo, y el aviso de los paquetes viejos que no tienen transporte. */
+export function formatearPaquete<P extends ConServicios>(p: P) {
+  const servicios = p.servicios.map((ps) => ({ ...ps, tipo: tipoDeServicio(ps.servicio) }));
+  return { ...p, servicios, faltaTransporte: !servicios.some((s) => s.tipo === TIPO_SERVICIO.TRANSPORTE) };
+}
+
+/** B9 y 12.6: los días que el asistente de crear salida deja elegir. Las reglas viven en shared/ventaAbierta. */
+function calendarioSalidas(p: PaqueteDetalle) {
+  const tren = p.servicios.find((s) => s.servicio.tren)?.servicio;
+  return {
+    diasHabilitados: diasHabilitados({
+      diasDisponibles: p.diasDisponibles,
+      tren: tren?.tren && { nombreServicio: tren.nombreServicio, diasOperacion: tren.tren.diasOperacion },
+    }),
+    fechaMinima: claveDia(fechaMinimaInicio(p.diasCierreVenta)),
+  };
+}
+
+const NOMBRE_TIPO: Partial<Record<TipoServicio, string>> = { TRANSPORTE: "un transporte", TREN: "un tren", EQUIPAMIENTO: "un equipamiento" };
 
 export class PaqueteService {
   private repository = new PaqueteRepository();
 
   async consultarPaquetes(filtros?: FiltrosPaquete) {
-    return this.repository.findAll(filtros);
+    return (await this.repository.findAll(filtros)).map(formatearPaquete);
   }
 
   // CAT-24: el detalle del admin (GET /paquetes/:id) también muestra los inactivos que lista con ?estado=INACTIVO
@@ -17,7 +42,7 @@ export class PaqueteService {
     if (!paquete || (!incluirInactivos && paquete.estado !== "ACTIVO")) {
       throw CustomError.notFound("Paquete no encontrado o inactivo.");
     }
-    return paquete;
+    return { ...formatearPaquete(paquete), calendarioSalidas: calendarioSalidas(paquete) };
   }
 
   /**
@@ -39,18 +64,16 @@ export class PaqueteService {
       throw CustomError.badRequest("El circuito debe tener etapas establecidas antes de crear un paquete.");
     }
 
-    // 3. DSS: h = buscarPorId(alojamientoId) + validarGarantiaAlojamiento
+    // 3. DSS: h = buscarPorId(alojamientoId) + validarGarantiaAlojamiento (B2: en la localidad de "Sale desde")
     if (dto.tipoGarantia === "POR_ESTABLECIMIENTO") {
-      await this.validarGarantiaAlojamiento(dto.idservicioGarantizado!);
+      await this.validarGarantiaAlojamiento(dto.idservicioGarantizado!, dto.localidadGarantizada!);
     }
 
     // 4. DSS: validarViabilidadComercial(matrizPrecios)
     await this.validarViabilidadComercial(dto.matrizPrecios);
 
-    // 5. Validar servicios incluidos (si vienen)
-    if (dto.serviciosIncluidos && dto.serviciosIncluidos.length > 0) {
-      await this.validarServiciosExisten(dto.serviciosIncluidos);
-    }
+    // 5. B2: el transporte, el tren y el equipo tienen que existir, estar activos y ser de ese tipo
+    await this.validarServiciosPaquete(dto.servicios);
 
     // 6 y 7. Generar nroPaquete y guardar(p) de forma atómica.
     // CAT-23: si otro alta tomó el mismo número (o hay un hueco), se reintenta con el siguiente
@@ -82,10 +105,15 @@ export class PaqueteService {
         nochesPosteriores: dto.nochesPosteriores ?? 0,
         diasDisponibles: dto.diasDisponibles,
         diasMinimosReintegro: dto.diasMinimosReintegro ?? null,
+        diasCierreVenta: dto.diasCierreVenta,
       },
       dto.matrizPrecios,
-      dto.serviciosIncluidos ?? []
-    );
+      [
+        { idservicio: dto.servicios.idtransporte! },
+        ...(dto.servicios.idtren ? [{ idservicio: dto.servicios.idtren }] : []),
+        ...(dto.servicios.equipo ?? []),
+      ]
+    ).then(formatearPaquete);
   }
 
   /**
@@ -129,16 +157,13 @@ export class PaqueteService {
       if (!idGarantizadoFinal) {
         throw CustomError.badRequest("Debe indicar el servicio de alojamiento a garantizar.");
       }
-      await this.validarGarantiaAlojamiento(idGarantizadoFinal);
+      await this.validarGarantiaAlojamiento(idGarantizadoFinal, dto.localidadGarantizada ?? paquete.localidadGarantizada);
     }
 
     // CAT-08/CAT-14: por categoría se valida el estado final (RF-06) y no puede quedar un hotel garantizado
     if (tipoGarantiaFinal === "POR_CATEGORIA") {
       if (dto.idservicioGarantizado != null) {
         throw CustomError.badRequest("Con garantía por categoría, no debe indicarse idservicioGarantizado.");
-      }
-      if (!(dto.localidadGarantizada ?? paquete.localidadGarantizada)) {
-        throw CustomError.badRequest("Con garantía por categoría, localidadGarantizada es obligatoria.");
       }
       if (!(dto.categoriaGarantizada ?? paquete.categoriaGarantizada)) {
         throw CustomError.badRequest("Con garantía por categoría, categoriaGarantizada es obligatoria.");
@@ -148,10 +173,13 @@ export class PaqueteService {
       }
     }
 
-    // Validar servicios incluidos si se envían
-    if (dto.serviciosIncluidos && dto.serviciosIncluidos.length > 0) {
-      await this.validarServiciosExisten(dto.serviciosIncluidos);
-    }
+    // B2: los tipos que vienen se validan y se reemplazan enteros
+    await this.validarServiciosPaquete(dto.servicios);
+    const { idtransporte, idtren, equipo } = dto.servicios;
+    const reemplazos: ReemplazoServicios = {};
+    if (idtransporte !== undefined) reemplazos.transporte = [{ idservicio: idtransporte }];
+    if (idtren !== undefined) reemplazos.tren = idtren ? [{ idservicio: idtren }] : [];
+    if (equipo !== undefined) reemplazos.equipamiento = equipo;
 
     // CAT-16: las temporadas de la matriz se validan antes de escribir nada, para no dejar el paquete a medias
     if (dto.matrizPrecios && dto.matrizPrecios.length > 0) {
@@ -171,16 +199,17 @@ export class PaqueteService {
     if (dto.nochesPosteriores !== undefined) dataUpdate.nochesPosteriores = dto.nochesPosteriores;
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
     if (dto.diasMinimosReintegro !== undefined) dataUpdate.diasMinimosReintegro = dto.diasMinimosReintegro;
+    if (dto.diasCierreVenta !== undefined) dataUpdate.diasCierreVenta = dto.diasCierreVenta;
 
     const hasData = Object.keys(dataUpdate).length > 0;
-    const hasServicios = dto.serviciosIncluidos !== undefined;
+    const hasServicios = Object.keys(reemplazos).length > 0;
     const hasGarantia = dto.idservicioGarantizado !== undefined || dto.tipoGarantia !== undefined;
 
     if (hasData || hasServicios || hasGarantia) {
       await this.repository.update(
         id,
         dataUpdate,
-        dto.serviciosIncluidos,
+        reemplazos,
         dto.idservicioGarantizado,
         dto.tipoGarantia
       );
@@ -191,7 +220,7 @@ export class PaqueteService {
       await this.repository.reemplazarTarifas(id, dto.matrizPrecios);
     }
 
-    return this.repository.findById(id);
+    return formatearPaquete((await this.repository.findById(id))!);
   }
 
   /**
@@ -224,7 +253,7 @@ export class PaqueteService {
    *     de confirmación sea por "bloqueo de plazas".
    * Flujo Alternativo 2: Establecimiento que confirma a solicitud → RECHAZO.
    */
-  private async validarGarantiaAlojamiento(idservicio: number) {
+  private async validarGarantiaAlojamiento(idservicio: number, saleDesde: string) {
     const servicio = await db.servicioBase.findUnique({
       where: { idservicio: idservicio },
       include: { alojamiento: true, proveedor: true },
@@ -245,6 +274,11 @@ export class PaqueteService {
         "Solo se puede garantizar por establecimiento cuando la modalidad es por 'bloqueo de plazas'. " +
         "Cambie la garantía a 'por categoría' o elija otro establecimiento."
       );
+    }
+
+    // B2: el hotel garantizado está en la ciudad de "Sale desde"
+    if (servicio.localidad !== saleDesde) {
+      throw CustomError.badRequest(`El hotel garantizado está en ${servicio.localidad} y el paquete sale desde ${saleDesde}.`);
     }
   }
 
@@ -267,21 +301,22 @@ export class PaqueteService {
     }
   }
 
-  /**
-   * Valida que los servicios incluidos existan, estén activos y pertenezcan a un proveedor activo (CAT-10).
-   */
-  private async validarServiciosExisten(ids: number[]) {
-    for (const idservicio of ids) {
-      const servicio = await db.servicioBase.findUnique({
-        where: { idservicio },
-        include: { proveedor: true },
-      });
-      if (!servicio || servicio.estado !== "ACTIVO" || (servicio.proveedor && servicio.proveedor.estado !== "ACTIVO")) {
-        throw CustomError.badRequest(
-          `El servicio con ID ${idservicio} no existe o no está activo.`
-        );
-      }
+  /** B2: los servicios del paquete existen, están activos, son de un proveedor activo (CAT-10) y son del tipo de su campo. */
+  private async validarServiciosPaquete({ idtransporte, idtren, equipo }: ServiciosPaquete) {
+    if (idtransporte !== undefined) await this.validarServicioDeTipo(idtransporte, TIPO_SERVICIO.TRANSPORTE);
+    if (idtren) await this.validarServicioDeTipo(idtren, TIPO_SERVICIO.TREN);
+    for (const e of equipo ?? []) await this.validarServicioDeTipo(e.idservicio, TIPO_SERVICIO.EQUIPAMIENTO);
+  }
+
+  private async validarServicioDeTipo(idservicio: number, tipo: TipoServicio) {
+    const servicio = await db.servicioBase.findUnique({
+      where: { idservicio },
+      include: { proveedor: true, alojamiento: true, transporte: true, tren: true, equipamiento: true },
+    });
+    if (!servicio || servicio.estado !== "ACTIVO" || (servicio.proveedor && servicio.proveedor.estado !== "ACTIVO")) {
+      throw CustomError.badRequest(`El servicio con ID ${idservicio} no existe o no está activo.`);
     }
+    if (tipoDeServicio(servicio) !== tipo) throw CustomError.badRequest(`El servicio con ID ${idservicio} no es ${NOMBRE_TIPO[tipo]}.`);
   }
 
   /**

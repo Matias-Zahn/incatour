@@ -1,36 +1,41 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AutoridadMock } from "../../../integraciones/autoridad/autoridad.mock";
 import { AsignacionService } from "./asignacion.service";
-import { ConfirmarAsignacionDto } from "./asignacion.dto";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
-const { repo, logistica, actual } = vi.hoisted(() => ({
-  repo: { buscarSalida: vi.fn(), personalLibre: vi.fn(), buscarPersonal: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn() },
-  logistica: { disponiblesTransporte: vi.fn(), disponiblesEquipamiento: vi.fn() },
+const { repo, salidas, actual } = vi.hoisted(() => ({
+  repo: { buscarSalida: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn(), buscarPersonal: vi.fn(), asignarPersonal: vi.fn() },
+  salidas: { cargarEquipoDe: vi.fn() },
   actual: { autoridad: null as unknown },
 }));
-vi.mock("./asignacion.repository", () => ({ ESTADOS_ASIGNABLES: ["PUBLICADA", "CERRADA"], AsignacionRepository: class { constructor() { return repo; } } }));
-vi.mock("../logistica/logistica.repository", () => ({ LogisticaRepository: class { constructor() { return logistica; } } }));
+vi.mock("./asignacion.repository", () => ({ AsignacionRepository: class { constructor() { return repo; } } }));
+vi.mock("../salidas/salida.repository", () => ({ SalidaRepository: class { constructor() { return salidas; } } }));
 vi.mock("../autoridad.wiring", () => ({ obtenerAutoridad: () => actual.autoridad }));
 
 const INICIO = new Date("2026-11-20");
 const FIN = new Date("2026-11-23");
 const pasaporte = (vence: string) => ({ nacionalidad: "Peruana", nroPasaporte: "P", fechaVencimientoPasaporte: new Date(vence) });
 const pasajero = (id: number, vence = "2030-01-01") => ({ idpasajero: id, pasajero: { idpasajero: id, nombreCompleto: `Pasajero ${id}`, ...pasaporte(vence) } });
-
-// Salida de 8 lugares: bloqueo inicial 8 + 2 guías + 4 porteadores = 14. Vendidos 3 → dotación 2 + 2 → sobran 7
-const salida = (bloqueo: string, pasajeros = [pasajero(1), pasajero(2), pasajero(3)]) => ({
-  idsalida: 2, nroSalida: "SAL-2026-002", estado: "PUBLICADA", idbloqueo: bloqueo, tamanoMaximo: 8,
-  fechaInicio: INICIO, fechaFin: FIN, stockLocalAlojamiento: 5, servicios: [], personalAsignado: [],
-  paquete: { circuito: { minimoGuias: 2, parametrosPorteadores: "1 por cada 2 pasajeros" } },
-  reservas: [{ idreserva: 10, nroReserva: "RES-1", estadoAlojamiento: "CONFIRMADO", pasajeros }],
-});
-const persona = (id: number, rol: string) => ({
-  idpersonal: id, nombreCompleto: `Persona ${id}`, rol, ...pasaporte("2030-01-01"),
-  guia: rol === "Guía" ? { fechaHabilitacion: new Date("2028-12-31"), usuario: { estado: "ACTIVO" } } : null,
+const persona = (id: number, rol: string, extra: Record<string, unknown> = {}) => ({
+  idpersonal: id,
+  personal: {
+    idpersonal: id, nombreCompleto: `Persona ${id}`, rol, estado: "ACTIVO", ...pasaporte("2030-01-01"),
+    guia: rol === "Guía" ? { fechaHabilitacion: new Date("2028-12-31"), usuario: { estado: "ACTIVO" } } : null,
+    ...extra,
+  },
 });
 const equipo = [persona(1, "Guía"), persona(2, "Guía"), persona(3, "Porteador"), persona(4, "Porteador")];
-const dto = ConfirmarAsignacionDto.create({ personalIds: [1, 2, 3, 4], idtransporte: 7, itemsCamping: [] })[1]!;
+const bus = { idservicio: 7, tipo: "TRANSPORTE", servicio: { nombreServicio: "Bus", transporte: { capacidadVehiculo: 20 }, alojamiento: null, equipamiento: null } };
+
+// Salida de 8 lugares con 4 del personal (asignado al crearla): bloqueo 12. Vendidos 3 → sobran 5.
+// Hoy es 01/11 y el corte de 25 días ya pasó: se puede confirmar
+const salida = (bloqueo: string, pasajeros = [pasajero(1), pasajero(2), pasajero(3)], extra: Record<string, unknown> = {}) => ({
+  idsalida: 2, nroSalida: "SAL-2026-002", estado: "PUBLICADA", idbloqueo: bloqueo, tamanoMaximo: 8, diasCierreVenta: 25,
+  fechaInicio: INICIO, fechaFin: FIN, stockLocalAlojamiento: 5, definicionPaquete: null, personalAsignado: equipo, ocupaciones: [bus],
+  paquete: { circuito: { minimoGuias: 2, parametrosPorteadores: "1 por cada 2 pasajeros" } },
+  reservas: [{ idreserva: 10, nroReserva: "RES-1", estadoAlojamiento: "CONFIRMADO", pasajeros }],
+  ...extra,
+});
 
 describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
   let autoridad: AutoridadMock;
@@ -43,14 +48,11 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     vi.setSystemTime(new Date("2026-11-01"));
     autoridad = new AutoridadMock();
     actual.autoridad = autoridad;
-    const b = await autoridad.solicitarBloqueoCupo(INICIO, 14);
+    const b = await autoridad.solicitarBloqueoCupo(INICIO, 12);
     if (!b.aprobado) throw new Error("bloqueo");
     idBloqueo = b.idBloqueo;
     repo.buscarSalida.mockResolvedValue(salida(idBloqueo));
-    repo.buscarPersonal.mockResolvedValue(equipo);
-    repo.personalLibre.mockResolvedValue(equipo);
-    logistica.disponiblesTransporte.mockResolvedValue([{ idservicio: 7 }]);
-    logistica.disponiblesEquipamiento.mockResolvedValue([]);
+    salidas.cargarEquipoDe.mockResolvedValue({ totales: new Map(), filas: [] });
     repo.tomarSobrantes.mockResolvedValue(true);
     repo.devolverSobrantes.mockResolvedValue(undefined);
   });
@@ -61,18 +63,68 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), fechaInicio: new Date("2026-10-31") });
     const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("ya inició");
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("ya inició");
     expect(emitir).not.toHaveBeenCalled();
   });
 
-  it("emite un permiso por persona de la nómina y libera los 7 lugares sobrantes", async () => {
+  it("decisión 4: antes del corte no se confirma", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { diasCierreVenta: 2 }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toMatchObject({
+      statusCode: 400,
+      message: "La venta sigue abierta hasta el 17/11/2026: la salida se confirma después del corte",
+    });
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { estado: "CERRADA" }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("ya está confirmada");
+  });
+
+  it("panel: puede confirmar, con el personal, el transporte y los porteadores que sobran (decisión 5)", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { personalAsignado: [...equipo, persona(5, "Porteador")] }));
+    const panel = await new AsignacionService().obtenerPanelAsignacion(2);
+    expect(panel).toMatchObject({
+      puedeConfirmar: true, motivoNoConfirmable: null, pasajerosConfirmados: 3, dotacionRequerida: { guias: 2, porteadores: 2 },
+      porteadoresSobrantes: 1, transporte: { idservicio: 7, capacidadVehiculo: 20, alcanza: true }, faltantes: [], bloqueoInicial: 13, lugaresSobrantes: 5,
+    });
+    expect(panel.personal[0]).toEqual({ idpersonal: 1, nombreCompleto: "Persona 1", rol: "Guía", apto: true, motivo: null });
+  });
+
+  it("salida anterior a la etapa 3 sin personal: el panel lo pide y confirmar lo asigna con personalIds", async () => {
+    const vieja = salida(idBloqueo, undefined, { personalAsignado: [] });
+    repo.buscarSalida.mockResolvedValue(vieja);
+    expect((await new AsignacionService().obtenerPanelAsignacion(2)).faltantes).toEqual([
+      "Sin personal asignado: la salida necesita al menos 2 guías y 2 porteadores (se eligen al confirmar)",
+    ]);
+
+    repo.buscarPersonal.mockResolvedValue([equipo[0]!.personal, { ...equipo[1]!.personal, estado: "INACTIVO" }]);
+    await expect(new AsignacionService().confirmarAsignacion(2, [1, 2])).rejects.toThrow("Persona 2: está dado de baja");
+
+    repo.buscarPersonal.mockResolvedValue(equipo.map((e) => e.personal));
+    repo.asignarPersonal.mockImplementation(async () => repo.buscarSalida.mockResolvedValue(salida(idBloqueo)));
+    repo.confirmar.mockResolvedValue({ idsalida: 2, nroSalida: "SAL-2026-002", estado: "CERRADA" });
+    await new AsignacionService().confirmarAsignacion(2, [1, 2, 3, 4]);
+    expect(repo.asignarPersonal).toHaveBeenCalledWith(vieja, [1, 2, 3, 4]);
+    expect(repo.confirmar).toHaveBeenCalled();
+
+    // con personal ya asignado, personalIds no vale
+    await expect(new AsignacionService().confirmarAsignacion(2, [1])).rejects.toThrow("La salida ya tiene personal");
+  });
+
+  it("B4: sin transporte no se confirma: 409 con los faltantes en el detalle", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { ocupaciones: [] }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Falta resolver antes de confirmar: Falta el transporte",
+      detalle: { faltantes: ["Falta el transporte"] },
+    });
+  });
+
+  it("emite un permiso por persona de la nómina y libera los 5 lugares sobrantes", async () => {
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
 
-    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+    const r = await new AsignacionService().confirmarAsignacion(2);
 
     expect(r.permisosEmitidos).toBe(7); // 3 pasajeros + 4 del personal
-    expect(r.lugaresLiberados).toBe(7);
-    // El bloqueo bajó de 14 a 7 lugares: ese día quedan 493 libres
+    expect(r.lugaresLiberados).toBe(5);
+    // El bloqueo bajó de 12 a 7 lugares: ese día quedan 493 libres
     expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
   });
 
@@ -80,14 +132,14 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
     vi.spyOn(autoridad, "liberarLugaresSobrantes").mockRejectedValueOnce(new Error("caída"));
 
-    const r = await new AsignacionService().confirmarAsignacion(2, dto);
-    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 7 }));
+    const r = await new AsignacionService().confirmarAsignacion(2);
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 5 }));
     expect(r.lugaresLiberados).toBe(0);
     expect(r.advertencia).toContain("liberar-sobrantes");
-    expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 7);
+    expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 5);
 
-    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 7 });
-    expect(await new AsignacionService().liberarSobrantes(2)).toEqual({ lugaresLiberados: 7 });
+    repo.buscarSalida.mockResolvedValue({ ...salida(idBloqueo), estado: "CERRADA", lugaresPorLiberar: 5 });
+    expect(await new AsignacionService().liberarSobrantes(2)).toEqual({ lugaresLiberados: 5 });
     expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
   });
 
@@ -116,19 +168,13 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect(repo.devolverSobrantes).toHaveBeenCalledWith(2, 7);
   });
 
-  it("FA4: con el pasaporte de un integrante del personal vencido no emite permisos ni guarda nada", async () => {
-    repo.buscarPersonal.mockResolvedValue([{ ...persona(1, "Guía"), ...pasaporte("2026-11-21") }, ...equipo.slice(1)]);
+  it("12.3: con el pasaporte de un integrante del personal vencido (aunque sea el último día) no emite ni guarda nada", async () => {
     const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
-
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("Persona 1");
+    for (const vence of ["2026-11-21", "2026-11-23"]) {
+      repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { personalAsignado: [persona(1, "Guía", pasaporte(vence)), ...equipo.slice(1)] }));
+      await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("Persona 1: el pasaporte vence") });
+    }
     expect(emitir).not.toHaveBeenCalled();
-    expect(repo.confirmar).not.toHaveBeenCalled();
-  });
-
-  it("RES-18: el personal con el pasaporte que vence el último día del recorrido tampoco va", async () => {
-    repo.buscarPersonal.mockResolvedValue([{ ...persona(1, "Guía"), ...pasaporte("2026-11-23") }, ...equipo.slice(1)]);
-
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("Persona 1");
     expect(repo.confirmar).not.toHaveBeenCalled();
   });
 
@@ -137,26 +183,26 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
     const emitir = vi.spyOn(autoridad, "solicitarEmisionNominal");
 
-    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+    const r = await new AsignacionService().confirmarAsignacion(2);
 
     expect(emitir.mock.calls[0]![1].map((t) => t.nombreCompleto)).not.toContain("Pasajero 2");
     expect(r.permisosEmitidos).toBe(6);
     expect(r.rechazados).toEqual([
       { tipo: "PASAJERO", id: 2, nombreCompleto: "Pasajero 2", motivo: "Pasaporte vence antes de finalizar el recorrido" },
     ]);
-    // 7 sobrantes + el lugar del rechazado
-    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 8 }));
+    // 5 sobrantes + el lugar del rechazado
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 6 }));
   });
 
   it("compensación: si la base falla después de emitir, da de baja los permisos", async () => {
     repo.confirmar.mockRejectedValue(new Error("fallo de la base"));
     const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("fallo de la base");
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("fallo de la base");
     expect(baja).toHaveBeenCalledTimes(7);
   });
 
-  // Bloqueo 14, nómina de 7 (3 pasajeros + 4 personal): sobran 7. Sin permiso al primero de la nómina
+  // Bloqueo 12, nómina de 7 (3 pasajeros + 4 personal): sobran 5. Sin permiso al primero de la nómina
   const rechazarPrimero = (indice: number) => {
     const real = autoridad.solicitarEmisionNominal.bind(autoridad);
     vi.spyOn(autoridad, "solicitarEmisionNominal").mockImplementation(async (id, nomina) => {
@@ -171,46 +217,41 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     const baja = vi.spyOn(autoridad, "darDeBajaPermiso");
     const liberar = vi.spyOn(autoridad, "liberarLugaresSobrantes");
 
-    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+    const r = await new AsignacionService().confirmarAsignacion(2);
 
     expect(baja).not.toHaveBeenCalled();
     expect(r.permisosEmitidos).toBe(6);
     expect(r.rechazados).toEqual([{ tipo: "PASAJERO", id: 1, nombreCompleto: "Pasajero 1", motivo: "Pasaporte vencido" }]);
-    // 7 sobrantes + 1 del rechazado (no ocupa lugar): quedan 6 permisos en un bloqueo de 6
-    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 8, rechazados: [expect.objectContaining({ motivo: "Pasaporte vencido" })] }));
-    expect(liberar).toHaveBeenCalledWith(idBloqueo, 8);
-    expect(r.lugaresLiberados).toBe(8);
+    // 5 sobrantes + 1 del rechazado (no ocupa lugar): quedan 6 permisos en un bloqueo de 6
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 6, rechazados: [expect.objectContaining({ motivo: "Pasaporte vencido" })] }));
+    expect(liberar).toHaveBeenCalledWith(idBloqueo, 6);
+    expect(r.lugaresLiberados).toBe(6);
   });
 
   it("RF-47: el lugar de un personal rechazado queda reservado para su reemplazo", async () => {
     rechazarPrimero(3); // nómina: 3 pasajeros y después el personal
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
 
-    const r = await new AsignacionService().confirmarAsignacion(2, dto);
+    const r = await new AsignacionService().confirmarAsignacion(2);
 
     expect(r.rechazados).toEqual([{ tipo: "PERSONAL", id: 1, nombreCompleto: "Persona 1", motivo: "Pasaporte vencido" }]);
-    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 7 }));
-    expect(r.lugaresLiberados).toBe(7);
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ lugaresPorLiberar: 5 }));
+    expect(r.lugaresLiberados).toBe(5);
   });
 
-  it("FA1: rechaza un guía sin habilitación vigente para las fechas", async () => {
-    const vencido = { ...persona(1, "Guía"), guia: { fechaHabilitacion: new Date("2026-11-21"), usuario: { estado: "ACTIVO" } } };
-    repo.buscarPersonal.mockResolvedValue([vencido, ...equipo.slice(1)]);
+  it("12.3: un guía con la habilitación vencida o sin cuenta activa frena la confirmación", async () => {
+    const vencida = persona(1, "Guía", { guia: { fechaHabilitacion: new Date("2026-11-21"), usuario: { estado: "ACTIVO" } } });
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { personalAsignado: [vencida, ...equipo.slice(1)] }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("Persona 1: la habilitación vence el 21/11/2026");
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("habilitación vigente");
+    const sinCuenta = persona(1, "Guía", { guia: { fechaHabilitacion: new Date("2028-12-31"), usuario: null } });
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { personalAsignado: [sinCuenta, ...equipo.slice(1)] }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("cuenta de usuario activa");
   });
 
-  it("exige la dotación mínima", async () => {
-    const pocos = ConfirmarAsignacionDto.create({ personalIds: [1, 3, 4], idtransporte: 7 })[1]!;
-    repo.buscarPersonal.mockResolvedValue([equipo[0], equipo[2], equipo[3]]);
-
-    await expect(new AsignacionService().confirmarAsignacion(2, pocos)).rejects.toThrow("al menos 2 guías");
-  });
-
-  it("CTA-18: un guía sin cuenta activa no se asigna (no podría informar los avances)", async () => {
-    repo.buscarPersonal.mockResolvedValue(equipo.map((p) => (p.guia ? { ...p, guia: { ...p.guia, usuario: null } } : p)));
-
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toThrow("cuenta de usuario activa");
+  it("exige la dotación mínima por los vendidos", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, undefined, { personalAsignado: [equipo[0], equipo[2], equipo[3]] }));
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toThrow("al menos 2 guías y 2 porteadores (tiene 1 y 2)");
   });
 
   it("FA5: con alojamientos pendientes responde 409", async () => {
@@ -219,6 +260,6 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
       reservas: [{ idreserva: 10, nroReserva: "RES-1", estadoAlojamiento: "PENDIENTE", pasajeros: [pasajero(1)] }],
     });
 
-    await expect(new AsignacionService().confirmarAsignacion(2, dto)).rejects.toMatchObject({ statusCode: 409 });
+    await expect(new AsignacionService().confirmarAsignacion(2)).rejects.toMatchObject({ statusCode: 409 });
   });
 });

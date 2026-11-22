@@ -1,4 +1,4 @@
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, PESO_MAXIMO_DECLARADO_KG, TIPO_SERVICIO, TipoServicio, TOPES } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TipoServicio, TOPES } from "../../../shared/constantes";
 import { sumarDias } from "../../../shared/ocupacion";
 
 export const MODALIDADES_CONFIRMACION = [MODALIDAD_BLOQUEO_PLAZAS, "A_SOLICITUD"];
@@ -58,9 +58,7 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
     modalidadConfirmacion: vModalidad,
   },
   TRANSPORTE: {
-    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo),
-    pesoEquipajeIncluido: vNumero(0, PESO_MAXIMO_DECLARADO_KG),
-    costoPorKgExcedente: vNumero(0, TOPES.costoPorKgExcedente),
+    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo), // B6: el equipaje se cobra en persona; sus campos, si llegan, se ignoran
   },
   TREN: {
     horarioSalida: vHora,

@@ -1,5 +1,5 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, SALIDAS_ACTIVAS, TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, ESTADO_SALIDA, TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
 import { hoyUTC } from "../../../shared/fechas";
 import { claveDia, OcupacionDias, ocupadoPorDia, totalDe } from "../../../shared/ocupacion";
 import { CAMPOS_MODIFICAR, CrearServicioDto, FiltrosServicioDto, ModificarServicioDto, RangoOcupacionDto } from "./servicio.dto";
@@ -50,8 +50,8 @@ export class ServicioService {
   async consultarOcupacion(id: number, { desde, hasta }: RangoOcupacionDto) {
     const servicio = await this.buscarOFallar(id);
     const historial = await this.repository.historialOcupacion(id, desde, hasta);
-    // Para el día solo cuentan las salidas activas; las finalizadas quedan en la lista como historial
-    const activas = historial.filter((o) => SALIDAS_ACTIVAS.includes(o.salida.estado));
+    // Para el día cuentan todas hasta su `hasta`, también las finalizadas (noches posteriores y reacondicionamiento)
+    const activas = historial.filter((o) => o.salida.estado !== ESTADO_SALIDA.CANCELADA);
     const total = totalDe(servicio);
     return {
       total,

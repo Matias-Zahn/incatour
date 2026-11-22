@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { Back, idDe, resumen } from "../lib-prueba";
 import { SALIDAS_ACTIVAS } from "../../src/shared/constantes";
 import { disponibleEnRango, totalDe } from "../../src/shared/ocupacion";
+import { calcularDotacion } from "../../src/modulos/salidas/salidas/salida.dotacion";
 
 export type Ctx = ReturnType<typeof crearContexto>;
 
@@ -96,7 +97,8 @@ export function crearContexto(p: {
     },
   };
 
-  type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string; equipajeKg?: number };
+  type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string };
+  type PersonalSalida = { guias?: number[] | undefined; porteadores?: number[] | undefined; idtransporte?: number | undefined; alojamientos?: number[] | undefined };
 
   // ==================== Fixtures ====================
   const f = {
@@ -124,8 +126,8 @@ export function crearContexto(p: {
       return idcircuito;
     },
 
-    /** Proveedor con un servicio. tipo ALOJAMIENTO, TRANSPORTE o EQUIPAMIENTO; `campos` según servicio.dto.ts */
-    async servicio(tipo: "ALOJAMIENTO" | "TRANSPORTE" | "EQUIPAMIENTO", localidad: string, campos: Record<string, unknown>) {
+    /** Proveedor con un servicio. tipo ALOJAMIENTO, TRANSPORTE, TREN o EQUIPAMIENTO; `campos` según servicio.dto.ts */
+    async servicio(tipo: "ALOJAMIENTO" | "TRANSPORTE" | "TREN" | "EQUIPAMIENTO", localidad: string, campos: Record<string, unknown>) {
       const prov = await ctx.preparar("Alta proveedor", "POST", "/proveedores", {
         tipoProveedor: tipo, razonSocial: `Int ${tipo} ${unico()}`, localidad, datosContacto: "int@test.com", canalComunicacion: "Email",
       });
@@ -142,19 +144,29 @@ export function crearContexto(p: {
     },
 
     transporte(localidad: string, capacidad = 30) {
-      return f.servicio("TRANSPORTE", localidad, { capacidadVehiculo: capacidad, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+      return f.servicio("TRANSPORTE", localidad, { capacidadVehiculo: capacidad });
     },
 
     equipamiento(localidad: string, cantidad = 10) {
       return f.servicio("EQUIPAMIENTO", localidad, { tipoEquipamiento: "Carpa", cantidadDisponible: cantidad });    },
 
+    /** B9: tren que opera los días `dias` ("L-X-V") */
+    tren(localidad: string, dias = "L-M-X-J-V-S-D") {
+      return f.servicio("TREN", localidad, { horarioSalida: "06:10", horarioLlegada: "07:45", diasOperacion: dias });
+    },
+
     /**
      * Paquete por categoría en una localidad propia (así solo ve los hoteles que arma el escenario).
      * Tarifa 500 USD en todas las temporadas activas (la del seed cubre hasta fin de 2026; setup agrega 2027-2028).
+     * B2: el transporte es obligatorio; si no se pasa, se crea uno en la localidad.
      */
-    async paquete(o: { idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; serviciosIncluidos?: number[]; monto?: number; nochesPrevias?: number; nochesPosteriores?: number } = {}) {
+    async paquete(o: {
+      idcircuito?: number; localidad?: string; diasMinimosReintegro?: number | null; idtransporte?: number; idtren?: number; monto?: number;
+      nochesPrevias?: number; nochesPosteriores?: number; diasDisponibles?: string; diasCierreVenta?: number;
+    } = {}) {
       const localidad = o.localidad ?? `Loc ${unico()}`;
       const idcircuito = o.idcircuito ?? (await f.circuito());
+      const idtransporte = o.idtransporte ?? (await f.transporte(localidad)).idservicio;
       const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
       const pq = await ctx.preparar("Crear paquete", "POST", "/paquetes", {
         idcircuito, nombrePaquete: `Int ${unico()}`, condiciones: "Integral", tipoGarantia: "POR_CATEGORIA",
@@ -163,15 +175,51 @@ export function crearContexto(p: {
         nochesPrevias: o.nochesPrevias ?? 1, nochesPosteriores: o.nochesPosteriores ?? 1,
         matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: o.monto ?? 500, moneda: "USD" })),
         ...(o.diasMinimosReintegro !== undefined && { diasMinimosReintegro: o.diasMinimosReintegro }),
-        ...(o.serviciosIncluidos && { serviciosIncluidos: o.serviciosIncluidos }),
+        idtransporte,
+        ...(o.idtren && { idtren: o.idtren }),
+        ...(o.diasDisponibles && { diasDisponibles: o.diasDisponibles }),
+        ...(o.diasCierreVenta !== undefined && { diasCierreVenta: o.diasCierreVenta }),
       });
-      return { idpaquete: idDe(pq, "idpaquete")!, idcircuito, localidad };
+      return { idpaquete: idDe(pq, "idpaquete")!, idcircuito, localidad, idtransporte };
     },
 
-    /** Salida PUBLICADA. Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
-    async salida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number) {
-      const s = await ctx.preparar("Crear salida", "POST", "/salidas", { idpaquete, fechaInicio, tamanoMaximo, ...(idalojamiento && { idalojamiento }) });
-      return idDe(s, "idsalida")!;
+    /**
+     * B3: body completo de POST /salidas. Sin guías, porteadores o transporte, arma los justos para la dotación del máximo
+     * (guías con cuenta, sin login) y un transporte propio de 60 asientos, así las salidas no se disputan nada
+     */
+    async cuerpoSalida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, o: PersonalSalida & { idalojamiento?: number | undefined } = {}) {
+      const pq = await db.paquete.findUnique({ where: { idpaquete }, include: { circuito: true } });
+      const dot = (pq && calcularDotacion(pq.circuito.minimoGuias, pq.circuito.parametrosPorteadores, tamanoMaximo)) ?? { guias: 1, porteadores: 0 };
+      const guias = o.guias ?? (await Promise.all(Array.from({ length: dot.guias }, () => f.guia({ sinLogin: true })))).map((g) => g.idpersonal);
+      const porteadores = o.porteadores ?? (await Promise.all(Array.from({ length: dot.porteadores }, () => f.porteador())));
+      const idtransporte = o.idtransporte ?? (await f.transporte(pq?.localidadGarantizada ?? "Loc T", 60)).idservicio;
+      return { idpaquete, fechaInicio, tamanoMaximo, idtransporte, personalIds: [...guias, ...porteadores], ...(o.idalojamiento && { idalojamiento: o.idalojamiento }), ...(o.alojamientos && { alojamientos: o.alojamientos }) };
+    },
+
+    /** Salida PUBLICADA con su personal y transporte (B3). Si hay un hotel con bloqueo que alcanza, lo usa (idalojamiento) */
+    async salida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number, o: PersonalSalida = {}) {
+      return (await f.altaSalida(idpaquete, fechaInicio, tamanoMaximo, idalojamiento, o)).idsalida;
+    },
+
+    /** Como salida, pero devuelve también quiénes quedaron asignados y el transporte */
+    async altaSalida(idpaquete: number, fechaInicio: string, tamanoMaximo: number, idalojamiento?: number, o: PersonalSalida = {}) {
+      const body = await f.cuerpoSalida(idpaquete, fechaInicio, tamanoMaximo, { ...o, ...(idalojamiento && { idalojamiento }) });
+      const s = await ctx.preparar("Crear salida", "POST", "/salidas", body);
+      const personal = await db.personal.findMany({ where: { idpersonal: { in: body.personalIds } } });
+      const deRol = (rol: string) => body.personalIds.filter((id) => personal.find((p) => p.idpersonal === id)?.rol === rol);
+      return { idsalida: idDe(s, "idsalida")!, guias: deRol("Guía"), porteadores: deRol("Porteador"), idtransporte: body.idtransporte, data: s };
+    },
+
+    /** B4: lleva el corte de venta a hoy (la venta ya cerró) sin mover la salida, como si hubieran pasado los días */
+    async cerrarVenta(idsalida: number) {
+      const s = await db.salida.findUniqueOrThrow({ where: { idsalida } });
+      await db.salida.update({ where: { idsalida }, data: { diasCierreVenta: Math.max(0, Math.ceil((s.fechaInicio.getTime() - Date.now()) / DIA)) } });
+    },
+
+    /** CU-40: confirmar la salida después del corte (body vacío) */
+    async confirmar(idsalida: number) {
+      await f.cerrarVenta(idsalida);
+      return ctx.preparar("Confirmar salida", "POST", `/salidas/${idsalida}/asignacion`, {});
     },
 
     /** Body de compra: `n` pasajeros nuevos (o los que se pasen) */
@@ -179,7 +227,6 @@ export function crearContexto(p: {
       const pasajeros = o.pasajeros ?? Array.from({ length: o.n ?? 1 }, () => f.pasajero());
       return {
         idsalida, medioPago: "TARJETA", pasajeros,
-        equipaje: pasajeros.map(() => ({ pesoDeclarado: o.equipajeKg ?? 8 })),
         tarjeta: { numero: o.tarjeta ?? "4242424242424242", titular: "Int Prueba", vencimiento: "12/30", cvv: "123" },
       };
     },
@@ -195,14 +242,14 @@ export function crearContexto(p: {
       return { idreserva: idDe(r, "idreserva")!, data: r };
     },
 
-    async guia(o: { habilitacionVence?: string; pasaporteVence?: string } = {}) {
+    async guia(o: { habilitacionVence?: string; pasaporteVence?: string; sinLogin?: boolean } = {}) {
       const u = unico();
       const email = `guia.${u.toLowerCase()}@integral.com`;
       const g = await ctx.preparar("Registrar guía", "POST", "/personal", {
         nombre: "Guia", apellido: letras(u), nroPasaporte: `GI${u}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: o.pasaporteVence ?? "2035-01-01",
         rolOperativo: "Guía", email, contrasenia: "guiaInt123", nroHabilitacion: `HAB-${u}`, fechaHabilitacion: o.habilitacionVence ?? "2034-12-31",
       });
-      return { idpersonal: idDe(g, "idpersonal")!, idusuario: idDe(g, "idusuario"), email, token: await back.login(email, "guiaInt123") };
+      return { idpersonal: idDe(g, "idpersonal")!, idusuario: idDe(g, "idusuario"), email, token: o.sinLogin ? "" : await back.login(email, "guiaInt123") };
     },
 
     async porteador(o: { pasaporteVence?: string } = {}) {
@@ -222,10 +269,10 @@ export function crearContexto(p: {
       await db.$executeRaw`UPDATE public."Ocupacion" SET desde = desde + ${dias}::int, hasta = hasta + ${dias}::int WHERE idsalida = ${idsalida}`;
     },
 
-    /** A1: lo libre del servicio en su día más ocupado: total − máximo diario de las salidas activas */
+    /** A1: lo libre del servicio en su día más ocupado: total − máximo diario (las finalizadas cuentan hasta su `hasta`) */
     async libre(idservicio: number) {
       const s = await db.servicioBase.findUniqueOrThrow({ where: { idservicio }, include: { alojamiento: true, equipamiento: true, transporte: true } });
-      const ocupaciones = await db.ocupacion.findMany({ where: { idservicio, salida: { estado: { in: SALIDAS_ACTIVAS } } } });
+      const ocupaciones = await db.ocupacion.findMany({ where: { idservicio, salida: { estado: { not: "CANCELADA" } } } });
       if (!ocupaciones.length) return totalDe(s);
       const desde = new Date(Math.min(...ocupaciones.map((o) => o.desde.getTime())));
       const hasta = new Date(Math.max(...ocupaciones.map((o) => o.hasta.getTime())));

@@ -1,5 +1,5 @@
 import { db } from "../../../config/postgresDatabase";
-import { ESTADO_RESERVA, ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
+import { ESTADO_RESERVA, ESTADO_SALIDA } from "../../../shared/constantes";
 
 export class GuiaRepository {
   // El token trae idusuario; el legajo se encuentra por Usuario → Guia → Personal
@@ -8,12 +8,12 @@ export class GuiaRepository {
     return guia?.idpersonal ?? null;
   }
 
-  // CU-48: salidas asignadas al guía, sin las canceladas ni las que siguen a la venta (la asignación las cierra)
+  // CU-48: salidas asignadas al guía, sin las canceladas. B3: desde que se crea, porque el personal se asigna en el alta
   async salidasAsignadas(idpersonal: number) {
     return db.salida.findMany({
       where: {
         personalAsignado: { some: { idpersonal } },
-        estado: { notIn: [ESTADO_SALIDA.CANCELADA, ESTADO_SALIDA.PUBLICADA] },
+        estado: { not: ESTADO_SALIDA.CANCELADA },
       },
       select: {
         idsalida: true,
@@ -55,7 +55,7 @@ export class GuiaRepository {
   // CU-49: el grupo partió. Pasa una sola vez: dos toques seguidos no pisan la hora de partida
   async iniciarSalida(idsalida: number, ahora: Date) {
     await db.salida.updateMany({
-      where: { idsalida, estado: { in: SALIDAS_NO_INICIADAS } },
+      where: { idsalida, estado: ESTADO_SALIDA.CERRADA }, // decisión 18
       data: { estado: ESTADO_SALIDA.EN_CURSO, fechaHoraInicioReal: ahora },
     });
     return db.salida.findUniqueOrThrow({

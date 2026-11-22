@@ -65,10 +65,26 @@ import { PaqueteController } from "./paquete.controller";
  *                 type: array
  *                 items:
  *                   type: object
- *               serviciosIncluidos:
+ *               localidadGarantizada:
+ *                 type: string
+ *                 description: 'Sale desde (B2), obligatoria en los dos tipos de garantía'
+ *               diasCierreVenta:
+ *                 type: integer
+ *                 description: La venta termina estos días antes del inicio (0 a 30, por defecto 2)
+ *               idtransporte:
+ *                 type: integer
+ *               idtren:
+ *                 type: integer
+ *                 nullable: true
+ *               equipo:
  *                 type: array
+ *                 description: Cada equipo con su regla, p. ej. 1 carpa cada 2 pasajeros
  *                 items:
- *                   type: integer
+ *                   type: object
+ *                   properties:
+ *                     idservicio: { type: integer }
+ *                     cantidad: { type: integer }
+ *                     cadaPasajeros: { type: integer }
  *     responses:
  *       201:
  *         description: Paquete creado exitosamente

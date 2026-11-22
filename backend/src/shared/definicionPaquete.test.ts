@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armarDefinicionPaquete, definicionEfectiva, textoGarantia } from "./definicionPaquete";
+import { armarDefinicionPaquete, definicionEfectiva, tarifaDeSalida, textoGarantia } from "./definicionPaquete";
 
 const paquete = {
   condiciones: "Sin reembolso a menos de 30 días",
@@ -15,13 +15,14 @@ const paquete = {
     { servicio: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", alojamiento: { categoria: "4 estrellas" } } },
   ],
   servicios: [
-    { servicio: { idservicio: 40, nombreServicio: "Hotel Sol", transporte: null } },
-    { servicio: { idservicio: 41, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } } },
+    { servicio: { idservicio: 41, nombreServicio: "Bus", transporte: { capacidadVehiculo: 20 } } },
+    { servicio: { idservicio: 42, nombreServicio: "Expedition", tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } } },
+    { cantidad: 1, cadaPasajeros: 2, servicio: { idservicio: 43, nombreServicio: "Carpas", equipamiento: {} } },
   ],
 };
 
 describe("armarDefinicionPaquete (CAT-05)", () => {
-  it("copia condiciones, garantía, servicios con equipaje, noches, días y plazo de reintegro", () => {
+  it("copia condiciones, garantía, servicios por tipo con la regla del equipo, noches, días, reintegro y corte", () => {
     expect(armarDefinicionPaquete(paquete)).toEqual({
       condiciones: "Sin reembolso a menos de 30 días",
       tipoGarantia: "POR_ESTABLECIMIENTO",
@@ -30,13 +31,16 @@ describe("armarDefinicionPaquete (CAT-05)", () => {
       tipoHabitacionGarantizada: null,
       establecimiento: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", categoria: "4 estrellas" },
       servicios: [
-        { idservicio: 40, nombreServicio: "Hotel Sol", transporte: null },
-        { idservicio: 41, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } },
+        { idservicio: 41, nombreServicio: "Bus", tipo: "TRANSPORTE", cantidad: null, cadaPasajeros: null, tren: null },
+        { idservicio: 42, nombreServicio: "Expedition", tipo: "TREN", cantidad: null, cadaPasajeros: null, tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } },
+        { idservicio: 43, nombreServicio: "Carpas", tipo: "EQUIPAMIENTO", cantidad: 1, cadaPasajeros: 2, tren: null },
       ],
       nochesPrevias: 1,
       nochesPosteriores: 2,
       diasDisponibles: "L-M-X",
       diasMinimosReintegro: 15,
+      diasCierreVenta: 2,
+      tarifa: null,
     });
   });
 
@@ -56,6 +60,24 @@ describe("definicionEfectiva", () => {
 
   it("salida sin foto (anterior a CAT-05): rige el paquete vivo", () => {
     expect(definicionEfectiva({ definicionPaquete: null, paquete: { ...paquete, condiciones: "Vivas" } }).condiciones).toBe("Vivas");
+  });
+});
+
+describe("tarifaDeSalida (12.5)", () => {
+  const temporada = { idtemporada: 3, nombre: "Alta", estado: "ACTIVO", fechaInicio: new Date("2026-01-01"), fechaFin: new Date("2026-03-31") };
+  const vivas = [{ monto: 900, moneda: "USD", temporada }];
+  const fechaInicio = new Date("2026-02-10");
+  const congelada = { idtemporada: 3, temporada: "Alta", monto: 800, moneda: "USD" };
+
+  it("usa la tarifa congelada aunque el paquete la haya cambiado o borrado", () => {
+    const definicionPaquete = armarDefinicionPaquete(paquete, congelada);
+    expect(tarifaDeSalida({ fechaInicio, definicionPaquete }, vivas)).toEqual(congelada);
+    expect(tarifaDeSalida({ fechaInicio, definicionPaquete }, [])).toEqual(congelada);
+  });
+
+  it("salida sin tarifa congelada: la del paquete vivo que cubre la fecha, o null", () => {
+    expect(tarifaDeSalida({ fechaInicio, definicionPaquete: armarDefinicionPaquete(paquete) }, vivas)).toEqual({ ...congelada, monto: 900 });
+    expect(tarifaDeSalida({ fechaInicio: new Date("2026-05-01"), definicionPaquete: null }, vivas)).toBeNull();
   });
 });
 

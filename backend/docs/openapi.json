@@ -2065,18 +2065,6 @@
                       }
                     }
                   },
-                  "equipaje": {
-                    "type": "array",
-                    "description": "Un elemento por pasajero, en el mismo orden.",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "pesoDeclarado": {
-                          "type": "number"
-                        }
-                      }
-                    }
-                  },
                   "tarjeta": {
                     "type": "object",
                     "properties": {
@@ -2899,7 +2887,7 @@
       },
       "post": {
         "summary": "Registrar servicio de un proveedor (CU-19)",
-        "description": "**RESTRINGIDO A ADMINISTRADOR.** El `tipo` debe coincidir con el rubro del proveedor, que además debe estar ACTIVO. Alojamiento: localidad, categoría, tipo de habitación, capacidad y modalidad de confirmación. Transporte: capacidad, peso de equipaje incluido y costo por kg excedente. Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.\n",
+        "description": "**RESTRINGIDO A ADMINISTRADOR.** El `tipo` debe coincidir con el rubro del proveedor, que además debe estar ACTIVO. Alojamiento: localidad, categoría, tipo de habitación, capacidad y modalidad de confirmación. Transporte: capacidad del vehículo (el equipaje se cobra en persona). Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.\n",
         "tags": [
           "Servicios de proveedores"
         ],

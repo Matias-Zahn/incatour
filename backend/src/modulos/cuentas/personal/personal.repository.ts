@@ -101,9 +101,9 @@ export class PersonalRepository {
         salida: { estado: { notIn: ["CANCELADA", "FINALIZADA"] } } 
       },
       include: {
-        salida: { 
-          select: { 
-            fechaFin: true,
+        salida: {
+          select: {
+            idsalida: true, nroSalida: true, fechaInicio: true, fechaFin: true, estado: true, // 12.8: el detalle del 409
             // Buscamos el permiso de ESTE personal en ESTA salida
             permisos: {
               where: { idpersonal },
@@ -182,10 +182,12 @@ export class PersonalRepository {
     return db.$transaction(async (tx) => {
       // CTA-09: mismo lock que CU-40 y CU-38 sobre el legajo: una asignación en curso termina antes de contar
       await tx.$queryRaw`SELECT 1 FROM public."Personal" WHERE idpersonal = ${idpersonal} FOR UPDATE`;
-      const pendientes = await tx.asignacionPersonal.count({
+      const pendientes = await tx.asignacionPersonal.findMany({
         where: { idpersonal, salida: { estado: { in: SALIDAS_ACTIVAS } } },
+        select: { salida: { select: { idsalida: true, nroSalida: true, fechaInicio: true, fechaFin: true, estado: true } } },
+        orderBy: { salida: { fechaInicio: "asc" } },
       });
-      if (pendientes > 0) return { bloqueadoPor: pendientes } as const;
+      if (pendientes.length > 0) return { bloqueadoPor: pendientes.map((p) => p.salida) } as const;
 
       const personal = await tx.personal.update({
         where: { idpersonal },

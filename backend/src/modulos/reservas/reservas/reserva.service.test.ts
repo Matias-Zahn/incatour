@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ReservaService } from "./reserva.service";
 import { CrearReservaDto } from "./reserva.dto";
+import { hoyUTC } from "../../../shared/fechas";
 
 // Repositorio, pasarela y notificador mockeados: el test no toca la base ni espera la latencia simulada
 const { repo, pasarela, notificador } = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ const salida = (over: Record<string, unknown> = {}) => ({
   fechaInicio: INICIO,
   fechaFin: FIN,
   stockLocal: 10,
+  diasCierreVenta: 2,
   servicios: [] as unknown[],
   paquete: {
     condiciones: "Sin reembolso a menos de 30 días",
@@ -66,6 +68,8 @@ const salida = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const HOTEL = { idservicio: 40, nombreServicio: "Sol", porStock: true };
+
 describe("ReservaService.crearReserva (CU-30)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,7 +77,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     repo.obtenerClientePorUsuario.mockResolvedValue({ idcliente: 3, estado: "ACTIVO", usuario: { email: "ana@mail.com" } });
     repo.obtenerSalidaParaCompra.mockResolvedValue(salida());
     repo.buscarPasajerosPorPasaporte.mockResolvedValue([]);
-    repo.reservarCupos.mockResolvedValue({ alojamientoReservado: true });
+    repo.reservarCupos.mockResolvedValue({ hotel: HOTEL });
     repo.liberarCupos.mockResolvedValue(undefined);
     repo.confirmarReserva.mockImplementation(async (d) => ({
       idreserva: 99, nroReserva: d.nroReserva, estado: "CONFIRMADA",
@@ -112,7 +116,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
         servicios: [],
       };
       repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ definicionPaquete: foto }));
-      repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
+      repo.reservarCupos.mockResolvedValue({ hotel: null });
 
       const r = await new ReservaService().crearReserva(crearDto(), 1);
 
@@ -120,6 +124,26 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       const datos = repo.confirmarReserva.mock.calls[0]![0];
       expect(datos).toMatchObject({ condicionesComerciales: "Condiciones de la foto", diasMinimosReintegro: 7 });
       expect(datos.solicitud.criterios).toContain("Urubamba");
+    });
+
+    it("12.2: la reserva guarda su hotel; con uno a solicitud queda pendiente y la solicitud nombra ese hotel", async () => {
+      const r = await new ReservaService().crearReserva(crearDto(), 1);
+      expect(r).toMatchObject({ estadoAlojamiento: "CONFIRMADO", hotel: { idservicio: 40, nombreServicio: "Sol" } });
+      expect(repo.confirmarReserva).toHaveBeenLastCalledWith(expect.objectContaining({ idalojamiento: 40, solicitud: undefined }));
+
+      repo.reservarCupos.mockResolvedValue({ hotel: { idservicio: 41, nombreServicio: "Pedido", porStock: false } });
+      const p = await new ReservaService().crearReserva(crearDto(), 1);
+      expect(p).toMatchObject({ estadoAlojamiento: "PENDIENTE", hotel: { idservicio: 41 } });
+      expect(repo.confirmarReserva.mock.lastCall![0]).toMatchObject({ idalojamiento: 41, solicitud: { criterios: expect.stringMatching(/^Hotel: Pedido \| /) } });
+    });
+
+    it("12.5: cobra la tarifa congelada en la salida aunque el paquete la haya cambiado; sin noches no hay hotel ni solicitud", async () => {
+      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({
+        definicionPaquete: { nochesPrevias: 0, nochesPosteriores: 0, servicios: [], tarifa: { idtemporada: 1, temporada: "Alta", monto: 700, moneda: "USD" } },
+      }));
+      repo.reservarCupos.mockResolvedValue({ hotel: null });
+      const r = await new ReservaService().crearReserva(crearDto(), 1);
+      expect(r).toMatchObject({ precioCongelado: 1400, estadoAlojamiento: "CONFIRMADO", hotel: null });
     });
 
     it("congela el desglose del precio en la reserva sin adicionales de equipaje (RES-07, B6)", async () => {
@@ -133,7 +157,7 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     });
 
     it("sin alojamiento disponible, deja la reserva PENDIENTE con su solicitud de alojamiento", async () => {
-      repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
+      repo.reservarCupos.mockResolvedValue({ hotel: null });
 
       const r = await new ReservaService().crearReserva(crearDto(), 1);
 
@@ -193,7 +217,15 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     it("rechaza si la salida ya comenzó", async () => {
       repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ fechaInicio: new Date("2020-01-01") }));
 
-      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("ya comenzó");
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("La venta de esta salida cerró el 29/12/2019.");
+      sinEfectos();
+    });
+
+    it("B4: rechaza si la venta cerró por fecha (corte de la salida), aunque siga PUBLICADA", async () => {
+      const inicio = new Date(hoyUTC().getTime() + 3 * 86400000);
+      repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ fechaInicio: inicio, diasCierreVenta: 5 }));
+
+      await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toThrow("La venta de esta salida cerró el");
       sinEfectos();
     });
 
@@ -251,11 +283,11 @@ describe("ReservaService.crearReserva (CU-30)", () => {
     });
 
     it("pago rechazado: libera los cupos, avisa al cliente y no registra la reserva", async () => {
-      repo.reservarCupos.mockResolvedValue({ alojamientoReservado: true });
+      repo.reservarCupos.mockResolvedValue({ hotel: HOTEL });
       pasarela.procesarPago.mockResolvedValue({ aprobado: false, mensaje: "Fondos insuficientes" });
 
       await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 400, message: "Pago rechazado: Fondos insuficientes" });
-      expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, true);
+      expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, HOTEL);
       expect(notificador.enviarEmailRechazo).toHaveBeenCalledWith("ana@mail.com", "Fondos insuficientes");
       expect(repo.confirmarReserva).not.toHaveBeenCalled();
     });
@@ -264,19 +296,19 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       pasarela.procesarPago.mockRejectedValue(new Error("timeout"));
 
       await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 503, message: expect.stringContaining("pasarela") });
-      expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, true);
+      expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, HOTEL);
       expect(repo.confirmarReserva).not.toHaveBeenCalled();
     });
 
     describe("pago aprobado pero falla la base", () => {
       beforeEach(() => {
-        repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
+        repo.reservarCupos.mockResolvedValue({ hotel: null });
         repo.confirmarReserva.mockRejectedValue(new Error("fallo de la base"));
       });
 
       it("libera los cupos y reembolsa el cobro", async () => {
         await expect(new ReservaService().crearReserva(crearDto(), 1)).rejects.toMatchObject({ statusCode: 500, message: expect.stringContaining("anulado") });
-        expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, false);
+        expect(repo.liberarCupos).toHaveBeenCalledWith(7, 2, null);
         expect(pasarela.reembolsar).toHaveBeenCalledWith("TXN-1", 1600);
         expect(repo.registrarReembolsoPendiente).not.toHaveBeenCalled();
         expect(notificador.enviarEmailConfirmacion).not.toHaveBeenCalled();

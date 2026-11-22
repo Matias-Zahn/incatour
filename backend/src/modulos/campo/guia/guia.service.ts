@@ -5,6 +5,7 @@ import { CustomError } from "../../../error/CustomError";
 import { hoyUTC } from "../../../shared/fechas";
 import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { unaPorServicio } from "../../../shared/ocupacion";
+import { DefinicionPaquete } from "../../../shared/definicionPaquete";
 import { ESTADO_TRAMO, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 import { GuiaRepository } from "./guia.repository";
 
@@ -44,6 +45,8 @@ export class GuiaService {
         fechaFin: s.fechaFin,
         estado: s.estado,
       },
+      // B9: el horario del tren, de la copia del paquete (null en las salidas anteriores o sin tren)
+      tren: trenDe(s.definicionPaquete as DefinicionPaquete | null),
       // Cada etapa con su último avance informado (CU-49), si lo hay
       itinerario: circuito.etapas.map((e) => {
         const ultimo = s.avances.find((a) => a.numeroOrden === e.numeroOrden);
@@ -98,6 +101,8 @@ export class GuiaService {
     if (s.estado === ESTADO_SALIDA.EN_CURSO) {
       return { idsalida, estado: s.estado, fechaHoraInicioReal: s.fechaHoraInicioReal };
     }
+    // Decisión 18: recién confirmada (CERRADA) tiene los permisos emitidos
+    if (s.estado === ESTADO_SALIDA.PUBLICADA) throw CustomError.badRequest("La salida todavía no está confirmada por la agencia");
     if (!SALIDAS_NO_INICIADAS.includes(s.estado)) {
       throw CustomError.badRequest(`No se puede iniciar una salida ${s.estado}`);
     }
@@ -256,3 +261,8 @@ export class GuiaService {
     return idpersonal;
   }
 }
+
+const trenDe = (d: DefinicionPaquete | null) => {
+  const t = d?.servicios.find((x) => x.tren);
+  return t?.tren ? { nombreServicio: t.nombreServicio, horarioSalida: t.tren.horarioSalida, horarioLlegada: t.tren.horarioLlegada } : null;
+};

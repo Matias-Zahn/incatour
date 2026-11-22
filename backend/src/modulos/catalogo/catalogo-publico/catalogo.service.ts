@@ -1,5 +1,8 @@
 import { hoyUTC } from "../../../shared/fechas";
-import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, textoGarantia } from "../../../shared/definicionPaquete";
+import { TIPO_SERVICIO, tipoDeServicio } from "../../../shared/constantes";
+import { claveDia, sumarDias } from "../../../shared/ocupacion";
+import { datosVenta } from "../../../shared/ventaAbierta";
+import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, tarifaDeSalida, textoGarantia } from "../../../shared/definicionPaquete";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 
@@ -11,6 +14,18 @@ function definicionDeSalida(d: DefinicionPaquete) {
     nochesPosteriores: d.nochesPosteriores,
     condiciones: d.condiciones,
   };
+}
+
+type ServicioIncluido = { nombreServicio: string; tren?: { horarioSalida: string; horarioLlegada: string } | null };
+
+// B2 y B9: el "incluye" sale de los servicios por tipo (transporte, tren y equipo); el tren lleva su horario
+const ORDEN_INCLUYE: string[] = [TIPO_SERVICIO.TRANSPORTE, TIPO_SERVICIO.TREN, TIPO_SERVICIO.EQUIPAMIENTO];
+export function textosIncluye(servicios: (ServicioIncluido & Parameters<typeof tipoDeServicio>[0])[]) {
+  return servicios
+    .map((s) => ({ s, orden: ORDEN_INCLUYE.indexOf(tipoDeServicio(s) ?? "") }))
+    .filter((x) => x.orden >= 0)
+    .sort((a, b) => a.orden - b.orden)
+    .map(({ s }) => (s.tren ? `${s.nombreServicio} (sale ${s.tren.horarioSalida}, llega ${s.tren.horarioLlegada})` : s.nombreServicio));
 }
 
 export class CatalogoService {
@@ -37,7 +52,7 @@ export class CatalogoService {
 
       // Extraemos información limpia de los servicios activos (CAT-09: filtrar solo servicios activos)
       const serviciosActivos = paquete.servicios.filter((s) => s.servicio.estado === "ACTIVO");
-      const serviciosIncluidos = serviciosActivos.map((s) => s.servicio.nombreServicio);
+      const serviciosIncluidos = textosIncluye(serviciosActivos.map((s) => s.servicio));
 
       // CAT-29: la garantía del paquete (rige para las salidas nuevas); cada salida informa la suya, congelada (CAT-05)
       const garantía = textoGarantia(armarDefinicionPaquete(paquete));
@@ -47,13 +62,8 @@ export class CatalogoService {
       const salidasDisponibles = (paquete.salidas ?? [])
         .filter((s) => s.estado === "PUBLICADA" && new Date(s.fechaInicio) > hoy)
         .map((s) => {
-          const fechaSalida = new Date(s.fechaInicio);
-          const tarifaSalida = paquete.tarifas.find(
-            (t) =>
-              t.temporada.estado === "ACTIVO" &&
-              new Date(t.temporada.fechaInicio) <= fechaSalida &&
-              fechaSalida <= new Date(t.temporada.fechaFin)
-          );
+          const definicion = definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete });
+          const tarifaSalida = tarifaDeSalida(s, paquete.tarifas); // 12.5: la congelada en la salida
 
           return {
             idsalida: s.idsalida,
@@ -65,8 +75,12 @@ export class CatalogoService {
             tamanoMaximo: s.tamanoMaximo,
             precioPersona: tarifaSalida ? tarifaSalida.monto : null,
             moneda: tarifaSalida ? tarifaSalida.moneda : null,
-            temporadaNombre: tarifaSalida ? tarifaSalida.temporada.nombre : null,
-            ...definicionDeSalida(definicionEfectiva({ definicionPaquete: s.definicionPaquete, paquete })),
+            temporadaNombre: tarifaSalida ? tarifaSalida.temporada : null,
+            ...datosVenta(s, hoy), // B4: las de venta cerrada se listan igual, para mostrar "Venta cerrada"
+            // 12.7: después de esta fecha, cancelar ya no tiene reintegro (la regla de reintegro.ts)
+            fechaLimiteReintegro:
+              definicion.diasMinimosReintegro == null ? null : claveDia(sumarDias(s.fechaInicio, -definicion.diasMinimosReintegro)),
+            ...definicionDeSalida(definicion),
           };
         });
 
@@ -119,6 +133,7 @@ export class CatalogoService {
           tipoGarantia: paquete.tipoGarantia,
         },
         garantíaAlojamiento: garantía,
+        saleDesde: paquete.localidadGarantizada, // B2
         logistica: {
           nochesPrevias: paquete.nochesPrevias,
           nochesPosteriores: paquete.nochesPosteriores,

@@ -62,12 +62,13 @@ model Reserva {
   // RES-07: desglose congelado al comprar (CU-30); null en reservas anteriores
   temporadaAplicada       String?
   precioPaquetePorPersona Float?
-  adicionalesEquipaje     Float?
   moneda                  String?
   diasMinimosReintegro    Int? // RES-06: plazo del paquete congelado al comprar (CU-30)
+  idalojamiento           Int? // B10/12.2: hotel al que la compra mandó al grupo (null en reservas anteriores)
 
   cliente     Cliente           @relation(fields: [idcliente], references: [idcliente])
   salida      Salida            @relation(fields: [idsalida], references: [idsalida])
+  alojamiento ServicioBase?     @relation(fields: [idalojamiento], references: [idservicio])
   pasajeros   ReservaPasajero[]
   pagos       Pago[]
   reembolsos  Reembolso[] // Relación con el nuevo modelo Reembolso
@@ -247,13 +248,14 @@ model Paquete {
   condiciones               String?
   estado                    String
   tipoGarantia              String
-  localidadGarantizada      String?
+  localidadGarantizada      String // B2: "Sale desde", obligatoria en los dos tipos de garantía
   categoriaGarantizada      String?
   tipoHabitacionGarantizada String?
   nochesPrevias             Int     @default(0)
   nochesPosteriores         Int     @default(0)
   diasDisponibles           String? // Formato JSON o CSV de días habilitados
   diasMinimosReintegro      Int? // RES-06: anticipación mínima para el reintegro del 100% (null = sin plazo)
+  diasCierreVenta           Int     @default(2) // B4: la venta termina estos días antes del inicio
 
   circuito                 Circuito                  @relation(fields: [idcircuito], references: [idcircuito])
   garantiasEstablecimiento GarantiaEstablecimiento[]
@@ -343,6 +345,7 @@ model Salida {
   ultimaEtapaAlcanzada  Int?
   fechaHoraInicioReal   DateTime? // la inicia el guía (CU-49); null = todavía no salió
   fechaHoraFinReal      DateTime? // al completar la última etapa
+  diasCierreVenta       Int       @default(2) // B4: el del paquete, o 5 si el hotel confirma a solicitud
   definicionPaquete     Json? // CAT-05: foto del paquete al crear la salida (null = salida anterior, rige el paquete vivo)
 
   paquete     Paquete     @relation(fields: [idpaquete], references: [idpaquete])
@@ -480,6 +483,7 @@ model ServicioBase {
   paquetes                 PaqueteServicio[]
   garantiasEstablecimiento GarantiaEstablecimiento[]
   gestiones                GestionSolicitud[]
+  reservas                 Reserva[]
 
   ocupaciones Ocupacion[]
 
@@ -500,8 +504,6 @@ model ServicioAlojamiento {
 model ServicioTransporte {
   idservicio           Int          @id
   capacidadVehiculo    Int
-  pesoEquipajeIncluido Float
-  costoPorKgExcedente  Float
   servicio             ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@schema("public")
@@ -527,10 +529,12 @@ model ServicioEquipamiento {
 }
 
 model PaqueteServicio {
-  idpaquete  Int
-  idservicio Int
-  paquete    Paquete      @relation(fields: [idpaquete], references: [idpaquete])
-  servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
+  idpaquete     Int
+  idservicio    Int
+  cantidad      Int? // B2: solo EQUIPAMIENTO, "cantidad cada cadaPasajeros"
+  cadaPasajeros Int?
+  paquete       Paquete      @relation(fields: [idpaquete], references: [idpaquete])
+  servicio      ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@id([idpaquete, idservicio])
   @@schema("public")
@@ -546,6 +550,7 @@ model Ocupacion {
   desde              DateTime     @db.Date
   hasta              DateTime     @db.Date // inclusive
   cantidad           Int // plazas, unidades, o 1 para un vehículo
+  plazasLibres       Int? // B10/12.2: solo ALOJAMIENTO con bloqueo, las plazas que la venta todavía no asignó
   comprobanteReserva String? // solo TRANSPORTE (CU-39)
   creadaEn           DateTime     @default(now())
   servicio           ServicioBase @relation(fields: [idservicio], references: [idservicio])

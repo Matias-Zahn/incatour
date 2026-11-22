@@ -28,7 +28,7 @@ export const manejadorErrores = (
 ) => {
   if (err instanceof CustomError) {
     // error conocido: lo tiramos nosotros a propósito
-    return res.status(err.statusCode).json({ error: err.message });
+    return res.status(err.statusCode).json({ error: err.message, ...(err.detalle !== undefined && { detalle: err.detalle }) });
   }
 
   // body con JSON mal formado (lo detecta express.json antes de llegar al controlador)

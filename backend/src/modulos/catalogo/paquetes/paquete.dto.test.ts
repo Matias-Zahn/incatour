@@ -9,6 +9,7 @@ const base = {
   localidadGarantizada: "Cusco",
   categoriaGarantizada: "3 estrellas",
   tipoHabitacionGarantizada: "Doble",
+  idtransporte: 11,
   matrizPrecios: precios,
 };
 const error = (cambio: Record<string, unknown>) => CrearPaqueteDto.create({ ...base, ...cambio })[0];
@@ -18,7 +19,8 @@ describe("CrearPaqueteDto", () => {
     const [err, dto] = CrearPaqueteDto.create(base);
 
     expect(err).toBeUndefined();
-    expect(dto).toMatchObject({ nochesPrevias: 0, nochesPosteriores: 0, serviciosIncluidos: [] });
+    expect(dto).toMatchObject({ nochesPrevias: 0, nochesPosteriores: 0, servicios: { idtransporte: 11, idtren: null, equipo: [] } });
+    expect(dto?.diasCierreVenta).toBeUndefined(); // la base pone 2
   });
 
   it("la tarifa sin moneda queda en USD (RES-16)", () => {
@@ -48,7 +50,8 @@ describe("CrearPaqueteDto", () => {
     [{ tipoGarantia: "OTRA" }, "tipoGarantia debe ser uno de: POR_ESTABLECIMIENTO, POR_CATEGORIA."],
     [{ tipoGarantia: "POR_ESTABLECIMIENTO" }, "Con garantía por establecimiento, idservicioGarantizado es obligatorio y debe ser un número entero mayor a 0."],
     [{ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 2.5 }, "Con garantía por establecimiento, idservicioGarantizado es obligatorio y debe ser un número entero mayor a 0."],
-    [{ localidadGarantizada: undefined }, "Con garantía por categoría, localidadGarantizada es obligatoria."],
+    [{ localidadGarantizada: undefined }, "localidadGarantizada (Sale desde) es obligatoria."],
+    [{ tipoGarantia: "POR_ESTABLECIMIENTO", idservicioGarantizado: 40, localidadGarantizada: " " }, "localidadGarantizada (Sale desde) es obligatoria."],
     [{ categoriaGarantizada: undefined }, "Con garantía por categoría, categoriaGarantizada es obligatoria."],
     [{ tipoHabitacionGarantizada: undefined }, "Con garantía por categoría, tipoHabitacionGarantizada es obligatoria."],
     [{ tipoGarantia: "POR_CATEGORIA", idservicioGarantizado: 40 }, "Con garantía por categoría, no debe indicarse idservicioGarantizado."],
@@ -58,9 +61,16 @@ describe("CrearPaqueteDto", () => {
     [{ nochesPosteriores: 2.5 }, "nochesPosteriores debe ser un número entero entre 0 y 30."],
     [{ diasMinimosReintegro: -1 }, "diasMinimosReintegro debe ser un número entero entre 0 y 365."],
     [{ diasMinimosReintegro: 2.5 }, "diasMinimosReintegro debe ser un número entero entre 0 y 365."],
-    [{ serviciosIncluidos: "40" }, "serviciosIncluidos debe ser un arreglo de IDs de servicios."],
-    [{ serviciosIncluidos: [40, "x"] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
-    [{ serviciosIncluidos: [40, 2.5] }, "serviciosIncluidos[1]: debe ser un número entero mayor a 0 (ID de servicio)."],
+    [{ serviciosIncluidos: [40] }, "serviciosIncluidos ya no se usa: mandá idtransporte, idtren y equipo."],
+    [{ idtransporte: undefined }, "idtransporte es requerido y debe ser un número entero mayor a 0."],
+    [{ idtransporte: "11" }, "idtransporte es requerido y debe ser un número entero mayor a 0."],
+    [{ idtren: 0 }, "idtren debe ser un número entero mayor a 0."],
+    [{ equipo: 7 }, "equipo debe ser una lista de { idservicio, cantidad, cadaPasajeros }."],
+    [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }, { idservicio: 8, cantidad: 0, cadaPasajeros: 2 }] }, "equipo[1]: cantidad y cadaPasajeros deben ser enteros entre 1 y 100."],
+    [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 101 }] }, "equipo[0]: cantidad y cadaPasajeros deben ser enteros entre 1 y 100."],
+    [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }, { idservicio: 7, cantidad: 2, cadaPasajeros: 2 }] }, "equipo repite el servicio 7."],
+    [{ diasCierreVenta: 31 }, "diasCierreVenta debe ser un número entero entre 0 y 30."],
+    [{ diasCierreVenta: 1.5 }, "diasCierreVenta debe ser un número entero entre 0 y 30."],
   ])("rechaza %o", (cambio, mensaje) => {
     expect(error(cambio)).toBe(mensaje);
   });
@@ -84,7 +94,8 @@ describe("ModificarPaqueteDto", () => {
   it("CAT-20: rechaza textos vacíos o de otro tipo", () => {
     expect(ModificarPaqueteDto.create({ nombrePaquete: "", nochesPrevias: 1 })[0]).toBe("nombrePaquete es requerido.");
     expect(ModificarPaqueteDto.create({ condiciones: 5 })[0]).toBe("condiciones debe ser un texto.");
-    expect(ModificarPaqueteDto.create({ localidadGarantizada: " " })[0]).toBe("localidadGarantizada es requerido.");
+    expect(ModificarPaqueteDto.create({ localidadGarantizada: " " })[0]).toBe("localidadGarantizada (Sale desde) es obligatoria.");
+    expect(ModificarPaqueteDto.create({ localidadGarantizada: null })[0]).toBe("localidadGarantizada (Sale desde) es obligatoria.");
     expect(ModificarPaqueteDto.create({ condiciones: "" })[0]).toBeUndefined();
   });
 
@@ -107,12 +118,14 @@ describe("ModificarPaqueteDto", () => {
     expect(dto?.matrizPrecios).toEqual(precios);
   });
 
-  it("acepta modificar circuito, garantía y servicios incluidos (CAT-14)", () => {
+  it("acepta modificar circuito, garantía y servicios por tipo (CAT-14, B2)", () => {
     const [err, dto] = ModificarPaqueteDto.create({
       idcircuito: 2,
       tipoGarantia: "POR_ESTABLECIMIENTO",
       idservicioGarantizado: 15,
-      serviciosIncluidos: [7, 8],
+      idtren: null,
+      equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }],
+      diasCierreVenta: 0,
     });
 
     expect(err).toBeUndefined();
@@ -120,8 +133,14 @@ describe("ModificarPaqueteDto", () => {
       idcircuito: 2,
       tipoGarantia: "POR_ESTABLECIMIENTO",
       idservicioGarantizado: 15,
-      serviciosIncluidos: [7, 8],
+      servicios: { idtransporte: undefined, idtren: null, equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }] },
+      diasCierreVenta: 0,
     });
+  });
+
+  it("B2: en el PUT el transporte no se puede quitar, y serviciosIncluidos se rechaza", () => {
+    expect(ModificarPaqueteDto.create({ idtransporte: null })[0]).toBe("idtransporte es requerido y debe ser un número entero mayor a 0.");
+    expect(ModificarPaqueteDto.create({ serviciosIncluidos: [7] })[0]).toBe("serviciosIncluidos ya no se usa: mandá idtransporte, idtren y equipo.");
   });
 
   it("si se envía la matriz, no puede venir vacía ni con temporadas repetidas", () => {

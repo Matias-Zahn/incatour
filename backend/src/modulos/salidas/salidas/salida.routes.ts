@@ -71,7 +71,10 @@ export class SalidaRoutes {
      *       **RESTRINGIDO A ADMINISTRADOR.** Calcula la dotación de personal que exige el circuito,
      *       el total de lugares a bloquear ante la autoridad y los alojamientos que cumplen la garantía
      *       del paquete y confirman por bloqueo de plazas. También informa cuántos lugares libres tiene la autoridad
-     *       ese día (`cupoAutoridad`, `null` si la autoridad no responde). No modifica nada.
+     *       ese día (`cupoAutoridad`, `null` si la autoridad no responde), la tarifa, los transportes (con el del paquete,
+     *       si están libres y si alcanzan para pasajeros más dotación), el personal apto y libre en esas fechas (ordenado
+     *       por salidas en el mes) y el equipo del paquete contra el stock proyectado (OK, RIESGO o NO_ALCANZA). No modifica nada.
+     *       La forma completa está en docs/contratos-viernes.md, sección 5.1.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -106,10 +109,13 @@ export class SalidaRoutes {
      *   post:
      *     summary: Crear salida planificada (CU-36)
      *     description: >
-     *       **RESTRINGIDO A ADMINISTRADOR.** Bloquea ante la autoridad el tamaño máximo más la dotación,
-     *       bloquea las plazas del alojamiento elegido y publica la salida. Si la base falla después del bloqueo,
-     *       el cupo se libera. idalojamiento es obligatorio si algún alojamiento confirma por bloqueo y alcanza;
-     *       si ninguno, la salida se crea sin alojamiento (FA3) y cada reserva generará su solicitud.
+     *       **RESTRINGIDO A ADMINISTRADOR.** Bloquea ante la autoridad el tamaño máximo más el personal elegido,
+     *       asigna el personal (tiene que cubrir la dotación del máximo y ser apto hasta el fin), ocupa el hotel y el
+     *       transporte (que tiene que llevar a pasajeros y personal) y publica la salida. El equipo del paquete se controla
+     *       contra el stock proyectado: bajo el 50 % responde 409 con `detalle`, entre el 50 y el 100 % crea con `advertencias`;
+     *       no se ocupa hasta la primera compra. Si la base falla después del bloqueo, el cupo se libera.
+     *       alojamientos (B10): uno o más hoteles de las opciones que entre todos cubran el máximo (uno a solicitud cubre lo
+     *       que falte); vacío solo si ninguno cubre (FA3), y entonces cada reserva generará su solicitud.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -119,12 +125,15 @@ export class SalidaRoutes {
      *         application/json:
      *           schema:
      *             type: object
-     *             required: [idpaquete, fechaInicio, tamanoMaximo]
+     *             required: [idpaquete, fechaInicio, tamanoMaximo, idtransporte, personalIds]
      *             properties:
      *               idpaquete: { type: integer, example: 1 }
      *               fechaInicio: { type: string, format: date, example: "2026-11-20" }
      *               tamanoMaximo: { type: integer, example: 8 }
-     *               idalojamiento: { type: integer, example: 1, description: Uno de los alojamientos de /api/salidas/opciones. }
+     *               alojamientos: { type: array, items: { type: integer }, example: [1, 2], description: "Hoteles de /api/salidas/opciones, en el orden en que se llenan. idalojamiento (un id) se acepta igual." }
+     *               idtransporte: { type: integer, example: 3 }
+     *               personalIds: { type: array, items: { type: integer }, example: [1, 4, 5, 6, 7] }
+     *               diasCierreVenta: { type: integer, example: 2 }
      *     responses:
      *       201:
      *         description: Salida creada y publicada.
@@ -140,7 +149,9 @@ export class SalidaRoutes {
      *                     salida: { $ref: '#/components/schemas/Salida' }
      *                     dotacion: { type: object, properties: { guias: { type: integer }, porteadores: { type: integer } } }
      *                     totalLugares: { type: integer, example: 14 }
-     *       400: { description: Datos inválidos, alojamiento no válido o sin elegir, o sin cupo suficiente (FA1, informa los lugares disponibles). }
+     *                     advertencias: { type: array, items: { type: string } }
+     *       400: { description: Datos inválidos, alojamiento no válido o sin elegir, personal no apto o que no cubre la dotación, transporte sin capacidad para pasajeros y personal, o sin cupo suficiente (FA1, informa los lugares disponibles). }
+     *       409: { description: "El hotel, el transporte o el personal se ocuparon en el medio, o no alcanza el equipo (detalle: faltantes y tamanoMaximoSugerido)." }
      *       401: { description: Token no proporcionado o inválido. }
      *       403: { description: Se requiere el perfil ADMIN. }
      *       404: { description: El paquete no existe. }

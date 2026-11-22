@@ -1,6 +1,22 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { SALIDAS_ACTIVAS } from "../../../shared/constantes";
 import { PrecioTemporada } from "./paquete.dto";
+
+/** B2: una fila de PaqueteServicio; cantidad y cadaPasajeros solo en el equipo. */
+export type FilaServicio = { idservicio: number; cantidad?: number | null; cadaPasajeros?: number | null };
+/** B2: qué tipos se reemplazan enteros en un PUT (la clave es la relación del subtipo en ServicioBase). */
+export type ReemplazoServicios = Partial<Record<"transporte" | "tren" | "equipamiento", FilaServicio[]>>;
+
+// B2: cada servicio con su subtipo, para saber el tipo, el horario del tren y la regla del equipo
+const SERVICIOS = { include: { servicio: { include: { transporte: true, tren: true, equipamiento: true, alojamiento: true } } } } satisfies Prisma.Paquete$serviciosArgs;
+const DETALLE = {
+  circuito: true,
+  tarifas: { include: { temporada: true } },
+  servicios: SERVICIOS,
+  garantiasEstablecimiento: { include: { servicio: { include: { alojamiento: true } } } },
+} satisfies Prisma.PaqueteInclude;
+export type PaqueteDetalle = Prisma.PaqueteGetPayload<{ include: typeof DETALLE }>;
 
 export interface FiltrosPaquete {
   estado?: string | undefined;
@@ -33,23 +49,14 @@ export class PaqueteRepository {
       include: {
         circuito: true,
         tarifas: { include: { temporada: true } },
+        servicios: SERVICIOS, // B2: faltaTransporte
       },
       orderBy: { idpaquete: "asc" },
     });
   }
 
   async findById(id: number) {
-    return db.paquete.findUnique({
-      where: { idpaquete: id },
-      include: {
-        circuito: true,
-        tarifas: { include: { temporada: true } },
-        servicios: { include: { servicio: true } },
-        garantiasEstablecimiento: {
-          include: { servicio: { include: { alojamiento: true } } },
-        },
-      },
-    });
+    return db.paquete.findUnique({ where: { idpaquete: id }, include: DETALLE });
   }
 
   /**
@@ -72,9 +79,10 @@ export class PaqueteRepository {
       nochesPosteriores: number;
       diasDisponibles?: string | undefined;
       diasMinimosReintegro?: number | null | undefined;
+      diasCierreVenta?: number | undefined;
     },
     matrizPrecios: PrecioTemporada[],
-    serviciosIncluidos: number[],
+    servicios: FilaServicio[],
   ) {
     return db.$transaction(async (tx) => {
       // 1. Crear el paquete
@@ -86,13 +94,14 @@ export class PaqueteRepository {
           condiciones: data.condiciones || null,
           estado: data.estado,
           tipoGarantia: data.tipoGarantia,
-          localidadGarantizada: data.localidadGarantizada || null,
+          localidadGarantizada: data.localidadGarantizada!,
           categoriaGarantizada: data.categoriaGarantizada || null,
           tipoHabitacionGarantizada: data.tipoHabitacionGarantizada || null,
           nochesPrevias: data.nochesPrevias,
           nochesPosteriores: data.nochesPosteriores,
           diasDisponibles: data.diasDisponibles || null,
           diasMinimosReintegro: data.diasMinimosReintegro ?? null,
+          ...(data.diasCierreVenta !== undefined && { diasCierreVenta: data.diasCierreVenta }),
         },
       });
 
@@ -108,14 +117,9 @@ export class PaqueteRepository {
         });
       }
 
-      // 3. Crear los servicios incluidos
-      if (serviciosIncluidos.length > 0) {
-        await tx.paqueteServicio.createMany({
-          data: serviciosIncluidos.map((idservicio) => ({
-            idpaquete: paquete.idpaquete,
-            idservicio,
-          })),
-        });
+      // 3. Crear los servicios incluidos (B2: transporte, tren y equipo con su regla)
+      if (servicios.length > 0) {
+        await tx.paqueteServicio.createMany({ data: servicios.map((s) => ({ idpaquete: paquete.idpaquete, ...s })) });
       }
 
       // 3.5. Crear GarantiaEstablecimiento SOLO si es POR_ESTABLECIMIENTO (CAT-08)
@@ -129,24 +133,14 @@ export class PaqueteRepository {
       }
 
       // 4. Devolver el paquete completo con relaciones
-      return tx.paquete.findUnique({
-        where: { idpaquete: paquete.idpaquete },
-        include: {
-          circuito: true,
-          tarifas: { include: { temporada: true } },
-          servicios: { include: { servicio: true } },
-          garantiasEstablecimiento: {
-            include: { servicio: { include: { alojamiento: true } } },
-          },
-        },
-      });
+      return tx.paquete.findUniqueOrThrow({ where: { idpaquete: paquete.idpaquete }, include: DETALLE });
     });
   }
 
   async update(
     id: number,
     data: Record<string, any>,
-    serviciosIncluidos?: number[],
+    reemplazos: ReemplazoServicios,
     idservicioGarantizado?: number | null,
     tipoGarantia?: string,
   ) {
@@ -158,16 +152,10 @@ export class PaqueteRepository {
         });
       }
 
-      if (serviciosIncluidos !== undefined) {
-        await tx.paqueteServicio.deleteMany({ where: { idpaquete: id } });
-        if (serviciosIncluidos.length > 0) {
-          await tx.paqueteServicio.createMany({
-            data: serviciosIncluidos.map((idservicio) => ({
-              idpaquete: id,
-              idservicio,
-            })),
-          });
-        }
+      // B2: el tipo que viene se reemplaza entero; los demás quedan como están
+      for (const [subtipo, filas] of Object.entries(reemplazos)) {
+        await tx.paqueteServicio.deleteMany({ where: { idpaquete: id, servicio: { [subtipo]: { isNot: null } } } });
+        if (filas.length > 0) await tx.paqueteServicio.createMany({ data: filas.map((s) => ({ idpaquete: id, ...s })) });
       }
 
       if (tipoGarantia === "POR_CATEGORIA") {
@@ -180,17 +168,7 @@ export class PaqueteRepository {
         });
       }
 
-      return tx.paquete.findUnique({
-        where: { idpaquete: id },
-        include: {
-          circuito: true,
-          tarifas: { include: { temporada: true } },
-          servicios: { include: { servicio: true } },
-          garantiasEstablecimiento: {
-            include: { servicio: { include: { alojamiento: true } } },
-          },
-        },
-      });
+      return tx.paquete.findUniqueOrThrow({ where: { idpaquete: id }, include: DETALLE });
     });
   }
 

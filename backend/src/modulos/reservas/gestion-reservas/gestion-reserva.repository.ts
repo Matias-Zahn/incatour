@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_PERMISO, ESTADO_RESERVA, ESTADO_SALIDA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
+import { devolverPlazas, recalcularEquipo } from "../../../shared/ocupacion.repository";
 import { FiltrosMisReservasDto, FiltrosReservaDto } from "./gestion-reserva.dto";
 
 const INCLUDE_RESUMEN = {
@@ -138,7 +139,8 @@ export class GestionReservaRepository {
    *  - Permisos emitidos -> Perdido (y el stock local NO se repone).
    *  - Sin permisos emitidos: el stock local recupera los lugares.
    *  - Alojamiento: se liberan las plazas bloqueadas o se cancela la solicitud vinculada.
-   *  - Salida CERRADA (RES-13): no se vende más, así que el stock local no se toca y las plazas vuelven al hotel.
+   *  - El equipo de la salida se recalcula sobre los pasajeros que quedan (12.1).
+ *  - Salida CERRADA (RES-13): no se vende más, así que el stock local no se toca y las plazas vuelven al hotel.
    *  - RES-14: bloquea la salida (mismo orden que CU-40) y devuelve "CAMBIO" si los permisos o el estado de la
    *    salida ya no son los que se usaron para calcular el reintegro; el servicio recalcula y reintenta.
    */
@@ -152,6 +154,7 @@ export class GestionReservaRepository {
     cantidadPasajeros: number;
     permisosEmitidos: boolean;
     alojamientoPorStock: boolean;
+    idalojamiento: number | null; // 12.2: el hotel de la reserva, que recupera las plazas
     salidaEnVenta: boolean;
   }) {
     return db.$transaction(async (tx) => {
@@ -169,6 +172,8 @@ export class GestionReservaRepository {
         data: { estado: ESTADO_RESERVA.CANCELADA },
       });
       if (guarda.count === 0) return null;
+      // 12.1: el equipo vuelve a calcularse sobre lo que quedó vendido
+      await recalcularEquipo(tx, p.idsalida);
 
       const reembolso = await tx.reembolso.create({
         data: {
@@ -203,10 +208,12 @@ export class GestionReservaRepository {
           },
         });
       }
+      // B10: mientras se vende, las plazas vuelven a las libres del hotel de la reserva
+      if (reponerPlazas && p.idalojamiento) await devolverPlazas(tx, p.idsalida, p.idalojamiento, p.cantidadPasajeros);
       // A1: con la venta cerrada las plazas vuelven al hotel: baja la ocupación de la salida (si no tiene hotel, no hay filas)
       if (p.alojamientoPorStock && !p.salidaEnVenta) {
         await tx.ocupacion.updateMany({
-          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO, ...(p.idalojamiento && { idservicio: p.idalojamiento }) },
           data: { cantidad: { decrement: p.cantidadPasajeros } },
         });
       }

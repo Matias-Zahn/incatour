@@ -12,7 +12,7 @@ vi.mock("../../../integraciones/notificador/notificador.mock", () => ({
 const dias = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
 
 const reserva = (over: Record<string, unknown> = {}) => ({
-  idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: "CONFIRMADO", cantidadPasajeros: 2,
+  idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: "CONFIRMADO", idalojamiento: 4, cantidadPasajeros: 2,
   diasMinimosReintegro: 15,
   cliente: { idusuario: 5, usuario: { email: "a@b.com" } },
   salida: { idsalida: 7, estado: "PUBLICADA", fechaInicio: dias(5) },

@@ -161,8 +161,6 @@ async function main() {
       transporte: {
         create: {
           capacidadVehiculo: 19,
-          pesoEquipajeIncluido: 15.0,
-          costoPorKgExcedente: 2.5,
         },
       },
     },
@@ -229,8 +227,6 @@ async function main() {
       transporte: {
         create: {
           capacidadVehiculo: 20,
-          pesoEquipajeIncluido: 15.0,
-          costoPorKgExcedente: 2.0,
         },
       },
     },
@@ -499,6 +495,7 @@ async function main() {
       nombrePaquete: "Inca VIP Hotel Montaña",
       estado: "ACTIVO",
       tipoGarantia: "Por Establecimiento",
+      localidadGarantizada: "Cusco", // B2: "Sale desde", la del hotel garantizado
       tarifas: { create: [{ idtemporada: temporada.idtemporada, monto: 980, moneda: "USD" }] },
       servicios: {
         create: [
@@ -704,7 +701,6 @@ async function main() {
       precioCongelado: 760.0,
       temporadaAplicada: "Alta 2026",
       precioPaquetePorPersona: 380,
-      adicionalesEquipaje: 0,
       moneda: "USD",
       diasMinimosReintegro: 10,
       estado: "CONFIRMADA",
@@ -734,10 +730,9 @@ async function main() {
       nroReserva: "RES-0001",
       cantidadPasajeros: 1,
       precioCongelado: 650.0,
-      // RES-07: desglose congelado (tarifa de Alta 2026, sin equipaje excedente)
+      // RES-07: desglose congelado (tarifa de Alta 2026)
       temporadaAplicada: "Alta 2026",
       precioPaquetePorPersona: 650,
-      adicionalesEquipaje: 0,
       moneda: "USD",
       diasMinimosReintegro: 15,
       estado: "CONFIRMADA",
@@ -767,7 +762,6 @@ async function main() {
       precioCongelado: 650.0,
       temporadaAplicada: "Alta 2026",
       precioPaquetePorPersona: 650,
-      adicionalesEquipaje: 0,
       moneda: "USD",
       diasMinimosReintegro: 15,
       estado: "CANCELADA",

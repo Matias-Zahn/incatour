@@ -54,16 +54,19 @@ const aFecha = (valor: unknown, campo: string): [string | undefined, Date?] => {
   return [undefined, fecha];
 };
 
-// CU-36: llega por body (números) en POST y por query (texto) en GET /opciones
+// CU-36: llega por body (números) en POST y por query (texto) en GET /opciones. El alta (POST) suma transporte y personal (B3)
 export class CrearSalidaDto {
   private constructor(
     public idpaquete: number,
     public fechaInicio: Date,
     public tamanoMaximo: number,
-    public idalojamiento: number | undefined,
+    public alojamientos: number[],
+    public diasCierreVenta: number | undefined,
+    public idtransporte: number = 0, // solo en el alta
+    public personalIds: number[] = [],
   ) {}
 
-  public static create(obj: { [key: string]: any }): [string | undefined, CrearSalidaDto?] {
+  public static create(obj: { [key: string]: any }, alta = false): [string | undefined, CrearSalidaDto?] {
     const idpaquete = entero(obj.idpaquete);
     if (!idpaquete) return ["idpaquete es requerido y debe ser un entero positivo"];
 
@@ -79,15 +82,33 @@ export class CrearSalidaDto {
       return ["fechaInicio es requerida y debe ser una fecha válida (AAAA-MM-DD)"];
     }
 
-    const idalojamiento = obj.idalojamiento == null ? undefined : entero(obj.idalojamiento);
-    if (idalojamiento === null) return ["idalojamiento debe ser un entero positivo"];
+    // B10: uno o más hoteles, en el orden en que se llenan. idalojamiento (un id) sigue valiendo, por los clientes viejos
+    const lista = obj.alojamientos ?? (obj.idalojamiento == null ? [] : [obj.idalojamiento]);
+    if (!Array.isArray(lista) || !lista.every((a: unknown) => entero(a))) return ["alojamientos debe ser una lista de ids de servicio"];
+    const alojamientos = lista.map((a) => entero(a)!);
+    if (new Set(alojamientos).size !== alojamientos.length) return ["alojamientos tiene ids repetidos"];
 
-    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, idalojamiento)];
+    // B4: sin él, rige el corte sugerido (el del paquete, o 5 días con un hotel a solicitud)
+    const diasCierreVenta = obj.diasCierreVenta == null ? undefined : entero(obj.diasCierreVenta, 0);
+    if (diasCierreVenta === null || (diasCierreVenta ?? 0) > TOPES.diasCierreVenta) {
+      return [`diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}`];
+    }
+    if (!alta) return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta)];
+
+    const idtransporte = entero(obj.idtransporte);
+    if (!idtransporte) return ["idtransporte es requerido y debe ser un entero positivo"];
+    const { personalIds } = obj;
+    if (!Array.isArray(personalIds) || personalIds.length === 0 || !personalIds.every((id) => typeof id === "number" && entero(id))) {
+      return ["personalIds debe ser una lista de ids de personal"];
+    }
+    if (new Set(personalIds).size !== personalIds.length) return ["personalIds tiene ids repetidos"];
+
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta, idtransporte, personalIds)];
   }
 }
 
-// Acepta 5 o "5"; devuelve null si no es un entero positivo
-const entero = (valor: unknown): number | null => {
+// Acepta 5 o "5"; devuelve null si no es un entero >= minimo (por defecto, positivo)
+const entero = (valor: unknown, minimo = 1): number | null => {
   const n = typeof valor === "string" && valor.trim() !== "" ? Number(valor) : valor;
-  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : null;
+  return typeof n === "number" && Number.isInteger(n) && n >= minimo ? n : null;
 };

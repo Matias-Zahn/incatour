@@ -22,21 +22,18 @@ export async function ventas(ctx: Ctx) {
   async function armar(o: { tamano?: number; hotel?: "bloqueo" | "solicitud" | "ninguno"; capHotel?: number; dias?: number; reintegro?: number | null; transporte?: boolean } = {}) {
     const localidad = `Loc ${ctx.unico()}`;
     const transp = o.transporte ? await f.transporte(localidad) : undefined;
-    const pq = await f.paquete({ localidad, diasMinimosReintegro: o.reintegro === undefined ? 15 : o.reintegro, ...(transp && { serviciosIncluidos: [transp.idservicio] }) });
+    const pq = await f.paquete({ localidad, diasMinimosReintegro: o.reintegro === undefined ? 15 : o.reintegro, ...(transp && { idtransporte: transp.idservicio }) });
     const modo = o.hotel ?? "bloqueo";
     const hotel = modo === "ninguno" ? undefined : await f.hotel(localidad, o.capHotel ?? 50, modo === "solicitud" ? "A_SOLICITUD" : "BLOQUEO_PLAZAS");
     const dias = o.dias ?? 30 + (k++ % 30);
-    const idsalida = await f.salida(pq.idpaquete, fecha(dias), o.tamano ?? 4, modo === "bloqueo" ? hotel!.idservicio : undefined);
+    // B10: el a solicitud también se elige (cubre lo que falte); sin hotel es el FA3
+    const idsalida = await f.salida(pq.idpaquete, fecha(dias), o.tamano ?? 4, hotel?.idservicio);
     return { pq, localidad, hotel, idsalida, dias };
   }
 
-  /** Cierra la salida con la asignación real (CU-40): emite los permisos de los pasajeros vendidos */
-  async function cerrar(idsalida: number, localidad: string, vendidos: number) {
-    const guia = await f.guia();
-    const porteadores = [];
-    for (let i = 0; i < Math.ceil(vendidos / 2); i++) porteadores.push(await f.porteador());
-    const t = await f.transporte(localidad, 30);
-    await ctx.preparar("Cerrar salida", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: [guia.idpersonal, ...porteadores], idtransporte: t.idservicio });
+  /** Confirma la salida (CU-40) después del corte: emite los permisos de los pasajeros vendidos. El personal vino con el alta */
+  async function cerrar(idsalida: number, _localidad: string, _vendidos: number) {
+    await f.confirmar(idsalida);
   }
 
   const cancelacion = (tok: string, id: number) => ctx.back.llamar("GET", `/reservas/${id}/cancelacion`, undefined, tok);
@@ -110,33 +107,27 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Tras los rechazos se puede comprar los 3 lugares → 201", "POST", "/reservas", f.compra(idsalida, { n: 3 }), cli.token, 201);
   });
 
-  await ctx.escenario("Precio con exceso de equipaje", async () => {
-    // El transporte del paquete (fixture) incluye 15 kg y cobra 2 por kg excedente
+  await ctx.escenario("Precio congelado: el equipaje no se cobra en la compra (B6)", async () => {
+    // El equipaje se pesa y cobra en persona: si un body viejo lo trae (aun inválido), se ignora
     const { idsalida, dias } = await armar({ tamano: 6, transporte: true });
     const cli = await f.cliente();
     const inicio = new Date(fecha(dias));
     const temporada = await db.temporada.findFirstOrThrow({ where: { estado: "ACTIVO", fechaInicio: { lte: inicio }, fechaFin: { gte: inicio } } });
 
-    const sin = await f.comprar(cli.token, idsalida, { n: 1, equipajeKg: 8 });
-    igual("Sin exceso: precioCongelado = tarifa", (await res(sin.idreserva)).precioCongelado, 500);
-    igual("Sin exceso: adicionalesEquipaje 0", (await res(sin.idreserva)).adicionalesEquipaje, 0);
-
-    // 20 kg (5 de exceso), 15 kg (justo la franquicia, no cobra) y 8 kg: recargo = 5 × 2 = 10
-    const body = f.compra(idsalida, { n: 3 });
-    body.equipaje = [{ pesoDeclarado: 20 }, { pesoDeclarado: 15 }, { pesoDeclarado: 8 }];
-    const r = await ctx.esperar("Compra con exceso de equipaje → 201", "POST", "/reservas", body, cli.token, 201);
-    igual("Respuesta: precioCongelado = 500 × 3 + 10", r?.precioCongelado, 1510);
+    const body: any = f.compra(idsalida, { n: 3 });
+    body.equipaje = [{ pesoDeclarado: 20 }, { pesoDeclarado: -1 }];
+    const r = await ctx.esperar("Compra con equipaje en el body → 201 (se ignora)", "POST", "/reservas", body, cli.token, 201);
+    igual("Respuesta: precioCongelado = 500 × 3", r?.precioCongelado, 1500);
     const reserva = await res(r?.idreserva);
-    igual("Reserva congela precioCongelado", reserva.precioCongelado, 1510);
+    igual("Reserva congela precioCongelado", reserva.precioCongelado, 1500);
     igual("Reserva congela precioPaquetePorPersona", reserva.precioPaquetePorPersona, 500);
-    igual("Reserva congela adicionalesEquipaje", reserva.adicionalesEquipaje, 10);
     igual("Reserva congela temporadaAplicada", reserva.temporadaAplicada, temporada.nombre);
     const pagos = await db.pago.findMany({ where: { idreserva: reserva.idreserva } });
-    ctx.controlar("Pago único igual al precio congelado", pagos.length === 1 && pagos[0]!.monto === 1510, `pagos=${JSON.stringify(pagos.map((p) => p.monto))}`);
+    ctx.controlar("Pago único igual al precio congelado", pagos.length === 1 && pagos[0]!.monto === 1500, `pagos=${JSON.stringify(pagos.map((p) => p.monto))}`);
 
     const det = await ctx.esperar("GET detalle de la reserva → 200", "GET", `/reservas/${reserva.idreserva}`, undefined, cli.token, 200);
-    ctx.controlar("Detalle: desglose 500 + 1500 + 10, pagado 1510",
-      det?.precioUnitario === 500 && det?.precioPaquete === 1500 && det?.adicionalesEquipaje === 10 && det?.pagado === 1510,
+    ctx.controlar("Detalle: desglose 500 + 1500, pagado 1500, sin adicionales de equipaje",
+      det?.precioUnitario === 500 && det?.precioPaquete === 1500 && det?.pagado === 1500 && !("adicionalesEquipaje" in (det ?? {})),
       JSON.stringify({ u: det?.precioUnitario, p: det?.precioPaquete, a: det?.adicionalesEquipaje, pagado: det?.pagado }));
   });
 
@@ -146,8 +137,6 @@ export async function ventas(ctx: Ctx) {
     const antes = await foto(idsalida);
     const casos: [string, (b: any) => void][] = [
       ["sin pasajeros", (b) => (b.pasajeros = [])],
-      ["equipaje con menos elementos que pasajeros", (b) => { b.pasajeros = [f.pasajero(), f.pasajero()]; b.equipaje = [{ pesoDeclarado: 1 }]; }],
-      ["peso de equipaje negativo", (b) => (b.equipaje = [{ pesoDeclarado: -1 }])],
       ["sin tarjeta", (b) => delete b.tarjeta],
       ["sin medioPago", (b) => delete b.medioPago],
       ["idsalida no numérico", (b) => (b.idsalida = "1")],
@@ -256,17 +245,29 @@ export async function ventas(ctx: Ctx) {
     await f.moverFechas(idsalida, fecha(0), fecha(2));
     await ctx.esperar("Compra en salida que empieza hoy → 400", "POST", "/reservas", f.compra(idsalida), cli.token, 400);
     igual("Salidas empezadas: stock sin cambios", await foto(idsalida), "3/3/0");
-    await f.moverFechas(idsalida, fecha(1), fecha(3));
-    await ctx.esperar("Compra en salida que empieza mañana → 201", "POST", "/reservas", f.compra(idsalida), cli.token, 201);
+    // B4: la venta cierra diasCierreVenta (2) días antes del inicio, sin tarea programada
+    await f.moverFechas(idsalida, fecha(2), fecha(4));
+    const cerrada = await ctx.back.llamar("POST", "/reservas", f.compra(idsalida), cli.token);
+    ctx.controlar("B4 compra en salida que empieza en 2 días (venta cerrada) → 400",
+      cerrada.status === 400 && cerrada.body?.error === `La venta de esta salida cerró el ${fecha(-1).split("-").reverse().join("/")}.`, `${cerrada.status} ${JSON.stringify(cerrada.body)}`);
+    const cat = await ctx.esperar("B4 catálogo con la venta cerrada → 200", "GET", "/catalogo", undefined, "", 200);
+    const enCat = (cat ?? []).flatMap((p: any) => p.salidasDisponibles).find((s: any) => s.idsalida === idsalida);
+    ctx.controlar("B4 el catálogo la lista igual, con ventaAbierta false", enCat?.ventaAbierta === false && enCat?.ultimoDiaVenta === fecha(-1), JSON.stringify(enCat && { v: enCat.ventaAbierta, u: enCat.ultimoDiaVenta }));
+    igual("Venta cerrada: stock sin cambios", await foto(idsalida), "3/3/0");
+    await f.moverFechas(idsalida, fecha(3), fecha(5));
+    await ctx.esperar("B4 compra el último día de venta (empieza en 3 días) → 201", "POST", "/reservas", f.compra(idsalida), cli.token, 201);
   });
 
   await ctx.escenario("Compra en salida sin tarifa vigente", async () => {
     const { pq, idsalida } = await armar({ tamano: 3 });
     const cli = await f.cliente();
     // Sin temporada que cubra 2029 no se puede ni crear la salida
-    await ctx.esperar("Crear salida en fecha sin tarifa → 400", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: "2029-06-01", tamanoMaximo: 3 }, ctx.admin, 400);
+    await ctx.esperar("Crear salida en fecha sin tarifa → 400", "POST", "/salidas", await f.cuerpoSalida(pq.idpaquete, "2029-06-01", 3), ctx.admin, 400);
     // Salida existente cuya fecha queda sin tarifa (se mueve por base)
     await f.moverFechas(idsalida, "2029-06-01", "2029-06-03");
+    // 12.5: como una salida anterior, sin la tarifa congelada (rige la del paquete vivo)
+    const s = await sal(idsalida);
+    await db.salida.update({ where: { idsalida }, data: { definicionPaquete: { ...(s.definicionPaquete as object), tarifa: null } } });
     await ctx.esperar("Compra en salida sin tarifa para su fecha → 400", "POST", "/reservas", f.compra(idsalida), cli.token, 400);
     igual("Sin tarifa: stock sin cambios", await foto(idsalida), "3/3/0");
     igual("Sin tarifa: ningún pago", await db.pago.count({ where: { reserva: { idsalida } } }), 0);
@@ -550,7 +551,8 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Solicitudes sin token → 401", "GET", "/solicitudes", undefined, "", 401);
 
     // CU-40 FA5: con alojamiento sin confirmar no se consolida la salida
-    await ctx.esperar("Cerrar la salida con alojamiento pendiente → 409", "POST", `/salidas/${idsalida}/asignacion`, { personalIds: [1], idtransporte: 1 }, ctx.admin, 409);
+    await f.cerrarVenta(idsalida);
+    await ctx.esperar("Cerrar la salida con alojamiento pendiente → 409", "POST", `/salidas/${idsalida}/asignacion`, {}, ctx.admin, 409);
     igual("La salida sigue PUBLICADA", (await sal(idsalida)).estado, "PUBLICADA");
   });
 
@@ -558,7 +560,7 @@ export async function ventas(ctx: Ctx) {
     const localidad = `Loc ${ctx.unico()}`;
     const pq = await f.paquete({ localidad });
     const hotel = await f.hotel(localidad, 2);
-    await ctx.esperar("Crear salida eligiendo un hotel sin capacidad → 400", "POST", "/salidas", { idpaquete: pq.idpaquete, fechaInicio: fecha(50), tamanoMaximo: 4, idalojamiento: hotel.idservicio }, ctx.admin, 400);
+    await ctx.esperar("Crear salida eligiendo un hotel sin capacidad → 400", "POST", "/salidas", await f.cuerpoSalida(pq.idpaquete, fecha(50), 4, { idalojamiento: hotel.idservicio }), ctx.admin, 400);
     const idsalida = await f.salida(pq.idpaquete, fecha(50), 4);
     const cli = await f.cliente();
     const r = await ctx.esperar("Comprar → 201", "POST", "/reservas", f.compra(idsalida, { n: 1 }), cli.token, 201);
@@ -576,7 +578,7 @@ export async function ventas(ctx: Ctx) {
     const hoteles = (op: any) => (op?.opcionesContacto ?? []).map((o: any) => o.servicioId).sort();
 
     const op1 = await ctx.esperar("Opciones de la solicitud → 200", "GET", `/solicitudes/${sol.idsolicitud}/opciones`, undefined, ctx.admin, 200);
-    igual("Opciones: los dos hoteles", JSON.stringify(hoteles(op1)), JSON.stringify([A!.idservicio, B.idservicio].sort()));
+    igual("12.2 opciones: solo el hotel de la salida al que fue el grupo", JSON.stringify(hoteles(op1)), JSON.stringify([A!.idservicio]));
 
     await ctx.esperar("Rechazar sin motivo → 400", "POST", `/solicitudes/${sol.idsolicitud}/resolver`, { servicioId: A!.idservicio, resolucion: "RECHAZADA" }, ctx.admin, 400);
     await ctx.esperar("Resolución inválida → 400", "POST", `/solicitudes/${sol.idsolicitud}/resolver`, { servicioId: A!.idservicio, resolucion: "TAL VEZ" }, ctx.admin, 400);

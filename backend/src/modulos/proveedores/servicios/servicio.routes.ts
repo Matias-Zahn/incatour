@@ -63,8 +63,8 @@ export class ServicioRoutes {
      *       **RESTRINGIDO A ADMINISTRADOR.** El `tipo` debe coincidir con el rubro del proveedor,
      *       que además debe estar ACTIVO. Alojamiento: localidad, categoría, tipo de habitación,
      *       capacidad (`capacidadDisponible`, el total de plazas; obligatoria solo con BLOQUEO_PLAZAS) y
-     *       modalidad de confirmación. Transporte: capacidad, peso de equipaje incluido
-     *       y costo por kg excedente. Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.
+     *       modalidad de confirmación. Transporte: capacidad del vehículo
+     *       (el equipaje se cobra en persona). Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.
      *     tags: [Servicios de proveedores]
      *     security:
      *       - BearerAuth: []

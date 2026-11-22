@@ -23,6 +23,11 @@ describe("manejadorErrores", () => {
     expect([r.estado, r.cuerpo.error]).toEqual([404, "No está"]);
   });
 
+  it("copia el detalle al cuerpo solo si viene (decisión 1 del contrato)", () => {
+    expect(responder(CustomError.conflict("Ocupado", { salidas: [1] })).cuerpo).toEqual({ error: "Ocupado", detalle: { salidas: [1] } });
+    expect(responder(CustomError.conflict("Ocupado")).cuerpo).toEqual({ error: "Ocupado" });
+  });
+
   it("un JSON mal formado es 400, no 500", () => {
     const err = Object.assign(new SyntaxError("Unexpected token"), { body: "{mal" });
     expect(responder(err).estado).toBe(400);
