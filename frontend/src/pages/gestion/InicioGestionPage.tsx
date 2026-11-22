@@ -9,6 +9,7 @@ import Modal from "../../components/Modal";
 import {
     criticosEnCurso,
     estilosEstadoSalida,
+    etiquetasTipoIncidente,
     fechaLocalHoy,
     formatearEstadoSalida,
     useIncidentes,
@@ -41,7 +42,7 @@ function FilaIncidente({ incidente: inc }: { incidente: IncidenteAdmin }) {
                     {etiquetaGravedad(inc.nivelGravedad)}
                 </span>
                 <p className="text-sm font-semibold text-texto">
-                    {inc.salida.nroSalida} · {inc.tipoIncidente}
+                    {inc.salida.nroSalida} · {etiquetasTipoIncidente[inc.tipoIncidente as keyof typeof etiquetasTipoIncidente] ?? inc.tipoIncidente}
                 </p>
             </div>
             <p className="mt-1 line-clamp-2 text-xs text-texto">{inc.descripcion}</p>
