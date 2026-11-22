@@ -1095,8 +1095,8 @@ export const manejadoresSalidas = [
         });
     }),
 
-    // POST /api/salidas/:idsalida/asignacion (CU-40 — §9.2 Confirmar salida con body {})
-    http.post("*/api/salidas/:idsalida/asignacion", async ({ params }) => {
+    // POST /api/salidas/:idsalida/asignacion (CU-40 — §9.2, §13 y §14)
+    http.post("*/api/salidas/:idsalida/asignacion", async ({ params, request }) => {
         await delay(250);
         const salida = buscarSalida(params.idsalida);
         if (!salida) return noExiste();
@@ -1109,6 +1109,44 @@ export const manejadoresSalidas = [
                 { status: 400 },
             );
         }
+
+        let body: { personalIds?: unknown };
+        try {
+            body = (await request.json()) as { personalIds?: unknown };
+        } catch {
+            body = {};
+        }
+        if (body.personalIds !== undefined) {
+            if (salida.personalAsignado.length > 0) {
+                return HttpResponse.json(
+                    {
+                        error: "La salida ya tiene personal: personalIds es solo para una salida sin personal. Se cambia con los reemplazos",
+                    },
+                    { status: 400 },
+                );
+            }
+            if (
+                !Array.isArray(body.personalIds) ||
+                body.personalIds.length === 0 ||
+                !body.personalIds.every((id) => Number.isInteger(id) && Number(id) > 0) ||
+                new Set(body.personalIds).size !== body.personalIds.length
+            ) {
+                return HttpResponse.json(
+                    { error: "personalIds debe ser una lista de ids de personal, sin repetidos" },
+                    { status: 400 },
+                );
+            }
+            salida.personalAsignado = (body.personalIds as number[]).map((idpersonal) => ({
+                idsalida: salida.idsalida,
+                idpersonal,
+                personal: personaDe(idpersonal),
+            }));
+            salida.cantidadPersonal = salida.personalAsignado.length;
+            salida.guias = salida.personalAsignado
+                .filter((p) => p.personal.rol === "Guía")
+                .map((p) => p.personal.nombreCompleto);
+        }
+
         if (salida.ventaAbierta) {
             const ultimo = salida.ultimoDiaVenta ?? salida.fechaInicio.slice(0, 10);
             return HttpResponse.json(
@@ -1123,6 +1161,16 @@ export const manejadoresSalidas = [
             return HttpResponse.json(
                 { error: "La salida no tiene pasajeros confirmados: corresponde cancelarla" },
                 { status: 400 },
+            );
+        }
+        if (salida.alertas?.includes("SOLICITUD_PENDIENTE")) {
+            const reservasSinAlojamiento = ["RES-2026-099"];
+            return HttpResponse.json(
+                {
+                    error: `No se puede confirmar: hay alojamientos sin confirmar en las reservas ${reservasSinAlojamiento.join(", ")}`,
+                    detalle: { reservasSinAlojamiento, faltantes: [] },
+                },
+                { status: 409 },
             );
         }
         const lugaresLiberados = Math.max(0, salida.tamanoMaximo - vendidos);

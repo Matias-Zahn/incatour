@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
@@ -7,17 +7,22 @@ import {
     formatearFechaUtcCorta,
     formatearRangoFechasUtc,
 } from "../services/formato";
-import type {
-    PanelConfirmacion,
-    PayloadConfirmarAsignacion,
+import {
+    useOpcionesSalida,
+    type DetalleConflictoConfirmacion,
+    type PanelConfirmacion,
+    type PayloadConfirmarAsignacion,
 } from "../services/salidaService";
 
 export type FormularioAsignarRecursosProps = {
     datos?: PanelConfirmacion | null;
+    idpaquete?: number;
+    tamanoMaximo?: number;
     cargando?: boolean;
     recargando?: boolean;
     guardando?: boolean;
     errorServidor?: string;
+    detalleErrorConfirmacion?: DetalleConflictoConfirmacion | null;
     onRecargarDatos?: () => void;
     onConfirmar?: (payload: PayloadConfirmarAsignacion) => void;
     onCancelar?: () => void;
@@ -27,10 +32,13 @@ export type FormularioAsignarRecursosProps = {
 
 export function FormularioAsignarRecursos({
     datos,
+    idpaquete,
+    tamanoMaximo,
     cargando = false,
     recargando = false,
     guardando = false,
     errorServidor,
+    detalleErrorConfirmacion = null,
     onRecargarDatos,
     onConfirmar,
     onCancelar,
@@ -38,6 +46,52 @@ export function FormularioAsignarRecursos({
     onAbrirLogistica,
 }: FormularioAsignarRecursosProps) {
     const idSeccion = useId();
+    const [personalElegidoIds, setPersonalElegidoIds] = useState<number[]>([]);
+
+    // §14: salidas creadas antes de la etapa 3 llegan sin personal asignado;
+    // se puede elegir acá usando las opciones de CU-36 (5.1) y enviarlo en { personalIds }.
+    const salidaSinPersonal = Boolean(datos && datos.personal.length === 0);
+    const paramsOpcionesPersonal = useMemo(() => {
+        if (!salidaSinPersonal || !datos || !idpaquete || !tamanoMaximo) return null;
+        return {
+            idpaquete,
+            fechaInicio: datos.salida.fechaInicio.slice(0, 10),
+            tamanoMaximo,
+        };
+    }, [salidaSinPersonal, datos, idpaquete, tamanoMaximo]);
+
+    const {
+        data: opcionesPersonal,
+        isPending: cargandoOpcionesPersonal,
+        error: errorOpcionesPersonal,
+    } = useOpcionesSalida(paramsOpcionesPersonal, { enabled: Boolean(paramsOpcionesPersonal) });
+
+    const guiasDisponibles = useMemo(
+        () => opcionesPersonal?.personal.guias ?? [],
+        [opcionesPersonal?.personal.guias],
+    );
+    const porteadoresDisponibles = useMemo(
+        () => opcionesPersonal?.personal.porteadores ?? [],
+        [opcionesPersonal?.personal.porteadores],
+    );
+
+    const guiasElegidosCount = useMemo(() => {
+        const ids = new Set(guiasDisponibles.map((g) => g.idpersonal));
+        return personalElegidoIds.filter((id) => ids.has(id)).length;
+    }, [guiasDisponibles, personalElegidoIds]);
+
+    const porteadoresElegidosCount = useMemo(() => {
+        const ids = new Set(porteadoresDisponibles.map((p) => p.idpersonal));
+        return personalElegidoIds.filter((id) => ids.has(id)).length;
+    }, [porteadoresDisponibles, personalElegidoIds]);
+
+    function alternarPersonalLegacy(idpersonal: number) {
+        setPersonalElegidoIds((prev) =>
+            prev.includes(idpersonal)
+                ? prev.filter((id) => id !== idpersonal)
+                : [...prev, idpersonal],
+        );
+    }
 
     if (cargando) {
         return (
@@ -114,6 +168,36 @@ export function FormularioAsignarRecursos({
     const hayFaltaEquipoOTransporte =
         equipo.some((e) => e.falta > 0) || Boolean(transporte && !transporte.alcanza);
 
+    // §14: si la salida no tiene personal y solo falta asignarlo (no hay otros faltantes ni venta abierta),
+    // habilitamos confirmar cuando la dotación seleccionada cubre lo requerido para los vendidos.
+    const faltantesSinPersonal = faltantes.filter(
+        (f) => !f.toLowerCase().startsWith("sin personal asignado"),
+    );
+    const cumpleDotacionLegacy =
+        salidaSinPersonal &&
+        guiasElegidosCount >= dotacionRequerida.guias &&
+        porteadoresElegidosCount >= dotacionRequerida.porteadores &&
+        personalElegidoIds.length > 0;
+    const puedeConfirmarConPersonalLegacy =
+        salidaSinPersonal &&
+        salida.estado === "PUBLICADA" &&
+        !salida.ventaAbierta &&
+        pasajerosConfirmados > 0 &&
+        reservasSinAlojamiento.length === 0 &&
+        faltantesSinPersonal.length === 0 &&
+        cumpleDotacionLegacy;
+
+    const habilitarConfirmacion = puedeConfirmar || puedeConfirmarConPersonalLegacy;
+
+    function manejarConfirmarClick() {
+        if (!habilitarConfirmacion || guardando) return;
+        if (salidaSinPersonal && personalElegidoIds.length > 0) {
+            onConfirmar?.({ personalIds: personalElegidoIds });
+            return;
+        }
+        onConfirmar?.({});
+    }
+
     return (
         <section
             aria-labelledby={`${idSeccion}-titulo`}
@@ -133,14 +217,14 @@ export function FormularioAsignarRecursos({
                         className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
                             salida.ventaAbierta
                                 ? "bg-sky-100 text-sky-900"
-                                : puedeConfirmar
+                                : habilitarConfirmacion
                                   ? "bg-emerald-100 text-emerald-900"
                                   : "bg-amber-100 text-amber-900"
                         }`}
                     >
                         {salida.ventaAbierta
                             ? `Venta abierta hasta el ${formatearFechaUtcCorta(salida.ultimoDiaVenta)}`
-                            : puedeConfirmar
+                            : habilitarConfirmacion
                               ? "Lista para confirmar"
                               : "Venta cerrada · con pendientes"}
                     </span>
@@ -154,6 +238,23 @@ export function FormularioAsignarRecursos({
                 <Alerta tipo="error" titulo="No se pudo confirmar la salida">
                     <div className="space-y-2">
                         <p>{errorServidor}</p>
+                        {detalleErrorConfirmacion &&
+                        detalleErrorConfirmacion.reservasSinAlojamiento.length > 0 ? (
+                            <p className="text-xs">
+                                Reservas con alojamiento pendiente:{" "}
+                                <strong>
+                                    {detalleErrorConfirmacion.reservasSinAlojamiento.join(", ")}
+                                </strong>
+                            </p>
+                        ) : null}
+                        {detalleErrorConfirmacion &&
+                        detalleErrorConfirmacion.faltantes.length > 0 ? (
+                            <ul className="list-disc pl-5 text-xs space-y-0.5">
+                                {detalleErrorConfirmacion.faltantes.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                ))}
+                            </ul>
+                        ) : null}
                         {onRecargarDatos ? (
                             <Boton
                                 type="button"
@@ -169,7 +270,7 @@ export function FormularioAsignarRecursos({
                 </Alerta>
             ) : null}
 
-            {!puedeConfirmar && motivoNoConfirmable ? (
+            {!habilitarConfirmacion && motivoNoConfirmable ? (
                 <Alerta
                     tipo={salida.ventaAbierta ? "informacion" : "advertencia"}
                     titulo={
@@ -221,10 +322,12 @@ export function FormularioAsignarRecursos({
                         Personal asignado
                     </span>
                     <p className="mt-1 text-2xl font-extrabold text-navegacion">
-                        {personal.length}
+                        {salidaSinPersonal ? personalElegidoIds.length : personal.length}
                     </p>
                     <p className="text-texto-suave">
-                        Permisos a emitir: {pasajerosConfirmados + personal.length}
+                        Permisos a emitir:{" "}
+                        {pasajerosConfirmados +
+                            (salidaSinPersonal ? personalElegidoIds.length : personal.length)}
                     </p>
                 </div>
                 <div className="rounded-control border border-borde bg-slate-50/70 p-3">
@@ -268,7 +371,9 @@ export function FormularioAsignarRecursos({
             <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-bold text-navegacion">
-                        Personal asignado ({personal.length})
+                        {salidaSinPersonal
+                            ? "Elegir personal para esta salida"
+                            : `Personal asignado (${personal.length})`}
                     </h3>
                     {hayPersonalNoApto && onAbrirReemplazo ? (
                         <Boton
@@ -281,39 +386,140 @@ export function FormularioAsignarRecursos({
                         </Boton>
                     ) : null}
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                    {personal.map((p) => (
-                        <div
-                            key={p.idpersonal}
-                            className={`flex items-start justify-between gap-2 rounded-control border p-3 text-xs ${
-                                p.apto
-                                    ? "border-borde bg-white"
-                                    : "border-rose-300 bg-rose-50"
-                            }`}
-                        >
-                            <div>
-                                <p className="font-bold text-sm text-navegacion">
-                                    {p.nombreCompleto}
-                                </p>
-                                <p className="text-texto-suave">{p.rol}</p>
-                                {!p.apto && p.motivo ? (
-                                    <p className="mt-1 font-semibold text-peligro">
-                                        {p.motivo}
-                                    </p>
-                                ) : null}
+
+                {salidaSinPersonal ? (
+                    <div className="space-y-3 rounded-control border border-amber-200 bg-amber-50/40 p-4">
+                        <p className="text-xs text-texto-suave">
+                            Esta salida fue creada sin personal asignado. Elegí al menos{" "}
+                            <strong>{dotacionRequerida.guias} guía(s)</strong> y{" "}
+                            <strong>{dotacionRequerida.porteadores} porteador(es)</strong> para asignarlos al confirmar.
+                        </p>
+                        {cargandoOpcionesPersonal ? (
+                            <p className="text-xs text-texto-suave">
+                                Cargando personal libre para esas fechas...
+                            </p>
+                        ) : errorOpcionesPersonal ? (
+                            <Alerta tipo="error" titulo="No se pudo consultar el personal libre">
+                                {errorOpcionesPersonal.message}
+                            </Alerta>
+                        ) : (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="rounded-control border border-borde bg-white p-3 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                        <span>Guías libres</span>
+                                        <span
+                                            className={
+                                                guiasElegidosCount >= dotacionRequerida.guias
+                                                    ? "text-emerald-700"
+                                                    : "text-amber-800"
+                                            }
+                                        >
+                                            {guiasElegidosCount} / {dotacionRequerida.guias}
+                                        </span>
+                                    </div>
+                                    <ul className="space-y-1 max-h-44 overflow-y-auto">
+                                        {guiasDisponibles.map((g) => {
+                                            const marcado = personalElegidoIds.includes(g.idpersonal);
+                                            return (
+                                                <li key={g.idpersonal}>
+                                                    <label className="flex items-center justify-between rounded border border-borde px-2.5 py-1.5 text-xs cursor-pointer hover:bg-slate-50">
+                                                        <span className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={marcado}
+                                                                onChange={() =>
+                                                                    alternarPersonalLegacy(g.idpersonal)
+                                                                }
+                                                            />
+                                                            {g.nombreCompleto}
+                                                        </span>
+                                                        <span className="text-texto-suave">
+                                                            {g.salidasEnElMes} este mes
+                                                        </span>
+                                                    </label>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                                <div className="rounded-control border border-borde bg-white p-3 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                        <span>Porteadores libres</span>
+                                        <span
+                                            className={
+                                                porteadoresElegidosCount >=
+                                                dotacionRequerida.porteadores
+                                                    ? "text-emerald-700"
+                                                    : "text-amber-800"
+                                            }
+                                        >
+                                            {porteadoresElegidosCount} /{" "}
+                                            {dotacionRequerida.porteadores}
+                                        </span>
+                                    </div>
+                                    <ul className="space-y-1 max-h-44 overflow-y-auto">
+                                        {porteadoresDisponibles.map((p) => {
+                                            const marcado = personalElegidoIds.includes(p.idpersonal);
+                                            return (
+                                                <li key={p.idpersonal}>
+                                                    <label className="flex items-center justify-between rounded border border-borde px-2.5 py-1.5 text-xs cursor-pointer hover:bg-slate-50">
+                                                        <span className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={marcado}
+                                                                onChange={() =>
+                                                                    alternarPersonalLegacy(p.idpersonal)
+                                                                }
+                                                            />
+                                                            {p.nombreCompleto}
+                                                        </span>
+                                                        <span className="text-texto-suave">
+                                                            {p.salidasEnElMes} este mes
+                                                        </span>
+                                                    </label>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
                             </div>
-                            <span
-                                className={`rounded-full px-2 py-0.5 font-semibold ${
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        {personal.map((p) => (
+                            <div
+                                key={p.idpersonal}
+                                className={`flex items-start justify-between gap-2 rounded-control border p-3 text-xs ${
                                     p.apto
-                                        ? "bg-emerald-100 text-emerald-800"
-                                        : "bg-rose-200 text-rose-900"
+                                        ? "border-borde bg-white"
+                                        : "border-rose-300 bg-rose-50"
                                 }`}
                             >
-                                {p.apto ? "Apto" : "No apto"}
-                            </span>
-                        </div>
-                    ))}
-                </div>
+                                <div>
+                                    <p className="font-bold text-sm text-navegacion">
+                                        {p.nombreCompleto}
+                                    </p>
+                                    <p className="text-texto-suave">{p.rol}</p>
+                                    {!p.apto && p.motivo ? (
+                                        <p className="mt-1 font-semibold text-peligro">
+                                            {p.motivo}
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <span
+                                    className={`rounded-full px-2 py-0.5 font-semibold ${
+                                        p.apto
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : "bg-rose-200 text-rose-900"
+                                    }`}
+                                >
+                                    {p.apto ? "Apto" : "No apto"}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Hoteles y Transporte */}
@@ -334,7 +540,9 @@ export function FormularioAsignarRecursos({
                                             {h.nombreServicio}
                                         </p>
                                         <p className="text-texto-suave">
-                                            {etiquetaModalidad(h.modalidadConfirmacion)}
+                                            {h.modalidadConfirmacion
+                                                ? etiquetaModalidad(h.modalidadConfirmacion)
+                                                : "—"}
                                         </p>
                                     </div>
                                     <span className="rounded bg-slate-100 px-2 py-0.5 font-semibold text-navegacion">
@@ -349,14 +557,14 @@ export function FormularioAsignarRecursos({
                 <div className="rounded-control border border-borde p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="text-sm font-bold text-navegacion">Transporte</h3>
-                        {transporte && !transporte.alcanza && onAbrirLogistica ? (
+                        {(!transporte || !transporte.alcanza) && onAbrirLogistica ? (
                             <Boton
                                 type="button"
                                 variante="secundario"
                                 className="px-2.5 py-1 text-xs"
                                 onClick={onAbrirLogistica}
                             >
-                                Cambiar en logística
+                                {transporte ? "Cambiar en logística" : "Asignar en logística"}
                             </Boton>
                         ) : null}
                     </div>
@@ -422,7 +630,7 @@ export function FormularioAsignarRecursos({
                                             {item.nombreServicio}
                                         </td>
                                         <td className="px-3 py-2 text-texto-suave">
-                                            {item.tipoEquipamiento}
+                                            {item.tipoEquipamiento ?? "—"}
                                         </td>
                                         <td className="px-3 py-2 text-right">{item.necesita}</td>
                                         <td className="px-3 py-2 text-right">{item.ocupado}</td>
@@ -469,8 +677,8 @@ export function FormularioAsignarRecursos({
                     type="button"
                     variante="principal"
                     cargando={guardando}
-                    disabled={!puedeConfirmar || guardando}
-                    onClick={() => onConfirmar?.({})}
+                    disabled={!habilitarConfirmacion || guardando}
+                    onClick={manejarConfirmarClick}
                 >
                     Confirmar salida
                 </Boton>

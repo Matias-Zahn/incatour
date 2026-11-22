@@ -44,6 +44,7 @@ import {
     useSalidas,
     useCancelarSalida,
     type DatosCrearSalida,
+    type DetalleConflictoConfirmacion,
     type DetalleFaltaEquipo,
     type FiltrosSalidas,
     type PayloadConfirmarAsignacion,
@@ -100,6 +101,22 @@ function extraerDetalleEquipo(error: unknown): DetalleFaltaEquipo | null {
     return null;
 }
 
+function extraerDetalleConfirmacion(error: unknown): DetalleConflictoConfirmacion | null {
+    if (!(error instanceof ErrorApi) || !error.detalle || typeof error.detalle !== "object") {
+        return null;
+    }
+    const det = error.detalle as Partial<DetalleConflictoConfirmacion>;
+    if (Array.isArray(det.reservasSinAlojamiento) || Array.isArray(det.faltantes)) {
+        return {
+            reservasSinAlojamiento: Array.isArray(det.reservasSinAlojamiento)
+                ? det.reservasSinAlojamiento
+                : [],
+            faltantes: Array.isArray(det.faltantes) ? det.faltantes : [],
+        };
+    }
+    return null;
+}
+
 const DIA_MS = 1000 * 60 * 60 * 24;
 const diaLocal = (iso: string) => {
     const f = new Date(iso);
@@ -150,6 +167,8 @@ function SalidasPage() {
     const [payloadConfirmarAsignacion, setPayloadConfirmarAsignacion] =
         useState<PayloadConfirmarAsignacion | null>(null);
     const [errorConfirmacion, setErrorConfirmacion] = useState("");
+    const [detalleErrorConfirmacion, setDetalleErrorConfirmacion] =
+        useState<DetalleConflictoConfirmacion | null>(null);
     const [errorLiberacionSobrantes, setErrorLiberacionSobrantes] = useState("");
     const [mensajeExitoLiberacion, setMensajeExitoLiberacion] = useState<{
         nroSalida: string;
@@ -290,6 +309,7 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setPayloadConfirmarAsignacion(null);
         setErrorConfirmacion("");
+        setDetalleErrorConfirmacion(null);
     }
 
     function abrirReemplazo(salida: Salida) {
@@ -503,6 +523,7 @@ function SalidasPage() {
 
     function manejarSolicitarConfirmacionAsignacion(payload: PayloadConfirmarAsignacion) {
         setErrorConfirmacion("");
+        setDetalleErrorConfirmacion(null);
         setPayloadConfirmarAsignacion(payload);
     }
 
@@ -576,6 +597,7 @@ function SalidasPage() {
                         mensaje ||
                             "Ocurrió un error al confirmar la asignación de recursos.",
                     );
+                    setDetalleErrorConfirmacion(extraerDetalleConfirmacion(err));
                     queryClient.invalidateQueries({
                         queryKey: clavesSalidas.asignacion(idsalida),
                     });
@@ -623,7 +645,10 @@ function SalidasPage() {
             return "";
         }
         const cantPersonal =
-            datosAsignacion?.personal.length ?? salidaParaAsignar.cantidadPersonal ?? 0;
+            payloadConfirmarAsignacion.personalIds?.length ??
+            datosAsignacion?.personal.length ??
+            salidaParaAsignar.cantidadPersonal ??
+            0;
         const pasajeros =
             datosAsignacion?.pasajerosConfirmados ??
             salidaParaAsignar.pasajerosConfirmados ??
@@ -1855,12 +1880,15 @@ function SalidasPage() {
                     <FormularioAsignarRecursos
                         key={salidaParaAsignar.idsalida}
                         datos={datosAsignacion}
+                        idpaquete={salidaParaAsignar.idpaquete}
+                        tamanoMaximo={salidaParaAsignar.tamanoMaximo}
                         cargando={cargandoAsignacion}
                         recargando={recargandoAsignacion}
                         guardando={confirmarAsignacionMutation.isPending}
                         errorServidor={
                             errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
                         }
+                        detalleErrorConfirmacion={detalleErrorConfirmacion}
                         onRecargarDatos={() => recargarAsignacion()}
                         onConfirmar={manejarSolicitarConfirmacionAsignacion}
                         onCancelar={cerrarAsignacion}

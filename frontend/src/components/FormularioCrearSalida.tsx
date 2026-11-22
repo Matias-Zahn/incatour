@@ -190,11 +190,13 @@ function FormularioCrearSalida({
         valorFechaInicio && valorFechaInicio < fechaMinima,
     );
 
-    // Hoteles elegidos y cálculo de plazas cubiertas (B10)
+    // Hoteles elegidos (en el orden de selección, que define el orden de llenado en §14) y cálculo de plazas cubiertas (B10)
     const hotelesElegidosObjetos = useMemo(() => {
         if (!opciones) return [];
-        const set = new Set(hotelesSeleccionados);
-        return opciones.alojamientos.filter((h) => set.has(h.idservicio));
+        const porId = new Map(opciones.alojamientos.map((h) => [h.idservicio, h]));
+        return hotelesSeleccionados
+            .map((id) => porId.get(id))
+            .filter((h): h is AlojamientoOpcion => Boolean(h));
     }, [opciones, hotelesSeleccionados]);
 
     const algunHotelASolicitud = hotelesElegidosObjetos.some(
@@ -207,15 +209,34 @@ function FormularioCrearSalida({
     );
 
     const plazasNecesarias = opciones?.plazasNecesarias ?? 0;
+
+    // §14 (FA3): si ningún hotel ni combinación de hoteles disponibles cubre plazasNecesarias,
+    // el back permite crear la salida sin hotel y sube el corte sugerido a 5 días.
+    const puedeCubrirConAlgunHotel = useMemo(() => {
+        if (!opciones || plazasNecesarias === 0) return true;
+        if (opciones.alojamientos.some((h) => h.modalidadConfirmacion === "A_SOLICITUD")) {
+            return true;
+        }
+        const totalBloqueoDisponible = opciones.alojamientos.reduce(
+            (acc, h) => acc + (h.capacidadDisponible ?? 0),
+            0,
+        );
+        return totalBloqueoDisponible >= plazasNecesarias;
+    }, [opciones, plazasNecesarias]);
+
+    const esSinHotelFA3 = plazasNecesarias > 0 && !puedeCubrirConAlgunHotel;
+
     const plazasCubiertasOk =
         plazasNecesarias === 0 ||
+        esSinHotelFA3 ||
         algunHotelASolicitud ||
         plazasCubiertasBloqueo >= plazasNecesarias;
 
     const corteSugerido = useMemo(() => {
         const base = opciones?.paquete.diasCierreVenta ?? 2;
-        return Math.max(base, algunHotelASolicitud ? DIAS_CIERRE_SOLICITUD : 0);
-    }, [opciones?.paquete.diasCierreVenta, algunHotelASolicitud]);
+        const requiereCorteLargo = algunHotelASolicitud || esSinHotelFA3;
+        return Math.max(base, requiereCorteLargo ? DIAS_CIERRE_SOLICITUD : 0);
+    }, [opciones?.paquete.diasCierreVenta, algunHotelASolicitud, esSinHotelFA3]);
 
     const diasCierreVenta = diasCierreVentaManual ?? corteSugerido;
 
@@ -349,7 +370,7 @@ function FormularioCrearSalida({
                 );
                 return;
             }
-            if (plazasNecesarias > 0 && hotelesSeleccionados.length === 0) {
+            if (plazasNecesarias > 0 && !esSinHotelFA3 && hotelesSeleccionados.length === 0) {
                 setErrorPaso("Elegí al menos un hotel para cubrir las plazas del grupo.");
                 return;
             }
@@ -684,6 +705,10 @@ function FormularioCrearSalida({
                                 <p className="rounded-control border border-borde bg-fondo/40 p-3 text-xs text-texto-suave">
                                     Este paquete no incluye noches de hotel.
                                 </p>
+                            ) : esSinHotelFA3 ? (
+                                <Alerta tipo="advertencia" titulo="Sin hotel con plazas suficientes">
+                                    Ningún hotel ni combinación disponible cubre las {plazasNecesarias} plazas. Podés crear la salida sin hotel asignado (cada compra generará una solicitud de alojamiento y el cierre sugerido pasa a {DIAS_CIERRE_SOLICITUD} días).
+                                </Alerta>
                             ) : opciones.alojamientos.length === 0 ? (
                                 <Alerta tipo="advertencia" titulo="Sin hoteles disponibles">
                                     No se encontraron alojamientos activos que cumplan la garantía del paquete.
@@ -756,7 +781,9 @@ function FormularioCrearSalida({
                                 <p className="text-xs text-texto-suave flex-1">
                                     {algunHotelASolicitud
                                         ? `Se sugieren ${corteSugerido} días antes porque elegiste al menos un hotel a solicitud.`
-                                        : `Valor del paquete: ${opciones.paquete.diasCierreVenta} días antes del inicio.`}
+                                        : esSinHotelFA3
+                                          ? `Se sugieren ${corteSugerido} días antes porque la salida queda sin hotel asignado.`
+                                          : `Valor del paquete: ${opciones.paquete.diasCierreVenta} días antes del inicio.`}
                                     {valorFechaInicio
                                         ? ` Último día de venta: ${formatearFechaUtcCorta(sumarDiasIso(valorFechaInicio, -(diasCierreVenta + 1)))}.`
                                         : ""}

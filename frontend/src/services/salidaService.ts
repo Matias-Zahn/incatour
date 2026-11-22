@@ -303,7 +303,7 @@ export type PersonalConfirmacionItem = {
 export type HotelConfirmacionItem = {
     idservicio: number;
     nombreServicio: string;
-    modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD";
+    modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD" | null;
     pasajeros: number;
 };
 
@@ -317,10 +317,15 @@ export type TransporteConfirmacionItem = {
 export type EquipoConfirmacionItem = {
     idservicio: number;
     nombreServicio: string;
-    tipoEquipamiento: string;
+    tipoEquipamiento: string | null;
     necesita: number;
     ocupado: number;
     falta: number;
+};
+
+export type DetalleConflictoConfirmacion = {
+    reservasSinAlojamiento: string[];
+    faltantes: string[];
 };
 
 export type PanelConfirmacion = {
@@ -346,7 +351,13 @@ type RespuestaPanelAsignacionApi = {
     data: PanelConfirmacion;
 };
 
-export type PayloadConfirmarAsignacion = Record<string, never>;
+/**
+ * §9.2 y §14: body vacío `{}` para salidas con personal ya asignado;
+ * `{ personalIds }` solo para salidas viejas (anteriores a etapa 3) que llegan sin personal.
+ */
+export type PayloadConfirmarAsignacion = {
+    personalIds?: number[];
+};
 
 export type ParametrosConfirmarAsignacion = {
     idsalida: number;
