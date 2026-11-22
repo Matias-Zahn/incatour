@@ -250,9 +250,19 @@ function FormularioPaquete({
         [temporadas],
     );
 
+    // Las tarifas de temporadas vencidas no se editan: no se muestran, pero se reenvían al guardar para no borrarlas
+    const [tarifasPasadas] = useState<PrecioTemporadaInput[]>(() => {
+        const vigentes = new Set(temporadasActivas.map((t) => t.idtemporada));
+        return (paqueteFuente?.tarifas ?? [])
+            .filter((t) => !vigentes.has(t.idtemporada))
+            .map((t) => ({ idtemporada: t.idtemporada, monto: Number(t.monto), moneda: "USD" }));
+    });
+
     const [filasPrecios, setFilasPrecios] = useState<FilaPrecio[]>(() => {
-        if (paqueteFuente?.tarifas && paqueteFuente.tarifas.length > 0) {
-            return paqueteFuente.tarifas.map((t) => ({
+        const vigentes = new Set(temporadasActivas.map((t) => t.idtemporada));
+        const tarifas = (paqueteFuente?.tarifas ?? []).filter((t) => vigentes.has(t.idtemporada));
+        if (tarifas.length > 0) {
+            return tarifas.map((t) => ({
                 idtemporada: t.idtemporada,
                 monto: String(t.monto),
                 moneda: t.moneda || "USD",
@@ -521,11 +531,14 @@ function FormularioPaquete({
         }
         setErrorPaso("");
 
-        const matrizPrecios: PrecioTemporadaInput[] = filasPrecios.map((f) => ({
-            idtemporada: f.idtemporada,
-            monto: Number(f.monto),
-            moneda: "USD",
-        }));
+        const matrizPrecios: PrecioTemporadaInput[] = [
+            ...tarifasPasadas,
+            ...filasPrecios.map((f) => ({
+                idtemporada: f.idtemporada,
+                monto: Number(f.monto),
+                moneda: "USD",
+            })),
+        ];
 
         const payloadComun = {
             idcircuito,

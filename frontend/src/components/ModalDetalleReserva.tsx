@@ -315,7 +315,8 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                             pago.medioPago
                                                         }
                                                     </p>
-                                                    <p className="font-mono text-xs text-texto-suave">
+                                                    <p className="text-xs text-texto-suave">
+                                                        Pago N°{" "}
                                                         {
                                                             pago.nrotransaccion
                                                         }{" "}

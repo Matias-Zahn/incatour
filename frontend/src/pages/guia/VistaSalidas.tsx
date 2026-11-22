@@ -154,7 +154,7 @@ export function VistaSalidas({
                                     key={s.idsalida}
                                     className={`flex flex-col justify-between rounded-tarjeta border bg-white p-5 shadow-tarjeta transition ${
                                         esActiva
-                                            ? "border-l-4 border-l-[#16d6dc] border-y border-r ring-2 ring-marca/20"
+                                            ? "border-marca ring-2 ring-marca/20"
                                             : "border-borde hover:border-marca/50"
                                     }`}
                                 >
@@ -274,7 +274,7 @@ export function VistaSalidas({
                     <IniciarSalida salida={salidaInfo} />
 
                     {/* Banner de Salida Actual */}
-                    <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border-l-4 border-l-[#16d6dc] border-y border-r border-borde bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
+                    <article className="grid grid-cols-1 items-center gap-4 rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta md:grid-cols-[auto_1fr_auto]">
                         <div className="grid size-12 place-items-center rounded-xl bg-[#1b9fc7] text-white">
                             <IconoMontana tamano={24} />
                         </div>
