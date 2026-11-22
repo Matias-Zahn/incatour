@@ -131,7 +131,6 @@ async function faseC() {
   const compra = (n: number, sal: number | null | undefined = idsalida) => ({
     idsalida: sal, medioPago: "TARJETA",
     pasajeros: [{ nombreCompleto: `Pasajero ${n} Humo`, nroPasaporte: `PP${n}${t}`, nacionalidad: "Argentina", fechaVencimientoPasaporte: "2031-01-01" }],
-    equipaje: [{ pesoDeclarado: 8 }],
     tarjeta: { numero: "4242424242424242", titular: "Carla Humo", vencimiento: "12/30", cvv: "123" },
   });
   const reserva = await paso("Comprar paquete (CU-30)", "POST", "/reservas", compra(1), tokCliente);
@@ -327,7 +326,7 @@ async function faseD() {
         (e) => controlar("Asignar una salida PUBLICADA sin reservas confirmadas", false, String(e)),
       );
       const compra = await Promise.allSettled([repoReserva.confirmarReserva({
-        idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100, temporadaAplicada: "Humo", precioPaquetePorPersona: 100, adicionalesEquipaje: 0, moneda: "USD", diasMinimosReintegro: null,
+        idcliente: cliente.idusuario, idsalida: s3.idsalida, nroReserva: `RES-D-${sufijo}`, precioCongelado: 100, temporadaAplicada: "Humo", precioPaquetePorPersona: 100, moneda: "USD", diasMinimosReintegro: null,
         condicionesComerciales: "humo", medioPago: "TARJETA", estadoAlojamiento: "CONFIRMADO",
         pasajeros: [{ nombreCompleto: "Humo D", nroPasaporte: `DPAS-${sufijo}`, nacionalidad: "Peruana", fechaVencimientoPasaporte: "2035-01-01" }],
       })]);

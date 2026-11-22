@@ -1,14 +1,8 @@
-import { PESO_MAXIMO_DECLARADO_KG } from "../../../shared/constantes";
-
 export interface PasajeroInput {
   nombreCompleto: string;
   nroPasaporte: string;
   nacionalidad: string;
   fechaVencimientoPasaporte: string;
-}
-
-export interface EquipajeInput {
-  pesoDeclarado: number;
 }
 
 // Datos de la tarjeta: solo viajan hasta la pasarela. NUNCA se guardan ni se loguean.
@@ -23,16 +17,16 @@ export class CrearReservaDto {
   private constructor(
     public idsalida: number,
     public pasajeros: PasajeroInput[],
-    public equipaje: EquipajeInput[],
     public medioPago: string,
     public tarjeta: TarjetaInput
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearReservaDto?] {
-    const { idsalida, pasajeros, equipaje, medioPago, tarjeta } = obj;
+    const { idsalida, pasajeros, medioPago, tarjeta } = obj;
 
     // El cliente NO viene en el body: se toma del token (usuario autenticado).
     // El monto tampoco: lo calcula el servidor a partir de la tarifa vigente.
+    // El equipaje se pesa y cobra en persona (B6): si llega en el body, se ignora.
     if (!Number.isInteger(idsalida)) return ["idsalida es requerido y debe ser un número entero."];
     if (!medioPago) return ["medioPago es requerido."];
     if (!pasajeros || !Array.isArray(pasajeros) || pasajeros.length === 0) {
@@ -52,21 +46,6 @@ export class CrearReservaDto {
       }
     }
 
-    // El equipaje es opcional; si viene, un elemento por pasajero (mismo orden).
-    const equipajeNormalizado: EquipajeInput[] = equipaje ?? [];
-    if (!Array.isArray(equipajeNormalizado)) return ["equipaje debe ser un arreglo."];
-    if (equipajeNormalizado.length > 0 && equipajeNormalizado.length !== pasajeros.length) {
-      return ["equipaje debe tener un elemento por cada pasajero."];
-    }
-    for (const e of equipajeNormalizado) {
-      if (typeof e.pesoDeclarado !== "number" || e.pesoDeclarado < 0) {
-        return ["pesoDeclarado debe ser un número mayor o igual a 0."];
-      }
-      if (e.pesoDeclarado > PESO_MAXIMO_DECLARADO_KG) {
-        return [`El equipaje declarado no puede superar los ${PESO_MAXIMO_DECLARADO_KG} kg por pasajero.`];
-      }
-    }
-
     if (
       !tarjeta ||
       typeof tarjeta !== "object" ||
@@ -75,6 +54,6 @@ export class CrearReservaDto {
       return ["Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."];
     }
 
-    return [undefined, new CrearReservaDto(idsalida, pasajeros, equipajeNormalizado, medioPago, tarjeta)];
+    return [undefined, new CrearReservaDto(idsalida, pasajeros, medioPago, tarjeta)];
   }
 }

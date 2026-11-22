@@ -7,11 +7,11 @@ const base = { idsalida: 7, medioPago: "TARJETA", pasajeros: [pasajero], tarjeta
 const error = (cambio: Record<string, unknown>) => CrearReservaDto.create({ ...base, ...cambio })[0];
 
 describe("CrearReservaDto (CU-30)", () => {
-  it("acepta una compra válida; el equipaje es opcional", () => {
-    const [err, dto] = CrearReservaDto.create(base);
+  it("acepta una compra válida e ignora equipaje si llega en el body (B6)", () => {
+    const [err, dto] = CrearReservaDto.create({ ...base, equipaje: [{ pesoDeclarado: 25 }] });
 
     expect(err).toBeUndefined();
-    expect(dto?.equipaje).toEqual([]);
+    expect(dto).not.toHaveProperty("equipaje");
   });
 
   it("ignora un idcliente o monto enviados en el body", () => {
@@ -38,10 +38,6 @@ describe("CrearReservaDto (CU-30)", () => {
     [{ pasajeros: [{ ...pasajero, nacionalidad: "" }] }, "nacionalidad es requerido para todos los pasajeros."],
     [{ pasajeros: [{ ...pasajero, fechaVencimientoPasaporte: "" }] }, "fechaVencimientoPasaporte es requerida."],
     [{ pasajeros: [{ ...pasajero, fechaVencimientoPasaporte: "nunca" }] }, "fechaVencimientoPasaporte inválida para Ana Pérez."],
-    [{ equipaje: { pesoDeclarado: 1 } }, "equipaje debe ser un arreglo."],
-    [{ equipaje: [{ pesoDeclarado: 1 }, { pesoDeclarado: 2 }] }, "equipaje debe tener un elemento por cada pasajero."],
-    [{ equipaje: [{ pesoDeclarado: -1 }] }, "pesoDeclarado debe ser un número mayor o igual a 0."],
-    [{ equipaje: [{ pesoDeclarado: 20.5 }] }, "El equipaje declarado no puede superar los 20 kg por pasajero."],
     [{ tarjeta: { ...tarjeta, cvv: "" } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
     [{ tarjeta: undefined }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],
     [{ tarjeta: { ...tarjeta, numero: 4111222233334444 } }, "Los datos de la tarjeta (numero, titular, vencimiento, cvv) son requeridos."],

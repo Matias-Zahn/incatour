@@ -66,10 +66,6 @@ const salida = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const servicioTransporte = (pesoEquipajeIncluido: number, costoPorKgExcedente: number) => ({
-  servicio: { transporte: { pesoEquipajeIncluido, costoPorKgExcedente } },
-});
-
 describe("ReservaService.crearReserva (CU-30)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -113,53 +109,27 @@ describe("ReservaService.crearReserva (CU-30)", () => {
       const foto = {
         condiciones: "Condiciones de la foto", localidadGarantizada: "Urubamba", categoriaGarantizada: "5 estrellas",
         tipoHabitacionGarantizada: "Suite", diasMinimosReintegro: 7,
-        servicios: [{ idservicio: 1, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } }],
+        servicios: [],
       };
       repo.obtenerSalidaParaCompra.mockResolvedValue(salida({ definicionPaquete: foto }));
       repo.reservarCupos.mockResolvedValue({ alojamientoReservado: false });
-      const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
 
-      const r = await new ReservaService().crearReserva(dto, 1);
+      const r = await new ReservaService().crearReserva(crearDto(), 1);
 
-      expect(r.precioCongelado).toBe(1650); // el transporte sale de la foto: 800*2 + 5*10
+      expect(r.precioCongelado).toBe(1600);
       const datos = repo.confirmarReserva.mock.calls[0]![0];
       expect(datos).toMatchObject({ condicionesComerciales: "Condiciones de la foto", diasMinimosReintegro: 7 });
       expect(datos.solicitud.criterios).toContain("Urubamba");
     });
 
-    it("congela el desglose del precio en la reserva (RES-07)", async () => {
-      const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
-      const s = salida();
-      s.paquete.servicios = [servicioTransporte(15, 10)];
-      repo.obtenerSalidaParaCompra.mockResolvedValue(s);
+    it("congela el desglose del precio en la reserva sin adicionales de equipaje (RES-07, B6)", async () => {
+      await new ReservaService().crearReserva(crearDto(), 1);
 
-      await new ReservaService().crearReserva(dto, 1);
-
-      expect(repo.confirmarReserva).toHaveBeenCalledWith(expect.objectContaining({
-        precioCongelado: 1650, temporadaAplicada: "Alta", precioPaquetePorPersona: 800, adicionalesEquipaje: 50, moneda: "USD",
-      }));
-    });
-
-    it("CAT-33: la franquicia sale de la foto aunque la salida tenga otro transporte asignado", async () => {
-      const s = salida({ servicios: [servicioTransporte(50, 0)] });
-      s.paquete.servicios = [servicioTransporte(15, 10)];
-      repo.obtenerSalidaParaCompra.mockResolvedValue(s);
-      const dto = crearDto({ equipaje: [{ pesoDeclarado: 20 }, { pesoDeclarado: 10 }] });
-
-      const r = await new ReservaService().crearReserva(dto, 1);
-
-      expect(r.precioCongelado).toBe(1650); // 800*2 + (20-15)*10
-    });
-
-    it("sin transporte asignado, usa el incluido en el paquete", async () => {
-      const s = salida();
-      s.paquete.servicios = [{ servicio: { transporte: null } }, servicioTransporte(10, 2.5)];
-      repo.obtenerSalidaParaCompra.mockResolvedValue(s);
-      const dto = crearDto({ equipaje: [{ pesoDeclarado: 13 }, { pesoDeclarado: 5 }] });
-
-      const r = await new ReservaService().crearReserva(dto, 1);
-
-      expect(r.precioCongelado).toBe(1607.5); // 800*2 + 3*2.5
+      const datos = repo.confirmarReserva.mock.calls[0]![0];
+      expect(datos).toMatchObject({
+        precioCongelado: 1600, temporadaAplicada: "Alta", precioPaquetePorPersona: 800, moneda: "USD",
+      });
+      expect(datos).not.toHaveProperty("adicionalesEquipaje");
     });
 
     it("sin alojamiento disponible, deja la reserva PENDIENTE con su solicitud de alojamiento", async () => {
