@@ -436,11 +436,21 @@ export const manejadoresPersonal = [
         const salidasActivas =
             salidasActivasPorPersonal[id] ?? cuentaAsociada?.salidasPendientes ?? 0;
         if (salidasActivas > 0) {
+            const salidasDetalle = [
+                {
+                    idsalida: id === 3 ? 6 : 1,
+                    nroSalida: id === 3 ? "SAL-2026-005" : "SAL-2026-001",
+                    fechaInicio: "2026-12-10T08:00:00.000Z",
+                    fechaFin: "2026-12-13T18:00:00.000Z",
+                    estado: "PUBLICADA",
+                },
+            ];
             return HttpResponse.json(
                 {
-                    error: `No se puede dar de baja: está asignado a ${salidasActivas} salida(s) que todavía no finalizaron`,
+                    error: `No se puede dar de baja: está asignado a ${salidasDetalle.map((s) => s.nroSalida).join(" y ")}, que todavía no finalizaron`,
+                    detalle: { salidas: salidasDetalle },
                 },
-                { status: 400 },
+                { status: 409 },
             );
         }
 

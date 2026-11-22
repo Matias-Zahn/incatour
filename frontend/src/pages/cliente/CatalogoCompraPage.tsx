@@ -390,7 +390,10 @@ function CatalogoCompraPage() {
         const primeraSalida =
             idSalidaInicial ??
             paquete.salidasDisponibles?.find(
-                (s) => s.stockLocal > 0 && s.precioPersona != null,
+                (s) =>
+                    s.ventaAbierta !== false &&
+                    s.stockLocal > 0 &&
+                    s.precioPersona != null,
             )?.idsalida ??
             paquete.salidasDisponibles?.[0]?.idsalida ??
             null;
@@ -528,12 +531,23 @@ function CatalogoCompraPage() {
         fechaHasta !== "" ||
         soloConSalidas;
 
+    const hoyIsoLocal = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
     const salidaEnRango = (s: { fechaInicio: string }) => {
         const dia = s.fechaInicio.slice(0, 10);
         return (!fechaDesde || dia >= fechaDesde) && (!fechaHasta || dia <= fechaHasta);
     };
-    const salidaComprable = (s: { stockLocal: number; precioPersona?: number | null }) =>
-        s.stockLocal > 0 && s.precioPersona != null;
+    const esVentaAbierta = (s: { ventaAbierta?: boolean }) =>
+        s.ventaAbierta !== false;
+    const salidaSinReintegro = (s: { fechaLimiteReintegro?: string | null }) =>
+        Boolean(s.fechaLimiteReintegro && hoyIsoLocal > s.fechaLimiteReintegro);
+    const salidaComprable = (s: {
+        stockLocal: number;
+        precioPersona?: number | null;
+        ventaAbierta?: boolean;
+    }) => esVentaAbierta(s) && s.stockLocal > 0 && s.precioPersona != null;
 
     const paquetesFiltrados = paquetes.filter((p) => {
         if (
@@ -716,6 +730,12 @@ function CatalogoCompraPage() {
                                             reservaConfirmada.paquete
                                                 .nochesAlojamiento.garantia}
                                     </p>
+                                    {reservaConfirmada.resultado.hotel ? (
+                                        <p className="mt-1 text-xs text-texto">
+                                            <strong>Hotel asignado:</strong>{" "}
+                                            {reservaConfirmada.resultado.hotel.nombreServicio}
+                                        </p>
+                                    ) : null}
                                     {fechasAlojConfirmadas.estadiaPrevia ? (
                                         <p className="mt-1 text-xs text-texto">
                                             <strong>Alojamiento previo:</strong>{" "}
@@ -924,7 +944,9 @@ function CatalogoCompraPage() {
                                             salidaActiva?.idsalida ===
                                             salida.idsalida;
                                         const sinTarifaSalida = salida.precioPersona == null;
+                                        const ventaCerrada = !esVentaAbierta(salida);
                                         const sinCupo =
+                                            ventaCerrada ||
                                             salida.stockLocal <= 0 ||
                                             sinTarifaSalida;
                                         return (
@@ -949,18 +971,20 @@ function CatalogoCompraPage() {
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span
                                                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                                            salida.stockLocal >
-                                                            3
-                                                                ? "bg-green-50 text-exito"
-                                                                : salida.stockLocal >
-                                                                    0
-                                                                  ? "bg-amber-50 text-advertencia"
-                                                                  : "bg-red-50 text-peligro"
+                                                            ventaCerrada
+                                                                ? "bg-slate-200 text-slate-700"
+                                                                : salida.stockLocal > 3
+                                                                  ? "bg-green-50 text-exito"
+                                                                  : salida.stockLocal > 0
+                                                                    ? "bg-amber-50 text-advertencia"
+                                                                    : "bg-red-50 text-peligro"
                                                         }`}
                                                     >
-                                                        {salida.stockLocal > 0
-                                                            ? `${salida.stockLocal} de ${salida.tamanoMaximo} lugares libres`
-                                                            : "Agotada"}
+                                                        {ventaCerrada
+                                                            ? "Venta cerrada"
+                                                            : salida.stockLocal > 0
+                                                              ? `${salida.stockLocal} de ${salida.tamanoMaximo} lugares libres`
+                                                              : "Agotada"}
                                                     </span>
                                                 </div>
 
@@ -980,6 +1004,11 @@ function CatalogoCompraPage() {
                                                         {salida.temporadaNombre ??
                                                             "Sin temporada"}
                                                     </p>
+                                                    {salidaSinReintegro(salida) ? (
+                                                        <p className="mt-1 text-xs font-semibold text-amber-800">
+                                                            Esta fecha ya no tiene reintegro si cancelás
+                                                        </p>
+                                                    ) : null}
                                                 </div>
 
                                                 <div className="mt-3 flex items-baseline justify-between border-t border-borde pt-2.5">
@@ -1420,12 +1449,19 @@ function CatalogoCompraPage() {
                             </div>
                         ) : null}
 
+                        {salidaActiva && salidaSinReintegro(salidaActiva) ? (
+                            <Alerta tipo="advertencia" titulo="Sin reintegro por cancelación">
+                                Esta fecha ya no tiene reintegro si cancelás.
+                            </Alerta>
+                        ) : null}
+
                         <Boton
                             type="submit"
                             className="w-full py-3"
                             cargando={mutacionReserva.isPending}
                             disabled={
                                 !salidaActiva ||
+                                !esVentaAbierta(salidaActiva) ||
                                 salidaActiva.stockLocal <= 0 ||
                                 sinTarifa
                             }
@@ -1434,9 +1470,11 @@ function CatalogoCompraPage() {
                                 ? "Procesando pago y cupos..."
                                 : !salidaActiva
                                   ? "Elegí una salida"
-                                  : sinTarifa
-                                    ? "Salida sin tarifa vigente"
-                                  : `Confirmar y pagar ${formatearMonto(totalPagar, monedaActiva)}`}
+                                  : !esVentaAbierta(salidaActiva)
+                                    ? "Venta cerrada"
+                                    : sinTarifa
+                                      ? "Salida sin tarifa vigente"
+                                      : `Confirmar y pagar ${formatearMonto(totalPagar, monedaActiva)}`}
                         </Boton>
                         {salidaActiva && sinTarifa ? (
                             <p className="text-center text-xs text-peligro">
@@ -1705,6 +1743,11 @@ function CatalogoCompraPage() {
                                                         <h2 className="text-xl font-bold text-navegacion">
                                                             {paquete.nombre}
                                                         </h2>
+                                                        {paquete.saleDesde ? (
+                                                            <p className="mt-0.5 text-xs font-medium text-texto-suave">
+                                                                Sale desde {paquete.saleDesde}
+                                                            </p>
+                                                        ) : null}
                                                     </div>
 
                                                     {tarifaMinima ? (
@@ -1897,6 +1940,11 @@ function CatalogoCompraPage() {
                                             <h2 className="mt-1.5 text-2xl font-bold text-navegacion">
                                                 {paqueteDetalle.nombre}
                                             </h2>
+                                            {paqueteDetalle.saleDesde ? (
+                                                <p className="mt-0.5 text-xs font-semibold text-marca-oscura">
+                                                    Sale desde {paqueteDetalle.saleDesde}
+                                                </p>
+                                            ) : null}
                                             <p className="mt-1 text-xs text-texto-suave">
                                                 <strong className="text-texto">Recorrido:</strong>{" "}
                                                 {paqueteDetalle.circuito.recorrido ||
@@ -2070,17 +2118,30 @@ function CatalogoCompraPage() {
                                                                         )}
                                                                     </p>
                                                                     <p className="text-texto-suave">
-                                                                        {
-                                                                            s.stockLocal
-                                                                        }{" "}
-                                                                        cupos
-                                                                        disponibles
+                                                                        {!esVentaAbierta(s) ? (
+                                                                            <span className="font-semibold text-slate-600">
+                                                                                Venta cerrada
+                                                                            </span>
+                                                                        ) : s.stockLocal <= 0 ? (
+                                                                            <span className="font-semibold text-peligro">
+                                                                                Agotada
+                                                                            </span>
+                                                                        ) : (
+                                                                            <>
+                                                                                {s.stockLocal} cupos disponibles
+                                                                            </>
+                                                                        )}{" "}
                                                                         ·{" "}
                                                                         {s.precioPersona ==
                                                                         null
                                                                             ? "Sin tarifa para esta fecha"
                                                                             : formatearMonto(s.precioPersona, s.moneda)}
                                                                     </p>
+                                                                    {salidaSinReintegro(s) ? (
+                                                                        <p className="mt-0.5 text-xs font-semibold text-amber-800">
+                                                                            Esta fecha ya no tiene reintegro si cancelás
+                                                                        </p>
+                                                                    ) : null}
                                                                     {s.garantia &&
                                                                     s.garantia !==
                                                                         paqueteDetalle
@@ -2105,6 +2166,7 @@ function CatalogoCompraPage() {
                                                                 <Boton
                                                                     className="px-3 py-1.5 text-xs"
                                                                     disabled={
+                                                                        !esVentaAbierta(s) ||
                                                                         s.stockLocal <=
                                                                             0 ||
                                                                         s.precioPersona ==
@@ -2117,8 +2179,11 @@ function CatalogoCompraPage() {
                                                                         )
                                                                     }
                                                                 >
-                                                                    Elegir y
-                                                                    comprar
+                                                                    {!esVentaAbierta(s)
+                                                                        ? "Venta cerrada"
+                                                                        : s.stockLocal <= 0
+                                                                          ? "Agotada"
+                                                                          : "Elegir y comprar"}
                                                                 </Boton>
                                                             </div>
                                                         ))}

@@ -339,6 +339,18 @@ export function VistaSalidas({
                                             <b>Duración:</b> {detalleSalida?.salida.duracionDias ?? 4} días
                                         </span>
                                     </div>
+                                    {detalleSalida?.tren ? (
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-marca">
+                                                <IconoReloj tamano={18} />
+                                            </span>
+                                            <span>
+                                                <b>Tren:</b> {detalleSalida.tren.nombreServicio} · Sale{" "}
+                                                {detalleSalida.tren.horarioSalida}, llega{" "}
+                                                {detalleSalida.tren.horarioLlegada}
+                                            </span>
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
 

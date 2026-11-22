@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
@@ -37,15 +38,15 @@ import {
     useCrearSalida,
     useLiberarSobrantes,
     useModificarLogistica,
-    useOpcionesSalida,
     usePanelAsignacion,
     usePanelLogistica,
     usePersonalSalida,
     useSalidas,
     useCancelarSalida,
     type DatosCrearSalida,
+    type DetalleConflictoConfirmacion,
+    type DetalleFaltaEquipo,
     type FiltrosSalidas,
-    type ParametrosConsultaOpciones,
     type PayloadConfirmarAsignacion,
     type PayloadConfirmarReemplazo,
     type PayloadModificarLogistica,
@@ -68,6 +69,53 @@ const ALERTAS_RECORRIDO: Record<string, string> = {
     SIN_AVANCES: "Sin avances del guía",
     SIN_FINALIZAR: "Vencida sin cerrar",
 };
+
+// Alertas de preparación y recursos (B4, 12.3 — §6)
+const ALERTAS_OPERATIVAS_NUEVAS: Record<string, { etiqueta: string; estilo: string }> = {
+    FALTA_RECURSO: {
+        etiqueta: "Falta equipo o transporte",
+        estilo: "bg-rose-100 border-rose-300 text-rose-900",
+    },
+    RIESGO_STOCK: {
+        etiqueta: "Equipo justo",
+        estilo: "bg-amber-100 border-amber-300 text-amber-900",
+    },
+    PERSONAL_NO_APTO: {
+        etiqueta: "Personal no apto",
+        estilo: "bg-rose-100 border-rose-300 text-rose-900",
+    },
+    PENDIENTE_CONFIRMAR: {
+        etiqueta: "Para confirmar",
+        estilo: "bg-indigo-100 border-indigo-300 text-indigo-900",
+    },
+};
+
+function extraerDetalleEquipo(error: unknown): DetalleFaltaEquipo | null {
+    if (!(error instanceof ErrorApi) || !error.detalle || typeof error.detalle !== "object") {
+        return null;
+    }
+    const det = error.detalle as Partial<DetalleFaltaEquipo>;
+    if (Array.isArray(det.faltantes) && typeof det.tamanoMaximoSugerido === "number") {
+        return det as DetalleFaltaEquipo;
+    }
+    return null;
+}
+
+function extraerDetalleConfirmacion(error: unknown): DetalleConflictoConfirmacion | null {
+    if (!(error instanceof ErrorApi) || !error.detalle || typeof error.detalle !== "object") {
+        return null;
+    }
+    const det = error.detalle as Partial<DetalleConflictoConfirmacion>;
+    if (Array.isArray(det.reservasSinAlojamiento) || Array.isArray(det.faltantes)) {
+        return {
+            reservasSinAlojamiento: Array.isArray(det.reservasSinAlojamiento)
+                ? det.reservasSinAlojamiento
+                : [],
+            faltantes: Array.isArray(det.faltantes) ? det.faltantes : [],
+        };
+    }
+    return null;
+}
 
 const DIA_MS = 1000 * 60 * 60 * 24;
 const diaLocal = (iso: string) => {
@@ -99,24 +147,18 @@ function SalidasPage() {
     const usuario = obtenerUsuario();
     const esAdmin = !usuario || usuario.rol === "ADMIN";
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Estados para la creación de salidas (CU-36)
     const [formularioAbierto, setFormularioAbierto] = useState(false);
-    const [parametrosConsulta, setParametrosConsulta] =
-        useState<ParametrosConsultaOpciones | null>(null);
     const [errorCreacion, setErrorCreacion] = useState("");
+    const [errorDetalleEquipo, setErrorDetalleEquipo] = useState<DetalleFaltaEquipo | null>(null);
     const [mensajeExito, setMensajeExito] = useState<{
         titulo: string;
         numeroSalida?: string;
         fechaInicio?: string;
+        advertencias?: string[];
     } | null>(null);
-
-    const {
-        data: opcionesSalida,
-        isFetching: cargandoOpciones,
-        error: errorOpciones,
-        refetch: refrescarOpciones,
-    } = useOpcionesSalida(parametrosConsulta);
 
     const crearSalidaMutation = useCrearSalida();
 
@@ -125,6 +167,8 @@ function SalidasPage() {
     const [payloadConfirmarAsignacion, setPayloadConfirmarAsignacion] =
         useState<PayloadConfirmarAsignacion | null>(null);
     const [errorConfirmacion, setErrorConfirmacion] = useState("");
+    const [detalleErrorConfirmacion, setDetalleErrorConfirmacion] =
+        useState<DetalleConflictoConfirmacion | null>(null);
     const [errorLiberacionSobrantes, setErrorLiberacionSobrantes] = useState("");
     const [mensajeExitoLiberacion, setMensajeExitoLiberacion] = useState<{
         nroSalida: string;
@@ -154,7 +198,11 @@ function SalidasPage() {
     const liberarSobrantesMutation = useLiberarSobrantes();
 
     // Estados para el reemplazo de personal (CU-38)
-    const [salidaParaReemplazar, setSalidaParaReemplazar] = useState<Salida | null>(null);
+    const [salidaParaReemplazarEstado, setSalidaParaReemplazar] = useState<Salida | null>(null);
+    const idReemplazarDesdeUrl = Number(searchParams.get("reemplazarSalida") ?? 0);
+    const idSalidaReemplazoActivo =
+        salidaParaReemplazarEstado?.idsalida ??
+        (idReemplazarDesdeUrl > 0 ? idReemplazarDesdeUrl : null);
     const [errorReemplazo, setErrorReemplazo] = useState("");
     const [resultadoReemplazo, setResultadoReemplazo] = useState<{
         nroSalida: string;
@@ -169,7 +217,7 @@ function SalidasPage() {
         isPending: cargandoPersonalSalida,
         error: errorPersonalSalida,
         refetch: recargarPersonalSalida,
-    } = usePersonalSalida(salidaParaReemplazar?.idsalida ?? null);
+    } = usePersonalSalida(idSalidaReemplazoActivo);
 
     const confirmarReemplazoMutation = useConfirmarReemplazo();
 
@@ -216,8 +264,8 @@ function SalidasPage() {
         setSalidaParaModificarLogistica(null);
         setSalidaParaCancelar(null);
         setSalidaParaDevolverEquipamiento(null);
-        setParametrosConsulta(null);
         setErrorCreacion("");
+        setErrorDetalleEquipo(null);
         setMensajeExito(null);
         setErrorConfirmacion("");
         setErrorLiberacionSobrantes("");
@@ -233,8 +281,8 @@ function SalidasPage() {
 
     function cerrarFormulario() {
         setFormularioAbierto(false);
-        setParametrosConsulta(null);
         setErrorCreacion("");
+        setErrorDetalleEquipo(null);
     }
 
     function abrirAsignacion(salida: Salida) {
@@ -261,6 +309,7 @@ function SalidasPage() {
         setSalidaParaAsignar(null);
         setPayloadConfirmarAsignacion(null);
         setErrorConfirmacion("");
+        setDetalleErrorConfirmacion(null);
     }
 
     function abrirReemplazo(salida: Salida) {
@@ -287,6 +336,11 @@ function SalidasPage() {
     function cerrarReemplazo() {
         setSalidaParaReemplazar(null);
         setErrorReemplazo("");
+        if (searchParams.has("reemplazarSalida")) {
+            const copia = new URLSearchParams(searchParams);
+            copia.delete("reemplazarSalida");
+            setSearchParams(copia, { replace: true });
+        }
     }
 
     function abrirModificarLogistica(salida: Salida) {
@@ -456,8 +510,7 @@ function SalidasPage() {
                         permisoDadoDeBaja: resultado.permisoDadoDeBaja,
                         permisoNuevo: resultado.permisoNuevo,
                     });
-                    setSalidaParaReemplazar(null);
-                    setErrorReemplazo("");
+                    cerrarReemplazo();
                 },
                 onError: (error) => {
                     const mensaje =
@@ -470,6 +523,7 @@ function SalidasPage() {
 
     function manejarSolicitarConfirmacionAsignacion(payload: PayloadConfirmarAsignacion) {
         setErrorConfirmacion("");
+        setDetalleErrorConfirmacion(null);
         setPayloadConfirmarAsignacion(payload);
     }
 
@@ -543,6 +597,7 @@ function SalidasPage() {
                         mensaje ||
                             "Ocurrió un error al confirmar la asignación de recursos.",
                     );
+                    setDetalleErrorConfirmacion(extraerDetalleConfirmacion(err));
                     queryClient.invalidateQueries({
                         queryKey: clavesSalidas.asignacion(idsalida),
                     });
@@ -589,17 +644,22 @@ function SalidasPage() {
         if (!salidaParaAsignar || !payloadConfirmarAsignacion) {
             return "";
         }
-        const cantPersonal = payloadConfirmarAsignacion.personalIds.length;
+        const cantPersonal =
+            payloadConfirmarAsignacion.personalIds?.length ??
+            datosAsignacion?.personal.length ??
+            salidaParaAsignar.cantidadPersonal ??
+            0;
         const pasajeros =
             datosAsignacion?.pasajerosConfirmados ??
             salidaParaAsignar.pasajerosConfirmados ??
             0;
         const totalNomina = pasajeros + cantPersonal;
-        return `¿Estás seguro de que deseás confirmar la dotación y recursos para la salida ${salidaParaAsignar.nroSalida}? Se solicitará la emisión de ${totalNomina} permisos nominales ante la autoridad externa (${pasajeros} pasajeros y ${cantPersonal} de personal asignado), se liberarán los lugares sobrantes del bloqueo y la salida pasará al estado Cerrada. Esta acción no se puede deshacer desde este formulario.`;
+        return `¿Confirmás la salida ${salidaParaAsignar.nroSalida}? Se solicitará la emisión de ${totalNomina} permisos nominales ante la autoridad (${pasajeros} pasajeros y ${cantPersonal} de personal asignado), se liberarán los lugares sobrantes del bloqueo y la salida pasará al estado Cerrada.`;
     }, [salidaParaAsignar, payloadConfirmarAsignacion, datosAsignacion]);
 
     function manejarConfirmarCreacion(datos: DatosCrearSalida) {
         setErrorCreacion("");
+        setErrorDetalleEquipo(null);
         crearSalidaMutation.mutate(datos, {
             onSuccess: (resultado) => {
                 const numero = resultado.numeroSalida ?? resultado.salida?.nroSalida;
@@ -607,11 +667,13 @@ function SalidasPage() {
                     titulo: resultado.mensaje || "Salida creada exitosamente",
                     numeroSalida: numero,
                     fechaInicio: resultado.salida?.fechaInicio,
+                    advertencias: resultado.advertencias,
                 });
                 cerrarFormulario();
             },
             onError: (err: Error) => {
                 setErrorCreacion(err.message || "Ocurrió un error al crear la salida.");
+                setErrorDetalleEquipo(extraerDetalleEquipo(err));
             },
         });
     }
@@ -620,9 +682,9 @@ function SalidasPage() {
     const anclaPaneles = useRef<HTMLDivElement>(null);
     const idPanelAbierto =
         salidaParaAsignar?.idsalida ??
-        salidaParaReemplazar?.idsalida ??
+        idSalidaReemplazoActivo ??
         salidaParaModificarLogistica?.idsalida;
-    const tipoPanelAbierto = salidaParaAsignar ? "asignar" : salidaParaReemplazar ? "reemplazar" : "logistica";
+    const tipoPanelAbierto = salidaParaAsignar ? "asignar" : idSalidaReemplazoActivo ? "reemplazar" : "logistica";
     useEffect(() => {
         if (idPanelAbierto !== undefined) anclaPaneles.current?.scrollIntoView();
     }, [idPanelAbierto, tipoPanelAbierto]);
@@ -665,6 +727,13 @@ function SalidasPage() {
         isError,
         error,
     } = useSalidas(filtrosConsulta);
+
+    // 12.8: abrir reemplazo automáticamente si se navegó desde PersonalPage (?reemplazarSalida=ID)
+    const salidaParaReemplazar =
+        salidaParaReemplazarEstado ??
+        (idReemplazarDesdeUrl > 0
+            ? salidas.find((s) => s.idsalida === idReemplazarDesdeUrl) ?? null
+            : null);
 
     // Consulta de solicitudes de alojamiento para enriquecer con el conteo exacto de solicitudes pendientes
     const { data: solicitudesPendientes = [] } = useQuery({
@@ -1022,8 +1091,14 @@ function SalidasPage() {
                 const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
 
                 const alertasRecorrido = (fila.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO);
+                const alertasNuevas = (fila.alertas ?? []).filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS);
                 const sinNovedades =
-                    faltantes === 0 && !tieneSobrantes && !alertaSol && !alertaPermisos && alertasRecorrido.length === 0;
+                    faltantes === 0 &&
+                    !tieneSobrantes &&
+                    !alertaSol &&
+                    !alertaPermisos &&
+                    alertasRecorrido.length === 0 &&
+                    alertasNuevas.length === 0;
 
                 if (sinNovedades) {
                     return (
@@ -1035,6 +1110,19 @@ function SalidasPage() {
 
                 return (
                     <div className="flex flex-col gap-1 items-start text-xs">
+                        {alertasNuevas.map((codigo) => {
+                            const cfg = ALERTAS_OPERATIVAS_NUEVAS[codigo]!;
+                            const aviso = fila.avisos?.find((av) => av.alerta === codigo);
+                            return (
+                                <span
+                                    key={codigo}
+                                    title={aviso?.mensaje}
+                                    className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-bold ${cfg.estilo}`}
+                                >
+                                    <span>{cfg.etiqueta}</span>
+                                </span>
+                            );
+                        })}
                         {alertasRecorrido.map((a) => (
                             <span
                                 key={a}
@@ -1107,9 +1195,7 @@ function SalidasPage() {
                         fila.alertas?.includes("SOLICITUD_PENDIENTE"));
                 const esFinalizada = fila.estado === "FINALIZADA";
 
-                // CU-40: Una salida admite asignación si está activa (PUBLICADA o CERRADA),
-                // tiene fecha futura y no tiene personal asignado aún.
-                const estadoAsignable = fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
+                // CU-40: Confirmar salida (revisar en cualquier momento mientras esté PUBLICADA, confirmar tras el corte)
                 const fechaFutura = fila.fechaInicio.slice(0, 10) > fechaLocalHoy();
                 const cantPersonal =
                     typeof fila.cantidadPersonal === "number"
@@ -1122,18 +1208,17 @@ function SalidasPage() {
                     resultadoAsignacion?.advertencia !== undefined &&
                     resultadoAsignacion?.idsalida === fila.idsalida;
 
-                // Si cumple las condiciones para ser asignable pero aún no tiene compras (pasajeros === 0),
-                // mostramos el botón deshabilitado con explicación para no confundir al usuario.
-                const baseAsignable =
+                const esPublicadaFutura =
                     esAdmin &&
-                    estadoAsignable &&
+                    fila.estado === "PUBLICADA" &&
                     fechaFutura &&
-                    sinPersonal &&
                     !tieneAdvertenciaPendiente;
 
-                const puedeAsignar = baseAsignable && fila.pasajerosConfirmados > 0;
-                const requierePasajerosParaAsignar =
-                    baseAsignable && fila.pasajerosConfirmados === 0;
+                const listaParaConfirmar =
+                    esPublicadaFutura &&
+                    (fila.puedeConfirmar === true ||
+                        (fila.ventaAbierta === false && fila.pasajerosConfirmados > 0));
+                const puedeRevisarConfirmacion = esPublicadaFutura && !listaParaConfirmar;
 
                 const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
                 const puedeLiberarSobrantes =
@@ -1148,10 +1233,10 @@ function SalidasPage() {
                     fechaFutura &&
                     !sinPersonal;
 
-                // CU-39: Modificar logística
+                // CU-39: Modificar logística (también en PUBLICADA — §9.2)
                 const puedeModificarLogistica =
                     esAdmin &&
-                    fila.estado === "CERRADA" &&
+                    (fila.estado === "PUBLICADA" || fila.estado === "CERRADA") &&
                     fechaFutura;
 
                 // CU-37: Cancelar salida
@@ -1180,8 +1265,8 @@ function SalidasPage() {
                 if (
                     !tieneSolicitudes &&
                     !esFinalizada &&
-                    !puedeAsignar &&
-                    !requierePasajerosParaAsignar &&
+                    !listaParaConfirmar &&
+                    !puedeRevisarConfirmacion &&
                     !puedeLiberarSobrantes &&
                     !puedeReemplazarPersonal &&
                     !puedeModificarLogistica &&
@@ -1204,34 +1289,29 @@ function SalidasPage() {
 
                 return (
                     <div className="flex flex-col gap-1.5 items-start text-xs font-semibold">
-                        {puedeAsignar && (
+                        {listaParaConfirmar && (
                             <button
                                 type="button"
-                                aria-label={`Asignar recursos a la salida ${fila.nroSalida}`}
+                                aria-label={`Confirmar salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-marca text-white font-semibold text-xs shadow-sm hover:bg-marca-oscura transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                             >
-                                <span>Asignar recursos</span>
+                                <span>Confirmar salida</span>
                                 <span aria-hidden="true">→</span>
                             </button>
                         )}
 
-                        {requierePasajerosParaAsignar && (
-                            <div className="flex flex-col items-start gap-0.5">
-                                <button
-                                    type="button"
-                                    aria-label={`Asignar recursos a la salida ${fila.nroSalida}`}
-                                    disabled
-                                    title="No se pueden asignar recursos ni emitir nómina sin pasajeros confirmados."
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 text-slate-400 font-semibold text-xs cursor-not-allowed border border-slate-200"
-                                >
-                                    <span>Asignar recursos</span>
-                                </button>
-                                <span className="text-xs text-amber-700 font-medium">
-                                    ⚠️ Requiere compras
-                                </span>
-                            </div>
+                        {puedeRevisarConfirmacion && (
+                            <button
+                                type="button"
+                                aria-label={`Revisar confirmación de la salida ${fila.nroSalida}`}
+                                disabled={algunaMutacionPendiente}
+                                onClick={() => abrirAsignacion(fila)}
+                                className="text-navegacion hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Revisar confirmación
+                            </button>
                         )}
 
                         {puedeReemplazarPersonal && (
@@ -1367,29 +1447,38 @@ function SalidasPage() {
 
             {mensajeExito ? (
                 <Alerta tipo="exito" titulo={mensajeExito.titulo}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p>
-                            Se creó la salida planificada{" "}
-                            <span className="font-bold text-navegacion">
-                                {mensajeExito.numeroSalida ?? "nueva"}
-                            </span>
-                            {mensajeExito.fechaInicio ? (
-                                <>
-                                    {" "}para el día{" "}
-                                    <span className="font-semibold">
-                                        {formatearFechaUtcCorta(mensajeExito.fechaInicio)}
-                                    </span>
-                                </>
-                            ) : null}
-                            . Ya se encuentra disponible en el listado a continuación.
-                        </p>
-                        <Boton
-                            variante="secundario"
-                            className="px-2.5 py-1 text-xs"
-                            onClick={() => setMensajeExito(null)}
-                        >
-                            Cerrar aviso
-                        </Boton>
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p>
+                                Se creó la salida planificada{" "}
+                                <span className="font-bold text-navegacion">
+                                    {mensajeExito.numeroSalida ?? "nueva"}
+                                </span>
+                                {mensajeExito.fechaInicio ? (
+                                    <>
+                                        {" "}para el día{" "}
+                                        <span className="font-semibold">
+                                            {formatearFechaUtcCorta(mensajeExito.fechaInicio)}
+                                        </span>
+                                    </>
+                                ) : null}
+                                . Ya se encuentra disponible en el listado a continuación.
+                            </p>
+                            <Boton
+                                variante="secundario"
+                                className="px-2.5 py-1 text-xs"
+                                onClick={() => setMensajeExito(null)}
+                            >
+                                Cerrar aviso
+                            </Boton>
+                        </div>
+                        {mensajeExito.advertencias && mensajeExito.advertencias.length > 0 ? (
+                            <ul className="list-disc pl-5 text-xs font-medium text-amber-900">
+                                {mensajeExito.advertencias.map((adv, idx) => (
+                                    <li key={idx}>{adv}</li>
+                                ))}
+                            </ul>
+                        ) : null}
                     </div>
                 </Alerta>
             ) : null}
@@ -1438,36 +1527,26 @@ function SalidasPage() {
             ) : null}
 
             {formularioAbierto ? (
-                <FormularioCrearSalida
-                    paquetes={paquetes}
-                    opciones={opcionesSalida}
-                    cargandoOpciones={cargandoOpciones}
-                    creando={crearSalidaMutation.isPending}
-                    errorServidor={
-                        errorCreacion || (errorOpciones ? errorOpciones.message : undefined)
-                    }
-                    errorEsAutoridad={
-                        Boolean(errorCreacion) &&
-                        crearSalidaMutation.error instanceof ErrorApi &&
-                        crearSalidaMutation.error.estado === 503
-                    }
-                    alConsultarOpciones={(parametros) => {
-                        setErrorCreacion("");
-                        // Mismos parámetros: la query no cambia de clave, hay que pedirla de nuevo
-                        if (
-                            parametrosConsulta &&
-                            parametrosConsulta.idpaquete === parametros.idpaquete &&
-                            parametrosConsulta.fechaInicio === parametros.fechaInicio &&
-                            parametrosConsulta.tamanoMaximo === parametros.tamanoMaximo
-                        ) {
-                            void refrescarOpciones();
-                            return;
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={crearSalidaMutation.isPending}
+                    tamano="xl"
+                    etiqueta="Nueva salida planificada"
+                >
+                    <FormularioCrearSalida
+                        paquetes={paquetes}
+                        creando={crearSalidaMutation.isPending}
+                        errorServidor={errorCreacion || undefined}
+                        errorDetalleEquipo={errorDetalleEquipo}
+                        errorEsAutoridad={
+                            Boolean(errorCreacion) &&
+                            crearSalidaMutation.error instanceof ErrorApi &&
+                            crearSalidaMutation.error.estado === 503
                         }
-                        setParametrosConsulta(parametros);
-                    }}
-                    alConfirmarCreacion={manejarConfirmarCreacion}
-                    alCancelar={cerrarFormulario}
-                />
+                        alConfirmarCreacion={manejarConfirmarCreacion}
+                        alCancelar={cerrarFormulario}
+                    />
+                </Modal>
             ) : null}
 
             {mensajeSalidaYaAsignada ? (
@@ -1792,53 +1871,79 @@ function SalidasPage() {
             <div ref={anclaPaneles} className="scroll-mt-24" />
 
             {salidaParaAsignar ? (
-                <FormularioAsignarRecursos
-                    key={salidaParaAsignar.idsalida}
-                    datos={datosAsignacion}
-                    cargando={cargandoAsignacion}
-                    recargando={recargandoAsignacion}
-                    guardando={confirmarAsignacionMutation.isPending}
-                    errorServidor={
-                        errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
-                    }
-                    onRecargarDatos={() => recargarAsignacion()}
-                    onConfirmar={manejarSolicitarConfirmacionAsignacion}
-                    onCancelar={cerrarAsignacion}
-                />
+                <Modal
+                    onCerrar={cerrarAsignacion}
+                    bloqueado={confirmarAsignacionMutation.isPending}
+                    tamano="xl"
+                    etiqueta={`Confirmar salida ${salidaParaAsignar.nroSalida}`}
+                >
+                    <FormularioAsignarRecursos
+                        key={salidaParaAsignar.idsalida}
+                        datos={datosAsignacion}
+                        idpaquete={salidaParaAsignar.idpaquete}
+                        tamanoMaximo={salidaParaAsignar.tamanoMaximo}
+                        cargando={cargandoAsignacion}
+                        recargando={recargandoAsignacion}
+                        guardando={confirmarAsignacionMutation.isPending}
+                        errorServidor={
+                            errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
+                        }
+                        detalleErrorConfirmacion={detalleErrorConfirmacion}
+                        onRecargarDatos={() => recargarAsignacion()}
+                        onConfirmar={manejarSolicitarConfirmacionAsignacion}
+                        onCancelar={cerrarAsignacion}
+                        onAbrirReemplazo={() => abrirReemplazo(salidaParaAsignar)}
+                        onAbrirLogistica={() => abrirModificarLogistica(salidaParaAsignar)}
+                    />
+                </Modal>
             ) : null}
 
             {salidaParaReemplazar ? (
-                <FormularioReemplazarPersonal
-                    key={salidaParaReemplazar.idsalida}
-                    idsalida={salidaParaReemplazar.idsalida}
-                    datosPersonal={datosPersonalSalida}
-                    cargandoPersonal={cargandoPersonalSalida}
-                    errorPersonal={
-                        errorPersonalSalida ? errorPersonalSalida.message : undefined
-                    }
-                    guardando={confirmarReemplazoMutation.isPending}
-                    errorReemplazo={errorReemplazo}
-                    onRecargarDatos={() => recargarPersonalSalida()}
-                    onConfirmarReemplazo={manejarConfirmarReemplazo}
-                    onCancelar={cerrarReemplazo}
-                />
+                <Modal
+                    onCerrar={cerrarReemplazo}
+                    bloqueado={confirmarReemplazoMutation.isPending}
+                    tamano="lg"
+                    etiqueta={`Reemplazar personal en ${salidaParaReemplazar.nroSalida}`}
+                >
+                    <FormularioReemplazarPersonal
+                        key={salidaParaReemplazar.idsalida}
+                        idsalida={salidaParaReemplazar.idsalida}
+                        datosPersonal={datosPersonalSalida}
+                        cargandoPersonal={cargandoPersonalSalida}
+                        errorPersonal={
+                            errorPersonalSalida ? errorPersonalSalida.message : undefined
+                        }
+                        guardando={confirmarReemplazoMutation.isPending}
+                        errorReemplazo={errorReemplazo}
+                        onRecargarDatos={() => recargarPersonalSalida()}
+                        onConfirmarReemplazo={manejarConfirmarReemplazo}
+                        onCancelar={cerrarReemplazo}
+                    />
+                </Modal>
             ) : null}
 
             {salidaParaModificarLogistica ? (
-                <FormularioModificarLogistica
-                    key={salidaParaModificarLogistica.idsalida}
-                    idsalida={salidaParaModificarLogistica.idsalida}
-                    datosLogistica={datosLogisticaSalida}
-                    cargandoLogistica={cargandoLogisticaSalida}
-                    errorLogistica={
-                        errorLogisticaSalida ? errorLogisticaSalida.message : undefined
-                    }
-                    guardando={modificarLogisticaMutation.isPending}
-                    errorModificacion={errorModificarLogistica}
-                    onRecargarDatos={() => recargarLogisticaSalida()}
-                    onConfirmarModificacion={manejarConfirmarModificacionLogistica}
-                    onCancelar={cerrarModificarLogistica}
-                />
+                <Modal
+                    onCerrar={cerrarModificarLogistica}
+                    bloqueado={modificarLogisticaMutation.isPending}
+                    tamano="xl"
+                    etiqueta={`Modificar logística de ${salidaParaModificarLogistica.nroSalida}`}
+                >
+                    <FormularioModificarLogistica
+                        key={salidaParaModificarLogistica.idsalida}
+                        idsalida={salidaParaModificarLogistica.idsalida}
+                        datosLogistica={datosLogisticaSalida}
+                        cargandoLogistica={cargandoLogisticaSalida}
+                        errorLogistica={
+                            errorLogisticaSalida ? errorLogisticaSalida.message : undefined
+                        }
+                        guardando={modificarLogisticaMutation.isPending}
+                        errorModificacion={errorModificarLogistica}
+                        onRecargarDatos={() => recargarLogisticaSalida()}
+                        onConfirmarModificacion={manejarConfirmarModificacionLogistica}
+                        onCancelar={cerrarModificarLogistica}
+                    />
+                </Modal>
             ) : null}
 
             {salidaParaCancelar ? (
@@ -2053,6 +2158,12 @@ function SalidasPage() {
                                 const tieneSol = s.alertas?.includes("SOLICITUD_PENDIENTE");
                                 const tienePerm = s.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
                                 const delRecorrido = (s.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO).map((a) => ALERTAS_RECORRIDO[a]);
+                                const nuevas = (s.alertas ?? [])
+                                    .filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS)
+                                    .map((a) => {
+                                        const aviso = s.avisos?.find((av) => av.alerta === a);
+                                        return aviso?.mensaje || ALERTAS_OPERATIVAS_NUEVAS[a]!.etiqueta;
+                                    });
                                 const cantSol = solicitudesPorSalida.get(s.idsalida);
 
                                 return (
@@ -2063,6 +2174,10 @@ function SalidasPage() {
                                         <span>
                                             {s.nroSalida} ({s.paquete?.nombrePaquete}):
                                         </span>
+                                        {nuevas.length > 0 && (
+                                            <span className="text-amber-950 font-bold">{nuevas.join(" · ")}</span>
+                                        )}
+                                        {nuevas.length > 0 && (delRecorrido.length > 0 || tieneSol || tienePerm) && <span>·</span>}
                                         {delRecorrido.length > 0 && (
                                             <span className="text-rose-900 font-bold">{delRecorrido.join(" · ")}</span>
                                         )}
@@ -2348,12 +2463,12 @@ function SalidasPage() {
 
             <DialogoConfirmacion
                 abierto={payloadConfirmarAsignacion !== null}
-                titulo="Confirmar asignación de recursos y emisión de nómina"
+                titulo="Confirmar salida y emitir permisos"
                 descripcion={descripcionDialogoConfirmacion}
                 textoConfirmar={
                     confirmarAsignacionMutation.isPending
                         ? "Emitiendo permisos..."
-                        : "Confirmar asignación"
+                        : "Confirmar salida"
                 }
                 textoCancelar="Volver a revisar"
                 cargando={confirmarAsignacionMutation.isPending}

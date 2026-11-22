@@ -5,6 +5,7 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioPersonal from "../../components/FormularioPersonal";
+import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
 import {
@@ -23,11 +24,29 @@ import {
     type ResultadoCrearPersonal,
     type RolPersonal,
 } from "../../services/personalService";
+import { ErrorApi } from "../../services/clienteApi";
 import {
     etiquetaEstadoRegistro,
     etiquetaHabilitacion,
     formatearFechaSalida,
+    formatearRangoFechasUtc,
 } from "../../services/formato";
+
+type SalidaBloqueantePersonal = {
+    idsalida: number;
+    nroSalida: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+};
+
+function extraerSalidasBloqueantes(error: unknown): SalidaBloqueantePersonal[] {
+    if (!(error instanceof ErrorApi) || !error.detalle || typeof error.detalle !== "object") {
+        return [];
+    }
+    const det = error.detalle as { salidas?: unknown };
+    return Array.isArray(det.salidas) ? (det.salidas as SalidaBloqueantePersonal[]) : [];
+}
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -56,11 +75,15 @@ function PersonalPage() {
     const [personalEnEdicion, setPersonalEnEdicion] = useState<Personal | null>(null);
     const [personalSeleccionado, setPersonalSeleccionado] = useState<Personal | null>(null);
     const [errorFormulario, setErrorFormulario] = useState("");
+    const [salidasBloqueantesEdicion, setSalidasBloqueantesEdicion] = useState<
+        SalidaBloqueantePersonal[]
+    >([]);
     const [ultimoRegistro, setUltimoRegistro] = useState<ResultadoCrearPersonal | null>(null);
 
     function abrirFormulario(persona?: Personal) {
         setPersonalEnEdicion(persona ?? null);
         setErrorFormulario("");
+        setSalidasBloqueantesEdicion([]);
         setUltimoRegistro(null);
         darDeBaja.reset();
         setFormularioAbierto(true);
@@ -70,6 +93,7 @@ function PersonalPage() {
         setFormularioAbierto(false);
         setPersonalEnEdicion(null);
         setErrorFormulario("");
+        setSalidasBloqueantesEdicion([]);
     }
 
     function manejarCrear(datos: DatosCrearPersonal) {
@@ -125,7 +149,10 @@ function PersonalPage() {
                     setUltimoRegistro(null);
                     cerrarFormulario();
                 },
-                onError: (e: Error) => setErrorFormulario(e.message),
+                onError: (e: Error) => {
+                    setErrorFormulario(e.message);
+                    setSalidasBloqueantesEdicion(extraerSalidasBloqueantes(e));
+                },
             },
         );
     }
@@ -207,14 +234,49 @@ function PersonalPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioPersonal
-                    personalEnEdicion={personalEnEdicion}
-                    alCrear={manejarCrear}
-                    alModificar={manejarModificar}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    bloqueado={guardando}
+                    tamano="lg"
+                    etiqueta={
+                        personalEnEdicion ? "Editar personal" : "Nuevo personal"
+                    }
+                >
+                    <FormularioPersonal
+                        personalEnEdicion={personalEnEdicion}
+                        alCrear={manejarCrear}
+                        alModificar={manejarModificar}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                    {salidasBloqueantesEdicion.length > 0 ? (
+                        <div className="px-6 pb-6">
+                            <Alerta tipo="advertencia" titulo="Salidas que impiden el cambio">
+                                <ul className="mt-1 space-y-2 text-xs">
+                                    {salidasBloqueantesEdicion.map((s) => (
+                                        <li
+                                            key={s.idsalida}
+                                            className="flex flex-wrap items-center justify-between gap-2"
+                                        >
+                                            <span>
+                                                <strong>{s.nroSalida}</strong> (
+                                                {formatearRangoFechasUtc(s.fechaInicio, s.fechaFin)})
+                                            </span>
+                                            <Link
+                                                to={`/gestion/salidas?reemplazarSalida=${s.idsalida}`}
+                                                onClick={cerrarFormulario}
+                                                className="rounded-control border border-marca bg-white px-2.5 py-1 font-semibold text-marca hover:bg-marca hover:text-white transition-colors"
+                                            >
+                                                Reemplazar en la salida
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Alerta>
+                        </div>
+                    ) : null}
+                </Modal>
             ) : null}
 
             {ultimoRegistro ? (
@@ -245,7 +307,34 @@ function PersonalPage() {
 
             {darDeBaja.isError ? (
                 <Alerta tipo="error" titulo="No se pudo dar de baja al personal">
-                    {darDeBaja.error.message}
+                    <div className="space-y-2">
+                        <p>{darDeBaja.error.message}</p>
+                        {(() => {
+                            const salidasBloq = extraerSalidasBloqueantes(darDeBaja.error);
+                            if (salidasBloq.length === 0) return null;
+                            return (
+                                <ul className="space-y-1.5 border-t border-rose-200 pt-2 text-xs">
+                                    {salidasBloq.map((s) => (
+                                        <li
+                                            key={s.idsalida}
+                                            className="flex flex-wrap items-center justify-between gap-2"
+                                        >
+                                            <span>
+                                                <strong>{s.nroSalida}</strong> ·{" "}
+                                                {formatearRangoFechasUtc(s.fechaInicio, s.fechaFin)}
+                                            </span>
+                                            <Link
+                                                to={`/gestion/salidas?reemplazarSalida=${s.idsalida}`}
+                                                className="rounded-control border border-rose-300 bg-white px-2.5 py-1 font-semibold text-rose-900 hover:bg-rose-100 transition-colors"
+                                            >
+                                                Reemplazar en la salida
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            );
+                        })()}
+                    </div>
                 </Alerta>
             ) : null}
 

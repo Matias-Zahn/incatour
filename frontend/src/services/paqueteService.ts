@@ -5,6 +5,50 @@ import type { Temporada } from "./temporadaService";
 
 export type TipoGarantiaPaquete = "POR_ESTABLECIMIENTO" | "POR_CATEGORIA";
 
+export const DIAS_CIERRE_VENTA_DEFECTO = 2;
+export const DIAS_CIERRE_SOLICITUD = 5;
+
+export type ItemEquipoPaquete = {
+    idservicio: number;
+    cantidad: number;
+    cadaPasajeros: number;
+};
+
+export type CalendarioSalidasPaquete = {
+    diasHabilitados: CodigoDia[];
+    fechaMinima: string; // "AAAA-MM-DD"
+};
+
+export type SimularCostoPayload = {
+    tipoGarantia: TipoGarantiaPaquete;
+    idservicioGarantizado?: number;
+    localidadGarantizada: string;
+    categoriaGarantizada?: string;
+    tipoHabitacionGarantizada?: string;
+    nochesPrevias: number;
+    nochesPosteriores: number;
+    idtransporte?: number;
+    idtren?: number;
+    equipo?: ItemEquipoPaquete[];
+    pasajeros: number;
+};
+
+export type ItemDesgloseCosto = {
+    tipo: "ALOJAMIENTO" | "TRANSPORTE" | "TREN" | "EQUIPAMIENTO";
+    idservicio: number | null;
+    nombreServicio: string;
+    costoBase: number;
+    calculo: string;
+    porPasajero: number;
+};
+
+export type ResultadoSimularCosto = {
+    costoPorPasajero: number;
+    moneda: "USD";
+    desglose: ItemDesgloseCosto[];
+    avisos: string[];
+};
+
 export const DIAS_SEMANA = [
     { codigo: "L", corto: "Lun", nombre: "Lunes" },
     { codigo: "M", corto: "Mar", nombre: "Martes" },
@@ -91,16 +135,22 @@ export type ServicioDisponiblePaquete = {
     datos?: {
         categoria?: string;
         tipoHabitacion?: string;
-        capacidadDisponible?: number;
+        capacidadDisponible?: number | null;
         modalidadConfirmacion?: "BLOQUEO_PLAZAS" | "A_SOLICITUD" | string;
         capacidadVehiculo?: number;
         horarioSalida?: string;
         horarioLlegada?: string;
+        diasOperacion?: string;
         tipoEquipamiento?: string;
+        cantidadDisponible?: number;
     };
     disponibilidad?: {
-        capacidadDisponible?: number;
+        capacidadDisponible?: number | null;
         modalidadConfirmacion?: string;
+        capacidadVehiculo?: number;
+        diasOperacion?: string;
+        cantidadDisponible?: number;
+        inventarioTotal?: number;
     };
 };
 
@@ -140,6 +190,9 @@ export type Paquete = {
     nochesPosteriores: number;
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string | null;
+    diasCierreVenta?: number;
+    faltaTransporte?: boolean;
+    calendarioSalidas?: CalendarioSalidasPaquete;
     imagenPrincipal?: string;
     imagenes?: string[];
     tieneImagenesPropias?: boolean;
@@ -148,11 +201,22 @@ export type Paquete = {
     servicios?: {
         idpaquete: number;
         idservicio: number;
+        tipo?: "TRANSPORTE" | "TREN" | "EQUIPAMIENTO";
+        cantidad?: number | null;
+        cadaPasajeros?: number | null;
         servicio?: {
             idservicio: number;
             nombreServicio: string;
             localidad?: string | null;
             costoBase: number;
+            tren?: {
+                horarioSalida: string;
+                horarioLlegada: string;
+                diasOperacion: string;
+            } | null;
+            equipamiento?: {
+                tipoEquipamiento: string;
+            } | null;
         };
     }[];
     garantiasEstablecimiento?: {
@@ -176,16 +240,19 @@ export type DatosCrearPaquete = {
     nombrePaquete: string;
     condiciones?: string;
     tipoGarantia: TipoGarantiaPaquete;
+    localidadGarantizada: string;
     idservicioGarantizado?: number;
-    localidadGarantizada?: string;
     categoriaGarantizada?: string;
     tipoHabitacionGarantizada?: string;
     nochesPrevias: number;
     nochesPosteriores: number;
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
+    diasCierreVenta?: number;
+    idtransporte: number;
+    idtren?: number | null;
+    equipo?: ItemEquipoPaquete[];
     matrizPrecios: PrecioTemporadaInput[];
-    serviciosIncluidos: number[];
 };
 
 export type DatosModificarPaquete = {
@@ -193,16 +260,19 @@ export type DatosModificarPaquete = {
     nombrePaquete?: string;
     condiciones?: string;
     tipoGarantia?: TipoGarantiaPaquete;
-    idservicioGarantizado?: number;
     localidadGarantizada?: string;
+    idservicioGarantizado?: number;
     categoriaGarantizada?: string;
     tipoHabitacionGarantizada?: string;
     nochesPrevias?: number;
     nochesPosteriores?: number;
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
+    diasCierreVenta?: number;
+    idtransporte?: number;
+    idtren?: number | null;
+    equipo?: ItemEquipoPaquete[];
     matrizPrecios?: PrecioTemporadaInput[];
-    serviciosIncluidos?: number[];
 };
 
 type PaqueteApi = Omit<Paquete, "id">;
@@ -276,6 +346,19 @@ export async function registrarPaquete(
     })
         .then(respuestaDatos)
         .then(normalizarPaquete);
+}
+
+// B5: Simular costo por pasajero de un paquete sin guardar
+export async function simularCostoPaquete(
+    datos: SimularCostoPayload,
+): Promise<ResultadoSimularCosto> {
+    return solicitarApi<RespuestaDatos<ResultadoSimularCosto>>(
+        "/paquetes/costos/simular",
+        {
+            method: "POST",
+            body: JSON.stringify(datos),
+        },
+    ).then(respuestaDatos);
 }
 
 export async function modificarPaquete(
@@ -440,6 +523,12 @@ export function useServiciosDisponiblesCatalogo(habilitado: boolean) {
         queryKey: clavesPaquetes.serviciosCatalogo,
         queryFn: listarServiciosDisponiblesCatalogo,
         enabled: habilitado,
+    });
+}
+
+export function useSimularCostoPaquete() {
+    return useMutation({
+        mutationFn: simularCostoPaquete,
     });
 }
 

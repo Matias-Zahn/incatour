@@ -1,7 +1,8 @@
 import { http, HttpResponse, delay } from "msw";
-import { alojamientosSalidaMock, salidasMockIniciales } from "../datos/salidas";
-import { paquetesIniciales } from "../datos/paquetes";
+import { salidasMockIniciales } from "../datos/salidas";
 import { personalSemilla } from "../datos/personal";
+import { obtenerPaquetesMock } from "./paquetes";
+import { obtenerServiciosMock } from "./servicios";
 import type {
     ItemDevolucionPayload,
     ItemEquipamientoAsignado,
@@ -42,15 +43,48 @@ const equipamientosMock: RecursoDisponibleEquipamiento[] = [
     { idservicio: 6, nombreServicio: "Bolsa de dormir -10°C", localidad: "Cusco", costoBase: 10, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Bolsas de dormir", cantidadDisponible: 20 } },
 ];
 const transportesMock: RecursoDisponibleTransporte[] = [
-    { idservicio: 3, nombreServicio: "Bus Cusco - Km 82", localidad: "Cusco", costoBase: 120, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" }, disponibilidad: { capacidadVehiculo: 20, pasajerosConfirmados: 0 } },
+    { idservicio: 2, nombreServicio: "Bus Cusco - Km 82", localidad: "Cusco", costoBase: 120, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" }, disponibilidad: { capacidadVehiculo: 24, pasajerosConfirmados: 0 } },
+    { idservicio: 3, nombreServicio: "Combi Valle Sagrado (14 plazas)", localidad: "Cusco", costoBase: 90, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" }, disponibilidad: { capacidadVehiculo: 14, pasajerosConfirmados: 0 } },
 ];
+
+const porteadoresExtrasMock = [
+    { idpersonal: 101, nombreCompleto: "Diego Puma", rol: "Porteador", salidasEnElMes: 0 },
+    { idpersonal: 102, nombreCompleto: "Ramiro Ccahuana", rol: "Porteador", salidasEnElMes: 1 },
+    { idpersonal: 103, nombreCompleto: "Julio Huanca", rol: "Porteador", salidasEnElMes: 1 },
+    { idpersonal: 104, nombreCompleto: "Humberto Apaza", rol: "Porteador", salidasEnElMes: 2 },
+    { idpersonal: 105, nombreCompleto: "Félix Ticona", rol: "Porteador", salidasEnElMes: 2 },
+    { idpersonal: 106, nombreCompleto: "Sandro Cusi", rol: "Porteador", salidasEnElMes: 3 },
+];
+
+const CODIGOS_DIA = ["D", "L", "M", "X", "J", "V", "S"] as const;
+const NOMBRES_DIA = ["domingos", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados"] as const;
+
+function sumarDiasIso(iso: string, dias: number): string {
+    const f = new Date(iso.slice(0, 10) + "T12:00:00Z");
+    f.setUTCDate(f.getUTCDate() + dias);
+    return f.toISOString().slice(0, 10);
+}
+
+function formatearDmy(iso: string): string {
+    const [y, m, d] = iso.slice(0, 10).split("-");
+    return `${d}/${m}/${y}`;
+}
+
+function diasPermitidosDeCadena(cadena: string): string[] {
+    const limpia = cadena.trim().toUpperCase();
+    if (!limpia || limpia === "TODOS") return ["L", "M", "X", "J", "V", "S", "D"];
+    return limpia.split(/[-,\s]+/).filter(Boolean);
+}
 
 const buscarSalida = (id: unknown) => salidas.find((s) => s.idsalida === Number(id));
 const noExiste = () => HttpResponse.json({ error: "La salida no existe" }, { status: 404 });
 const cabecera = (s: SalidaApi) => ({ idsalida: s.idsalida, nroSalida: s.nroSalida, fechaInicio: s.fechaInicio, fechaFin: s.fechaFin });
 const personaDe = (idpersonal: number) => {
     const p = personalSemilla.find((x) => x.idpersonal === idpersonal);
-    return { nombreCompleto: p?.nombreCompleto ?? `Personal ${idpersonal}`, rol: p?.rol ?? "Porteador" };
+    if (p) return { nombreCompleto: p.nombreCompleto, rol: p.rol };
+    const extra = porteadoresExtrasMock.find((x) => x.idpersonal === idpersonal);
+    if (extra) return { nombreCompleto: extra.nombreCompleto, rol: extra.rol };
+    return { nombreCompleto: `Personal ${idpersonal}`, rol: "Porteador" };
 };
 const panelLogistica = (s: SalidaApi): PanelLogistica => {
     const transporte = s.servicios.find((x) => x.tipo === "TRANSPORTE");
@@ -176,7 +210,7 @@ export const manejadoresSalidas = [
         return HttpResponse.json({ data: resultado });
     }),
 
-    // GET /api/salidas/opciones (CU-36)
+    // GET /api/salidas/opciones (CU-36 — §5.1)
     http.get("*/api/salidas/opciones", async ({ request }) => {
         await delay(150);
         const url = new URL(request.url);
@@ -213,19 +247,7 @@ export const manejadoresSalidas = [
             );
         }
 
-        const hoy = new Date();
-        const yyyy = hoy.getFullYear();
-        const mm = String(hoy.getMonth() + 1).padStart(2, "0");
-        const dd = String(hoy.getDate()).padStart(2, "0");
-        const hoyIso = `${yyyy}-${mm}-${dd}`;
-        if (fechaInicioParam <= hoyIso) {
-            return HttpResponse.json(
-                { error: "La fecha de inicio tiene que ser futura" },
-                { status: 400 },
-            );
-        }
-
-        const paquete = paquetesIniciales.find((p) => p.idpaquete === idpaquete);
+        const paquete = obtenerPaquetesMock().find((p) => p.idpaquete === idpaquete);
         if (!paquete) {
             return HttpResponse.json({ error: "El paquete no existe" }, { status: 404 });
         }
@@ -241,8 +263,36 @@ export const manejadoresSalidas = [
             );
         }
 
-        const guias = paquete.circuito?.minimoGuias ?? 2;
-        const porteadores = Math.ceil(tamanoMaximo / 2) * 1;
+        const diasCierreVenta = paquete.diasCierreVenta ?? 2;
+        const hoy = new Date();
+        const hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+        const fechaLimiteMinima = sumarDiasIso(hoyIso, diasCierreVenta);
+        if (fechaInicioParam <= fechaLimiteMinima) {
+            return HttpResponse.json(
+                {
+                    error: `La salida tiene que empezar después del ${formatearDmy(fechaLimiteMinima)}: la venta cierra ${diasCierreVenta} ${diasCierreVenta === 1 ? "día" : "días"} antes del inicio`,
+                },
+                { status: 400 },
+            );
+        }
+
+        const diaSemana = new Date(fechaInicioParam + "T12:00:00Z").getUTCDay();
+        const codigoDia = CODIGOS_DIA[diaSemana]!;
+        const nombreDia = NOMBRES_DIA[diaSemana]!;
+        const diasPaquete = diasPermitidosDeCadena(paquete.diasDisponibles ?? "TODOS");
+        if (!diasPaquete.includes(codigoDia)) {
+            return HttpResponse.json(
+                {
+                    error: `El paquete no sale los ${nombreDia}: los días habilitados son ${diasPaquete.join(", ")}`,
+                },
+                { status: 400 },
+            );
+        }
+
+        const duracionDias = paquete.circuito?.duracionDias ?? 4;
+        const fechaFin = sumarDiasIso(fechaInicioParam, Math.max(0, duracionDias - 1));
+        const guias = paquete.circuito?.minimoGuias ?? 1;
+        const porteadores = Math.ceil(tamanoMaximo / 2);
         const totalLugares = tamanoMaximo + guias + porteadores;
 
         let cupoAutoridad: { lugaresDisponibles: number; alcanza: boolean } | null;
@@ -264,41 +314,192 @@ export const manejadoresSalidas = [
             };
         }
 
-        let alojamientos: {
-            idservicio: number;
-            nombreServicio: string;
-            localidad: string;
-            categoria?: string | null;
-            capacidadDisponible?: number | null;
-            alcanza: boolean;
-        }[] = [];
-        if (idpaquete !== 3 && simular !== "sin_alojamiento") {
-            alojamientos = alojamientosSalidaMock.map((a) => ({
+        const noches = (paquete.nochesPrevias ?? 0) + (paquete.nochesPosteriores ?? 0);
+        const plazasNecesarias = noches > 0 ? tamanoMaximo : 0;
+
+        const serviciosActivos = obtenerServiciosMock().filter((s) => s.estado === "ACTIVO");
+        const alojamientosDisponibles = serviciosActivos
+            .filter(
+                (s) =>
+                    s.tipo === "ALOJAMIENTO" &&
+                    (!paquete.localidadGarantizada ||
+                        s.localidad.toLowerCase() ===
+                            paquete.localidadGarantizada.toLowerCase()),
+            )
+            .map((a) => ({
                 idservicio: a.idservicio,
                 nombreServicio: a.nombreServicio,
                 localidad: a.localidad,
-                categoria: a.categoria,
-                capacidadDisponible: a.capacidadDisponible,
-                alcanza: (a.capacidadDisponible ?? 0) >= tamanoMaximo,
+                categoria: a.categoria ?? null,
+                modalidadConfirmacion: (a.modalidadConfirmacion ?? "BLOQUEO_PLAZAS") as
+                    | "BLOQUEO_PLAZAS"
+                    | "A_SOLICITUD",
+                capacidadDisponible:
+                    a.modalidadConfirmacion === "A_SOLICITUD"
+                        ? null
+                        : (a.capacidadDisponible ?? 0),
             }));
-        }
+
+        const alojamientos =
+            plazasNecesarias > 0 && simular !== "sin_alojamiento"
+                ? alojamientosDisponibles.map((a) => ({
+                      ...a,
+                      alcanza:
+                          a.modalidadConfirmacion === "A_SOLICITUD"
+                              ? true
+                              : (a.capacidadDisponible ?? 0) >= plazasNecesarias,
+                  }))
+                : [];
+
+        const servicioTransporte = paquete.servicios?.find(
+            (s) => s.tipo === "TRANSPORTE",
+        );
+        const transportesServicios = serviciosActivos
+            .filter((s) => s.tipo === "TRANSPORTE")
+            .map((t) => ({
+                idservicio: t.idservicio,
+                nombreServicio: t.nombreServicio,
+                capacidadVehiculo: t.capacidadVehiculo ?? 20,
+            }));
+        const idtransportePaquete =
+            servicioTransporte?.idservicio ?? transportesServicios[0]?.idservicio ?? null;
+
+        const transportes = transportesServicios.map((t) => ({
+            idservicio: t.idservicio,
+            nombreServicio: t.nombreServicio,
+            capacidadVehiculo: t.capacidadVehiculo,
+            delPaquete: t.idservicio === idtransportePaquete,
+            libre: true,
+            alcanza: t.capacidadVehiculo >= totalLugares,
+        }));
+
+        const guiasLibres = personalSemilla
+            .filter(
+                (p) =>
+                    p.estado === "ACTIVO" &&
+                    p.rol === "Guía" &&
+                    (!p.fechaHabilitacion || p.fechaHabilitacion.slice(0, 10) >= fechaFin) &&
+                    p.fechaVencimientoPasaporte.slice(0, 10) > fechaFin,
+            )
+            .map((p, idx) => ({
+                idpersonal: p.idpersonal,
+                nombreCompleto: p.nombreCompleto,
+                rol: "Guía" as const,
+                salidasEnElMes: idx,
+            }))
+            .sort((a, b) => a.salidasEnElMes - b.salidasEnElMes || a.nombreCompleto.localeCompare(b.nombreCompleto));
+
+        const porteadoresLibres = [
+            ...personalSemilla
+                .filter(
+                    (p) =>
+                        p.estado === "ACTIVO" &&
+                        p.rol === "Porteador" &&
+                        p.fechaVencimientoPasaporte.slice(0, 10) > fechaFin,
+                )
+                .map((p, idx) => ({
+                    idpersonal: p.idpersonal,
+                    nombreCompleto: p.nombreCompleto,
+                    rol: "Porteador" as const,
+                    salidasEnElMes: idx,
+                })),
+            ...porteadoresExtrasMock.map((p) => ({
+                ...p,
+                rol: "Porteador" as const,
+            })),
+        ].sort((a, b) => a.salidasEnElMes - b.salidasEnElMes || a.nombreCompleto.localeCompare(b.nombreCompleto));
+
+        const equipoPaquete = (paquete.servicios ?? []).filter(
+            (s) => s.tipo === "EQUIPAMIENTO",
+        );
+        const equipo = (
+            equipoPaquete.length > 0
+                ? equipoPaquete.map((item) => ({
+                      idservicio: item.idservicio,
+                      nombreServicio: item.servicio?.nombreServicio ?? "Equipamiento",
+                      tipoEquipamiento: item.servicio?.equipamiento?.tipoEquipamiento ?? "Camping",
+                      cantidad: item.cantidad ?? 1,
+                      cadaPasajeros: item.cadaPasajeros ?? 1,
+                      stockLibre: 12,
+                  }))
+                : [
+                      {
+                          idservicio: 5,
+                          nombreServicio: "Carpa de alta montaña 4 estaciones",
+                          tipoEquipamiento: "Carpas",
+                          cantidad: 1,
+                          cadaPasajeros: 2,
+                          stockLibre: 8,
+                      },
+                  ]
+        ).map((eq) => {
+            const necesitaCompleta = Math.ceil(tamanoMaximo / eq.cadaPasajeros) * eq.cantidad;
+            const nivel: "OK" | "RIESGO" | "NO_ALCANZA" =
+                eq.stockLibre >= necesitaCompleta
+                    ? "OK"
+                    : eq.stockLibre >= Math.ceil(necesitaCompleta * 0.5)
+                      ? "RIESGO"
+                      : "NO_ALCANZA";
+            return {
+                idservicio: eq.idservicio,
+                nombreServicio: eq.nombreServicio,
+                tipoEquipamiento: eq.tipoEquipamiento,
+                cantidad: eq.cantidad,
+                cadaPasajeros: eq.cadaPasajeros,
+                necesitaCompleta,
+                libre: eq.stockLibre,
+                fechaCritica: nivel === "OK" ? null : fechaInicioParam,
+                nivel,
+            };
+        });
+
+        const servicioTren = paquete.servicios?.find((s) => s.tipo === "TREN");
+        const tren = servicioTren
+            ? {
+                  idservicio: servicioTren.idservicio,
+                  nombreServicio: servicioTren.servicio?.nombreServicio ?? "Tren",
+                  horarioSalida: servicioTren.servicio?.tren?.horarioSalida ?? "06:10",
+                  horarioLlegada: servicioTren.servicio?.tren?.horarioLlegada ?? "07:45",
+                  diasOperacion: servicioTren.servicio?.tren?.diasOperacion ?? "L-M-X-J-V-S-D",
+                  operaEseDia: true,
+              }
+            : null;
+
+        const tarifaActual = paquete.tarifas?.[0];
 
         return HttpResponse.json({
             data: {
                 paquete: {
                     idpaquete: paquete.idpaquete,
                     nombrePaquete: paquete.nombrePaquete,
+                    idtransporte: idtransportePaquete,
+                    diasCierreVenta,
                 },
+                fechaFin,
                 tamanoMaximo,
                 dotacion: { guias, porteadores },
                 totalLugares,
                 cupoAutoridad,
+                tarifa: {
+                    idtemporada: tarifaActual?.idtemporada ?? 1,
+                    temporada: tarifaActual?.temporada?.nombre ?? "Temporada Alta",
+                    monto: tarifaActual?.monto ?? 650,
+                    moneda: tarifaActual?.moneda ?? "USD",
+                },
+                plazasNecesarias,
                 alojamientos,
+                transportes,
+                personal: {
+                    guias: guiasLibres,
+                    porteadores: porteadoresLibres,
+                },
+                equipo,
+                tren,
             },
         });
     }),
 
-    // POST /api/salidas (CU-36)
+    // POST /api/salidas (CU-36 — §5.2 & §5.3)
     http.post("*/api/salidas", async ({ request }) => {
         await delay(200);
         let body: Record<string, unknown>;
@@ -332,19 +533,7 @@ export const manejadoresSalidas = [
             );
         }
 
-        const hoy = new Date();
-        const yyyy = hoy.getFullYear();
-        const mm = String(hoy.getMonth() + 1).padStart(2, "0");
-        const dd = String(hoy.getDate()).padStart(2, "0");
-        const hoyIso = `${yyyy}-${mm}-${dd}`;
-        if (fechaInicio.slice(0, 10) <= hoyIso) {
-            return HttpResponse.json(
-                { error: "La fecha de inicio tiene que ser futura" },
-                { status: 400 },
-            );
-        }
-
-        const paquete = paquetesIniciales.find((p) => p.idpaquete === idpaquete);
+        const paquete = obtenerPaquetesMock().find((p) => p.idpaquete === idpaquete);
         if (!paquete) {
             return HttpResponse.json({ error: "El paquete no existe" }, { status: 404 });
         }
@@ -359,53 +548,121 @@ export const manejadoresSalidas = [
             );
         }
 
-        const guias = paquete.circuito?.minimoGuias ?? 2;
-        const porteadores = Math.ceil(tamanoMaximo / 2) * 1;
-        const totalLugares = tamanoMaximo + guias + porteadores;
+        const alojamientosIds = Array.isArray(body.alojamientos)
+            ? body.alojamientos.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+            : [];
+        const idtransporte = Number(body.idtransporte);
+        if (!Number.isInteger(idtransporte) || idtransporte <= 0) {
+            return HttpResponse.json(
+                { error: "idtransporte es requerido y debe ser un entero positivo" },
+                { status: 400 },
+            );
+        }
+        const personalIds = Array.isArray(body.personalIds)
+            ? body.personalIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+            : [];
 
-        // FA1: Cupo insuficiente ante la autoridad (400)
-        if (
-            fechaInicio.slice(0, 10).endsWith("-30") ||
-            body.simular === "cupo_insuficiente" ||
-            tamanoMaximo >= 490
-        ) {
-            const disponibles = Math.max(1, totalLugares - 4);
+        const guiasMin = paquete.circuito?.minimoGuias ?? 1;
+        const porteadoresMin = Math.ceil(tamanoMaximo / 2);
+
+        const personalElegido = personalIds.map((id) => ({
+            idpersonal: id,
+            ...personaDe(id),
+        }));
+        const cantGuias = personalElegido.filter((p) => p.rol === "Guía").length;
+        const cantPorteadores = personalElegido.filter((p) => p.rol === "Porteador").length;
+        if (cantGuias < guiasMin || cantPorteadores < porteadoresMin) {
             return HttpResponse.json(
                 {
-                    error: `No hay cupo suficiente: la salida necesita ${totalLugares} lugares y hay ${disponibles} disponibles para esa fecha`,
+                    error: `La salida necesita al menos ${guiasMin} guías y ${porteadoresMin} porteadores (elegiste ${cantGuias} y ${cantPorteadores})`,
                 },
                 { status: 400 },
             );
         }
 
-        // Validación de alojamiento con bloqueo
-        const conPlazas =
-            idpaquete !== 3
-                ? alojamientosSalidaMock.filter(
-                      (a) => (a.capacidadDisponible ?? 0) >= tamanoMaximo,
-                  )
-                : [];
+        const totalLugares = tamanoMaximo + personalElegido.length;
 
-        const idalojamiento = body.idalojamiento
-            ? Number(body.idalojamiento)
-            : undefined;
-
-        if (idalojamiento && !conPlazas.some((a) => a.idservicio === idalojamiento)) {
+        const serviciosActivosPost = obtenerServiciosMock().filter((s) => s.estado === "ACTIVO");
+        const transporteElegido = serviciosActivosPost.find(
+            (s) => s.tipo === "TRANSPORTE" && s.idservicio === idtransporte,
+        );
+        const capacidadTransporte = transporteElegido?.capacidadVehiculo ?? 0;
+        if (transporteElegido && capacidadTransporte < totalLugares) {
             return HttpResponse.json(
                 {
-                    error: "El alojamiento elegido no cumple la garantía del paquete, no confirma por bloqueo de plazas o no tiene capacidad suficiente",
+                    error: `El transporte elegido tiene ${capacidadTransporte} asientos y la salida necesita ${totalLugares} lugares (${tamanoMaximo} pasajeros y ${personalElegido.length} del personal)`,
                 },
                 { status: 400 },
             );
         }
 
-        // FA3: si hay alojamientos con plazas suficientes, es obligatorio elegir uno
-        if (!idalojamiento && conPlazas.length > 0) {
+        const noches = (paquete.nochesPrevias ?? 0) + (paquete.nochesPosteriores ?? 0);
+        const hotelesElegidos = alojamientosIds
+            .map((id) =>
+                serviciosActivosPost.find(
+                    (s) => s.tipo === "ALOJAMIENTO" && s.idservicio === id,
+                ),
+            )
+            .filter((h): h is (typeof serviciosActivosPost)[number] => Boolean(h));
+        if (noches > 0) {
+            if (hotelesElegidos.length === 0) {
+                return HttpResponse.json({ error: "Elegí al menos un hotel" }, { status: 400 });
+            }
+            const tieneASolicitud = hotelesElegidos.some(
+                (h) => h.modalidadConfirmacion === "A_SOLICITUD",
+            );
+            const cubiertas = hotelesElegidos.reduce(
+                (acc, h) => acc + (h.capacidadDisponible ?? 0),
+                0,
+            );
+            if (!tieneASolicitud && cubiertas < tamanoMaximo) {
+                return HttpResponse.json(
+                    {
+                        error: `Los hoteles elegidos cubren ${cubiertas} de ${tamanoMaximo} plazas en esas noches`,
+                    },
+                    { status: 400 },
+                );
+            }
+        }
+
+        const tieneASolicitud = hotelesElegidos.some(
+            (h) => h.modalidadConfirmacion === "A_SOLICITUD",
+        );
+        const corteSugerido = Math.max(paquete.diasCierreVenta ?? 2, tieneASolicitud ? 5 : 0);
+        const diasCierreVenta =
+            typeof body.diasCierreVenta === "number" ? body.diasCierreVenta : corteSugerido;
+
+        const hoy = new Date();
+        const hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+        const fechaLimiteMinima = sumarDiasIso(hoyIso, diasCierreVenta);
+        if (fechaInicio.slice(0, 10) <= fechaLimiteMinima) {
             return HttpResponse.json(
                 {
-                    error: "Hay alojamientos que confirman por bloqueo de plazas: elegí uno (idalojamiento)",
+                    error: `La salida tiene que empezar después del ${formatearDmy(fechaLimiteMinima)}: la venta cierra ${diasCierreVenta} ${diasCierreVenta === 1 ? "día" : "días"} antes del inicio`,
                 },
                 { status: 400 },
+            );
+        }
+
+        // Control equipo proyectado al 50% (409 con DetalleFaltaEquipo)
+        if (tamanoMaximo > 24) {
+            return HttpResponse.json(
+                {
+                    error: `No alcanza el equipo: el ${formatearDmy(fechaInicio)} hay 8 carpas libres y la salida necesita al menos ${Math.ceil(tamanoMaximo / 4)} (${Math.ceil(tamanoMaximo / 2)} si se vende completa). Probá con un máximo de 16 pasajeros`,
+                    detalle: {
+                        faltantes: [
+                            {
+                                idservicio: 5,
+                                nombreServicio: "Carpa de alta montaña 4 estaciones",
+                                fecha: fechaInicio.slice(0, 10),
+                                libre: 8,
+                                necesitaMinimo: Math.ceil(tamanoMaximo / 4),
+                            },
+                        ],
+                        tamanoMaximoSugerido: 16,
+                    },
+                },
+                { status: 409 },
             );
         }
 
@@ -421,24 +678,33 @@ export const manejadoresSalidas = [
         const delAnio = salidas.filter((s) => s.nroSalida.startsWith(`SAL-${anio}-`)).length;
         const nroSalida = `SAL-${anio}-${String(delAnio + 1).padStart(3, "0")}`;
         const idbloqueo = `BLQ-MSW-${Date.now().toString(16).toUpperCase().slice(-8)}`;
+        const nuevaId = salidas.length + 100;
 
-        const hotelElegido = idalojamiento
-            ? alojamientosSalidaMock.find((a) => a.idservicio === idalojamiento)
-            : undefined;
+        const ultimoDiaVenta = sumarDiasIso(fechaInicio.slice(0, 10), -(diasCierreVenta + 1));
+        const advertencias: string[] = [];
+        if (tamanoMaximo > 12) {
+            advertencias.push(
+                `Si se vende completa faltarían hasta ${Math.ceil(tamanoMaximo / 2) - 8} carpas el ${formatearDmy(fechaInicio)}`,
+            );
+        }
 
         const nuevaSalida: SalidaApi = {
-            idsalida: salidas.length + 100,
+            idsalida: nuevaId,
             idpaquete: paquete.idpaquete,
             nroSalida,
             idbloqueo,
             stockLocal: tamanoMaximo,
-            stockLocalAlojamiento: idalojamiento ? tamanoMaximo : 0,
+            stockLocalAlojamiento: hotelesElegidos.length > 0 ? tamanoMaximo : null,
             tamanoMaximo,
             fechaInicio: fechaInicioDate.toISOString(),
             fechaFin: fechaFinDate.toISOString(),
             estado: "PUBLICADA",
             lugaresPorLiberar: 0,
             ultimaEtapaAlcanzada: null,
+            diasCierreVenta,
+            ultimoDiaVenta,
+            ventaAbierta: true,
+            puedeConfirmar: false,
             paquete: {
                 nroPaquete: paquete.nroPaquete,
                 nombrePaquete: paquete.nombrePaquete,
@@ -449,29 +715,42 @@ export const manejadoresSalidas = [
                     _count: { etapas: duracionDias },
                 },
             },
-            personalAsignado: [],
-            servicios:
-                idalojamiento && hotelElegido
+            personalAsignado: personalElegido.map((p) => ({
+                idsalida: nuevaId,
+                idpersonal: p.idpersonal,
+                personal: { nombreCompleto: p.nombreCompleto, rol: p.rol },
+            })),
+            servicios: [
+                ...hotelesElegidos.map((h) => ({
+                    idsalida: nuevaId,
+                    idservicio: h.idservicio,
+                    tipo: "ALOJAMIENTO",
+                    comprobanteReserva: null,
+                    servicio: { nombreServicio: h.nombreServicio },
+                })),
+                ...(transporteElegido
                     ? [
                           {
-                              idsalida: salidas.length + 100,
-                              idservicio: hotelElegido.idservicio,
-                              tipo: "ALOJAMIENTO",
+                              idsalida: nuevaId,
+                              idservicio: transporteElegido.idservicio,
+                              tipo: "TRANSPORTE",
                               comprobanteReserva: null,
-                              servicio: {
-                                  nombreServicio: hotelElegido.nombreServicio,
-                              },
+                              servicio: { nombreServicio: transporteElegido.nombreServicio },
                           },
                       ]
-                    : [],
+                    : []),
+            ],
             pasajerosConfirmados: 0,
-            cantidadPersonal: 0,
-            guias: [],
+            cantidadPersonal: personalElegido.length,
+            guias: personalElegido
+                .filter((p) => p.rol === "Guía")
+                .map((p) => p.nombreCompleto),
             permisosFaltantes: 0,
             etapaEsperada: null,
             etapaInformada: null,
             etapaDesfasada: false,
-            alertas: [],
+            alertas: advertencias.length > 0 ? ["RIESGO_STOCK"] : [],
+            avisos: advertencias.map((mensaje) => ({ alerta: "RIESGO_STOCK", mensaje })),
         };
 
         salidas.unshift(nuevaSalida);
@@ -481,8 +760,9 @@ export const manejadoresSalidas = [
                 mensaje: "Salida creada y publicada exitosamente",
                 data: {
                     salida: nuevaSalida,
-                    dotacion: { guias, porteadores },
+                    dotacion: { guias: guiasMin, porteadores: porteadoresMin },
                     totalLugares,
+                    advertencias,
                 },
             },
             { status: 201 },
@@ -710,56 +990,204 @@ export const manejadoresSalidas = [
     }),
     // ---- FE-51: lo mínimo de CU-37 a CU-40 para que esas pantallas funcionen con mocks (misma forma que el back) ----
 
-    // GET /api/salidas/:idsalida/asignacion (CU-40)
+    // GET /api/salidas/:idsalida/asignacion (CU-40 — §9.1 Panel de confirmación)
     http.get("*/api/salidas/:idsalida/asignacion", async ({ params }) => {
         await delay(150);
         const salida = buscarSalida(params.idsalida);
         if (!salida) return noExiste();
-        const vendidos = salida.tamanoMaximo - salida.stockLocal;
-        const asignados = new Set(salida.personalAsignado.map((a) => a.idpersonal));
+        const vendidos = salida.pasajerosConfirmados ?? Math.max(0, salida.tamanoMaximo - salida.stockLocal);
+        const guiasReq = 1;
+        const porteadoresReq = Math.ceil(vendidos / 2);
+        const personal = salida.personalAsignado.map((a) => ({
+            idpersonal: a.idpersonal,
+            nombreCompleto: a.personal.nombreCompleto,
+            rol: a.personal.rol,
+            apto: true,
+            motivo: null as string | null,
+        }));
+        const porteadoresAsignados = personal.filter((p) => p.rol === "Porteador").length;
+        const porteadoresSobrantes = Math.max(0, porteadoresAsignados - porteadoresReq);
+
+        const hoteles = salida.servicios
+            .filter((s) => s.tipo === "ALOJAMIENTO")
+            .map((h, idx) => ({
+                idservicio: h.idservicio,
+                nombreServicio: h.servicio.nombreServicio,
+                modalidadConfirmacion: (h.idservicio === 5 ? "A_SOLICITUD" : "BLOQUEO_PLAZAS") as
+                    | "BLOQUEO_PLAZAS"
+                    | "A_SOLICITUD",
+                pasajeros: idx === 0 ? vendidos : 0,
+            }));
+
+        const srvTrans = salida.servicios.find((s) => s.tipo === "TRANSPORTE");
+        const transMock = srvTrans
+            ? transportesMock.find((t) => t.idservicio === srvTrans.idservicio)
+            : null;
+        const capacidad = transMock?.disponibilidad.capacidadVehiculo ?? 20;
+        const transporte = srvTrans
+            ? {
+                  idservicio: srvTrans.idservicio,
+                  nombreServicio: srvTrans.servicio.nombreServicio,
+                  capacidadVehiculo: capacidad,
+                  alcanza: capacidad >= vendidos + personal.length,
+              }
+            : null;
+
+        const necesitaCarpas = Math.ceil(vendidos / 2);
+        const equipo = [
+            {
+                idservicio: 5,
+                nombreServicio: "Carpa de alta montaña 4 estaciones",
+                tipoEquipamiento: "Carpas",
+                necesita: necesitaCarpas,
+                ocupado: necesitaCarpas,
+                falta: 0,
+            },
+        ];
+
+        const reservasSinAlojamiento = salida.alertas?.includes("SOLICITUD_PENDIENTE")
+            ? ["RES-2026-099"]
+            : [];
+        const faltantes: string[] = [];
+        if (reservasSinAlojamiento.length > 0) {
+            faltantes.push(
+                `Hay alojamientos sin confirmar en las reservas ${reservasSinAlojamiento.join(", ")}`,
+            );
+        }
+        if (vendidos === 0) {
+            faltantes.push("La salida no tiene pasajeros confirmados: corresponde cancelarla");
+        }
+
+        const ventaAbierta = salida.ventaAbierta ?? false;
+        const ultimoDiaVenta = salida.ultimoDiaVenta ?? salida.fechaInicio.slice(0, 10);
+        const puedeConfirmar =
+            salida.estado === "PUBLICADA" && !ventaAbierta && faltantes.length === 0;
+        const motivoNoConfirmable = puedeConfirmar
+            ? null
+            : salida.estado !== "PUBLICADA"
+              ? "La salida ya está confirmada o no está activa"
+              : ventaAbierta
+                ? `La venta sigue abierta hasta el ${formatearDmy(ultimoDiaVenta)}`
+                : faltantes[0] ?? null;
+
         return HttpResponse.json({
             data: {
-                salida: cabecera(salida),
+                salida: {
+                    ...cabecera(salida),
+                    estado: salida.estado,
+                    ultimoDiaVenta,
+                    ventaAbierta,
+                },
+                puedeConfirmar,
+                motivoNoConfirmable,
                 pasajerosConfirmados: vendidos,
-                dotacionRequerida: { guias: 2, porteadores: Math.ceil(vendidos / 2) },
-                bloqueoInicial: salida.tamanoMaximo,
-                lugaresSobrantes: salida.stockLocal,
-                personalDisponible: personalSemilla
-                    .filter((p) => p.estado === "ACTIVO" && !asignados.has(p.idpersonal))
-                    .map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol })),
-                transportesDisponibles: transportesMock.map((t) => ({
-                    idservicio: t.idservicio,
-                    nombreServicio: t.nombreServicio,
-                    capacidadVehiculo: t.disponibilidad.capacidadVehiculo,
-                })),
-                stockCamping: equipamientosMock.map((e) => ({
-                    idservicio: e.idservicio,
-                    nombreServicio: e.nombreServicio,
-                    tipoEquipamiento: e.disponibilidad.tipoEquipamiento,
-                    cantidadDisponible: e.disponibilidad.cantidadDisponible,
-                })),
+                dotacionRequerida: { guias: guiasReq, porteadores: porteadoresReq },
+                personal,
+                porteadoresSobrantes,
+                hoteles,
+                transporte,
+                equipo,
+                reservasSinAlojamiento,
+                faltantes,
+                bloqueoInicial: salida.tamanoMaximo + personal.length,
+                lugaresSobrantes: Math.max(0, salida.tamanoMaximo - vendidos),
             },
         });
     }),
 
-    // POST /api/salidas/:idsalida/asignacion (CU-40)
+    // POST /api/salidas/:idsalida/asignacion (CU-40 — §9.2, §13 y §14)
     http.post("*/api/salidas/:idsalida/asignacion", async ({ params, request }) => {
         await delay(250);
         const salida = buscarSalida(params.idsalida);
         if (!salida) return noExiste();
-        const { personalIds = [] } = (await request.json()) as { personalIds?: number[] };
-        const vendidos = salida.tamanoMaximo - salida.stockLocal;
-        const lugaresLiberados = salida.stockLocal;
-        salida.personalAsignado = personalIds.map((idpersonal) => ({
-            idsalida: salida.idsalida,
-            idpersonal,
-            personal: personaDe(idpersonal),
-        }));
+        if (salida.estado === "CERRADA") {
+            return HttpResponse.json({ error: "La salida ya está confirmada" }, { status: 400 });
+        }
+        if (salida.estado !== "PUBLICADA") {
+            return HttpResponse.json(
+                { error: "No se puede confirmar una salida que ya inició o no está activa" },
+                { status: 400 },
+            );
+        }
+
+        let body: { personalIds?: unknown };
+        try {
+            body = (await request.json()) as { personalIds?: unknown };
+        } catch {
+            body = {};
+        }
+        if (body.personalIds !== undefined) {
+            if (salida.personalAsignado.length > 0) {
+                return HttpResponse.json(
+                    {
+                        error: "La salida ya tiene personal: personalIds es solo para una salida sin personal. Se cambia con los reemplazos",
+                    },
+                    { status: 400 },
+                );
+            }
+            if (
+                !Array.isArray(body.personalIds) ||
+                body.personalIds.length === 0 ||
+                !body.personalIds.every((id) => Number.isInteger(id) && Number(id) > 0) ||
+                new Set(body.personalIds).size !== body.personalIds.length
+            ) {
+                return HttpResponse.json(
+                    { error: "personalIds debe ser una lista de ids de personal, sin repetidos" },
+                    { status: 400 },
+                );
+            }
+            salida.personalAsignado = (body.personalIds as number[]).map((idpersonal) => ({
+                idsalida: salida.idsalida,
+                idpersonal,
+                personal: personaDe(idpersonal),
+            }));
+            salida.cantidadPersonal = salida.personalAsignado.length;
+            salida.guias = salida.personalAsignado
+                .filter((p) => p.personal.rol === "Guía")
+                .map((p) => p.personal.nombreCompleto);
+        }
+
+        if (salida.ventaAbierta) {
+            const ultimo = salida.ultimoDiaVenta ?? salida.fechaInicio.slice(0, 10);
+            return HttpResponse.json(
+                {
+                    error: `La venta sigue abierta hasta el ${formatearDmy(ultimo)}: la salida se confirma después del corte`,
+                },
+                { status: 400 },
+            );
+        }
+        const vendidos = salida.pasajerosConfirmados ?? 0;
+        if (vendidos === 0) {
+            return HttpResponse.json(
+                { error: "La salida no tiene pasajeros confirmados: corresponde cancelarla" },
+                { status: 400 },
+            );
+        }
+        if (salida.alertas?.includes("SOLICITUD_PENDIENTE")) {
+            const reservasSinAlojamiento = ["RES-2026-099"];
+            return HttpResponse.json(
+                {
+                    error: `No se puede confirmar: hay alojamientos sin confirmar en las reservas ${reservasSinAlojamiento.join(", ")}`,
+                    detalle: { reservasSinAlojamiento, faltantes: [] },
+                },
+                { status: 409 },
+            );
+        }
+        const lugaresLiberados = Math.max(0, salida.tamanoMaximo - vendidos);
         salida.estado = "CERRADA";
         salida.stockLocal = 0;
+        salida.ventaAbierta = false;
+        salida.puedeConfirmar = false;
+        salida.alertas = (salida.alertas ?? []).filter((a) => a !== "PENDIENTE_CONFIRMAR");
+        salida.avisos = (salida.avisos ?? []).filter((a) => a.alerta !== "PENDIENTE_CONFIRMAR");
         return HttpResponse.json({
-            mensaje: "Asignación confirmada y permisos de la nómina emitidos",
-            data: { salida, permisosEmitidos: vendidos + personalIds.length, rechazados: [], lugaresLiberados },
+            mensaje: "Salida confirmada y permisos de la nómina emitidos",
+            data: {
+                salida: { idsalida: salida.idsalida, nroSalida: salida.nroSalida, estado: "CERRADA" },
+                permisosEmitidos: vendidos + salida.personalAsignado.length,
+                rechazados: [],
+                lugaresLiberados,
+            },
         });
     }),
 

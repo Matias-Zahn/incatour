@@ -317,6 +317,41 @@ export function darDeBajaServicio(idservicio: number): Promise<Servicio> {
         .then((item) => normalizarServicio(item));
 }
 
+export type DiaOcupacionServicio = {
+    fecha: string;
+    ocupado: number;
+    disponible: number | null;
+};
+
+export type ItemOcupacionServicio = {
+    idsalida?: number;
+    nroSalida: string;
+    desde: string;
+    hasta: string;
+    cantidad: number;
+    estadoSalida: "PUBLICADA" | "CERRADA" | "EN_CURSO" | "FINALIZADA" | string;
+};
+
+export type OcupacionServicio = {
+    total: number | null;
+    dias: DiaOcupacionServicio[];
+    ocupaciones: ItemOcupacionServicio[];
+};
+
+export function obtenerOcupacionServicio(
+    idservicio: number,
+    desde?: string,
+    hasta?: string,
+): Promise<OcupacionServicio> {
+    const params = new URLSearchParams();
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    const query = params.toString();
+    return solicitarApi<RespuestaDatos<OcupacionServicio>>(
+        `/servicios/${idservicio}/ocupacion${query ? `?${query}` : ""}`,
+    ).then(extraer);
+}
+
 export const darDeBaja = darDeBajaServicio;
 
 export const clavesServicios = {
@@ -324,7 +359,23 @@ export const clavesServicios = {
     listaPorProveedor: (idproveedor: number, filtros: FiltrosServicio) =>
         ["servicios", idproveedor, "lista", filtros] as const,
     uno: (idservicio: number) => ["servicio", idservicio] as const,
+    ocupacion: (idservicio: number, desde?: string, hasta?: string) =>
+        ["servicio", idservicio, "ocupacion", desde ?? "", hasta ?? ""] as const,
 };
+
+export function useOcupacionServicio(
+    idservicio: number | null | undefined,
+    desde?: string,
+    hasta?: string,
+) {
+    const idValido =
+        typeof idservicio === "number" && Number.isInteger(idservicio) && idservicio > 0;
+    return useQuery({
+        queryKey: clavesServicios.ocupacion(idservicio ?? 0, desde, hasta),
+        queryFn: () => obtenerOcupacionServicio(idservicio!, desde, hasta),
+        enabled: idValido,
+    });
+}
 
 export function useServicios(idproveedor: number, filtros: FiltrosServicio = {}) {
     return useQuery({

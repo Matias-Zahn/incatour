@@ -1,29 +1,35 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import Alerta from "./Alerta";
+import AsistentePasos from "./AsistentePasos";
 import Boton from "./Boton";
 import type { Circuito } from "../services/circuitoService";
 import {
+    DIAS_CIERRE_VENTA_DEFECTO,
     DIAS_HABILES,
     DIAS_SEMANA,
     FIN_DE_SEMANA,
     TODOS_LOS_DIAS,
-    extraerNombreFotoCarrusel,
     parsearDiasDisponibles,
-    resolverUrlImagenPaquete,
     serializarDiasDisponibles,
-    useEliminarFotoIndividualPaquete,
-    useModificarFotoIndividualPaquete,
     usePaqueteDetalle,
+    useSimularCostoPaquete,
     type CodigoDia,
     type DatosCrearPaquete,
     type DatosModificarPaquete,
+    type ItemEquipoPaquete,
     type Paquete,
     type PrecioTemporadaInput,
+    type ResultadoSimularCosto,
     type ServicioDisponiblePaquete,
     type TipoGarantiaPaquete,
 } from "../services/paqueteService";
 import { temporadaVencida, type Temporada } from "../services/temporadaService";
-import { formatearRangoFechasUtc } from "../services/formato";
+import {
+    etiquetaTipoServicio,
+    formatearMonto,
+    formatearRangoFechasUtc,
+} from "../services/formato";
 
 type FormularioPaqueteProps = {
     paqueteEnEdicion?: Paquete | null;
@@ -36,7 +42,7 @@ type FormularioPaqueteProps = {
         imagenesArchivos?: File[],
     ) => void;
     alGuardarEdicion: (
-        id: number,
+        idpaquete: number,
         datos: DatosModificarPaquete,
         imagenesArchivos?: File[],
     ) => void;
@@ -45,60 +51,40 @@ type FormularioPaqueteProps = {
     errorServidor?: string;
 };
 
-const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
-const TAMANO_MAXIMO_IMAGEN_BYTES = 3 * 1024 * 1024; // 3 MB
-const MAX_IMAGENES_PAQUETE = 5;
+type FilaPrecio = {
+    idtemporada: number;
+    monto: string;
+    moneda: string;
+};
 
 const CATEGORIAS_SUGERIDAS = [
+    "1 Estrella",
+    "2 Estrellas",
     "3 Estrellas",
     "4 Estrellas",
     "5 Estrellas",
-    "Boutique",
 ];
 
-const HABITACIONES_SUGERIDAS = ["Doble", "Simple", "Triple", "Matrimonial"];
-
-const LOCALIDADES_SUGERIDAS = [
-    "Cusco",
-    "Ollantaytambo",
-    "Aguas Calientes",
-    "Valle Sagrado",
+const HABITACIONES_SUGERIDAS = [
+    "Simple",
+    "Doble",
+    "Triple",
+    "Matrimonial",
+    "Suite",
 ];
 
-function normalizarTipoGarantiaInicial(valor?: string): TipoGarantiaPaquete {
-    if (!valor) return "POR_CATEGORIA";
-    const limpio = valor.toUpperCase();
-    if (limpio.includes("ESTABLECIMIENTO")) {
-        return "POR_ESTABLECIMIENTO";
-    }
-    return "POR_CATEGORIA";
+const LOCALIDADES_BASE = ["Cusco", "Aguas Calientes", "Ollantaytambo", "Urubamba"];
+
+const PASOS_PAQUETE = [
+    { titulo: "Datos y garantía", descripcion: "Definí el nombre, circuito, ciudad de salida y garantía hotelera." },
+    { titulo: "Servicios y equipo", descripcion: "Elegí el transporte obligatorio, tren opcional y el equipo con su regla por pasajeros." },
+    { titulo: "Noches y venta", descripcion: "Configurá las noches de hotel, días habilitados, corte de venta y condiciones." },
+    { titulo: "Precios con costo", descripcion: "Revisá el costo por pasajero en vivo, probá un margen y definí las tarifas por temporada." },
+];
+
+function esGarantiaEstablecimiento(tipo?: string): boolean {
+    return (tipo ?? "").toUpperCase().includes("ESTABLECIMIENTO");
 }
-
-function tarifasIniciales(
-    paquete?: Paquete | null,
-    temporadas: Temporada[] = [],
-): PrecioTemporadaInput[] {
-    if (paquete?.tarifas && paquete.tarifas.length > 0) {
-        return paquete.tarifas.map((tarifa) => ({
-            idtemporada: tarifa.idtemporada,
-            monto: tarifa.monto,
-            // RES-16: la única moneda es USD; un paquete viejo en otra moneda se edita y se guarda en USD
-            moneda: "USD",
-        }));
-    }
-    const primeraTemporada = (temporadas.find((t) => !temporadaVencida(t)) ?? temporadas[0])?.idtemporada ?? 0;
-    return [
-        {
-            idtemporada: primeraTemporada,
-            monto: 650,
-            moneda: "USD",
-        },
-    ];
-}
-
-
-// Marca para que el navegador no muestre la foto vieja desde la caché
-const marcaDeTiempo = () => Date.now();
 
 function FormularioPaquete({
     paqueteEnEdicion,
@@ -113,1656 +99,1187 @@ function FormularioPaquete({
     errorServidor,
 }: FormularioPaqueteProps) {
     const esEdicion = Boolean(paqueteEnEdicion);
-
-    const circuitoConEtapas =
-        circuitos.find((c) => (c.etapas?.length ?? 0) > 0) ?? circuitos[0];
-
-    const [idcircuito, setIdcircuito] = useState<number>(
-        paqueteEnEdicion?.idcircuito ?? circuitoConEtapas?.idcircuito ?? 0,
+    const { data: detallePaquete } = usePaqueteDetalle(
+        paqueteEnEdicion?.idpaquete ?? null,
     );
+    const paqueteFuente = detallePaquete ?? paqueteEnEdicion ?? null;
+
+    const [pasoActual, setPasoActual] = useState(0);
+    const [errorPaso, setErrorPaso] = useState("");
+
+    // Servicios clasificados por tipo
+    const transportesActivos = useMemo(
+        () =>
+            serviciosDisponibles.filter(
+                (s) => s.tipo === "TRANSPORTE" && s.estado === "ACTIVO",
+            ),
+        [serviciosDisponibles],
+    );
+    const trenesActivos = useMemo(
+        () =>
+            serviciosDisponibles.filter(
+                (s) => s.tipo === "TREN" && s.estado === "ACTIVO",
+            ),
+        [serviciosDisponibles],
+    );
+    const equiposActivos = useMemo(
+        () =>
+            serviciosDisponibles.filter(
+                (s) => s.tipo === "EQUIPAMIENTO" && s.estado === "ACTIVO",
+            ),
+        [serviciosDisponibles],
+    );
+    const alojamientosBloqueo = useMemo(
+        () =>
+            serviciosDisponibles.filter(
+                (s) =>
+                    s.tipo === "ALOJAMIENTO" &&
+                    s.estado === "ACTIVO" &&
+                    (s.datos?.modalidadConfirmacion ??
+                        s.disponibilidad?.modalidadConfirmacion) ===
+                        "BLOQUEO_PLAZAS",
+            ),
+        [serviciosDisponibles],
+    );
+
+    const localidadesSugeridas = useMemo(() => {
+        const set = new Set<string>(LOCALIDADES_BASE);
+        for (const s of serviciosDisponibles) {
+            if (s.localidad?.trim()) set.add(s.localidad.trim());
+        }
+        return Array.from(set);
+    }, [serviciosDisponibles]);
+
+    const localidadInicial =
+        paqueteFuente?.localidadGarantizada ??
+        paqueteFuente?.garantiasEstablecimiento?.[0]?.servicio?.localidad ??
+        "Cusco";
+
+    // Paso 1: Datos y garantía
     const [nombrePaquete, setNombrePaquete] = useState(
-        paqueteEnEdicion?.nombrePaquete ?? "",
+        paqueteFuente?.nombrePaquete ?? "",
     );
-    const [condiciones, setCondiciones] = useState(
-        paqueteEnEdicion?.condiciones ?? "",
+    const [idcircuito, setIdcircuito] = useState<number>(
+        paqueteFuente?.idcircuito ?? circuitos[0]?.idcircuito ?? 0,
     );
-    const [nochesPrevias, setNochesPrevias] = useState<string>(
-        String(paqueteEnEdicion?.nochesPrevias ?? 0),
-    );
-    const [nochesPosteriores, setNochesPosteriores] = useState<string>(
-        String(paqueteEnEdicion?.nochesPosteriores ?? 0),
-    );
-    // Vacío = sin plazo: el reintegro es siempre del 100% (RES-06)
-    const [diasMinimosReintegro, setDiasMinimosReintegro] = useState<string>(
-        paqueteEnEdicion?.diasMinimosReintegro != null
-            ? String(paqueteEnEdicion.diasMinimosReintegro)
-            : "",
-    );
-    const [diasSeleccionados, setDiasSeleccionados] = useState<CodigoDia[]>(
-        () => parsearDiasDisponibles(paqueteEnEdicion?.diasDisponibles),
-    );
-
+    const [localidadGarantizada, setLocalidadGarantizada] = useState(localidadInicial);
     const [tipoGarantia, setTipoGarantia] = useState<TipoGarantiaPaquete>(
-        normalizarTipoGarantiaInicial(paqueteEnEdicion?.tipoGarantia),
-    );
-
-    const alojamientosDisponibles = serviciosDisponibles.filter(
-        (s) => s.tipo === "ALOJAMIENTO",
-    );
-    const primerAlojamientoBloqueo = alojamientosDisponibles.find(
-        (s) =>
-            (s.datos?.modalidadConfirmacion ??
-                s.disponibilidad?.modalidadConfirmacion) === "BLOQUEO_PLAZAS",
-    );
-
-    const {
-        data: detallePaquete,
-        isLoading: cargandoDetalle,
-        isError: errorDetalle,
-    } = usePaqueteDetalle(paqueteEnEdicion?.idpaquete ?? null);
-    // GET /paquetes no trae servicios ni garantías: hasta tener el detalle no se puede guardar
-    const detalleBloqueado = esEdicion && !detallePaquete;
-
-    const [idservicioGarantizadoEditado, setIdservicioGarantizado] = useState<
-        number | null
-    >(null);
-    const idservicioGarantizado =
-        idservicioGarantizadoEditado ??
-        paqueteEnEdicion?.garantiasEstablecimiento?.[0]?.idservicio ??
-        detallePaquete?.garantiasEstablecimiento?.[0]?.idservicio ??
-        primerAlojamientoBloqueo?.idservicio ??
-        alojamientosDisponibles[0]?.idservicio ??
-        0;
-
-    const [localidadGarantizada, setLocalidadGarantizada] = useState(
-        paqueteEnEdicion?.localidadGarantizada ?? "Cusco",
+        esGarantiaEstablecimiento(paqueteFuente?.tipoGarantia)
+            ? "POR_ESTABLECIMIENTO"
+            : "POR_CATEGORIA",
     );
     const [categoriaGarantizada, setCategoriaGarantizada] = useState(
-        paqueteEnEdicion?.categoriaGarantizada ?? "3 Estrellas",
+        paqueteFuente?.categoriaGarantizada ?? "3 Estrellas",
     );
     const [tipoHabitacionGarantizada, setTipoHabitacionGarantizada] = useState(
-        paqueteEnEdicion?.tipoHabitacionGarantizada ?? "Doble",
+        paqueteFuente?.tipoHabitacionGarantizada ?? "Doble",
+    );
+    const [idservicioGarantizado, setIdservicioGarantizado] = useState<number>(
+        paqueteFuente?.garantiasEstablecimiento?.[0]?.idservicio ?? 0,
     );
 
-    // Las filas guardadas son las primeras N de la matriz: las nuevas solo se agregan al final
-    const cantidadPersistidas = esEdicion
-        ? (paqueteEnEdicion?.tarifas?.length ?? 0)
-        : 0;
+    // Paso 2: Servicios por tipo (B2)
+    const transporteInicial =
+        paqueteFuente?.servicios?.find((s) => s.tipo === "TRANSPORTE")?.idservicio ?? 0;
+    const trenInicial =
+        paqueteFuente?.servicios?.find((s) => s.tipo === "TREN")?.idservicio ?? 0;
+    const equipoInicial: ItemEquipoPaquete[] = (paqueteFuente?.servicios ?? [])
+        .filter((s) => s.tipo === "EQUIPAMIENTO")
+        .map((s) => ({
+            idservicio: s.idservicio,
+            cantidad: s.cantidad ?? 1,
+            cadaPasajeros: s.cadaPasajeros ?? 1,
+        }));
 
-    const [verTarifasVencidas, setVerTarifasVencidas] = useState(false);
-    const [matrizPrecios, setMatrizPrecios] = useState<PrecioTemporadaInput[]>(
-        () => tarifasIniciales(paqueteEnEdicion, temporadas),
+    const [idtransporte, setIdtransporte] = useState<number>(transporteInicial);
+    const [idtren, setIdtren] = useState<number>(trenInicial);
+    const [equipo, setEquipo] = useState<ItemEquipoPaquete[]>(equipoInicial);
+
+    // Sincronizar cuando llega el detalle del paquete en edición
+    const [sincronizadoDetalleId, setSincronizadoDetalleId] = useState<number | null>(
+        paqueteEnEdicion?.servicios ? paqueteEnEdicion.idpaquete : null,
     );
-    const [serviciosIncluidosEditados, setServiciosIncluidosEditados] =
-        useState<number[] | null>(null);
-    const serviciosIncluidos =
-        serviciosIncluidosEditados ??
-        paqueteEnEdicion?.servicios?.map((item) => item.idservicio) ??
-        detallePaquete?.servicios?.map((item) => item.idservicio) ??
-        [];
-    const [imagenesArchivos, setImagenesArchivos] = useState<File[]>([]);
-    const [vistasPrevias, setVistasPrevias] = useState<string[]>([]);
-    const [errorValidacion, setErrorValidacion] = useState("");
-    const [mensajeFotoIndividual, setMensajeFotoIndividual] = useState("");
-    const [imagenesServidorEditadas, setImagenesServidorEditadas] = useState<
-        string[] | null
-    >(null);
-    const [tienePropiasEditado, setTienePropiasEditado] = useState<
-        boolean | null
-    >(null);
+    if (
+        detallePaquete &&
+        sincronizadoDetalleId !== detallePaquete.idpaquete
+    ) {
+        setSincronizadoDetalleId(detallePaquete.idpaquete);
+        const tr = detallePaquete.servicios?.find((s) => s.tipo === "TRANSPORTE")?.idservicio ?? 0;
+        const tren = detallePaquete.servicios?.find((s) => s.tipo === "TREN")?.idservicio ?? 0;
+        const eq = (detallePaquete.servicios ?? [])
+            .filter((s) => s.tipo === "EQUIPAMIENTO")
+            .map((s) => ({
+                idservicio: s.idservicio,
+                cantidad: s.cantidad ?? 1,
+                cadaPasajeros: s.cadaPasajeros ?? 1,
+            }));
+        if (tr) setIdtransporte(tr);
+        setIdtren(tren);
+        setEquipo(eq);
+        const estId = detallePaquete.garantiasEstablecimiento?.[0]?.idservicio ?? 0;
+        if (estId) setIdservicioGarantizado(estId);
+    }
 
-    const mutacionModificarFoto = useModificarFotoIndividualPaquete();
-    const mutacionEliminarFoto = useEliminarFotoIndividualPaquete();
+    // Paso 3: Noches, venta, condiciones e imágenes
+    const [nochesPrevias, setNochesPrevias] = useState(
+        String(paqueteFuente?.nochesPrevias ?? 1),
+    );
+    const [nochesPosteriores, setNochesPosteriores] = useState(
+        String(paqueteFuente?.nochesPosteriores ?? 1),
+    );
+    const [diasElegidos, setDiasElegidos] = useState<CodigoDia[]>(
+        parsearDiasDisponibles(paqueteFuente?.diasDisponibles),
+    );
+    const [diasCierreVenta, setDiasCierreVenta] = useState(
+        String(paqueteFuente?.diasCierreVenta ?? DIAS_CIERRE_VENTA_DEFECTO),
+    );
+    const [diasMinimosReintegro, setDiasMinimosReintegro] = useState(
+        paqueteFuente?.diasMinimosReintegro != null
+            ? String(paqueteFuente.diasMinimosReintegro)
+            : "",
+    );
+    const [condiciones, setCondiciones] = useState(
+        paqueteFuente?.condiciones ?? "",
+    );
+    const [archivosImagenes, setArchivosImagenes] = useState<File[]>([]);
+    const inputImagenesRef = useRef<HTMLInputElement>(null);
 
-    const imagenesActualesPaquete: string[] =
-        imagenesServidorEditadas ??
-        (paqueteEnEdicion?.imagenes && paqueteEnEdicion.imagenes.length > 0
-            ? paqueteEnEdicion.imagenes
-            : paqueteEnEdicion?.imagenPrincipal
-              ? [paqueteEnEdicion.imagenPrincipal]
-              : []);
+    // Paso 4: Costo por pasajero (B5) + Matriz de precios
+    const temporadasActivas = useMemo(
+        () => temporadas.filter((t) => t.estado === "ACTIVO" && !temporadaVencida(t)),
+        [temporadas],
+    );
 
-    const tieneImagenesPropiasActual =
-        tienePropiasEditado ?? Boolean(paqueteEnEdicion?.tieneImagenesPropias);
+    const [filasPrecios, setFilasPrecios] = useState<FilaPrecio[]>(() => {
+        if (paqueteFuente?.tarifas && paqueteFuente.tarifas.length > 0) {
+            return paqueteFuente.tarifas.map((t) => ({
+                idtemporada: t.idtemporada,
+                monto: String(t.monto),
+                moneda: t.moneda || "USD",
+            }));
+        }
+        return [
+            {
+                idtemporada: temporadasActivas[0]?.idtemporada ?? 0,
+                monto: "",
+                moneda: "USD",
+            },
+        ];
+    });
 
-    const SLOTS_CARRUSEL = [
-        "principal",
-        "foto_2",
-        "foto_3",
-        "foto_4",
-        "foto_5",
-    ] as const;
+    const [pasajerosSimulacion, setPasajerosSimulacion] = useState("12");
+    const [margenPorcentaje, setMargenPorcentaje] = useState("25");
+    const [simulacion, setSimulacion] = useState<ResultadoSimularCosto | null>(null);
+    const [errorSimulacion, setErrorSimulacion] = useState("");
+    const simularMutation = useSimularCostoPaquete();
+    const { mutate: ejecutarSimulacion } = simularMutation;
 
-    function obtenerProximoSlotLibre(): string {
-        const usados = new Set(
-            imagenesActualesPaquete.map((url, idx) =>
-                extraerNombreFotoCarrusel(url, idx),
-            ),
+    // Hoteles filtrados por la ciudad de "Sale desde" (B2)
+    const alojamientosCiudad = useMemo(() => {
+        const ciudad = localidadGarantizada.trim().toLowerCase();
+        if (!ciudad) return alojamientosBloqueo;
+        return alojamientosBloqueo.filter(
+            (h) => (h.localidad ?? "").trim().toLowerCase() === ciudad,
         );
-        for (const slot of SLOTS_CARRUSEL) {
-            if (!usados.has(slot)) return slot;
-        }
-        return `foto_${Math.min(5, imagenesActualesPaquete.length + 1)}`;
-    }
+    }, [alojamientosBloqueo, localidadGarantizada]);
 
-    async function manejarReemplazarFotoIndividual(
-        nombreFoto: string,
-        indice: number,
-        evento: React.ChangeEvent<HTMLInputElement>,
-    ) {
-        const archivo = evento.target.files?.[0];
-        evento.target.value = "";
-        if (!archivo || !paqueteEnEdicion) return;
+    // Simular costo en vivo al entrar o modificar parámetros en el Paso 4 (B5)
+    useEffect(() => {
+        if (pasoActual !== 3) return;
+        const pax = Number(pasajerosSimulacion);
+        if (!Number.isInteger(pax) || pax < 1 || pax > 100) return;
+        if (!localidadGarantizada.trim()) return;
 
-        setErrorValidacion("");
-        setMensajeFotoIndividual("");
-
-        if (!FORMATOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
-            setErrorValidacion(
-                `El archivo "${archivo.name}" no tiene un formato válido (JPG, PNG o WEBP).`,
+        const timer = setTimeout(() => {
+            setErrorSimulacion("");
+            ejecutarSimulacion(
+                {
+                    tipoGarantia,
+                    ...(tipoGarantia === "POR_ESTABLECIMIENTO" && idservicioGarantizado > 0
+                        ? { idservicioGarantizado }
+                        : {}),
+                    localidadGarantizada: localidadGarantizada.trim(),
+                    ...(tipoGarantia === "POR_CATEGORIA"
+                        ? { categoriaGarantizada, tipoHabitacionGarantizada }
+                        : {}),
+                    nochesPrevias: Math.max(0, Number(nochesPrevias) || 0),
+                    nochesPosteriores: Math.max(0, Number(nochesPosteriores) || 0),
+                    ...(idtransporte > 0 ? { idtransporte } : {}),
+                    ...(idtren > 0 ? { idtren } : {}),
+                    equipo,
+                    pasajeros: pax,
+                },
+                {
+                    onSuccess: (res) => setSimulacion(res),
+                    onError: (err) => {
+                        setSimulacion(null);
+                        setErrorSimulacion(err.message);
+                    },
+                },
             );
-            return;
-        }
-        if (archivo.size > TAMANO_MAXIMO_IMAGEN_BYTES) {
-            setErrorValidacion(
-                `El archivo "${archivo.name}" supera el límite de 3 MB.`,
-            );
-            return;
-        }
+        }, 200);
 
-        try {
-            const res = await mutacionModificarFoto.mutateAsync({
-                id: paqueteEnEdicion.idpaquete,
-                nombreFoto,
-                archivo,
-            });
-            const urlConCacheBust = `${res.url}?v=${marcaDeTiempo()}`;
-            setImagenesServidorEditadas((prev) => {
-                const base = [...(prev ?? imagenesActualesPaquete)];
-                if (indice >= 0 && indice < base.length) {
-                    base[indice] = urlConCacheBust;
-                } else {
-                    base.push(urlConCacheBust);
-                }
-                return base;
-            });
-            setTienePropiasEditado(true);
-            setMensajeFotoIndividual(
-                indice >= 0
-                    ? `✓ Se actualizó "${nombreFoto === "principal" ? "Portada principal" : nombreFoto}" correctamente.`
-                    : `✓ Se agregó una nueva foto (${nombreFoto}) a la galería del paquete.`,
-            );
-        } catch (err) {
-            setErrorValidacion(
-                err instanceof Error
-                    ? err.message
-                    : "No se pudo actualizar la foto individual.",
-            );
-        }
-    }
+        return () => clearTimeout(timer);
+    }, [
+        pasoActual,
+        pasajerosSimulacion,
+        tipoGarantia,
+        idservicioGarantizado,
+        localidadGarantizada,
+        categoriaGarantizada,
+        tipoHabitacionGarantizada,
+        nochesPrevias,
+        nochesPosteriores,
+        idtransporte,
+        idtren,
+        equipo,
+        ejecutarSimulacion,
+    ]);
 
-    async function manejarEliminarFotoIndividual(
-        nombreFoto: string,
-        indice: number,
-    ) {
-        if (!paqueteEnEdicion) return;
-        if (imagenesActualesPaquete.length <= 1) {
-            setErrorValidacion(
-                "El paquete debe conservar como mínimo 1 imagen. Si querés cambiarla, usá el botón «Cambiar».",
-            );
-            return;
-        }
-
-        setErrorValidacion("");
-        setMensajeFotoIndividual("");
-
-        try {
-            await mutacionEliminarFoto.mutateAsync({
-                id: paqueteEnEdicion.idpaquete,
-                nombreFoto,
-            });
-            setImagenesServidorEditadas((prev) => {
-                const base = [...(prev ?? imagenesActualesPaquete)];
-                return base.filter((_, idx) => idx !== indice);
-            });
-            setMensajeFotoIndividual(
-                `✓ Se eliminó "${nombreFoto === "principal" ? "Portada principal" : nombreFoto}" de la galería.`,
-            );
-        } catch (err) {
-            setErrorValidacion(
-                err instanceof Error
-                    ? err.message
-                    : "No se pudo eliminar la foto del carrusel.",
-            );
-        }
-    }
-
-    const circuitoSeleccionado = circuitos.find(
-        (c) => c.idcircuito === idcircuito,
-    );
-    const cantidadEtapasCircuito = circuitoSeleccionado?.etapas?.length ?? 0;
-
-    function manejarSeleccionImagenes(
-        evento: React.ChangeEvent<HTMLInputElement>,
-    ) {
-        setErrorValidacion("");
-        const listaSeleccionada = Array.from(evento.target.files ?? []);
-        evento.target.value = "";
-        if (listaSeleccionada.length === 0) {
-            return;
-        }
-
-        if (
-            imagenesArchivos.length + listaSeleccionada.length >
-            MAX_IMAGENES_PAQUETE
-        ) {
-            setErrorValidacion(
-                `Solo se permiten hasta ${MAX_IMAGENES_PAQUETE} imágenes por paquete (actualmente tenés ${imagenesArchivos.length} seleccionadas).`,
-            );
-            return;
-        }
-
-        for (const archivo of listaSeleccionada) {
-            if (!FORMATOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
-                setErrorValidacion(
-                    `El archivo "${archivo.name}" no tiene un formato válido. Solo se permiten JPG, PNG o WEBP.`,
-                );
-                return;
-            }
-            if (archivo.size > TAMANO_MAXIMO_IMAGEN_BYTES) {
-                setErrorValidacion(
-                    `El archivo "${archivo.name}" supera el tamaño máximo permitido de 3 MB.`,
-                );
-                return;
-            }
-        }
-
-        const nuevasUrls = listaSeleccionada.map((archivo) =>
-            URL.createObjectURL(archivo),
-        );
-        setImagenesArchivos((prev) => [...prev, ...listaSeleccionada]);
-        setVistasPrevias((prev) => [...prev, ...nuevasUrls]);
-    }
-
-    function quitarImagenEnIndice(indice: number) {
-        setVistasPrevias((prev) => {
-            const urlQuitada = prev[indice];
-            if (urlQuitada) URL.revokeObjectURL(urlQuitada);
-            return prev.filter((_, idx) => idx !== indice);
-        });
-        setImagenesArchivos((prev) => prev.filter((_, idx) => idx !== indice));
-    }
-
-    function promoverImagenAPortada(indice: number) {
-        if (indice <= 0 || indice >= imagenesArchivos.length) return;
-        setImagenesArchivos((prev) => {
-            const copia = [...prev];
-            const [elegida] = copia.splice(indice, 1);
-            return elegida ? [elegida, ...copia] : prev;
-        });
-        setVistasPrevias((prev) => {
-            const copia = [...prev];
-            const [elegida] = copia.splice(indice, 1);
-            return elegida ? [elegida, ...copia] : prev;
-        });
-    }
-
-    function limpiarTodasLasImagenesSeleccionadas() {
-        for (const url of vistasPrevias) {
-            URL.revokeObjectURL(url);
-        }
-        setImagenesArchivos([]);
-        setVistasPrevias([]);
-    }
+    const costoEstimado = simulacion?.costoPorPasajero ?? null;
+    const margenNum = Number(margenPorcentaje);
+    const tarifaSugerida =
+        costoEstimado !== null && Number.isFinite(margenNum) && margenNum >= 0
+            ? Math.round(costoEstimado * (1 + margenNum / 100) * 100) / 100
+            : null;
 
     function alternarDia(codigo: CodigoDia) {
-        setErrorValidacion("");
-        setDiasSeleccionados((previos) => {
-            if (previos.includes(codigo)) {
-                if (previos.length <= 1) return previos;
-                return previos.filter((item) => item !== codigo);
+        setDiasElegidos((prev) =>
+            prev.includes(codigo) ? prev.filter((d) => d !== codigo) : [...prev, codigo],
+        );
+    }
+
+    function alternarEquipo(idservicio: number) {
+        setEquipo((prev) => {
+            if (prev.some((e) => e.idservicio === idservicio)) {
+                return prev.filter((e) => e.idservicio !== idservicio);
             }
-            return [...previos, codigo];
+            return [...prev, { idservicio, cantidad: 1, cadaPasajeros: 1 }];
         });
     }
 
-    function alternarServicioIncluido(idServicio: number) {
-        setErrorValidacion("");
-        setServiciosIncluidosEditados((previos) => {
-            const base = previos ?? serviciosIncluidos;
-            return base.includes(idServicio)
-                ? base.filter((id) => id !== idServicio)
-                : [...base, idServicio];
-        });
-    }
-
-    function actualizarFilaPrecio(
-        indice: number,
-        cambios: Partial<PrecioTemporadaInput>,
+    function actualizarReglaEquipo(
+        idservicio: number,
+        campo: "cantidad" | "cadaPasajeros",
+        valor: number,
     ) {
-        setErrorValidacion("");
-        setMatrizPrecios((previas) =>
-            previas.map((fila, idx) =>
-                idx === indice ? { ...fila, ...cambios } : fila,
+        setEquipo((prev) =>
+            prev.map((item) =>
+                item.idservicio === idservicio ? { ...item, [campo]: valor } : item,
             ),
         );
     }
 
-    const esTemporadaVencida = (idtemporada: number) => {
-        const temporada = temporadas.find((t) => t.idtemporada === idtemporada);
-        return temporada !== undefined && temporadaVencida(temporada);
-    };
-    const tarifasVencidas = matrizPrecios.filter((f) => esTemporadaVencida(f.idtemporada)).length;
-
     function agregarFilaPrecio() {
-        setErrorValidacion("");
-        const usadas = new Set(matrizPrecios.map((f) => f.idtemporada));
-        const temporadaLibre = temporadas.find(
-            (t) => !usadas.has(t.idtemporada) && !temporadaVencida(t),
-        );
-        if (!temporadaLibre) {
-            setErrorValidacion(
-                "Ya agregaste una tarifa para todas las temporadas activas disponibles.",
-            );
-            return;
-        }
-        setMatrizPrecios((previas) => [
-            ...previas,
+        const usadas = new Set(filasPrecios.map((f) => f.idtemporada));
+        const libre = temporadasActivas.find((t) => !usadas.has(t.idtemporada));
+        setFilasPrecios((prev) => [
+            ...prev,
             {
-                idtemporada: temporadaLibre.idtemporada,
-                monto: 650,
+                idtemporada: libre?.idtemporada ?? 0,
+                monto: tarifaSugerida != null ? String(tarifaSugerida) : "",
                 moneda: "USD",
             },
         ]);
     }
 
-    function quitarFilaPrecio(indice: number) {
-        const fila = matrizPrecios[indice];
-        if (fila && indice < cantidadPersistidas) {
-            return;
-        }
-        if (matrizPrecios.length <= 1) {
-            setErrorValidacion(
-                "El paquete debe tener al menos una tarifa vigente en su matriz de precios.",
-            );
-            return;
-        }
-        setErrorValidacion("");
-        setMatrizPrecios((previas) =>
-            previas.filter((_, idx) => idx !== indice),
+    function actualizarFilaPrecio(indice: number, cambios: Partial<FilaPrecio>) {
+        setFilasPrecios((prev) =>
+            prev.map((f, i) => (i === indice ? { ...f, ...cambios } : f)),
         );
     }
 
-    function manejarSubmit(evento: React.FormEvent) {
-        evento.preventDefault();
-        setErrorValidacion("");
+    function quitarFilaPrecio(indice: number) {
+        setFilasPrecios((prev) => prev.filter((_, i) => i !== indice));
+    }
 
-        if (!nombrePaquete.trim()) {
-            setErrorValidacion("El nombre del paquete es obligatorio.");
-            return;
-        }
+    function aplicarTarifaSugeridaATodas() {
+        if (tarifaSugerida == null) return;
+        setFilasPrecios((prev) =>
+            prev.map((f) => ({ ...f, monto: String(tarifaSugerida) })),
+        );
+    }
 
-        if (diasSeleccionados.length === 0) {
-            setErrorValidacion(
-                "Seleccioná al menos un día de salida habilitado.",
-            );
-            return;
-        }
-
-        const nochesPreviasNumero =
-            nochesPrevias.trim() === "" ? 0 : Math.trunc(Number(nochesPrevias));
-        const nochesPosterioresNumero =
-            nochesPosteriores.trim() === ""
-                ? 0
-                : Math.trunc(Number(nochesPosteriores));
-
-        if (
-            !Number.isFinite(nochesPreviasNumero) ||
-            !Number.isFinite(nochesPosterioresNumero) ||
-            nochesPreviasNumero < 0 ||
-            nochesPosterioresNumero < 0 ||
-            nochesPreviasNumero > 30 ||
-            nochesPosterioresNumero > 30
-        ) {
-            setErrorValidacion(
-                "Las noches previas y posteriores deben estar entre 0 y 30.",
-            );
-            return;
-        }
-
-        if (diasMinimosReintegro !== "" && Number(diasMinimosReintegro) > 365) {
-            setErrorValidacion("Los días mínimos para reintegro no pueden superar 365.");
-            return;
-        }
-
-        if (matrizPrecios.length === 0) {
-            setErrorValidacion(
-                "La matriz de precios debe contener al menos una tarifa.",
-            );
-            return;
-        }
-
-        const temporadasVistas = new Set<number>();
-        for (let i = 0; i < matrizPrecios.length; i++) {
-            const fila = matrizPrecios[i];
-            if (!fila.idtemporada || fila.idtemporada <= 0) {
-                setErrorValidacion(
-                    `Seleccioná una temporada válida en la fila #${i + 1} de precios.`,
-                );
-                return;
-            }
-            if (!Number.isFinite(fila.monto) || fila.monto <= 0 || fila.monto > 10_000_000) {
-                setErrorValidacion(
-                    `El monto en la fila #${i + 1} debe ser mayor a 0 y no superar 10.000.000.`,
-                );
-                return;
-            }
-            if (temporadasVistas.has(fila.idtemporada)) {
-                setErrorValidacion(
-                    "No podés repetir la misma temporada en la matriz de precios.",
-                );
-                return;
-            }
-            temporadasVistas.add(fila.idtemporada);
-        }
-
-        const diasSerializados = serializarDiasDisponibles(diasSeleccionados);
-
-        if (!idcircuito || idcircuito <= 0) {
-            setErrorValidacion("Seleccioná un circuito turístico base.");
-            return;
-        }
-
-        if (cantidadEtapasCircuito === 0) {
-            setErrorValidacion(
-                "El circuito seleccionado todavía no tiene etapas cargadas. Configuralas antes de guardar el paquete.",
-            );
-            return;
-        }
-
-        if (tipoGarantia === "POR_ESTABLECIMIENTO") {
-            if (!idservicioGarantizado || idservicioGarantizado <= 0) {
-                setErrorValidacion(
-                    "Seleccioná el establecimiento de alojamiento garantizado.",
-                );
-                return;
-            }
-        } else {
+    // Validación por paso (B7: cada paso se valida antes de avanzar)
+    function validarPaso(paso: number): string | null {
+        if (paso === 0) {
+            if (!nombrePaquete.trim()) return "Ingresá el nombre del paquete.";
+            if (!idcircuito) return "Seleccioná un circuito activo.";
             if (!localidadGarantizada.trim()) {
-                setErrorValidacion(
-                    "Con garantía por categoría, la localidad garantizada es obligatoria.",
-                );
-                return;
+                return "Indicá desde qué ciudad sale el paquete (Sale desde).";
             }
-            if (!categoriaGarantizada.trim()) {
-                setErrorValidacion(
-                    "Con garantía por categoría, la categoría garantizada es obligatoria.",
+            if (tipoGarantia === "POR_ESTABLECIMIENTO") {
+                if (!idservicioGarantizado) {
+                    return "Elegí un hotel garantizado en la ciudad de salida.";
+                }
+                const hotel = alojamientosCiudad.find(
+                    (h) => h.idservicio === idservicioGarantizado,
                 );
-                return;
+                if (!hotel) {
+                    return `El hotel elegido no pertenece a ${localidadGarantizada.trim()} o no confirma por bloqueo de plazas.`;
+                }
+            } else {
+                if (!categoriaGarantizada.trim() || !tipoHabitacionGarantizada.trim()) {
+                    return "Completá la categoría y el tipo de habitación garantizados.";
+                }
             }
-            // FE-49: el back también la exige; se avisa acá en vez de esperar el 400
-            if (!tipoHabitacionGarantizada.trim()) {
-                setErrorValidacion(
-                    "Con garantía por categoría, el tipo de habitación garantizado es obligatorio.",
-                );
+            return null;
+        }
+
+        if (paso === 1) {
+            if (!idtransporte) {
+                return "Elegí un servicio de transporte (es obligatorio para todo paquete).";
+            }
+            for (const item of equipo) {
+                if (
+                    !Number.isInteger(item.cantidad) ||
+                    item.cantidad < 1 ||
+                    item.cantidad > 100 ||
+                    !Number.isInteger(item.cadaPasajeros) ||
+                    item.cadaPasajeros < 1 ||
+                    item.cadaPasajeros > 100
+                ) {
+                    return "Cada equipo seleccionado debe tener cantidad y cadaPasajeros enteros entre 1 y 100.";
+                }
+            }
+            return null;
+        }
+
+        if (paso === 2) {
+            const prev = Number(nochesPrevias);
+            const post = Number(nochesPosteriores);
+            const cierre = Number(diasCierreVenta);
+            if (!Number.isInteger(prev) || prev < 0 || prev > 30) {
+                return "Las noches previas deben ser un entero entre 0 y 30.";
+            }
+            if (!Number.isInteger(post) || post < 0 || post > 30) {
+                return "Las noches posteriores deben ser un entero entre 0 y 30.";
+            }
+            if (!Number.isInteger(cierre) || cierre < 0 || cierre > 30) {
+                return "Los días de cierre de venta deben ser un entero entre 0 y 30.";
+            }
+            if (diasElegidos.length === 0) {
+                return "Elegí al menos un día habilitado para las salidas.";
+            }
+            if (diasMinimosReintegro.trim() !== "") {
+                const reintegro = Number(diasMinimosReintegro);
+                if (!Number.isInteger(reintegro) || reintegro < 0 || reintegro > 365) {
+                    return "El plazo mínimo de reintegro debe ser un entero entre 0 y 365 días.";
+                }
+            }
+            return null;
+        }
+
+        if (paso === 3) {
+            if (filasPrecios.length === 0) {
+                return "Agregá al menos una tarifa por temporada.";
+            }
+            const vistas = new Set<number>();
+            for (const fila of filasPrecios) {
+                if (!fila.idtemporada) {
+                    return "Seleccioná una temporada en todas las filas de precios.";
+                }
+                if (vistas.has(fila.idtemporada)) {
+                    return "No podés repetir la misma temporada en la matriz de precios.";
+                }
+                vistas.add(fila.idtemporada);
+                const monto = Number(fila.monto);
+                if (!Number.isFinite(monto) || monto <= 0 || monto > 10_000_000) {
+                    return "Cada tarifa debe tener un monto mayor a 0 y menor o igual a 10.000.000.";
+                }
+            }
+            return null;
+        }
+
+        return null;
+    }
+
+    function avanzarPaso() {
+        const err = validarPaso(pasoActual);
+        if (err) {
+            setErrorPaso(err);
+            return;
+        }
+        setErrorPaso("");
+        setPasoActual((p) => Math.min(PASOS_PAQUETE.length - 1, p + 1));
+    }
+
+    function retrocederPaso() {
+        setErrorPaso("");
+        setPasoActual((p) => Math.max(0, p - 1));
+    }
+
+    function enviarFormulario(evento: React.FormEvent) {
+        evento.preventDefault();
+        for (let i = 0; i < PASOS_PAQUETE.length; i++) {
+            const err = validarPaso(i);
+            if (err) {
+                setPasoActual(i);
+                setErrorPaso(err);
                 return;
             }
         }
+        setErrorPaso("");
 
-        const payloadComun: DatosCrearPaquete = {
+        const matrizPrecios: PrecioTemporadaInput[] = filasPrecios.map((f) => ({
+            idtemporada: f.idtemporada,
+            monto: Number(f.monto),
+            moneda: "USD",
+        }));
+
+        const payloadComun = {
             idcircuito,
             nombrePaquete: nombrePaquete.trim(),
             condiciones: condiciones.trim() || undefined,
             tipoGarantia,
+            localidadGarantizada: localidadGarantizada.trim(),
             ...(tipoGarantia === "POR_ESTABLECIMIENTO"
-                ? // En edición sin tocar la garantía no se manda: el back la deja como está
-                  esEdicion &&
-                  idservicioGarantizadoEditado === null &&
-                  tipoGarantia ===
-                      normalizarTipoGarantiaInicial(
-                          paqueteEnEdicion?.tipoGarantia,
-                      )
-                    ? {}
-                    : { idservicioGarantizado }
+                ? { idservicioGarantizado }
                 : {
-                      localidadGarantizada: localidadGarantizada.trim(),
                       categoriaGarantizada: categoriaGarantizada.trim(),
-                      tipoHabitacionGarantizada:
-                          tipoHabitacionGarantizada.trim() || undefined,
+                      tipoHabitacionGarantizada: tipoHabitacionGarantizada.trim(),
                   }),
-            nochesPrevias: nochesPreviasNumero,
-            nochesPosteriores: nochesPosterioresNumero,
+            nochesPrevias: Number(nochesPrevias),
+            nochesPosteriores: Number(nochesPosteriores),
+            diasDisponibles: serializarDiasDisponibles(diasElegidos),
+            diasCierreVenta: Number(diasCierreVenta),
             diasMinimosReintegro:
-                diasMinimosReintegro === ""
+                diasMinimosReintegro.trim() === ""
                     ? null
-                    : Math.max(0, Math.trunc(Number(diasMinimosReintegro))),
-            diasDisponibles: diasSerializados,
+                    : Number(diasMinimosReintegro),
+            idtransporte,
+            idtren: idtren > 0 ? idtren : null,
+            equipo,
             matrizPrecios,
-            serviciosIncluidos,
         };
 
         if (esEdicion && paqueteEnEdicion) {
-            // Solo se manda si el usuario los tocó: reenviarlos falla si hay servicios dados de baja
-            const sinServicios: Partial<DatosCrearPaquete> = {
-                ...payloadComun,
-            };
-            delete sinServicios.serviciosIncluidos;
             alGuardarEdicion(
                 paqueteEnEdicion.idpaquete,
-                {
-                    ...(serviciosIncluidosEditados === null
-                        ? sinServicios
-                        : payloadComun),
-                    condiciones: condiciones.trim(),
-                },
-                imagenesArchivos,
+                payloadComun,
+                archivosImagenes.length > 0 ? archivosImagenes : undefined,
             );
-            return;
+        } else {
+            alGuardarNuevo(
+                payloadComun,
+                archivosImagenes.length > 0 ? archivosImagenes : undefined,
+            );
         }
-
-        alGuardarNuevo(payloadComun, imagenesArchivos);
     }
 
-    const mensajeError = errorValidacion || errorServidor;
-
     return (
-        <form
-            className="space-y-6 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta"
-            onSubmit={manejarSubmit}
-        >
-            <div className="border-b border-borde pb-4">
-                <h2 className="text-xl font-bold text-navegacion">
-                    {esEdicion
-                        ? `Editar paquete: ${paqueteEnEdicion?.nombrePaquete}`
-                        : "Configurar nuevo paquete turístico"}
-                </h2>
-                <p className="mt-1 text-sm text-texto-suave">
-                    {esEdicion
-                        ? "Actualizá el circuito asociado, la modalidad de garantía, los servicios incluidos y el cuadro tarifario por temporada."
-                        : "Completá los pasos para publicar un paquete comercial con garantía de alojamiento y tarifas por temporada."}
-                </p>
-            </div>
-
-            {/* PASO 1: IDENTIFICACIÓN Y CIRCUITO BASE */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                        1
-                    </span>
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                        Identificación y circuito base
-                    </h3>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-1.5 text-sm font-semibold text-texto">
-                        Nombre comercial del paquete
-                        <input
-                            type="text"
-                            value={nombrePaquete}
-                            onChange={(e) => setNombrePaquete(e.target.value)}
-                            placeholder="Ej. Inca Clásico Standard"
-                            className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                            autoFocus
-                        />
-                    </label>
-
-                    <div className="grid gap-1.5 text-sm font-semibold text-texto">
-                        <label htmlFor="select-circuito">
-                            Circuito turístico asociado
-                        </label>
-                        <select
-                            id="select-circuito"
-                            value={idcircuito}
-                            onChange={(e) =>
-                                setIdcircuito(Number(e.target.value))
-                            }
-                            className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
-                        >
-                            {circuitos.map((circuito) => {
-                                const numEtapas =
-                                    circuito.etapas?.length ?? 0;
-                                return (
-                                    <option
-                                        key={circuito.idcircuito}
-                                        value={circuito.idcircuito}
-                                    >
-                                        {circuito.nombreCircuito} (
-                                        {circuito.duracionDias}{" "}
-                                        {circuito.duracionDias === 1
-                                            ? "día"
-                                            : "días"}{" "}
-                                        · Dif. {circuito.dificultad} ·{" "}
-                                        {numEtapas}{" "}
-                                        {numEtapas === 1 ? "etapa" : "etapas"})
-                                    </option>
-                                );
-                            })}
-                        </select>
-                        {circuitoSeleccionado ? (
-                            cantidadEtapasCircuito > 0 ? (
-                                <p className="text-xs font-normal text-exito">
-                                    ✓ Circuito válido con{" "}
-                                    {cantidadEtapasCircuito}{" "}
-                                    {cantidadEtapasCircuito === 1
-                                        ? "etapa definida"
-                                        : "etapas definidas"}
-                                    .
-                                </p>
-                            ) : (
-                                <p className="text-xs font-normal text-peligro">
-                                    ⚠ Este circuito no tiene etapas cargadas.{" "}
-                                    <Link
-                                        to={`/gestion/circuitos/${circuitoSeleccionado.idcircuito}/etapas`}
-                                        className="font-semibold underline"
-                                    >
-                                        Cargar etapas ahora →
-                                    </Link>
-                                </p>
-                            )
-                        ) : null}
-                    </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-[1fr_1fr_2fr]">
-                    <label className="grid gap-1.5 text-sm font-semibold text-texto">
-                        Noches previas al circuito
-                        <input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={nochesPrevias}
-                            onChange={(e) => setNochesPrevias(e.target.value)}
-                            onBlur={() => {
-                                if (nochesPrevias.trim() === "") {
-                                    setNochesPrevias("0");
-                                }
-                            }}
-                            placeholder="0"
-                            className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        />
-                    </label>
-
-                    <label className="grid gap-1.5 text-sm font-semibold text-texto">
-                        Noches posteriores al circuito
-                        <input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={nochesPosteriores}
-                            onChange={(e) =>
-                                setNochesPosteriores(e.target.value)
-                            }
-                            onBlur={() => {
-                                if (nochesPosteriores.trim() === "") {
-                                    setNochesPosteriores("0");
-                                }
-                            }}
-                            placeholder="0"
-                            className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        />
-                    </label>
-
-                    <div className="grid gap-1.5 text-sm font-semibold text-texto">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span>Días de salida habilitados</span>
-                            <div className="flex gap-1.5 text-xs font-semibold">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setDiasSeleccionados([
-                                            ...TODOS_LOS_DIAS,
-                                        ])
-                                    }
-                                    className="rounded bg-fondo px-2 py-0.5 text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
-                                >
-                                    Todos
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setDiasSeleccionados([...DIAS_HABILES])
-                                    }
-                                    className="rounded bg-fondo px-2 py-0.5 text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
-                                >
-                                    Lun a Vie
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setDiasSeleccionados([...FIN_DE_SEMANA])
-                                    }
-                                    className="rounded bg-fondo px-2 py-0.5 text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
-                                >
-                                    Fin de semana
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            role="group"
-                            aria-label="Seleccionar días de salida habilitados"
-                            className="grid grid-cols-7 gap-1.5"
-                        >
-                            {DIAS_SEMANA.map((dia) => {
-                                const activo = diasSeleccionados.includes(
-                                    dia.codigo,
-                                );
-                                return (
-                                    <button
-                                        key={dia.codigo}
-                                        type="button"
-                                        title={dia.nombre}
-                                        aria-pressed={activo}
-                                        onClick={() => alternarDia(dia.codigo)}
-                                        className={`rounded-control border py-2 text-center text-xs font-bold transition-colors ${
-                                            activo
-                                                ? "border-marca bg-marca text-white shadow-sm"
-                                                : "border-borde bg-white text-texto-suave hover:border-marca/40 hover:text-texto"
-                                        }`}
-                                    >
-                                        {dia.corto}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                <label className="grid gap-1.5 text-sm font-semibold text-texto md:max-w-xs">
-                    Días mínimos para reintegro (opcional)
-                    <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={diasMinimosReintegro}
-                        onChange={(e) => setDiasMinimosReintegro(e.target.value)}
-                        placeholder="Sin plazo"
-                        className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    />
-                    <span className="text-xs font-normal text-texto-suave">
-                        Si el cliente cancela con menos anticipación, no recibe reintegro.
-                    </span>
-                </label>
-
-                <label className="grid gap-1.5 text-sm font-semibold text-texto">
-                    Condiciones comerciales y observaciones (opcional)
-                    <input
-                        type="text"
-                        value={condiciones}
-                        onChange={(e) => setCondiciones(e.target.value)}
-                        placeholder="Ej. Incluye aclimatación en Cusco y traslados desde el aeropuerto."
-                        className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    />
-                </label>
-            </div>
-
-            {/* PASO 2: GARANTÍA DE ALOJAMIENTO */}
-            <div className="space-y-4 border-t border-borde pt-5">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            2
-                        </span>
-                        <div>
-                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                                Modalidad de garantía de alojamiento
-                            </h3>
-                            <p className="text-xs text-texto-suave">
-                                Elegí si el paquete garantiza una categoría de hotel en la localidad o un establecimiento específico con bloqueo de plazas.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <button
-                            type="button"
-                            onClick={() => setTipoGarantia("POR_CATEGORIA")}
-                            className={`rounded-control border p-4 text-left transition-colors ${
-                                tipoGarantia === "POR_CATEGORIA"
-                                    ? "border-marca bg-marca-suave/60 ring-2 ring-marca/20"
-                                    : "border-borde bg-white hover:bg-fondo"
-                            }`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-navegacion">
-                                    Garantía por Categoría
-                                </span>
-                                <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
-                                    Flexible
-                                </span>
-                            </div>
-                            <p className="mt-1 text-xs text-texto-suave">
-                                Garantiza localidad, categoría de estrellas y tipo de habitación. Permite resolver alojamiento a solicitud.
-                            </p>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setTipoGarantia("POR_ESTABLECIMIENTO")
-                            }
-                            className={`rounded-control border p-4 text-left transition-colors ${
-                                tipoGarantia === "POR_ESTABLECIMIENTO"
-                                    ? "border-marca bg-marca-suave/60 ring-2 ring-marca/20"
-                                    : "border-borde bg-white hover:bg-fondo"
-                            }`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-navegacion">
-                                    Garantía por Establecimiento
-                                </span>
-                                <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-exito">
-                                    Bloqueo de plazas
-                                </span>
-                            </div>
-                            <p className="mt-1 text-xs text-texto-suave">
-                                Garantiza un hotel específico. Exige que el servicio tenga confirmación por bloqueo de plazas.
-                            </p>
-                        </button>
-                    </div>
-
-                    {tipoGarantia === "POR_CATEGORIA" ? (
-                        <div className="grid gap-4 rounded-control border border-borde bg-fondo/50 p-4 md:grid-cols-3">
-                            <div className="grid gap-1.5 text-sm font-semibold text-texto">
-                                <label htmlFor="input-localidad-garantizada">
-                                    Localidad garantizada
-                                </label>
+        <form onSubmit={enviarFormulario}>
+            <AsistentePasos
+                titulo={
+                    esEdicion
+                        ? `Editar paquete ${paqueteEnEdicion?.nroPaquete ?? ""}`
+                        : "Nuevo paquete turístico"
+                }
+                subtitulo="Completá los 4 pasos para publicar o actualizar el paquete."
+                pasos={PASOS_PAQUETE}
+                pasoActual={pasoActual}
+                alCambiarPaso={(nuevo) => {
+                    setErrorPaso("");
+                    setPasoActual(nuevo);
+                }}
+                alSiguiente={avanzarPaso}
+                alAtras={retrocederPaso}
+                alCancelar={alCancelar}
+                textoGuardar={esEdicion ? "Guardar cambios" : "Crear paquete"}
+                guardando={guardando}
+                errorPaso={errorPaso}
+                errorServidor={errorServidor}
+            >
+                {/* ==================== PASO 1: DATOS Y GARANTÍA ==================== */}
+                {pasoActual === 0 ? (
+                    <div className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="grid gap-1.5 text-sm font-semibold text-texto">
+                                Nombre del paquete *
                                 <input
-                                    id="input-localidad-garantizada"
                                     type="text"
-                                    value={localidadGarantizada}
-                                    onChange={(e) =>
-                                        setLocalidadGarantizada(e.target.value)
-                                    }
-                                    placeholder="Ej. Cusco"
+                                    value={nombrePaquete}
+                                    onChange={(e) => setNombrePaquete(e.target.value)}
+                                    placeholder="Ej. Camino Inca Clásico 4 días"
                                     className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 />
-                                <div className="flex flex-wrap gap-1">
-                                    {LOCALIDADES_SUGERIDAS.map((loc) => (
-                                        <button
-                                            key={loc}
-                                            type="button"
-                                            onClick={() =>
-                                                setLocalidadGarantizada(loc)
-                                            }
-                                            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                                localidadGarantizada === loc
-                                                    ? "bg-marca text-white"
-                                                    : "bg-white text-texto-suave hover:text-texto"
-                                            }`}
-                                        >
-                                            {loc}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <label className="grid content-start gap-1.5 text-sm font-semibold text-texto">
-                                Categoría garantizada
-                                <select
-                                    value={categoriaGarantizada}
-                                    onChange={(e) =>
-                                        setCategoriaGarantizada(e.target.value)
-                                    }
-                                    className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                >
-                                    {CATEGORIAS_SUGERIDAS.map((cat) => (
-                                        <option key={cat} value={cat}>
-                                            {cat}
-                                        </option>
-                                    ))}
-                                </select>
                             </label>
 
-                            <label className="grid content-start gap-1.5 text-sm font-semibold text-texto">
-                                Tipo de habitación
+                            <label className="grid gap-1.5 text-sm font-semibold text-texto">
+                                Circuito *
                                 <select
-                                    value={tipoHabitacionGarantizada}
-                                    onChange={(e) =>
-                                        setTipoHabitacionGarantizada(
-                                            e.target.value,
-                                        )
-                                    }
+                                    value={idcircuito}
+                                    onChange={(e) => setIdcircuito(Number(e.target.value))}
                                     className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                                 >
-                                    {HABITACIONES_SUGERIDAS.map((hab) => (
-                                        <option key={hab} value={hab}>
-                                            {hab}
+                                    <option value={0}>Elegí un circuito...</option>
+                                    {circuitos.map((c) => (
+                                        <option key={c.idcircuito} value={c.idcircuito}>
+                                            {c.nombreCircuito} ({c.duracionDias} días · {c.dificultad})
                                         </option>
                                     ))}
                                 </select>
                             </label>
                         </div>
-                    ) : (
+
+                        <label className="grid gap-1.5 text-sm font-semibold text-texto">
+                            Sale desde (ciudad de origen) *
+                            <input
+                                type="text"
+                                list="localidades-salida-paquete"
+                                value={localidadGarantizada}
+                                onChange={(e) => {
+                                    setLocalidadGarantizada(e.target.value);
+                                    setIdservicioGarantizado(0);
+                                }}
+                                placeholder="Ej. Cusco"
+                                className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            />
+                            <datalist id="localidades-salida-paquete">
+                                {localidadesSugeridas.map((loc) => (
+                                    <option key={loc} value={loc} />
+                                ))}
+                            </datalist>
+                            <span className="text-xs font-normal text-texto-suave">
+                                Se muestra en el catálogo y filtra los hoteles disponibles para la garantía.
+                            </span>
+                        </label>
+
                         <div className="space-y-3 rounded-control border border-borde bg-fondo/50 p-4">
-                            <p className="text-xs font-semibold text-texto">
-                                Seleccioná el establecimiento de alojamiento garantizado:
+                            <p className="text-sm font-semibold text-navegacion">
+                                Garantía de alojamiento
                             </p>
-                            {errorCargaServicios ? (
-                                <p
-                                    className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
-                                    role="alert"
-                                >
-                                    No se pudieron cargar los servicios de alojamiento: {errorCargaServicios}
-                                </p>
-                            ) : alojamientosDisponibles.length === 0 ? (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                {(
+                                    [
+                                        ["POR_CATEGORIA", "Por categoría y habitación"],
+                                        ["POR_ESTABLECIMIENTO", "Por establecimiento (hotel fijo)"],
+                                    ] as const
+                                ).map(([valor, etiqueta]) => (
+                                    <button
+                                        key={valor}
+                                        type="button"
+                                        onClick={() => setTipoGarantia(valor)}
+                                        className={`rounded-control border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                                            tipoGarantia === valor
+                                                ? "border-marca bg-marca-suave text-marca-oscura"
+                                                : "border-borde bg-white text-texto hover:border-marca/40"
+                                        }`}
+                                    >
+                                        {etiqueta}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {tipoGarantia === "POR_CATEGORIA" ? (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Categoría *
+                                        <select
+                                            value={categoriaGarantizada}
+                                            onChange={(e) => setCategoriaGarantizada(e.target.value)}
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        >
+                                            {CATEGORIAS_SUGERIDAS.map((cat) => (
+                                                <option key={cat} value={cat}>
+                                                    {cat}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Tipo de habitación *
+                                        <select
+                                            value={tipoHabitacionGarantizada}
+                                            onChange={(e) =>
+                                                setTipoHabitacionGarantizada(e.target.value)
+                                            }
+                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                        >
+                                            {HABITACIONES_SUGERIDAS.map((hab) => (
+                                                <option key={hab} value={hab}>
+                                                    {hab}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {errorCargaServicios ? (
+                                        <Alerta tipo="error">{errorCargaServicios}</Alerta>
+                                    ) : alojamientosCiudad.length === 0 ? (
+                                        <p className="text-xs text-texto-suave">
+                                            No hay hoteles activos con bloqueo de plazas en{" "}
+                                            <strong>{localidadGarantizada || "esa ciudad"}</strong>.{" "}
+                                            <Link
+                                                to="/gestion/proveedores"
+                                                className="font-semibold text-marca hover:underline"
+                                            >
+                                                Cargar en Proveedores
+                                            </Link>
+                                        </p>
+                                    ) : (
+                                        <label className="grid gap-1 text-xs font-semibold text-texto">
+                                            Hotel garantizado en {localidadGarantizada} *
+                                            <select
+                                                value={idservicioGarantizado}
+                                                onChange={(e) =>
+                                                    setIdservicioGarantizado(Number(e.target.value))
+                                                }
+                                                className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                            >
+                                                <option value={0}>Elegí un hotel...</option>
+                                                {alojamientosCiudad.map((h) => (
+                                                    <option key={h.idservicio} value={h.idservicio}>
+                                                        {h.nombreServicio} · {h.datos?.categoria ?? "-"}{" "}
+                                                        · {h.datos?.tipoHabitacion ?? "-"} (
+                                                        {formatearMonto(h.costoBase)}/noche)
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* ==================== PASO 2: SERVICIOS POR TIPO Y EQUIPO ==================== */}
+                {pasoActual === 1 ? (
+                    <div className="space-y-5">
+                        {errorCargaServicios ? (
+                            <Alerta tipo="error">{errorCargaServicios}</Alerta>
+                        ) : null}
+
+                        {/* Transporte (uno, obligatorio) */}
+                        <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-bold text-navegacion">
+                                    1. Transporte *
+                                </h3>
+                                <span className="text-xs text-texto-suave">
+                                    Obligatorio · Se reserva al crear cada salida
+                                </span>
+                            </div>
+                            <select
+                                aria-label="Transporte del paquete"
+                                value={idtransporte}
+                                onChange={(e) => setIdtransporte(Number(e.target.value))}
+                                className="w-full rounded-control border border-borde bg-white px-3 py-2 text-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            >
+                                <option value={0}>Elegí un transporte...</option>
+                                {transportesActivos.map((t) => (
+                                    <option key={t.idservicio} value={t.idservicio}>
+                                        {t.nombreServicio} · {t.datos?.capacidadVehiculo ?? "?"} asientos ·{" "}
+                                        {formatearMonto(t.costoBase)} por salida
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Tren (uno, opcional) */}
+                        <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-bold text-navegacion">
+                                    2. Tren (opcional)
+                                </h3>
+                                <span className="text-xs text-texto-suave">
+                                    Sus horarios se muestran en el catálogo y en la ficha del guía
+                                </span>
+                            </div>
+                            <select
+                                aria-label="Tren del paquete"
+                                value={idtren}
+                                onChange={(e) => setIdtren(Number(e.target.value))}
+                                className="w-full rounded-control border border-borde bg-white px-3 py-2 text-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            >
+                                <option value={0}>Sin tren incluido</option>
+                                {trenesActivos.map((tr) => (
+                                    <option key={tr.idservicio} value={tr.idservicio}>
+                                        {tr.nombreServicio} ({tr.datos?.horarioSalida ?? "--:--"}–
+                                        {tr.datos?.horarioLlegada ?? "--:--"} ·{" "}
+                                        {tr.datos?.diasOperacion ?? "Todos los días"}) ·{" "}
+                                        {formatearMonto(tr.costoBase)}/pasajero
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Equipo (varios, con regla cantidad / cadaPasajeros) */}
+                        <div className="space-y-3 rounded-control border border-borde bg-fondo/40 p-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-bold text-navegacion">
+                                    3. Equipamiento y regla por pasajeros
+                                </h3>
+                                <span className="text-xs text-texto-suave">
+                                    Se descuenta en cada compra según los pasajeros vendidos
+                                </span>
+                            </div>
+
+                            {equiposActivos.length === 0 ? (
                                 <p className="text-xs text-texto-suave">
-                                    No se encontraron servicios de alojamiento activos. Podés registrarlos desde la sección Proveedores.
+                                    No hay servicios de equipamiento activos cargados.
                                 </p>
                             ) : (
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    {alojamientosDisponibles.map((aloj) => {
-                                        const modalidad =
-                                            aloj.datos
-                                                ?.modalidadConfirmacion ??
-                                            aloj.disponibilidad
-                                                ?.modalidadConfirmacion ??
-                                            "";
-                                        const esBloqueo =
-                                            modalidad === "BLOQUEO_PLAZAS";
-                                        const seleccionado =
-                                            idservicioGarantizado ===
-                                            aloj.idservicio;
-
+                                <div className="space-y-2">
+                                    {equiposActivos.map((eq) => {
+                                        const regla = equipo.find(
+                                            (item) => item.idservicio === eq.idservicio,
+                                        );
+                                        const seleccionado = Boolean(regla);
                                         return (
-                                            <button
-                                                key={aloj.idservicio}
-                                                type="button"
-                                                disabled={
-                                                    !esBloqueo ||
-                                                    detalleBloqueado
-                                                }
-                                                onClick={() =>
-                                                    setIdservicioGarantizado(
-                                                        aloj.idservicio,
-                                                    )
-                                                }
-                                                className={`rounded-control border p-3.5 text-left transition-colors ${
-                                                    !esBloqueo
-                                                        ? "cursor-not-allowed border-borde bg-slate-100/70 opacity-65"
-                                                        : seleccionado
-                                                          ? "border-marca bg-white ring-2 ring-marca/25"
-                                                          : "border-borde bg-white hover:border-marca/50"
+                                            <div
+                                                key={eq.idservicio}
+                                                className={`rounded-control border p-3 transition-colors ${
+                                                    seleccionado
+                                                        ? "border-marca bg-white"
+                                                        : "border-borde bg-white/70"
                                                 }`}
                                             >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div>
-                                                        <p className="text-sm font-bold text-texto">
-                                                            {
-                                                                aloj.nombreServicio
+                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-texto">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={seleccionado}
+                                                            onChange={() =>
+                                                                alternarEquipo(eq.idservicio)
                                                             }
-                                                        </p>
-                                                        <p className="mt-0.5 text-xs text-texto-suave">
-                                                            {aloj.localidad ??
-                                                                "Cusco"}{" "}
-                                                            ·{" "}
-                                                            {aloj.datos
-                                                                ?.categoria ??
-                                                                ""}{" "}
-                                                            · Hab.{" "}
-                                                            {aloj.datos
-                                                                ?.tipoHabitacion ??
-                                                                ""}
-                                                        </p>
-                                                    </div>
-                                                    <span
-                                                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                                            esBloqueo
-                                                                ? "bg-green-50 text-exito"
-                                                                : "bg-amber-50 text-advertencia"
-                                                        }`}
-                                                    >
-                                                        {esBloqueo
-                                                            ? "✓ Bloqueo de plazas"
-                                                            : "A solicitud (No apto)"}
-                                                    </span>
+                                                            className="size-4 accent-marca"
+                                                        />
+                                                        <span>{eq.nombreServicio}</span>
+                                                        <span className="text-xs font-normal text-texto-suave">
+                                                            ({eq.datos?.tipoEquipamiento ?? "Equipo"} ·{" "}
+                                                            {formatearMonto(eq.costoBase)}/u)
+                                                        </span>
+                                                    </label>
+
+                                                    {regla ? (
+                                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                            <label className="flex items-center gap-1.5 font-semibold text-texto">
+                                                                Cantidad
+                                                                <input
+                                                                    type="number"
+                                                                    min={1}
+                                                                    max={100}
+                                                                    value={regla.cantidad}
+                                                                    onChange={(e) =>
+                                                                        actualizarReglaEquipo(
+                                                                            eq.idservicio,
+                                                                            "cantidad",
+                                                                            Number(e.target.value),
+                                                                        )
+                                                                    }
+                                                                    className="w-16 rounded-control border border-borde px-2 py-1 text-center font-normal"
+                                                                />
+                                                            </label>
+                                                            <label className="flex items-center gap-1.5 font-semibold text-texto">
+                                                                cada
+                                                                <input
+                                                                    type="number"
+                                                                    min={1}
+                                                                    max={100}
+                                                                    value={regla.cadaPasajeros}
+                                                                    onChange={(e) =>
+                                                                        actualizarReglaEquipo(
+                                                                            eq.idservicio,
+                                                                            "cadaPasajeros",
+                                                                            Number(e.target.value),
+                                                                        )
+                                                                    }
+                                                                    className="w-16 rounded-control border border-borde px-2 py-1 text-center font-normal"
+                                                                />
+                                                                pasajeros
+                                                            </label>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                 </div>
                             )}
                         </div>
-                    )}
-            </div>
-
-            {/* PASO 3: MATRIZ DE PRECIOS POR TEMPORADA */}
-            <div className="space-y-4 border-t border-borde pt-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            3
-                        </span>
-                        <div>
-                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                                Cuadro tarifario por temporada
-                            </h3>
-                            <p className="text-xs text-texto-suave">
-                                Todo paquete publicado requiere al menos una tarifa vigente asociada a una temporada activa.
-                            </p>
-                            {esEdicion ? (
-                                <p className="text-xs text-texto-suave">
-                                    Las tarifas guardadas se modifican; no se quitan.
-                                </p>
-                            ) : null}
-                        </div>
                     </div>
+                ) : null}
 
-                    <Boton
-                        type="button"
-                        variante="secundario"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={agregarFilaPrecio}
-                        disabled={
-                            !temporadas.some(
-                                (t) =>
-                                    !temporadaVencida(t) &&
-                                    !matrizPrecios.some((f) => f.idtemporada === t.idtemporada),
-                            )
-                        }
-                    >
-                        + Agregar temporada
-                    </Boton>
-                </div>
-
-                {temporadas.length === 0 ? (
-                    <p className="rounded-control border border-advertencia/30 bg-amber-50 p-3 text-xs text-texto">
-                        No hay temporadas activas registradas.{" "}
-                        <Link
-                            to="/gestion/temporadas"
-                            className="font-semibold text-marca underline"
-                        >
-                            Crear una temporada primero →
-                        </Link>
-                    </p>
-                ) : (
-                    <div className="space-y-3">
-                        {tarifasVencidas > 0 ? (
-                            <button
-                                type="button"
-                                onClick={() => setVerTarifasVencidas(!verTarifasVencidas)}
-                                className="text-xs font-semibold text-marca-oscura hover:underline"
-                            >
-                                {verTarifasVencidas ? "Ocultar" : "Ver"} {tarifasVencidas} {tarifasVencidas === 1 ? "tarifa de temporada vencida" : "tarifas de temporadas vencidas"}
-                            </button>
-                        ) : null}
-                        {matrizPrecios.map((fila, indice) => {
-                            const esTarifaPersistida =
-                                indice < cantidadPersistidas;
-                            return (
-                                // Las vencidas se ocultan sin desmontarse: se siguen enviando igual al guardar
-                                <div
-                                    key={indice}
-                                    className={`grid items-end gap-3 rounded-control border border-borde bg-fondo/50 p-3.5 md:grid-cols-[1.5fr_0.7fr_1fr_auto] ${
-                                        !verTarifasVencidas && esTemporadaVencida(fila.idtemporada) ? "hidden" : ""
-                                    }`}
-                                >
-                                    <label className="grid gap-1 text-xs font-semibold text-texto">
-                                        Temporada comercial
-                                        <select
-                                            value={fila.idtemporada}
-                                            disabled={esTarifaPersistida}
-                                            onChange={(e) =>
-                                                actualizarFilaPrecio(indice, {
-                                                    idtemporada: Number(
-                                                        e.target.value,
-                                                    ),
-                                                })
-                                            }
-                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
-                                        >
-                                            {temporadas
-                                                .filter(
-                                                    (temp) =>
-                                                        temp.idtemporada ===
-                                                            fila.idtemporada ||
-                                                        (!temporadaVencida(temp) && !matrizPrecios.some(
-                                                            (otra, j) =>
-                                                                j !== indice &&
-                                                                otra.idtemporada ===
-                                                                    temp.idtemporada,
-                                                        )),
-                                                )
-                                                .map((temp) => (
-                                                <option
-                                                    key={temp.idtemporada}
-                                                    value={temp.idtemporada}
-                                                >
-                                                    {temp.nombre} (
-                                                    {formatearRangoFechasUtc(
-                                                        temp.fechaInicio,
-                                                        temp.fechaFin,
-                                                    )}
-                                                    )
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-
-                                    <label className="grid gap-1 text-xs font-semibold text-texto">
-                                        Moneda
-                                        <select
-                                            value={fila.moneda}
-                                            onChange={(e) =>
-                                                actualizarFilaPrecio(indice, {
-                                                    moneda: e.target.value,
-                                                })
-                                            }
-                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                        >
-                                            <option value="USD">USD ($)</option>
-                                        </select>
-                                    </label>
-
-                                    <label className="grid gap-1 text-xs font-semibold text-texto">
-                                        Monto por pasajero
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            step="0.01"
-                                            // 0 se muestra vacío: si no, Number("") vuelve a poner 0 y no se puede borrar
-                                            value={fila.monto || ""}
-                                            placeholder="0"
-                                            onChange={(e) =>
-                                                actualizarFilaPrecio(indice, {
-                                                    monto: Number(
-                                                        e.target.value,
-                                                    ),
-                                                })
-                                            }
-                                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                                        />
-                                    </label>
-
-                                    {matrizPrecios.length > 1 &&
-                                    !esTarifaPersistida ? (
-                                        <Boton
-                                            type="button"
-                                            variante="fantasma"
-                                            className="px-2.5 py-2 text-xs text-peligro hover:bg-peligro/10"
-                                            onClick={() =>
-                                                quitarFilaPrecio(indice)
-                                            }
-                                        >
-                                            Quitar
-                                        </Boton>
-                                    ) : null}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* PASO 4: SERVICIOS OPERATIVOS INCLUIDOS */}
-            {errorCargaServicios ? (
-                <div className="space-y-3 border-t border-borde pt-5">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            4
-                        </span>
-                        <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                            Servicios operativos incluidos en el paquete
-                        </h3>
-                    </div>
-                    <p
-                        className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-xs text-peligro"
-                        role="alert"
-                    >
-                        No se pudieron cargar los servicios operativos de proveedores: {errorCargaServicios}
-                    </p>
-                </div>
-            ) : serviciosDisponibles.length > 0 ? (
-                <div className="space-y-3 border-t border-borde pt-5">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            4
-                        </span>
-                        <div>
-                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                                Servicios operativos incluidos en el paquete
-                            </h3>
-                            <p className="text-xs text-texto-suave">
-                                Seleccioná los transportes, trenes o equipamientos que componen este paquete. El alojamiento sale de la garantía del paso 2.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                        {[
-                            // El alojamiento lo define la garantía del paso 2; un hotel solo aparece si ya estaba incluido, para poder quitarlo
-                            ...serviciosDisponibles
-                                .filter((s) => s.tipo !== "ALOJAMIENTO" || serviciosIncluidos.includes(s.idservicio))
-                                .map((s) => ({
-                                ...s,
-                                inactivo: false,
-                            })),
-                            // Incluidos que ya no están disponibles (dados de baja): se muestran para poder quitarlos
-                            ...serviciosIncluidos
-                                .filter(
-                                    (id) =>
-                                        !serviciosDisponibles.some(
-                                            (s) => s.idservicio === id,
-                                        ),
-                                )
-                                .map((id) => {
-                                    const s = detallePaquete?.servicios?.find(
-                                        (item) => item.idservicio === id,
-                                    )?.servicio;
-                                    return {
-                                        idservicio: id,
-                                        nombreServicio:
-                                            s?.nombreServicio ??
-                                            `Servicio #${id}`,
-                                        tipo: "",
-                                        localidad: s?.localidad,
-                                        costoBase: s?.costoBase ?? 0,
-                                        inactivo: true,
-                                    };
-                                }),
-                        ].map((servicio) => {
-                            const marcado = serviciosIncluidos.includes(
-                                servicio.idservicio,
-                            );
-                            return (
-                                <label
-                                    key={servicio.idservicio}
-                                    className={`flex cursor-pointer items-start gap-3 rounded-control border p-3 text-sm transition-colors ${
-                                        marcado
-                                            ? "border-marca bg-marca-suave/50"
-                                            : "border-borde bg-white hover:bg-fondo"
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={marcado}
-                                        disabled={detalleBloqueado}
-                                        onChange={() =>
-                                            alternarServicioIncluido(
-                                                servicio.idservicio,
-                                            )
-                                        }
-                                        className="mt-1 size-4 accent-marca"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-semibold text-texto">
-                                            {servicio.nombreServicio}
-                                            {servicio.inactivo
-                                                ? " (inactivo)"
-                                                : ""}
-                                        </p>
-                                        <p className="mt-0.5 text-xs text-texto-suave">
-                                            {servicio.tipo
-                                                ? `${servicio.tipo} · `
-                                                : ""}
-                                            {" "}
-                                            {servicio.localidad ?? "Cusco"} ·
-                                            Costo base USD {servicio.costoBase}
-                                        </p>
-                                    </div>
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
-            ) : null}
-
-            {/* GALERÍA DE IMÁGENES DEL PAQUETE (MÍNIMO 1, MÁXIMO 5 AL SUBIR) */}
-            <div className="space-y-4 border-t border-borde pt-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex size-6 items-center justify-center rounded-full bg-marca text-xs font-bold text-white">
-                            5
-                        </span>
-                        <div>
-                            <h3 className="text-sm font-bold uppercase tracking-wide text-navegacion">
-                                Galería de imágenes del paquete{" "}
-                                <span className="font-normal normal-case text-texto-suave">
-                                    (1 a {MAX_IMAGENES_PAQUETE} imágenes)
+                {/* ==================== PASO 3: NOCHES, VENTA Y CONDICIONES ==================== */}
+                {pasoActual === 2 ? (
+                    <div className="space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                Noches previas
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={30}
+                                    value={nochesPrevias}
+                                    onChange={(e) => setNochesPrevias(e.target.value)}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                Noches posteriores
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={30}
+                                    value={nochesPosteriores}
+                                    onChange={(e) => setNochesPosteriores(e.target.value)}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                Cierre de venta (días antes)
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={30}
+                                    value={diasCierreVenta}
+                                    onChange={(e) => setDiasCierreVenta(e.target.value)}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                                <span className="text-[11px] font-normal text-texto-suave">
+                                    Por defecto {DIAS_CIERRE_VENTA_DEFECTO} días (5 si el hotel es a solicitud)
                                 </span>
-                            </h3>
-                            <p className="text-xs text-texto-suave">
-                                Formatos admitidos: JPG, PNG o WEBP · Máximo 3 MB por foto · Hasta{" "}
-                                {MAX_IMAGENES_PAQUETE} imágenes (la primera será la portada{" "}
-                                <code className="rounded bg-fondo px-1 py-0.5 text-xs">
-                                    principal.*
-                                </code>
-                                ).
-                            </p>
-                        </div>
-                    </div>
-
-                    <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-semibold text-marca-oscura">
-                        {imagenesArchivos.length} / {MAX_IMAGENES_PAQUETE} nuevas seleccionadas
-                    </span>
-                </div>
-
-                {/* IMÁGENES ACTUALES EN MODO EDICIÓN */}
-                {esEdicion && imagenesActualesPaquete.length > 0 ? (
-                    <div className="space-y-2.5 rounded-control border border-borde bg-fondo/60 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold uppercase tracking-wide text-navegacion">
-                                    Imágenes actuales del paquete ({imagenesActualesPaquete.length} / {MAX_IMAGENES_PAQUETE})
-                                </span>
-                                <span
-                                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                        tieneImagenesPropiasActual
-                                            ? "bg-green-50 text-exito"
-                                            : "bg-slate-200 text-texto-suave"
-                                    }`}
-                                >
-                                    {tieneImagenesPropiasActual
-                                        ? "Galería propia cargada"
-                                        : "Imagen de catálogo por defecto"}
-                                </span>
-                            </div>
-                            <span className="text-xs text-texto-suave">
-                                {imagenesArchivos.length > 0
-                                    ? "⚠ Al guardar el formulario se reemplazará todo el carrusel por el lote de abajo."
-                                    : "Podés cambiar o eliminar una foto individual al instante, o subir un carrusel nuevo abajo."}
-                            </span>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                Plazo reintegro 100% (días)
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={365}
+                                    placeholder="Sin plazo"
+                                    value={diasMinimosReintegro}
+                                    onChange={(e) => setDiasMinimosReintegro(e.target.value)}
+                                    className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
                         </div>
 
-                        {mensajeFotoIndividual ? (
-                            <p className="rounded bg-green-50 px-3 py-1.5 text-xs font-semibold text-exito">
-                                {mensajeFotoIndividual}
-                            </p>
-                        ) : null}
-
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-                            {imagenesActualesPaquete.map((urlImg, idx) => {
-                                const nombreFotoSlot =
-                                    extraerNombreFotoCarrusel(urlImg, idx);
-                                const ocupado =
-                                    mutacionModificarFoto.isPending ||
-                                    mutacionEliminarFoto.isPending;
-
-                                return (
-                                    <div
-                                        key={`${urlImg}-${idx}`}
-                                        className="group relative flex flex-col overflow-hidden rounded-control border border-borde bg-white shadow-xs"
+                        <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-texto">
+                                    Días habilitados de salida *
+                                </span>
+                                <div className="flex flex-wrap gap-1.5 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiasElegidos([...TODOS_LOS_DIAS])}
+                                        className="rounded border border-borde px-2 py-0.5 text-texto-suave hover:border-marca hover:text-marca"
                                     >
-                                        <div className="relative">
-                                            <img
-                                                src={resolverUrlImagenPaquete(
-                                                    urlImg,
-                                                )}
-                                                alt={`Imagen actual ${idx + 1} de ${paqueteEnEdicion?.nombrePaquete ?? "paquete"}`}
-                                                className="h-24 w-full object-cover"
-                                            />
-                                            <span
-                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-xs font-bold shadow-xs ${
-                                                    idx === 0
-                                                        ? "bg-marca text-white"
-                                                        : "bg-navegacion/80 text-white"
-                                                }`}
-                                            >
-                                                {idx === 0
-                                                    ? "★ Portada"
-                                                    : `Foto #${idx + 1}`}
-                                            </span>
-                                        </div>
+                                        Todos
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiasElegidos([...DIAS_HABILES])}
+                                        className="rounded border border-borde px-2 py-0.5 text-texto-suave hover:border-marca hover:text-marca"
+                                    >
+                                        Lun a Vie
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDiasElegidos([...FIN_DE_SEMANA])}
+                                        className="rounded border border-borde px-2 py-0.5 text-texto-suave hover:border-marca hover:text-marca"
+                                    >
+                                        Finde
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-7 gap-1.5">
+                                {DIAS_SEMANA.map((dia) => {
+                                    const activo = diasElegidos.includes(dia.codigo);
+                                    return (
+                                        <button
+                                            key={dia.codigo}
+                                            type="button"
+                                            title={dia.nombre}
+                                            aria-pressed={activo}
+                                            onClick={() => alternarDia(dia.codigo)}
+                                            className={`rounded-control border py-2 text-center text-xs font-bold transition-colors ${
+                                                activo
+                                                    ? "border-marca bg-marca text-white"
+                                                    : "border-borde bg-white text-texto-suave hover:border-marca/40"
+                                            }`}
+                                        >
+                                            {dia.corto}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-                                        <div className="flex items-center justify-between gap-1 bg-white px-2 py-1.5 text-xs">
-                                            <label
-                                                className={`cursor-pointer font-semibold text-marca-oscura hover:underline ${
-                                                    ocupado
-                                                        ? "pointer-events-none opacity-50"
-                                                        : ""
-                                                }`}
-                                                title={`Reemplazar únicamente ${nombreFotoSlot}`}
-                                            >
-                                                Cambiar
-                                                <input
-                                                    type="file"
-                                                    accept="image/jpeg,image/png,image/webp"
-                                                    disabled={ocupado}
-                                                    onChange={(e) =>
-                                                        manejarReemplazarFotoIndividual(
-                                                            nombreFotoSlot,
-                                                            idx,
-                                                            e,
-                                                        )
-                                                    }
-                                                    className="sr-only"
-                                                />
-                                            </label>
+                        <label className="grid gap-1.5 text-sm font-semibold text-texto">
+                            Condiciones comerciales
+                            <textarea
+                                rows={3}
+                                value={condiciones}
+                                onChange={(e) => setCondiciones(e.target.value)}
+                                placeholder="Políticas de cancelación, inclusiones, recomendaciones..."
+                                className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            />
+                        </label>
 
-                                            {tieneImagenesPropiasActual &&
-                                            imagenesActualesPaquete.length >
-                                                1 ? (
-                                                <button
-                                                    type="button"
-                                                    disabled={ocupado}
-                                                    onClick={() =>
-                                                        manejarEliminarFotoIndividual(
-                                                            nombreFotoSlot,
-                                                            idx,
-                                                        )
-                                                    }
-                                                    className="font-semibold text-peligro hover:underline disabled:opacity-50"
-                                                    title={`Eliminar ${nombreFotoSlot} de la galería`}
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            ) : (
-                                                <span className="text-xs text-texto-suave">
-                                                    Mín. 1 foto
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-
-                            {imagenesActualesPaquete.length <
-                            MAX_IMAGENES_PAQUETE ? (
-                                <label
-                                    className={`flex min-h-[124px] cursor-pointer flex-col items-center justify-center gap-1 rounded-control border border-dashed border-marca/40 bg-white/80 p-2 text-center text-xs font-semibold text-marca-oscura transition hover:border-marca hover:bg-marca-suave/40 ${
-                                        mutacionModificarFoto.isPending
-                                            ? "pointer-events-none opacity-50"
-                                            : ""
-                                    }`}
+                        <div className="rounded-control border border-dashed border-borde bg-fondo/40 p-3 text-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-semibold text-texto">
+                                    Fotos del paquete (opcional, hasta 5)
+                                </span>
+                                <Boton
+                                    type="button"
+                                    variante="secundario"
+                                    className="px-3 py-1.5 text-xs"
+                                    onClick={() => inputImagenesRef.current?.click()}
                                 >
-                                    <span className="text-lg leading-none">
-                                        +
-                                    </span>
-                                    <span>Sumar 1 foto</span>
-                                    <span className="text-xs font-normal text-texto-suave">
-                                        Slot {obtenerProximoSlotLibre()}
-                                    </span>
-                                    <input
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        disabled={
-                                            mutacionModificarFoto.isPending
-                                        }
-                                        onChange={(e) =>
-                                            manejarReemplazarFotoIndividual(
-                                                obtenerProximoSlotLibre(),
-                                                -1,
-                                                e,
-                                            )
-                                        }
-                                        className="sr-only"
-                                    />
-                                </label>
+                                    Elegir imágenes
+                                </Boton>
+                            </div>
+                            <input
+                                ref={inputImagenesRef}
+                                type="file"
+                                multiple
+                                accept="image/jpeg,image/png,image/webp"
+                                className="sr-only"
+                                onChange={(e) => {
+                                    const files = Array.from(e.target.files ?? []).slice(0, 5);
+                                    setArchivosImagenes(files);
+                                }}
+                            />
+                            {archivosImagenes.length > 0 ? (
+                                <p className="mt-2 text-texto-suave">
+                                    Seleccionadas ({archivosImagenes.length}):{" "}
+                                    {archivosImagenes.map((f) => f.name).join(", ")}
+                                </p>
                             ) : null}
                         </div>
                     </div>
                 ) : null}
 
-                {/* SELECTOR Y VISTA PREVIA DE NUEVAS IMÁGENES (1 A 5) */}
-                <div className="space-y-3 rounded-control border border-dashed border-borde bg-fondo/40 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <label
-                                htmlFor="archivo-imagen-paquete"
-                                className={`inline-flex items-center gap-2 rounded-control border border-borde bg-white px-3.5 py-2 text-xs font-semibold text-navegacion shadow-xs transition ${
-                                    imagenesArchivos.length >= MAX_IMAGENES_PAQUETE
-                                        ? "cursor-not-allowed opacity-50"
-                                        : "cursor-pointer hover:bg-fondo"
-                                }`}
-                            >
-                                <span>
-                                    {imagenesArchivos.length === 0
-                                        ? esEdicion
-                                            ? "Seleccionar nuevas imágenes (1 a 5)"
-                                            : "Seleccionar imágenes (1 a 5)"
-                                        : imagenesArchivos.length < MAX_IMAGENES_PAQUETE
-                                          ? `Agregar más imágenes (${MAX_IMAGENES_PAQUETE - imagenesArchivos.length} disponibles)`
-                                          : "Límite de 5 imágenes alcanzado"}
-                                </span>
-                                <input
-                                    id="archivo-imagen-paquete"
-                                    type="file"
-                                    multiple
-                                    disabled={
-                                        imagenesArchivos.length >=
-                                        MAX_IMAGENES_PAQUETE
-                                    }
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={manejarSeleccionImagenes}
-                                    className="sr-only"
-                                />
-                            </label>
+                {/* ==================== PASO 4: PRECIOS CON COSTO EN VIVO (B5) ==================== */}
+                {pasoActual === 3 ? (
+                    <div className="space-y-5">
+                        {/* Simulador de costo por pasajero */}
+                        <div className="space-y-3 rounded-control border border-marca/30 bg-marca-suave/30 p-4">
+                            <div className="flex flex-wrap items-end justify-between gap-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-navegacion">
+                                        Costo estimado por pasajero
+                                    </h3>
+                                    <p className="text-xs text-texto-suave">
+                                        Calculado en vivo con el hotel, transporte, tren y equipo elegidos.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap items-end gap-3">
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Pasajeros base (transporte)
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={100}
+                                            value={pasajerosSimulacion}
+                                            onChange={(e) =>
+                                                setPasajerosSimulacion(e.target.value)
+                                            }
+                                            className="w-24 rounded-control border border-borde bg-white px-2.5 py-1.5 text-sm font-normal"
+                                        />
+                                    </label>
+                                    <label className="grid gap-1 text-xs font-semibold text-texto">
+                                        Margen (%)
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={500}
+                                            value={margenPorcentaje}
+                                            onChange={(e) => setMargenPorcentaje(e.target.value)}
+                                            className="w-24 rounded-control border border-borde bg-white px-2.5 py-1.5 text-sm font-normal"
+                                        />
+                                    </label>
+                                </div>
+                            </div>
 
-                            {imagenesArchivos.length > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={limpiarTodasLasImagenesSeleccionadas}
-                                    className="rounded-control px-2.5 py-1.5 text-xs font-semibold text-peligro hover:bg-peligro/10"
-                                >
-                                    Quitar todas ({imagenesArchivos.length})
-                                </button>
+                            {errorSimulacion ? (
+                                <Alerta tipo="advertencia">{errorSimulacion}</Alerta>
+                            ) : null}
+
+                            {simulacion?.avisos.map((aviso) => (
+                                <Alerta key={aviso} tipo="advertencia">
+                                    {aviso}
+                                </Alerta>
+                            ))}
+
+                            {simulacion ? (
+                                <div className="space-y-2 rounded-control border border-borde bg-white p-3">
+                                    {simulacion.desglose.length > 0 ? (
+                                        <ul className="divide-y divide-borde text-xs">
+                                            {simulacion.desglose.map((item, idx) => (
+                                                <li
+                                                    key={`${item.tipo}-${item.idservicio ?? idx}`}
+                                                    className="flex flex-wrap items-center justify-between gap-2 py-1.5"
+                                                >
+                                                    <div>
+                                                        <span className="font-semibold text-texto">
+                                                            {etiquetaTipoServicio(item.tipo)}:
+                                                        </span>{" "}
+                                                        <span>{item.nombreServicio}</span>{" "}
+                                                        <span className="text-texto-suave">
+                                                            ({item.calculo})
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold text-navegacion">
+                                                        {formatearMonto(item.porPasajero)}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs text-texto-suave">
+                                            Sin costos de servicios para sumar.
+                                        </p>
+                                    )}
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-borde pt-2.5">
+                                        <div className="flex flex-wrap items-baseline gap-4 text-sm">
+                                            <span>
+                                                Costo:{" "}
+                                                <strong className="text-navegacion">
+                                                    {formatearMonto(simulacion.costoPorPasajero)}
+                                                </strong>
+                                            </span>
+                                            {tarifaSugerida != null ? (
+                                                <span>
+                                                    Tarifa sugerida (+{margenPorcentaje || 0}%):{" "}
+                                                    <strong className="text-marca">
+                                                        {formatearMonto(tarifaSugerida)}
+                                                    </strong>
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        {tarifaSugerida != null ? (
+                                            <Boton
+                                                type="button"
+                                                variante="secundario"
+                                                className="px-3 py-1 text-xs"
+                                                onClick={aplicarTarifaSugeridaATodas}
+                                            >
+                                                Aplicar sugerida
+                                            </Boton>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : simularMutation.isPending ? (
+                                <p className="text-xs text-texto-suave">Calculando costo...</p>
                             ) : null}
                         </div>
 
-                        <p className="text-xs text-texto-suave">
-                            {imagenesArchivos.length === 0
-                                ? esEdicion
-                                    ? "Podés subir entre 1 y 5 imágenes nuevas para actualizar la galería del paquete."
-                                    : "Podés adjuntar entre 1 y 5 imágenes; la primera será la portada principal."
-                                : "Podés elegir cuál será la portada haciendo clic en «Usar como portada»."}
-                        </p>
-                    </div>
+                        {/* Matriz de precios por temporada */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-navegacion">
+                                    Tarifas por temporada (USD) *
+                                </h3>
+                                <Boton
+                                    type="button"
+                                    variante="secundario"
+                                    className="px-3 py-1.5 text-xs"
+                                    onClick={agregarFilaPrecio}
+                                    disabled={filasPrecios.length >= temporadasActivas.length}
+                                >
+                                    + Agregar temporada
+                                </Boton>
+                            </div>
 
-                    {vistasPrevias.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-                            {vistasPrevias.map((urlPrevia, idx) => {
-                                const archivo = imagenesArchivos[idx];
-                                return (
-                                    <div
-                                        key={`${archivo?.name ?? "img"}-${idx}`}
-                                        className={`flex flex-col overflow-hidden rounded-control border bg-white shadow-xs ${
-                                            idx === 0
-                                                ? "border-marca ring-2 ring-marca/20"
-                                                : "border-borde"
-                                        }`}
-                                    >
-                                        <div className="relative">
-                                            <img
-                                                src={urlPrevia}
-                                                alt={`Vista previa ${idx + 1}`}
-                                                className="h-24 w-full object-cover"
-                                            />
-                                            <span
-                                                className={`absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-xs font-bold shadow-xs ${
-                                                    idx === 0
-                                                        ? "bg-marca text-white"
-                                                        : "bg-navegacion/80 text-white"
-                                                }`}
-                                            >
-                                                {idx === 0
-                                                    ? "★ Portada"
-                                                    : `Imagen #${idx + 1}`}
-                                            </span>
-                                        </div>
+                            <div className="space-y-2">
+                                {filasPrecios.map((fila, indice) => {
+                                    const montoNum = Number(fila.monto);
+                                    const bajoCosto =
+                                        costoEstimado !== null &&
+                                        fila.monto.trim() !== "" &&
+                                        Number.isFinite(montoNum) &&
+                                        montoNum < costoEstimado;
 
-                                        <div className="flex flex-1 flex-col justify-between gap-1.5 p-2 text-xs">
-                                            <div className="truncate font-semibold text-texto" title={archivo?.name}>
-                                                {archivo?.name}
-                                                <span className="ml-1 font-normal text-texto-suave">
-                                                    ({((archivo?.size ?? 0) / 1024).toFixed(0)} KB)
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between gap-1 border-t border-borde pt-1">
-                                                {idx > 0 ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            promoverImagenAPortada(
-                                                                idx,
-                                                            )
-                                                        }
-                                                        className="font-semibold text-marca-oscura hover:underline"
-                                                    >
-                                                        Usar como portada
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-xs font-semibold text-exito">
-                                                        Principal
-                                                    </span>
-                                                )}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        quitarImagenEnIndice(idx)
+                                    return (
+                                        <div
+                                            key={indice}
+                                            className={`grid items-end gap-3 rounded-control border p-3 sm:grid-cols-[1.6fr_1fr_auto] ${
+                                                bajoCosto
+                                                    ? "border-peligro bg-peligro/5"
+                                                    : "border-borde bg-white"
+                                            }`}
+                                        >
+                                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                                Temporada
+                                                <select
+                                                    value={fila.idtemporada}
+                                                    onChange={(e) =>
+                                                        actualizarFilaPrecio(indice, {
+                                                            idtemporada: Number(e.target.value),
+                                                        })
                                                     }
-                                                    className="font-semibold text-peligro hover:underline"
+                                                    className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal"
+                                                >
+                                                    <option value={0}>Elegí una temporada...</option>
+                                                    {temporadasActivas.map((temp) => (
+                                                        <option
+                                                            key={temp.idtemporada}
+                                                            value={temp.idtemporada}
+                                                        >
+                                                            {temp.nombre} (
+                                                            {formatearRangoFechasUtc(
+                                                                temp.fechaInicio,
+                                                                temp.fechaFin,
+                                                            )}
+                                                            )
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+
+                                            <label className="grid gap-1 text-xs font-semibold text-texto">
+                                                Tarifa por pasajero (USD)
+                                                <input
+                                                    type="number"
+                                                    min={0.01}
+                                                    step="0.01"
+                                                    value={fila.monto}
+                                                    onChange={(e) =>
+                                                        actualizarFilaPrecio(indice, {
+                                                            monto: e.target.value,
+                                                        })
+                                                    }
+                                                    placeholder="Ej. 650"
+                                                    className={`rounded-control border bg-white px-3 py-2 text-sm font-normal outline-none ${
+                                                        bajoCosto
+                                                            ? "border-peligro text-peligro focus:ring-2 focus:ring-peligro/20"
+                                                            : "border-borde focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                                    }`}
+                                                />
+                                                {bajoCosto && costoEstimado !== null ? (
+                                                    <span className="text-[11px] font-semibold text-peligro">
+                                                        Por debajo del costo (
+                                                        {formatearMonto(costoEstimado)})
+                                                    </span>
+                                                ) : null}
+                                            </label>
+
+                                            {filasPrecios.length > 1 ? (
+                                                <Boton
+                                                    type="button"
+                                                    variante="peligroSuave"
+                                                    className="px-2.5 py-2 text-xs"
+                                                    onClick={() => quitarFilaPrecio(indice)}
                                                 >
                                                     Quitar
-                                                </button>
-                                            </div>
+                                                </Boton>
+                                            ) : null}
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
-                    ) : null}
-                </div>
-            </div>
-
-            {detalleBloqueado ? (
-                errorDetalle ? (
-                    <p className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-sm text-peligro" role="alert">
-                        No se pudieron cargar los servicios y la garantía del paquete. Cerrá y volvé a abrir la edición para reintentar.
-                    </p>
-                ) : cargandoDetalle ? (
-                    <p className="text-sm text-texto-suave">
-                        Cargando datos del paquete…
-                    </p>
-                ) : null
-            ) : null}
-
-            {mensajeError ? (
-                <p className="rounded-control border border-peligro/30 bg-peligro/10 p-3 text-sm text-peligro" role="alert">
-                    {mensajeError}
-                </p>
-            ) : null}
-
-            <div className="flex justify-end gap-3 border-t border-borde pt-4">
-                <Boton
-                    type="button"
-                    variante="secundario"
-                    onClick={alCancelar}
-                    disabled={guardando}
-                >
-                    Cancelar
-                </Boton>
-                <Boton
-                    type="submit"
-                    cargando={guardando}
-                    disabled={detalleBloqueado}
-                >
-                    {esEdicion
-                        ? "Guardar cambios del paquete"
-                        : "Publicar paquete turístico"}
-                </Boton>
-            </div>
+                    </div>
+                ) : null}
+            </AsistentePasos>
         </form>
     );
 }

@@ -46,12 +46,21 @@ export type AlertaSalida =
     | "SIN_INICIAR" // llegó su fecha y el guía no la inició
     | "SIN_AVANCES" // iniciada hace más de 12 h sin ningún avance
     | "SIN_FINALIZAR" // sigue en curso pasado el día siguiente a su fin
+    | "FALTA_RECURSO" // falta equipo, transporte o plazas
+    | "RIESGO_STOCK" // si se vende completa, faltaría equipo
+    | "PERSONAL_NO_APTO" // alguien del personal asignado dejó de ser apto
+    | "PENDIENTE_CONFIRMAR" // cerró la venta y sigue PUBLICADA
     | string;
+
+export type AvisoSalida = {
+    alerta: AlertaSalida;
+    mensaje: string;
+};
 
 /**
  * Estructura real de una salida devuelta por GET /api/salidas en el backend.
  * Refleja los campos escalares de Salida más los includes de paquete (con circuito),
- * personal asignado, servicios y los nuevos cálculos de RF-50 y RF-61.
+ * personal asignado, servicios y los cálculos de venta y alertas.
  */
 export type SalidaApi = {
     idsalida: number;
@@ -74,7 +83,12 @@ export type SalidaApi = {
     paquete: PaqueteSalidaApi;
     personalAsignado: PersonalAsignadoSalidaApi[];
     servicios: ServicioSalidaApi[];
-    // Campos incorporados por RF-50 y RF-61:
+    // Campos de venta y confirmación (B4):
+    diasCierreVenta?: number;
+    ultimoDiaVenta?: string;
+    ventaAbierta?: boolean;
+    puedeConfirmar?: boolean;
+    // Campos de estado y alertas:
     pasajerosConfirmados: number;
     cantidadPersonal: number;
     guias: string[];
@@ -83,6 +97,7 @@ export type SalidaApi = {
     etapaInformada: number | null;
     etapaDesfasada: boolean;
     alertas: AlertaSalida[];
+    avisos?: AvisoSalida[];
 };
 
 // ==========================================
@@ -135,20 +150,88 @@ export type AlojamientoOpcion = {
     nombreServicio: string;
     localidad: string;
     categoria?: string | null;
-    capacidadDisponible?: number | null;
+    modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD";
+    capacidadDisponible: number | null;
     alcanza: boolean;
+};
+
+export type TransporteOpcion = {
+    idservicio: number;
+    nombreServicio: string;
+    capacidadVehiculo: number;
+    delPaquete: boolean;
+    libre: boolean;
+    alcanza: boolean;
+};
+
+export type PersonalLibreOpcion = {
+    idpersonal: number;
+    nombreCompleto: string;
+    rol: "Guía" | "Porteador" | string;
+    salidasEnElMes: number;
+};
+
+export type EquipoOpcion = {
+    idservicio: number;
+    nombreServicio: string;
+    tipoEquipamiento: string;
+    cantidad: number;
+    cadaPasajeros: number;
+    necesitaCompleta: number;
+    libre: number;
+    fechaCritica: string | null;
+    nivel: "OK" | "RIESGO" | "NO_ALCANZA";
+};
+
+export type TrenOpcion = {
+    idservicio: number;
+    nombreServicio: string;
+    horarioSalida: string;
+    horarioLlegada: string;
+    diasOperacion: string;
+    operaEseDia: boolean;
+};
+
+export type TarifaCongeladaSalida = {
+    idtemporada: number;
+    temporada: string;
+    monto: number;
+    moneda: string;
+};
+
+export type DetalleFaltaEquipo = {
+    faltantes: {
+        idservicio: number;
+        nombreServicio: string;
+        fecha: string;
+        libre: number;
+        necesitaMinimo: number;
+    }[];
+    tamanoMaximoSugerido: number;
 };
 
 export type OpcionesSalidaDto = {
     paquete: {
         idpaquete: number;
         nombrePaquete: string;
+        idtransporte: number | null;
+        diasCierreVenta: number;
     };
+    fechaFin: string;
     tamanoMaximo: number;
     dotacion: DotacionOpciones;
     totalLugares: number;
     cupoAutoridad: CupoAutoridadOpciones | null;
+    tarifa: TarifaCongeladaSalida;
+    plazasNecesarias: number;
     alojamientos: AlojamientoOpcion[];
+    transportes: TransporteOpcion[];
+    personal: {
+        guias: PersonalLibreOpcion[];
+        porteadores: PersonalLibreOpcion[];
+    };
+    equipo: EquipoOpcion[];
+    tren: TrenOpcion | null;
 };
 
 export type ParametrosConsultaOpciones = {
@@ -161,7 +244,10 @@ export type DatosCrearSalida = {
     idpaquete: number;
     fechaInicio: string; // "YYYY-MM-DD"
     tamanoMaximo: number;
-    idalojamiento?: number;
+    alojamientos: number[];
+    idtransporte: number;
+    personalIds: number[];
+    diasCierreVenta?: number;
 };
 
 type RespuestaOpcionesSalidaApi = {
@@ -174,6 +260,7 @@ type RespuestaCrearSalidaApi = {
         salida: SalidaApi;
         dotacion: DotacionOpciones;
         totalLugares: number;
+        advertencias?: string[];
     };
 };
 
@@ -181,12 +268,13 @@ export type ResultadoCrearSalida = {
     salida: Salida;
     dotacion: DotacionOpciones;
     totalLugares: number;
+    advertencias: string[];
     mensaje: string;
     numeroSalida?: string;
 };
 
 // ==========================================
-// Tipos TypeScript: CU-40 Asignar Recursos
+// Tipos TypeScript: CU-40 Confirmar Salida
 // ==========================================
 
 export type SalidaAsignacionInfo = {
@@ -194,6 +282,9 @@ export type SalidaAsignacionInfo = {
     nroSalida: string;
     fechaInicio: string;
     fechaFin: string;
+    estado: string;
+    ultimoDiaVenta: string;
+    ventaAbierta: boolean;
 };
 
 export type DotacionRequerida = {
@@ -201,54 +292,76 @@ export type DotacionRequerida = {
     porteadores: number;
 };
 
-export type PersonalDisponibleItem = {
+export type PersonalConfirmacionItem = {
     idpersonal: number;
     nombreCompleto: string;
-    rol: string;
+    rol: "Guía" | "Porteador" | string;
+    apto: boolean;
+    motivo: string | null;
 };
 
-export type TransporteDisponibleItem = {
+export type HotelConfirmacionItem = {
     idservicio: number;
     nombreServicio: string;
-    capacidadVehiculo?: number;
+    modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD" | null;
+    pasajeros: number;
 };
 
-export type ItemStockCamping = {
+export type TransporteConfirmacionItem = {
     idservicio: number;
     nombreServicio: string;
-    tipoEquipamiento?: string;
-    cantidadDisponible?: number;
+    capacidadVehiculo: number;
+    alcanza: boolean;
 };
 
-export type DatosPanelAsignacion = {
+export type EquipoConfirmacionItem = {
+    idservicio: number;
+    nombreServicio: string;
+    tipoEquipamiento: string | null;
+    necesita: number;
+    ocupado: number;
+    falta: number;
+};
+
+export type DetalleConflictoConfirmacion = {
+    reservasSinAlojamiento: string[];
+    faltantes: string[];
+};
+
+export type PanelConfirmacion = {
     salida: SalidaAsignacionInfo;
+    puedeConfirmar: boolean;
+    motivoNoConfirmable: string | null;
     pasajerosConfirmados: number;
     dotacionRequerida: DotacionRequerida;
+    personal: PersonalConfirmacionItem[];
+    porteadoresSobrantes: number;
+    hoteles: HotelConfirmacionItem[];
+    transporte: TransporteConfirmacionItem | null;
+    equipo: EquipoConfirmacionItem[];
+    reservasSinAlojamiento: string[];
+    faltantes: string[];
     bloqueoInicial: number;
     lugaresSobrantes: number;
-    personalDisponible: PersonalDisponibleItem[];
-    transportesDisponibles: TransporteDisponibleItem[];
-    stockCamping: ItemStockCamping[];
 };
+
+export type DatosPanelAsignacion = PanelConfirmacion;
 
 type RespuestaPanelAsignacionApi = {
-    data: DatosPanelAsignacion;
+    data: PanelConfirmacion;
 };
 
-export type ItemCampingSeleccionado = {
-    idservicio: number;
-    cantidad: number;
-};
-
+/**
+ * §9.2 y §14: body vacío `{}` para salidas con personal ya asignado;
+ * `{ personalIds }` solo para salidas viejas (anteriores a etapa 3) que llegan sin personal.
+ */
 export type PayloadConfirmarAsignacion = {
-    personalIds: number[];
-    idtransporte: number;
-    itemsCamping: ItemCampingSeleccionado[];
+    personalIds?: number[];
 };
 
 export type ParametrosConfirmarAsignacion = {
     idsalida: number;
-    datos: PayloadConfirmarAsignacion;
+    datos?: PayloadConfirmarAsignacion;
 };
 
 /** Titular que se quedó sin permiso: lo rechazó la autoridad o tiene el pasaporte vencido (RF-47). */
@@ -260,7 +373,7 @@ export type PermisoRechazadoAsignacion = {
 };
 
 export type DatosResultadoConfirmarAsignacion = {
-    salida: SalidaApi;
+    salida: { idsalida: number; nroSalida: string; estado: string };
     permisosEmitidos: number;
     rechazados: PermisoRechazadoAsignacion[];
     lugaresLiberados: number;
@@ -273,7 +386,7 @@ type RespuestaConfirmarAsignacionApi = {
 };
 
 export type ResultadoConfirmarAsignacion = {
-    salida: Salida;
+    salida: { idsalida: number; nroSalida: string; estado: string };
     permisosEmitidos: number;
     rechazados: PermisoRechazadoAsignacion[];
     lugaresLiberados: number;
@@ -701,9 +814,12 @@ export async function crearSalida(
         idpaquete: datos.idpaquete,
         fechaInicio: datos.fechaInicio,
         tamanoMaximo: datos.tamanoMaximo,
+        alojamientos: datos.alojamientos,
+        idtransporte: datos.idtransporte,
+        personalIds: datos.personalIds,
     };
-    if (datos.idalojamiento !== undefined && datos.idalojamiento !== null) {
-        cuerpo.idalojamiento = datos.idalojamiento;
+    if (datos.diasCierreVenta !== undefined) {
+        cuerpo.diasCierreVenta = datos.diasCierreVenta;
     }
 
     const respuesta = await solicitarApi<RespuestaCrearSalidaApi>("/salidas", {
@@ -714,17 +830,18 @@ export async function crearSalida(
     return {
         ...respuesta.data,
         salida: normalizarSalida(respuesta.data.salida),
+        advertencias: respuesta.data.advertencias ?? [],
         mensaje: respuesta.mensaje,
         numeroSalida: respuesta.data.salida.nroSalida,
     };
 }
 
 /**
- * Consulta la dotación definitiva y recursos disponibles para una salida (CU-40, GET /api/salidas/:idsalida/asignacion).
+ * Consulta el panel de control y confirmación de una salida (CU-40, GET /api/salidas/:idsalida/asignacion).
  */
 export async function obtenerPanelAsignacion(
     idsalida: number,
-): Promise<DatosPanelAsignacion> {
+): Promise<PanelConfirmacion> {
     const respuesta = await solicitarApi<RespuestaPanelAsignacionApi>(
         `/salidas/${idsalida}/asignacion`,
     );
@@ -732,12 +849,11 @@ export async function obtenerPanelAsignacion(
 }
 
 /**
- * Confirma la asignación de recursos, emite permisos y cierra la venta (CU-40, POST /api/salidas/:idsalida/asignacion).
- * Si la autoridad no pudo liberar los lugares sobrantes, devuelve `advertencia` sin fallar la asignación.
+ * Confirma la salida después del corte de venta, emite permisos y libera sobrantes (CU-40, POST /api/salidas/:idsalida/asignacion).
  */
 export async function confirmarAsignacion(
     idsalida: number,
-    payload: PayloadConfirmarAsignacion,
+    payload: PayloadConfirmarAsignacion = {},
 ): Promise<ResultadoConfirmarAsignacion> {
     const respuesta = await solicitarApi<RespuestaConfirmarAsignacionApi>(
         `/salidas/${idsalida}/asignacion`,
@@ -748,7 +864,7 @@ export async function confirmarAsignacion(
     );
 
     return {
-        salida: normalizarSalida(respuesta.data.salida),
+        salida: respuesta.data.salida,
         permisosEmitidos: respuesta.data.permisosEmitidos,
         rechazados: respuesta.data.rechazados ?? [],
         lugaresLiberados: respuesta.data.lugaresLiberados,
@@ -1017,7 +1133,7 @@ export function useConfirmarAsignacion() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ idsalida, datos }: ParametrosConfirmarAsignacion) =>
-            confirmarAsignacion(idsalida, datos),
+            confirmarAsignacion(idsalida, datos ?? {}),
         onSuccess: (_resultado, variables) => {
             queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
             queryClient.invalidateQueries({

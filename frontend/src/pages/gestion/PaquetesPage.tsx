@@ -388,24 +388,34 @@ function PaquetesPage() {
             </header>
 
             {formularioAbierto ? (
-                <FormularioPaquete
-                    key={paqueteEnEdicion?.idpaquete ?? "nuevo"}
-                    paqueteEnEdicion={paqueteEnEdicion}
-                    circuitos={circuitosActivos}
-                    temporadas={temporadas}
-                    serviciosDisponibles={serviciosDisponibles}
-                    errorCargaServicios={
-                        errorServiciosCatalogo
-                            ? (detalleErrorServiciosCatalogo?.message ??
-                              "Error al consultar proveedores y servicios.")
-                            : undefined
-                    }
-                    alGuardarNuevo={guardarNuevoPaquete}
-                    alGuardarEdicion={guardarEdicionPaquete}
-                    alCancelar={cerrarFormulario}
-                    guardando={guardando}
-                    errorServidor={errorFormulario}
-                />
+                <Modal
+                    onCerrar={cerrarFormulario}
+                    etiquetaId="titulo-asistente-paquete"
+                    tamano="xl"
+                    className="p-6"
+                >
+                    <div id="titulo-asistente-paquete" className="sr-only">
+                        {paqueteEnEdicion ? "Editar paquete turístico" : "Nuevo paquete turístico"}
+                    </div>
+                    <FormularioPaquete
+                        key={paqueteEnEdicion?.idpaquete ?? "nuevo"}
+                        paqueteEnEdicion={paqueteEnEdicion}
+                        circuitos={circuitosActivos}
+                        temporadas={temporadas}
+                        serviciosDisponibles={serviciosDisponibles}
+                        errorCargaServicios={
+                            errorServiciosCatalogo
+                                ? (detalleErrorServiciosCatalogo?.message ??
+                                  "Error al consultar proveedores y servicios.")
+                                : undefined
+                        }
+                        alGuardarNuevo={guardarNuevoPaquete}
+                        alGuardarEdicion={guardarEdicionPaquete}
+                        alCancelar={cerrarFormulario}
+                        guardando={guardando}
+                        errorServidor={errorFormulario}
+                    />
+                </Modal>
             ) : null}
 
             <input
@@ -596,7 +606,23 @@ function PaquetesPage() {
                                                     >
                                                         {paquete.nombrePaquete}
                                                     </button>
+                                                    {paquete.faltaTransporte ? (
+                                                        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                            Falta transporte
+                                                        </span>
+                                                    ) : null}
                                                 </div>
+                                                {paquete.localidadGarantizada ? (
+                                                    <p className="mt-0.5 text-xs text-texto-suave">
+                                                        Sale desde{" "}
+                                                        <span className="font-medium text-texto">
+                                                            {paquete.localidadGarantizada}
+                                                        </span>
+                                                        {paquete.diasCierreVenta != null
+                                                            ? ` · Cierre ${paquete.diasCierreVenta} d antes`
+                                                            : ""}
+                                                    </p>
+                                                ) : null}
                                                 {paquete.condiciones ? (
                                                     <p className="mt-1 line-clamp-2 text-xs text-texto-suave">
                                                         {paquete.condiciones}
