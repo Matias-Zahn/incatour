@@ -9,6 +9,8 @@ import {
   TIPO_SERVICIO,
 } from "../../../shared/constantes";
 import { PermisoEmitido, PermisoRechazado } from "../../../integraciones/autoridad/autoridad.interface";
+import { rangosDe } from "../../../shared/ocupacion";
+import { disponible, ocupar } from "../../../shared/ocupacion.repository";
 import { LogisticaRepository } from "../logistica/logistica.repository";
 import { ItemCamping } from "./asignacion.dto";
 
@@ -23,7 +25,6 @@ export class AsignacionRepository {
       include: {
         paquete: { include: { circuito: true } },
         personalAsignado: true,
-        servicios: true,
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },
           include: { pasajeros: { include: { pasajero: true } } },
@@ -110,22 +111,16 @@ export class AsignacionRepository {
         data: p.personalIds.map((idpersonal) => ({ idsalida, idpersonal })),
       });
 
-      await tx.salidaServicio.create({
-        data: { idsalida, idservicio: p.idtransporte, tipo: TIPO_SERVICIO.TRANSPORTE },
-      });
+      await ocupar(tx, { idservicio: p.idtransporte, idsalida, tipo: TIPO_SERVICIO.TRANSPORTE, rangos: rangosDe(TIPO_SERVICIO.TRANSPORTE, p.salida), cantidad: 1 });
 
-      for (const item of p.itemsCamping) {
-        // Descuento condicional: si otra salida se llevó el stock en el medio, no descuenta nada (FA2)
-        const stock = await tx.servicioEquipamiento.updateMany({
-          where: { idservicio: item.idservicio, cantidadDisponible: { gte: item.cantidad } },
-          data: { cantidadDisponible: { decrement: item.cantidad } },
-        });
-        if (stock.count === 0) {
+      // A1: cada equipo se bloquea y se mira lo disponible en sus fechas, con el reacondicionamiento (FA2).
+      // En orden de id: dos cierres con los mismos artículos los bloquean en el mismo orden
+      const rangosEquipo = rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, p.salida);
+      for (const item of [...p.itemsCamping].sort((a, b) => a.idservicio - b.idservicio)) {
+        if ((await disponible(tx, item.idservicio, rangosEquipo)) < item.cantidad) {
           throw CustomError.badRequest(`No hay stock suficiente del artículo ${item.idservicio}`);
         }
-        await tx.salidaEquipamiento.create({
-          data: { idsalida, idservicio: item.idservicio, cantidad: item.cantidad },
-        });
+        await ocupar(tx, { idservicio: item.idservicio, idsalida, tipo: TIPO_SERVICIO.EQUIPAMIENTO, rangos: rangosEquipo, cantidad: item.cantidad });
       }
 
       for (const permiso of p.permisos) {
@@ -151,13 +146,12 @@ export class AsignacionRepository {
         }
       }
 
-      // Las plazas de hotel bloqueadas que no se vendieron vuelven al proveedor (regla 7 del CU-36)
-      const hotel = p.salida.servicios.find((s) => s.tipo === TIPO_SERVICIO.ALOJAMIENTO);
+      // Las plazas de hotel bloqueadas que no se vendieron vuelven al proveedor (regla 7 del CU-36): baja la ocupación
       const plazasSobrantes = fila.stockLocalAlojamiento ?? 0;
-      if (hotel && plazasSobrantes > 0) {
-        await tx.servicioAlojamiento.update({
-          where: { idservicio: hotel.idservicio },
-          data: { capacidadDisponible: { increment: plazasSobrantes } },
+      if (plazasSobrantes > 0) {
+        await tx.ocupacion.updateMany({
+          where: { idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+          data: { cantidad: { decrement: plazasSobrantes } },
         });
       }
 
@@ -167,8 +161,7 @@ export class AsignacionRepository {
         data: { estado: "CERRADA", stockLocal: 0, stockLocalAlojamiento: 0, lugaresPorLiberar: p.lugaresPorLiberar },
         include: {
           personalAsignado: { include: { personal: { select: { nombreCompleto: true, rol: true } } } },
-          servicios: { include: { servicio: { select: { nombreServicio: true } } } },
-          equipamientos: true,
+          ocupaciones: { include: { servicio: { select: { nombreServicio: true } } } },
         },
       });
     });

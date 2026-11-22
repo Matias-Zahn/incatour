@@ -9,7 +9,7 @@ export async function ventas(ctx: Ctx) {
   let k = 0; // reparte las fechas de salida: el cupo diario de la autoridad es compartido
 
   const sal = (idsalida: number) => db.salida.findUniqueOrThrow({ where: { idsalida } });
-  const cap = async (idservicio: number) => (await db.servicioAlojamiento.findUniqueOrThrow({ where: { idservicio } })).capacidadDisponible;
+  const cap = (idservicio: number) => ctx.f.libre(idservicio);
   const res = (idreserva: number) => db.reserva.findUniqueOrThrow({ where: { idreserva } });
   /** "stockLocal/stockLocalAlojamiento/reservas" para comparar antes y después de un rechazo */
   const foto = async (idsalida: number) => {

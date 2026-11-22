@@ -22,7 +22,9 @@ export class ServicioRoutes {
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** Lista los servicios del proveedor con las condiciones
      *       propias de su rubro y su disponibilidad. Para EQUIPAMIENTO la disponibilidad informa
-     *       `cantidadDisponible` (libre), `cantidadComprometida` (en salidas activas) e `inventarioTotal`.
+     *       `cantidadDisponible` (libre hoy), `cantidadComprometida` (el día de mayor ocupación de hoy en
+     *       adelante) e `inventarioTotal`. Para ALOJAMIENTO, `capacidadDisponible` es lo libre hoy (null si
+     *       confirma a solicitud y no tiene plazas cargadas).
      *     tags: [Servicios de proveedores]
      *     security:
      *       - BearerAuth: []
@@ -60,7 +62,8 @@ export class ServicioRoutes {
      *     description: >
      *       **RESTRINGIDO A ADMINISTRADOR.** El `tipo` debe coincidir con el rubro del proveedor,
      *       que además debe estar ACTIVO. Alojamiento: localidad, categoría, tipo de habitación,
-     *       capacidad y modalidad de confirmación. Transporte: capacidad, peso de equipaje incluido
+     *       capacidad (`capacidadDisponible`, el total de plazas; obligatoria solo con BLOQUEO_PLAZAS) y
+     *       modalidad de confirmación. Transporte: capacidad, peso de equipaje incluido
      *       y costo por kg excedente. Tren: horarios y días de operación. Equipamiento: tipo y cantidad disponible.
      *     tags: [Servicios de proveedores]
      *     security:
@@ -150,6 +153,67 @@ export class ServicioRoutes {
 
     /**
      * @swagger
+     * /api/servicios/{id}/ocupacion:
+     *   get:
+     *     summary: Ocupación del servicio por día e historial de salidas (A1)
+     *     description: >
+     *       **RESTRINGIDO A ADMINISTRADOR.** Para cada día del rango, lo ocupado por salidas activas y lo
+     *       disponible (`total − ocupado`). `ocupaciones` lista también las de salidas finalizadas (historial),
+     *       que ya no ocupan. El hotel ocupa solo las noches previas y posteriores; el equipamiento, del inicio
+     *       al fin más 2 días de reacondicionamiento. Sin `desde`, hoy; sin `hasta`, 30 días después; máximo 366 días.
+     *     tags: [Servicios de proveedores]
+     *     security:
+     *       - BearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema: { type: integer }
+     *       - in: query
+     *         name: desde
+     *         schema: { type: string, format: date }
+     *       - in: query
+     *         name: hasta
+     *         schema: { type: string, format: date }
+     *     responses:
+     *       200:
+     *         description: Ocupación del servicio.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 data:
+     *                   type: object
+     *                   properties:
+     *                     total: { type: integer }
+     *                     dias:
+     *                       type: array
+     *                       items:
+     *                         type: object
+     *                         properties:
+     *                           fecha: { type: string, format: date }
+     *                           ocupado: { type: integer }
+     *                           disponible: { type: integer }
+     *                     ocupaciones:
+     *                       type: array
+     *                       items:
+     *                         type: object
+     *                         properties:
+     *                           nroSalida: { type: string }
+     *                           desde: { type: string, format: date }
+     *                           hasta: { type: string, format: date }
+     *                           cantidad: { type: integer }
+     *                           estadoSalida: { type: string }
+     *       400:
+     *         description: Fechas inválidas o rango mayor a 366 días.
+     *       404:
+     *         description: El servicio no existe.
+     */
+    router.get("/:id/ocupacion", controller.consultarOcupacion);
+
+    /**
+     * @swagger
      * /api/servicios/{id}:
      *   put:
      *     summary: Modificar servicio de un proveedor (CU-20)
@@ -159,9 +223,9 @@ export class ServicioRoutes {
      *       Reglas: (1) siempre se edita en el lugar (sin versionar): lo ofrecido en cada salida
      *       está en su foto del paquete. Un transporte asignado a salidas activas no puede quedar con capacidad
      *       menor a sus pasajeros confirmados y un alojamiento en salidas activas no puede cambiar localidad,
-     *       categoría, tipo de habitación ni modalidad de confirmación. (2) En equipamiento se
-     *       edita `inventarioTotal` (inventario físico real) y no puede quedar por debajo de lo comprometido
-     *       en salidas activas. (3) Un alojamiento garantizado por un paquete activo no puede cambiar
+     *       categoría, tipo de habitación ni modalidad de confirmación. (2) Se edita el total: `inventarioTotal`
+     *       en equipamiento y `capacidadDisponible` (plazas totales) en alojamiento. Subirlo es libre; bajarlo
+     *       se rechaza si queda por debajo del día de mayor ocupación de hoy en adelante. (3) Un alojamiento garantizado por un paquete activo no puede cambiar
      *       localidad, categoría ni tipo de habitación, y debe mantener el bloqueo de plazas.
      *       Las reservas ya contratadas no se alteran: conservan su precio congelado.
      *     tags: [Servicios de proveedores]

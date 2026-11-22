@@ -5,11 +5,10 @@ import {
   ESTADO_RESERVA,
   ESTADO_SALIDA,
   ESTADO_SOLICITUD,
-  TIPO_SERVICIO,
   SALIDAS_NO_INICIADAS,
   redondear2,
 } from "../../../shared/constantes";
-import { plazasADevolverAlHotel } from "./cancelacion-salida.plazas";
+import { liberar } from "../../../shared/ocupacion.repository";
 
 export class CancelacionSalidaRepository {
   // Todo lo necesario para validar, mostrar el impacto y decidir
@@ -34,8 +33,7 @@ export class CancelacionSalidaRepository {
         },
         permisos: { select: { estadoTramite: true } },
         personalAsignado: { select: { idpersonal: true } },
-        equipamientos: { select: { cantidad: true } },
-        servicios: { select: { tipo: true } },
+        ocupaciones: { select: { tipo: true, idservicio: true } },
       },
     });
   }
@@ -44,9 +42,9 @@ export class CancelacionSalidaRepository {
    * CU-37: cancelación en una única transacción. Devuelve null si otra petición ya la canceló
    * o si el recorrido empezó mientras tanto.
    *
-   * Las filas de asignación de personal, transporte, alojamiento y equipamiento se CONSERVAN como
-   * historial; los recursos quedan libres porque toda consulta de disponibilidad considera solo las
-   * salidas activas (la salida pasa a CANCELADA). El stock de equipamiento sí se reintegra.
+   * Las asignaciones de personal se CONSERVAN como historial: quedan libres porque toda consulta de
+   * disponibilidad considera solo las salidas activas. A1: la ocupación de hotel, transporte y equipamiento
+   * se borra, así lo liberado vuelve de inmediato.
    */
   async ejecutarCancelacion(p: {
     idsalida: number;
@@ -74,14 +72,8 @@ export class CancelacionSalidaRepository {
           data: { estadoTramite: ESTADO_PERMISO.PERDIDO },
         });
 
-        // Equipamiento: se reintegra al stock interno del proveedor
-        const equipos = await tx.salidaEquipamiento.findMany({ where: { idsalida: p.idsalida } });
-        for (const e of equipos) {
-          await tx.servicioEquipamiento.update({
-            where: { idservicio: e.idservicio },
-            data: { cantidadDisponible: { increment: e.cantidad } },
-          });
-        }
+        // A1: hotel, transporte y equipamiento quedan libres de inmediato (SAL-02)
+        await liberar(tx, p.idsalida);
 
         // Reservas confirmadas (se leen dentro de la transacción: son las que se cancelan)
         const reservas = await tx.reserva.findMany({
@@ -90,8 +82,6 @@ export class CancelacionSalidaRepository {
             idreserva: true,
             nroReserva: true,
             cantidadPasajeros: true,
-            estadoAlojamiento: true,
-            solicitudes: { select: { estado: true } },
             pagos: { select: { monto: true } },
             cliente: { select: { usuario: { select: { email: true } } } },
           },
@@ -103,19 +93,6 @@ export class CancelacionSalidaRepository {
           email: r.cliente.usuario.email,
           montoReembolsado: redondear2(r.pagos.reduce((acc, pago) => acc + pago.monto, 0)),
         }));
-
-        // SAL-02: Alojamiento: se reponen al hotel las plazas aún bloqueadas y las de las reservas que salieron del bloqueo (RF-51)
-        // Se calcula acá, con las reservas todavía Confirmadas y antes de cancelar las solicitudes
-        const servicioHotel = await tx.salidaServicio.findFirst({
-          where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
-          select: { idservicio: true, salida: { select: { stockLocalAlojamiento: true } } },
-        });
-        if (servicioHotel) {
-          await tx.servicioAlojamiento.update({
-            where: { idservicio: servicioHotel.idservicio },
-            data: { capacidadDisponible: { increment: plazasADevolverAlHotel(servicioHotel.salida.stockLocalAlojamiento, reservas) } },
-          });
-        }
 
         // Se dan de baja las solicitudes de alojamiento pendientes y las confirmadas, igual que CU-32 (SAL-18)
         await tx.solicitud.updateMany({

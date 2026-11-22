@@ -333,7 +333,7 @@ async function faseD() {
       controlar("Confirmar una compra sobre una salida ya cerrada se rechaza", compra[0]!.status === "rejected");
     } finally {
       await db.asignacionPersonal.deleteMany({ where: { idsalida: { in: salidas } } });
-      await db.salidaServicio.deleteMany({ where: { idsalida: { in: salidas } } });
+      await db.ocupacion.deleteMany({ where: { idsalida: { in: salidas } } });
       await db.salida.deleteMany({ where: { idsalida: { in: salidas } } });
       await db.personal.delete({ where: { idpersonal: personal.idpersonal } });
     }

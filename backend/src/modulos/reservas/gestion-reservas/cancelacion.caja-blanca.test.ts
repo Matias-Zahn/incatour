@@ -17,8 +17,7 @@ const { tx, enviarEmail } = vi.hoisted(() => ({
     reembolso: { create: vi.fn() },
     solicitud: { updateMany: vi.fn() },
     salida: { update: vi.fn() },
-    salidaServicio: { findFirst: vi.fn() },
-    servicioAlojamiento: { update: vi.fn() },
+    ocupacion: { updateMany: vi.fn() },
   },
   enviarEmail: vi.fn(),
 }));
@@ -176,7 +175,6 @@ describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solici
     tx.permisoPasajero.count.mockResolvedValue(0);
     tx.reserva.updateMany.mockResolvedValue({ count: 1 });
     tx.reembolso.create.mockResolvedValue({ idreembolso: 1 });
-    tx.salidaServicio.findFirst.mockResolvedValue({ idservicio: 3 });
   });
 
   it("P1 aparecieron permisos desde el cálculo: CAMBIO y no toca nada", async () => {
@@ -198,7 +196,7 @@ describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solici
     expect(tx.salida.update).toHaveBeenCalledWith({ where: { idsalida: 7 }, data: { stockLocal: { increment: 2 } } });
     expect(tx.solicitud.updateMany).toHaveBeenCalled();
     expect(tx.permisoPasajero.updateMany).not.toHaveBeenCalled();
-    expect(tx.servicioAlojamiento.update).not.toHaveBeenCalled();
+    expect(tx.ocupacion.updateMany).not.toHaveBeenCalled();
   });
   it("P5 a la venta, alojamiento por stock: repone lugares y plazas de la salida", async () => {
     await repository.cancelarReserva(datos({ alojamientoPorStock: true }));
@@ -215,16 +213,15 @@ describe("cancelarReserva (repositorio): decide stock, plazas, permisos y solici
     await repository.cancelarReserva(datos({ permisosEmitidos: true }));
     expect(tx.salida.update).not.toHaveBeenCalled();
   });
-  it("P8 salida cerrada con alojamiento por stock: las plazas vuelven al hotel", async () => {
+  it("P8 salida cerrada con alojamiento por stock: las plazas vuelven al hotel (baja la ocupación)", async () => {
     tx.$queryRaw.mockResolvedValue([{ estado: "CERRADA" }]);
     await repository.cancelarReserva(datos({ salidaEnVenta: false, alojamientoPorStock: true }));
     expect(tx.salida.update).not.toHaveBeenCalled();
-    expect(tx.servicioAlojamiento.update).toHaveBeenCalledWith({ where: { idservicio: 3 }, data: { capacidadDisponible: { increment: 2 } } });
+    expect(tx.ocupacion.updateMany).toHaveBeenCalledWith({ where: { idsalida: 7, tipo: "ALOJAMIENTO" }, data: { cantidad: { decrement: 2 } } });
   });
-  it("P9 salida cerrada sin hotel asignado: no falla", async () => {
+  it("P9 salida cerrada con alojamiento por solicitud: no toca la ocupación del hotel", async () => {
     tx.$queryRaw.mockResolvedValue([{ estado: "CERRADA" }]);
-    tx.salidaServicio.findFirst.mockResolvedValue(null);
-    await repository.cancelarReserva(datos({ salidaEnVenta: false, alojamientoPorStock: true }));
-    expect(tx.servicioAlojamiento.update).not.toHaveBeenCalled();
+    await repository.cancelarReserva(datos({ salidaEnVenta: false }));
+    expect(tx.ocupacion.updateMany).not.toHaveBeenCalled();
   });
 });

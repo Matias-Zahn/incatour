@@ -177,7 +177,7 @@ export async function catalogoCuentas(ctx: Ctx) {
 
   await escenario("Baja de proveedor con servicios asignados a una salida activa", async () => {
     const { hotel, idsalida } = await conReserva();
-    controlar("La salida quedó con el hotel asignado", (await db.salidaServicio.count({ where: { idsalida, idservicio: hotel.idservicio } })) === 1);
+    controlar("La salida quedó con el hotel asignado", (await db.ocupacion.count({ where: { idsalida, idservicio: hotel.idservicio } })) > 0);
     await esperar("Baja de proveedor con servicio en salida activa → 400", "PATCH", `/proveedores/${hotel.idproveedor}/baja`, undefined, admin, 400);
     controlar("El proveedor sigue ACTIVO", (await estadoDe("proveedor", { idproveedor: hotel.idproveedor })) === "ACTIVO");
     await esperar("Baja del servicio asignado a salida activa → 400", "PATCH", `/servicios/${hotel.idservicio}/baja`, undefined, admin, 400);

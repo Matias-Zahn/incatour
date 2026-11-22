@@ -329,11 +329,11 @@ model TarifaPaquete {
 // ==========================================
 
 model Salida {
-  idsalida              Int      @id @default(autoincrement())
+  idsalida              Int       @id @default(autoincrement())
   idpaquete             Int
-  nroSalida             String   @unique
+  nroSalida             String    @unique
   idbloqueo             String?
-  lugaresPorLiberar     Int      @default(0) // CU-40: sobrantes que la autoridad todavía no liberó (SAL-09)
+  lugaresPorLiberar     Int       @default(0) // CU-40: sobrantes que la autoridad todavía no liberó (SAL-09)
   stockLocal            Int // Restricción CHECK pendiente en BD
   stockLocalAlojamiento Int?
   tamanoMaximo          Int
@@ -345,12 +345,11 @@ model Salida {
   fechaHoraFinReal      DateTime? // al completar la última etapa
   definicionPaquete     Json? // CAT-05: foto del paquete al crear la salida (null = salida anterior, rige el paquete vivo)
 
-  paquete   Paquete          @relation(fields: [idpaquete], references: [idpaquete])
-  servicios SalidaServicio[]
+  paquete     Paquete     @relation(fields: [idpaquete], references: [idpaquete])
+  ocupaciones Ocupacion[] // A1: hotel, transporte y equipamiento, por fechas
 
   reservas                Reserva[]
   resenias                Resenia[]
-  equipamientos           SalidaEquipamiento[]
   personalAsignado        AsignacionPersonal[]
   permisos                PermisoPersonal[] // Relacionado con los permisos específicos
   avances                 Avance[]
@@ -359,19 +358,6 @@ model Salida {
   evaluacionesPersonal    EvaluacionPersonal[]
   evaluacionesProveedores EvaluacionProveedor[]
 
-  @@schema("public")
-}
-
-model SalidaServicio {
-  idsalida           Int
-  idservicio         Int
-  tipo               String
-  comprobanteReserva String? // Solo TRANSPORTE: comprobante de la reserva externa (CU-39)
-
-  salida   Salida       @relation(fields: [idsalida], references: [idsalida])
-  servicio ServicioBase @relation(fields: [idservicio], references: [idservicio])
-
-  @@unique([idsalida, tipo])
   @@schema("public")
 }
 
@@ -495,8 +481,7 @@ model ServicioBase {
   garantiasEstablecimiento GarantiaEstablecimiento[]
   gestiones                GestionSolicitud[]
 
-  salidas      SalidaServicio[]
-  salidasEquip SalidaEquipamiento[]
+  ocupaciones Ocupacion[]
 
   @@schema("public")
 }
@@ -505,7 +490,7 @@ model ServicioAlojamiento {
   idservicio            Int          @id
   categoria             String
   tipoHabitacion        String
-  capacidadDisponible   Int
+  plazasTotales         Int? // A1: total del hotel; null si confirma a solicitud (bloque 8)
   modalidadConfirmacion String
   servicio              ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
@@ -533,10 +518,10 @@ model ServicioTren {
 }
 
 model ServicioEquipamiento {
-  idservicio         Int          @id
-  tipoEquipamiento   String
-  cantidadDisponible Int
-  servicio           ServicioBase @relation(fields: [idservicio], references: [idservicio])
+  idservicio       Int          @id
+  tipoEquipamiento String
+  cantidadTotal    Int // A1: inventario total; lo disponible sale de Ocupacion
+  servicio         ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@schema("public")
 }
@@ -551,14 +536,23 @@ model PaqueteServicio {
   @@schema("public")
 }
 
-model SalidaEquipamiento {
-  idsalida   Int
-  idservicio Int
-  cantidad   Int
-  salida     Salida       @relation(fields: [idsalida], references: [idsalida])
-  servicio   ServicioBase @relation(fields: [idservicio], references: [idservicio])
+// A1: lo que una salida ocupa de un servicio, por fechas. El stock de cada día es el total menos la suma de
+// las ocupaciones de salidas activas que cubren ese día. Sin @@unique: el hotel ocupa dos tramos (noches previas y posteriores).
+model Ocupacion {
+  idocupacion        Int          @id @default(autoincrement())
+  idservicio         Int
+  idsalida           Int
+  tipo               String // ALOJAMIENTO | TRANSPORTE | EQUIPAMIENTO
+  desde              DateTime     @db.Date
+  hasta              DateTime     @db.Date // inclusive
+  cantidad           Int // plazas, unidades, o 1 para un vehículo
+  comprobanteReserva String? // solo TRANSPORTE (CU-39)
+  creadaEn           DateTime     @default(now())
+  servicio           ServicioBase @relation(fields: [idservicio], references: [idservicio])
+  salida             Salida       @relation(fields: [idsalida], references: [idsalida])
 
-  @@id([idsalida, idservicio])
+  @@index([idservicio, desde, hasta])
+  @@index([idsalida])
   @@schema("public")
 }
 

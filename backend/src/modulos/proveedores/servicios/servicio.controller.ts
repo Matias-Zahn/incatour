@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../../../error/CustomError";
-import { CrearServicioDto, FiltrosServicioDto, ModificarServicioDto } from "./servicio.dto";
+import { hoyUTC } from "../../../shared/fechas";
+import { CrearServicioDto, FiltrosServicioDto, ModificarServicioDto, RangoOcupacionDto } from "./servicio.dto";
 import { ServicioService } from "./servicio.service";
 import { leerIdUrl } from "../../../shared/validaciones";
 
@@ -45,6 +46,18 @@ export class ServicioController {
       const id = leerId(req.params.id, "ID de servicio");
       const servicio = await servicioService.obtenerServicio(id);
       return res.json({ data: servicio });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // A1: GET /api/servicios/:id/ocupacion?desde&hasta
+  consultarOcupacion = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = leerId(req.params.id, "ID de servicio");
+      const [error, rango] = RangoOcupacionDto.create(req.query, hoyUTC());
+      if (error) throw CustomError.badRequest(error);
+      return res.json({ data: await servicioService.consultarOcupacion(id, rango!) });
     } catch (error) {
       next(error);
     }

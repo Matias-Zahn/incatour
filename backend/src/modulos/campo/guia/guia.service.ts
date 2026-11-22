@@ -3,7 +3,8 @@ import { INotificador } from "../../../integraciones/notificador/notificador.int
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { CustomError } from "../../../error/CustomError";
 import { hoyUTC } from "../../../shared/fechas";
-import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
+import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { unaPorServicio } from "../../../shared/ocupacion";
 import { ESTADO_TRAMO, RegistrarAvanceDto, RegistrarIncidenteDto } from "./guia.dto";
 import { GuiaRepository } from "./guia.repository";
 
@@ -78,8 +79,12 @@ export class GuiaService {
         fechaHoraReporte: i.fechaHoraReporte,
       })),
       personal: s.personalAsignado.map((a) => a.personal),
-      servicios: s.servicios.map((x) => ({ tipo: x.tipo, nombreServicio: x.servicio.nombreServicio })),
-      equipamiento: s.equipamientos.map((e) => ({
+      // el hotel puede tener dos tramos (noches previas y posteriores): se lista una vez
+      servicios: unaPorServicio(s.ocupaciones.filter((o) => o.tipo !== TIPO_SERVICIO.EQUIPAMIENTO)).map((x) => ({
+        tipo: x.tipo,
+        nombreServicio: x.servicio.nombreServicio,
+      })),
+      equipamiento: s.ocupaciones.filter((o) => o.tipo === TIPO_SERVICIO.EQUIPAMIENTO).map((e) => ({
         nombreServicio: e.servicio.nombreServicio,
         tipoEquipamiento: e.servicio.equipamiento?.tipoEquipamiento ?? null,
         cantidad: e.cantidad,

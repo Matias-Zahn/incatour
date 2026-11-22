@@ -13,8 +13,7 @@ export class ReemplazoRepository {
       include: {
         personalAsignado: { include: { personal: { include: { guia: true } } } },
         permisos: { orderBy: { idpermisopersonal: "asc" } },
-        servicios: { include: { servicio: { select: { nombreServicio: true } } } },
-        equipamientos: { include: { servicio: { select: { nombreServicio: true } } } },
+        ocupaciones: { include: { servicio: { select: { nombreServicio: true } } }, orderBy: { idocupacion: "asc" } },
       },
     });
   }

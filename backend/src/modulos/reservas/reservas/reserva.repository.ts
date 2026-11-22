@@ -58,8 +58,6 @@ export class ReservaRepository {
           where: { estado: { not: "CANCELADA" } },
           select: { pasajeros: { select: { pasajero: { select: { nroPasaporte: true } } } } },
         },
-        // Servicios ya asignados a la salida (SalidaServicio)
-        servicios: { include: { servicio: { include: { transporte: true } } } },
       },
     });
   }

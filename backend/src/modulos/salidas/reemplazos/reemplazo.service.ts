@@ -1,6 +1,7 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_PERMISO, SALIDAS_NO_INICIADAS } from "../../../shared/constantes";
+import { ESTADO_PERMISO, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { unaPorServicio } from "../../../shared/ocupacion";
 import { PermisoEmitido } from "../../../integraciones/autoridad/autoridad.interface";
 import { ROL_GUIA } from "../../cuentas/personal/personal.dto";
 import { obtenerAutoridad } from "../autoridad.wiring";
@@ -26,8 +27,8 @@ export class ReemplazoService {
         rol: personal.rol,
         permiso: permisoVigente(salida, personal.idpersonal)?.nroPermiso ?? null,
       })),
-      servicios: salida.servicios.map((s) => ({ tipo: s.tipo, nombreServicio: s.servicio.nombreServicio })),
-      equipamiento: salida.equipamientos.map((e) => ({ nombreServicio: e.servicio.nombreServicio, cantidad: e.cantidad })),
+      servicios: unaPorServicio(salida.ocupaciones.filter((o) => o.tipo !== TIPO_SERVICIO.EQUIPAMIENTO)).map((s) => ({ tipo: s.tipo, nombreServicio: s.servicio.nombreServicio })),
+      equipamiento: salida.ocupaciones.filter((o) => o.tipo === TIPO_SERVICIO.EQUIPAMIENTO).map((e) => ({ nombreServicio: e.servicio.nombreServicio, cantidad: e.cantidad })),
     };
   }
 
