@@ -62,7 +62,6 @@ model Reserva {
   // RES-07: desglose congelado al comprar (CU-30); null en reservas anteriores
   temporadaAplicada       String?
   precioPaquetePorPersona Float?
-  adicionalesEquipaje     Float?
   moneda                  String?
   diasMinimosReintegro    Int? // RES-06: plazo del paquete congelado al comprar (CU-30)
   idalojamiento           Int? // B10/12.2: hotel al que la compra mandó al grupo (null en reservas anteriores)
@@ -505,8 +504,6 @@ model ServicioAlojamiento {
 model ServicioTransporte {
   idservicio           Int          @id
   capacidadVehiculo    Int
-  pesoEquipajeIncluido Float
-  costoPorKgExcedente  Float
   servicio             ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@schema("public")

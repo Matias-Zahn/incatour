@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CrearServicioDto } from "./servicio.dto";
+import { CrearServicioDto, ModificarServicioDto } from "./servicio.dto";
 
 describe("CU-19: CrearServicioDto", () => {
   it("valida y crea servicio de alojamiento", () => {
@@ -72,30 +72,14 @@ describe("CU-19: CrearServicioDto", () => {
       costoBase: 10_000_001,
       localidad: "Cusco",
       capacidadVehiculo: 20,
-      pesoEquipajeIncluido: 15,
-      costoPorKgExcedente: 5,
     });
 
     expect(error).toContain("no puede superar el máximo de 10000000");
   });
 
-  it("rechaza pesoEquipajeIncluido superior a 20 kg en transporte", () => {
-    const [error] = CrearServicioDto.create({
-      tipo: "TRANSPORTE",
-      nombreServicio: "Bus Premium",
-      costoBase: 500,
-      localidad: "Cusco",
-      capacidadVehiculo: 20,
-      pesoEquipajeIncluido: 21,
-      costoPorKgExcedente: 5,
-    });
-
-    expect(error).toContain("no puede superar el máximo de 20");
-  });
-
   it("capacidadVehiculo: rechaza 0, negativos y más de 60; acepta 60", () => {
     const transporte = (capacidadVehiculo: number) =>
-      CrearServicioDto.create({ tipo: "TRANSPORTE", nombreServicio: "Bus", costoBase: 500, localidad: "Cusco", capacidadVehiculo, pesoEquipajeIncluido: 15, costoPorKgExcedente: 5 })[0];
+      CrearServicioDto.create({ tipo: "TRANSPORTE", nombreServicio: "Bus", costoBase: 500, localidad: "Cusco", capacidadVehiculo })[0];
     expect(transporte(0)).toContain("mayor o igual a 1");
     expect(transporte(-5)).toContain("mayor o igual a 1");
     expect(transporte(61)).toContain("no puede superar el máximo de 60");
@@ -109,19 +93,26 @@ describe("CU-19: CrearServicioDto", () => {
     expect(e2).toContain("no puede superar el máximo de 10000");
   });
 
-  it("acepta pesoEquipajeIncluido de 20 kg y costoBase de 10.000.000", () => {
+  it("transporte: acepta costoBase de 10.000.000 e ignora los campos de equipaje si llegan (B6)", () => {
     const [error, dto] = CrearServicioDto.create({
       tipo: "TRANSPORTE",
       nombreServicio: "Bus Premium",
       costoBase: 10_000_000,
       localidad: "Cusco",
       capacidadVehiculo: 20,
-      pesoEquipajeIncluido: 20,
-      costoPorKgExcedente: 5,
+      pesoEquipajeIncluido: 99,
+      costoPorKgExcedente: -5,
     });
 
     expect(error).toBeUndefined();
     expect(dto?.base.costoBase).toBe(10_000_000);
-    expect(dto?.especifico.pesoEquipajeIncluido).toBe(20);
+    expect(dto?.especifico).toEqual({ capacidadVehiculo: 20 });
+  });
+
+  it("modificar transporte: ignora los campos de equipaje si llegan (B6)", () => {
+    const [error, dto] = ModificarServicioDto.create({ capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+
+    expect(error).toBeUndefined();
+    expect(dto?.especifico).toEqual({ capacidadVehiculo: 30 });
   });
 });

@@ -118,7 +118,7 @@ describe("CatalogoService (CU-26)", () => {
           servicio("Carpas", { equipamiento: {} }),
           servicio("Expedition", { tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } }),
           servicio("Hotel viejo", { alojamiento: {} }), // los paquetes viejos podían tener el hotel como servicio
-          servicio("Bus", { transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } }),
+          servicio("Bus", { transporte: { capacidadVehiculo: 20 } }),
         ],
       }),
     ]);

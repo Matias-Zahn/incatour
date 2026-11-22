@@ -91,7 +91,7 @@ async function faseC() {
   await paso("Modificar temporada (CU-08)", "PUT", `/temporadas/${idDe(temporada, "idtemporada")}`, { nombre: `Humo ${t} bis` });
   // B2: el paquete exige su transporte
   const provTransporte = await paso("Alta proveedor de transporte (CU-15)", "POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `Humo Bus ${t}`, localidad: "Cusco", datosContacto: "bus@test.com", canalComunicacion: "Email" });
-  const transportePaquete = await paso("Registrar transporte (CU-19)", "POST", `/proveedores/${idDe(provTransporte, "idproveedor")}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `Bus ${t}`, localidad: "Cusco", costoBase: 300, capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+  const transportePaquete = await paso("Registrar transporte (CU-19)", "POST", `/proveedores/${idDe(provTransporte, "idproveedor")}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `Bus ${t}`, localidad: "Cusco", costoBase: 300, capacidadVehiculo: 30 });
   const paquete = await paso("Crear paquete (CU-11)", "POST", "/paquetes", {
     idcircuito, nombrePaquete: `Humo ${t}`, condiciones: "Prueba", tipoGarantia: "POR_CATEGORIA", idtransporte: idDe(transportePaquete, "idservicio"),
     localidadGarantizada: "Cusco", categoriaGarantizada: "3 Estrellas", tipoHabitacionGarantizada: "Doble",

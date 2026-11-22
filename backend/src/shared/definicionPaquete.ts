@@ -27,7 +27,7 @@ export type DefinicionPaquete = {
   tipoHabitacionGarantizada: string | null;
   // Solo con garantía por establecimiento
   establecimiento: { idservicio: number; nombreServicio: string; localidad: string; categoria: string | null } | null;
-  // Servicios incluidos (B2); el transporte lleva la franquicia de equipaje (CU-30) hasta que se saque (B6)
+  // Servicios incluidos (B2). Las fotos anteriores a B6 pueden traer además `transporte` (la franquicia de equipaje): se ignora
   servicios: {
     idservicio: number;
     nombreServicio: string;
@@ -35,7 +35,6 @@ export type DefinicionPaquete = {
     cantidad: number | null; // solo EQUIPAMIENTO
     cadaPasajeros: number | null;
     tren: { horarioSalida: string; horarioLlegada: string } | null;
-    transporte: { pesoEquipajeIncluido: number; costoPorKgExcedente: number } | null;
   }[];
   nochesPrevias: number;
   nochesPosteriores: number;
@@ -67,7 +66,7 @@ export interface PaqueteParaDefinicion {
     servicio: {
       idservicio: number;
       nombreServicio: string;
-      transporte?: { pesoEquipajeIncluido: number; costoPorKgExcedente: number } | null;
+      transporte?: unknown;
       tren?: { horarioSalida: string; horarioLlegada: string } | null;
       equipamiento?: unknown;
       alojamiento?: unknown;
@@ -94,12 +93,6 @@ export function armarDefinicionPaquete(p: PaqueteParaDefinicion, tarifa: TarifaS
       cantidad: s.cantidad ?? null,
       cadaPasajeros: s.cadaPasajeros ?? null,
       tren: s.servicio.tren ? { horarioSalida: s.servicio.tren.horarioSalida, horarioLlegada: s.servicio.tren.horarioLlegada } : null,
-      transporte: s.servicio.transporte
-        ? {
-            pesoEquipajeIncluido: s.servicio.transporte.pesoEquipajeIncluido,
-            costoPorKgExcedente: s.servicio.transporte.costoPorKgExcedente,
-          }
-        : null,
     })),
     nochesPrevias: p.nochesPrevias,
     nochesPosteriores: p.nochesPosteriores,

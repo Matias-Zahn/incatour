@@ -97,7 +97,7 @@ export function crearContexto(p: {
     },
   };
 
-  type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string; equipajeKg?: number };
+  type OpcionesCompra = { n?: number; pasajeros?: any[]; tarjeta?: string };
   type PersonalSalida = { guias?: number[] | undefined; porteadores?: number[] | undefined; idtransporte?: number | undefined; alojamientos?: number[] | undefined };
 
   // ==================== Fixtures ====================
@@ -144,7 +144,7 @@ export function crearContexto(p: {
     },
 
     transporte(localidad: string, capacidad = 30) {
-      return f.servicio("TRANSPORTE", localidad, { capacidadVehiculo: capacidad, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+      return f.servicio("TRANSPORTE", localidad, { capacidadVehiculo: capacidad });
     },
 
     equipamiento(localidad: string, cantidad = 10) {
@@ -227,7 +227,6 @@ export function crearContexto(p: {
       const pasajeros = o.pasajeros ?? Array.from({ length: o.n ?? 1 }, () => f.pasajero());
       return {
         idsalida, medioPago: "TARJETA", pasajeros,
-        equipaje: pasajeros.map(() => ({ pesoDeclarado: o.equipajeKg ?? 8 })),
         tarjeta: { numero: o.tarjeta ?? "4242424242424242", titular: "Int Prueba", vencimiento: "12/30", cvv: "123" },
       };
     },

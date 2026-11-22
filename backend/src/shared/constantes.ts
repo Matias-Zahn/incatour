@@ -43,13 +43,10 @@ export const COBERTURA_MINIMA_STOCK = 0.5;
 /** Salidas cuyo recorrido todavía no comenzó (CU-37, CU-39). Además se valida fechaInicio > ahora. */
 export const SALIDAS_NO_INICIADAS = ["PUBLICADA", "CERRADA"];
 
-/** Tope de equipaje que puede declarar cada pasajero al comprar (RES, PR #138). */
-export const PESO_MAXIMO_DECLARADO_KG = 20;
 /** Topes de los campos numéricos: evitan valores absurdos y desbordar los Int de la base (máx. 2.147.483.647). */
 export const TOPES = {
   capacidadVehiculo: 60, // un bus grande ronda los 60 asientos
   plazasAlojamiento: 5000,
-  costoPorKgExcedente: 1000,
   unidadesEquipamiento: 10000,
   duracionDias: 30,
   minimoGuias: 10,

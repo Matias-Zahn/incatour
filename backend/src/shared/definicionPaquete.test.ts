@@ -15,7 +15,7 @@ const paquete = {
     { servicio: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", alojamiento: { categoria: "4 estrellas" } } },
   ],
   servicios: [
-    { servicio: { idservicio: 41, nombreServicio: "Bus", transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } } },
+    { servicio: { idservicio: 41, nombreServicio: "Bus", transporte: { capacidadVehiculo: 20 } } },
     { servicio: { idservicio: 42, nombreServicio: "Expedition", tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } } },
     { cantidad: 1, cadaPasajeros: 2, servicio: { idservicio: 43, nombreServicio: "Carpas", equipamiento: {} } },
   ],
@@ -31,9 +31,9 @@ describe("armarDefinicionPaquete (CAT-05)", () => {
       tipoHabitacionGarantizada: null,
       establecimiento: { idservicio: 40, nombreServicio: "Hotel Sol", localidad: "Cusco", categoria: "4 estrellas" },
       servicios: [
-        { idservicio: 41, nombreServicio: "Bus", tipo: "TRANSPORTE", cantidad: null, cadaPasajeros: null, tren: null, transporte: { pesoEquipajeIncluido: 15, costoPorKgExcedente: 10 } },
-        { idservicio: 42, nombreServicio: "Expedition", tipo: "TREN", cantidad: null, cadaPasajeros: null, tren: { horarioSalida: "06:10", horarioLlegada: "07:45" }, transporte: null },
-        { idservicio: 43, nombreServicio: "Carpas", tipo: "EQUIPAMIENTO", cantidad: 1, cadaPasajeros: 2, tren: null, transporte: null },
+        { idservicio: 41, nombreServicio: "Bus", tipo: "TRANSPORTE", cantidad: null, cadaPasajeros: null, tren: null },
+        { idservicio: 42, nombreServicio: "Expedition", tipo: "TREN", cantidad: null, cadaPasajeros: null, tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } },
+        { idservicio: 43, nombreServicio: "Carpas", tipo: "EQUIPAMIENTO", cantidad: 1, cadaPasajeros: 2, tren: null },
       ],
       nochesPrevias: 1,
       nochesPosteriores: 2,

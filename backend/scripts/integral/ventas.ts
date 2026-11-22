@@ -107,33 +107,27 @@ export async function ventas(ctx: Ctx) {
     await ctx.esperar("Tras los rechazos se puede comprar los 3 lugares → 201", "POST", "/reservas", f.compra(idsalida, { n: 3 }), cli.token, 201);
   });
 
-  await ctx.escenario("Precio con exceso de equipaje", async () => {
-    // El transporte del paquete (fixture) incluye 15 kg y cobra 2 por kg excedente
+  await ctx.escenario("Precio congelado: el equipaje no se cobra en la compra (B6)", async () => {
+    // El equipaje se pesa y cobra en persona: si un body viejo lo trae (aun inválido), se ignora
     const { idsalida, dias } = await armar({ tamano: 6, transporte: true });
     const cli = await f.cliente();
     const inicio = new Date(fecha(dias));
     const temporada = await db.temporada.findFirstOrThrow({ where: { estado: "ACTIVO", fechaInicio: { lte: inicio }, fechaFin: { gte: inicio } } });
 
-    const sin = await f.comprar(cli.token, idsalida, { n: 1, equipajeKg: 8 });
-    igual("Sin exceso: precioCongelado = tarifa", (await res(sin.idreserva)).precioCongelado, 500);
-    igual("Sin exceso: adicionalesEquipaje 0", (await res(sin.idreserva)).adicionalesEquipaje, 0);
-
-    // 20 kg (5 de exceso), 15 kg (justo la franquicia, no cobra) y 8 kg: recargo = 5 × 2 = 10
-    const body = f.compra(idsalida, { n: 3 });
-    body.equipaje = [{ pesoDeclarado: 20 }, { pesoDeclarado: 15 }, { pesoDeclarado: 8 }];
-    const r = await ctx.esperar("Compra con exceso de equipaje → 201", "POST", "/reservas", body, cli.token, 201);
-    igual("Respuesta: precioCongelado = 500 × 3 + 10", r?.precioCongelado, 1510);
+    const body: any = f.compra(idsalida, { n: 3 });
+    body.equipaje = [{ pesoDeclarado: 20 }, { pesoDeclarado: -1 }];
+    const r = await ctx.esperar("Compra con equipaje en el body → 201 (se ignora)", "POST", "/reservas", body, cli.token, 201);
+    igual("Respuesta: precioCongelado = 500 × 3", r?.precioCongelado, 1500);
     const reserva = await res(r?.idreserva);
-    igual("Reserva congela precioCongelado", reserva.precioCongelado, 1510);
+    igual("Reserva congela precioCongelado", reserva.precioCongelado, 1500);
     igual("Reserva congela precioPaquetePorPersona", reserva.precioPaquetePorPersona, 500);
-    igual("Reserva congela adicionalesEquipaje", reserva.adicionalesEquipaje, 10);
     igual("Reserva congela temporadaAplicada", reserva.temporadaAplicada, temporada.nombre);
     const pagos = await db.pago.findMany({ where: { idreserva: reserva.idreserva } });
-    ctx.controlar("Pago único igual al precio congelado", pagos.length === 1 && pagos[0]!.monto === 1510, `pagos=${JSON.stringify(pagos.map((p) => p.monto))}`);
+    ctx.controlar("Pago único igual al precio congelado", pagos.length === 1 && pagos[0]!.monto === 1500, `pagos=${JSON.stringify(pagos.map((p) => p.monto))}`);
 
     const det = await ctx.esperar("GET detalle de la reserva → 200", "GET", `/reservas/${reserva.idreserva}`, undefined, cli.token, 200);
-    ctx.controlar("Detalle: desglose 500 + 1500 + 10, pagado 1510",
-      det?.precioUnitario === 500 && det?.precioPaquete === 1500 && det?.adicionalesEquipaje === 10 && det?.pagado === 1510,
+    ctx.controlar("Detalle: desglose 500 + 1500, pagado 1500, sin adicionales de equipaje",
+      det?.precioUnitario === 500 && det?.precioPaquete === 1500 && det?.pagado === 1500 && !("adicionalesEquipaje" in (det ?? {})),
       JSON.stringify({ u: det?.precioUnitario, p: det?.precioPaquete, a: det?.adicionalesEquipaje, pagado: det?.pagado }));
   });
 
@@ -143,8 +137,6 @@ export async function ventas(ctx: Ctx) {
     const antes = await foto(idsalida);
     const casos: [string, (b: any) => void][] = [
       ["sin pasajeros", (b) => (b.pasajeros = [])],
-      ["equipaje con menos elementos que pasajeros", (b) => { b.pasajeros = [f.pasajero(), f.pasajero()]; b.equipaje = [{ pesoDeclarado: 1 }]; }],
-      ["peso de equipaje negativo", (b) => (b.equipaje = [{ pesoDeclarado: -1 }])],
       ["sin tarjeta", (b) => delete b.tarjeta],
       ["sin medioPago", (b) => delete b.medioPago],
       ["idsalida no numérico", (b) => (b.idsalida = "1")],

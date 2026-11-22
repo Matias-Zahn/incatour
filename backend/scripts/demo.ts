@@ -68,14 +68,14 @@ const ZONAS: Record<string, Zona> = {
 // B10: el hostal chico no cubre una salida solo, así las de Cusco reparten el grupo entre los dos hoteles
 const PLAZAS_PARA_OPERAR: Record<string, number> = { "Hostal Wayra San Blas": 8 };
 
-// [empresa, vehículo, asientos, costo del traslado, kg de equipaje incluidos, canal]
-const TRANSPORTES: [string, string, number, number, number, string][] = [
-  ["Trans Andes", "Sprinter 19 asientos", 19, 95, 15, "WhatsApp"],
-  ["Vilcanota Tours", "Coaster 25 asientos", 25, 130, 20, "Email"],
-  ["Inka Express Bus", "Bus 33 asientos", 33, 180, 20, "Email"],
-  ["Valle Sagrado Traslados", "Sprinter 19 asientos", 19, 90, 15, "WhatsApp"],
-  ["Cusco Van", "Hiace 20 asientos", 20, 100, 15, "Teléfono"],
-  ["Qosqo Móvil", "Coaster 25 asientos", 25, 125, 20, "WhatsApp"],
+// [empresa, vehículo, asientos, costo del traslado, canal] (el equipaje se cobra en persona)
+const TRANSPORTES: [string, string, number, number, string][] = [
+  ["Trans Andes", "Sprinter 19 asientos", 19, 95, "WhatsApp"],
+  ["Vilcanota Tours", "Coaster 25 asientos", 25, 130, "Email"],
+  ["Inka Express Bus", "Bus 33 asientos", 33, 180, "Email"],
+  ["Valle Sagrado Traslados", "Sprinter 19 asientos", 19, 90, "WhatsApp"],
+  ["Cusco Van", "Hiace 20 asientos", 20, 100, "Teléfono"],
+  ["Qosqo Móvil", "Coaster 25 asientos", 25, 125, "WhatsApp"],
 ];
 // Equipamiento de campamento: [artículo, tipo, inventario, costo por unidad]
 const EQUIPOS: [string, string, number, number][] = [
@@ -247,11 +247,11 @@ async function main() {
     }
 
     const transportes: { idservicio: number; idproveedor: number; asientos: number; ocupado: [string, string][] }[] = [];
-    for (const [empresa, vehiculo, asientos, costo, kg, canal] of TRANSPORTES) {
+    for (const [empresa, vehiculo, asientos, costo, canal] of TRANSPORTES) {
       const contacto = canal === "Email" ? `operaciones@${correo(empresa).replace(/\./g, "")}.com.pe` : `+51 984 ${digitos(3)} ${digitos(3)}`;
       const prov = await api("POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `${empresa} E.I.R.L.`, localidad: "Cusco", datosContacto: contacto, canalComunicacion: canal });
       const idproveedor = idDe(prov, "idproveedor")!;
-      const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `${empresa} · ${vehiculo}`, localidad: "Cusco", costoBase: costo, capacidadVehiculo: asientos, pesoEquipajeIncluido: kg, costoPorKgExcedente: 2.5 });
+      const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `${empresa} · ${vehiculo}`, localidad: "Cusco", costoBase: costo, capacidadVehiculo: asientos });
       transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, asientos, ocupado: [] });
     }
 
@@ -396,7 +396,7 @@ async function main() {
       const vendidas = (await Promise.all(compras.map(async (c) => {
         // 12.2: un grupo no se parte entre hoteles; si ya no entra entero en ninguno, ese cliente no compra
         const r = await api("POST", "/reservas", {
-          idsalida, medioPago: "TARJETA", pasajeros: c.pasajeros, equipaje: c.pasajeros.map(() => ({ pesoDeclarado: entre(6, 14) })),
+          idsalida, medioPago: "TARJETA", pasajeros: c.pasajeros,
           tarjeta: { numero: "4242424242424242", titular: `${c.cliente.nombre} ${c.cliente.apellido}`.toUpperCase(), vencimiento: "12/30", cvv: "123" },
         }, c.cliente.token).catch((e) => { if (/no en un mismo hotel/.test(String(e))) return null; throw e; });
         if (!r) return null;
