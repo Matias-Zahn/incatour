@@ -19,7 +19,7 @@ export class AsignacionService {
     const [personal, transportes, equipamiento] = await Promise.all([
       this.repository.personalLibre(salida),
       this.logistica.disponiblesTransporte(salida, vendidos),
-      this.logistica.disponiblesEquipamiento(),
+      this.logistica.disponiblesEquipamiento(salida),
     ]);
 
     return {
@@ -45,7 +45,7 @@ export class AsignacionService {
         idservicio: e.idservicio,
         nombreServicio: e.nombreServicio,
         tipoEquipamiento: e.equipamiento?.tipoEquipamiento,
-        cantidadDisponible: e.equipamiento?.cantidadDisponible,
+        cantidadDisponible: e.disponible, // A1: en las fechas de la salida
       })),
     };
   }
@@ -90,9 +90,9 @@ export class AsignacionService {
     }
 
     // FA2: stock de camping (se vuelve a controlar en la transacción por si cambia en el medio)
-    const stock = await this.logistica.disponiblesEquipamiento();
+    const stock = await this.logistica.disponiblesEquipamiento(salida);
     for (const item of dto.itemsCamping) {
-      const disponible = stock.find((s) => s.idservicio === item.idservicio)?.equipamiento?.cantidadDisponible ?? 0;
+      const disponible = stock.find((s) => s.idservicio === item.idservicio)?.disponible ?? 0;
       if (item.cantidad > disponible) {
         throw CustomError.badRequest(`No hay stock suficiente del artículo ${item.idservicio}: hay ${disponible}`);
       }

@@ -203,17 +203,12 @@ export class GestionReservaRepository {
           },
         });
       }
+      // A1: con la venta cerrada las plazas vuelven al hotel: baja la ocupación de la salida (si no tiene hotel, no hay filas)
       if (p.alojamientoPorStock && !p.salidaEnVenta) {
-        const hotel = await tx.salidaServicio.findFirst({
+        await tx.ocupacion.updateMany({
           where: { idsalida: p.idsalida, tipo: TIPO_SERVICIO.ALOJAMIENTO },
-          select: { idservicio: true },
+          data: { cantidad: { decrement: p.cantidadPasajeros } },
         });
-        if (hotel) {
-          await tx.servicioAlojamiento.update({
-            where: { idservicio: hotel.idservicio },
-            data: { capacidadDisponible: { increment: p.cantidadPasajeros } },
-          });
-        }
       }
 
       return reembolso;

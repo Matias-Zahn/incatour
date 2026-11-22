@@ -26,7 +26,7 @@ export class LogisticaService {
     const salida = await this.buscarModificableOFallar(idsalida);
 
     if (dto.tipo === TIPO_SERVICIO.EQUIPAMIENTO) {
-      const servicios = await this.repository.disponiblesEquipamiento();
+      const servicios = await this.repository.disponiblesEquipamiento(salida);
       return servicios.map((s) => ({
         idservicio: s.idservicio,
         nombreServicio: s.nombreServicio,
@@ -35,7 +35,7 @@ export class LogisticaService {
         proveedor: s.proveedor,
         disponibilidad: {
           tipoEquipamiento: s.equipamiento?.tipoEquipamiento,
-          cantidadDisponible: s.equipamiento?.cantidadDisponible,
+          cantidadDisponible: s.disponible, // A1: en las fechas de la salida
         },
       }));
     }
@@ -97,14 +97,14 @@ export class LogisticaService {
   }
 
   private formatearPanel(panel: Panel) {
-    const transporte = panel.servicios[0] ?? null;
+    const transporte = panel.ocupaciones.find((o) => o.tipo === TIPO_SERVICIO.TRANSPORTE) ?? null;
     return {
       idsalida: panel.idsalida,
       nroSalida: panel.nroSalida,
       estado: panel.estado,
       fechaInicio: panel.fechaInicio,
       fechaFin: panel.fechaFin,
-      equipamiento: panel.equipamientos.map((e) => ({
+      equipamiento: panel.ocupaciones.filter((o) => o.tipo === TIPO_SERVICIO.EQUIPAMIENTO).map((e) => ({
         idservicio: e.servicio.idservicio,
         nombreServicio: e.servicio.nombreServicio,
         tipoEquipamiento: e.servicio.equipamiento?.tipoEquipamiento ?? null,
@@ -113,7 +113,7 @@ export class LogisticaService {
       })),
       transporte: transporte
         ? {
-            idservicio: transporte.idservicio,
+            idservicio: transporte.servicio.idservicio,
             nombreServicio: transporte.servicio.nombreServicio,
             comprobanteReserva: transporte.comprobanteReserva,
             proveedor: transporte.servicio.proveedor,

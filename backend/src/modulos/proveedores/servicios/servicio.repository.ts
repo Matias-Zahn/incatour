@@ -1,6 +1,8 @@
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, ESTADO_RESERVA, ESTADO_SOLICITUD, SALIDAS_ACTIVAS, TipoServicio } from "../../../shared/constantes";
-import { CrearServicioDto } from "./servicio.dto";
+import { hoyUTC } from "../../../shared/fechas";
+import { ocupacionesDe } from "../../../shared/ocupacion.repository";
+import { aColumnas, CrearServicioDto } from "./servicio.dto";
 
 const INCLUDE_COMPLETO = {
   proveedor: { select: { idproveedor: true, razonSocial: true, tipoProveedor: true, estado: true } },
@@ -70,7 +72,7 @@ export class ServicioRepository {
         idproveedor,
         ...dto.base,
         estado: ESTADO.ACTIVO,
-        ...subtipoCrear(dto.tipo, dto.especifico),
+        ...subtipoCrear(dto.tipo, aColumnas(dto.especifico)),
       },
       include: INCLUDE_COMPLETO,
     });
@@ -82,7 +84,7 @@ export class ServicioRepository {
       where: { idservicio: id },
       data: {
         ...base,
-        ...(Object.keys(especifico).length > 0 && subtipoActualizar(tipo, especifico)),
+        ...(Object.keys(especifico).length > 0 && subtipoActualizar(tipo, aColumnas(especifico))),
       },
       include: INCLUDE_COMPLETO,
     });
@@ -94,7 +96,7 @@ export class ServicioRepository {
       by: ["idsalida"],
       where: {
         estado: ESTADO_RESERVA.CONFIRMADA,
-        salida: { estado: { in: SALIDAS_ACTIVAS }, servicios: { some: { idservicio } } },
+        salida: { estado: { in: SALIDAS_ACTIVAS }, ocupaciones: { some: { idservicio } } },
       },
       _sum: { cantidadPasajeros: true },
     });
@@ -108,10 +110,7 @@ export class ServicioRepository {
   // ----- Consultas de dependencias (CU-17, CU-20, CU-21) -----
   async contarSalidasActivas(idservicio: number): Promise<number> {
     return db.salida.count({
-      where: {
-        estado: { in: SALIDAS_ACTIVAS },
-        OR: [{ servicios: { some: { idservicio } } }, { equipamientos: { some: { idservicio } } }],
-      },
+      where: { estado: { in: SALIDAS_ACTIVAS }, ocupaciones: { some: { idservicio } } },
     });
   }
 
@@ -137,23 +136,19 @@ export class ServicioRepository {
     return db.paqueteServicio.count({ where: { idservicio, paquete: { estado: ESTADO.ACTIVO } } });
   }
 
-  /** Unidades de equipamiento comprometidas en salidas activas o en curso (CU-20). */
-  async cantidadComprometida(idservicio: number): Promise<number> {
-    const r = await db.salidaEquipamiento.aggregate({
-      where: { idservicio, salida: { estado: { in: SALIDAS_ACTIVAS } } },
-      _sum: { cantidad: true },
-    });
-    return r._sum.cantidad ?? 0;
+  /** A1: ocupaciones que cuentan (salidas activas) de hoy en adelante, para lo disponible hoy y el pico comprometido. */
+  async ocupacionesDesdeHoy(ids: number[]) {
+    return ids.length ? ocupacionesDe(db, ids, hoyUTC(), SIN_FIN) : [];
   }
 
-  /** Lo mismo, para varios servicios a la vez (listados). */
-  async comprometidasPorServicio(ids: number[]): Promise<Map<number, number>> {
-    if (ids.length === 0) return new Map();
-    const filas = await db.salidaEquipamiento.groupBy({
-      by: ["idservicio"],
-      where: { idservicio: { in: ids }, salida: { estado: { in: SALIDAS_ACTIVAS } } },
-      _sum: { cantidad: true },
+  /** A1: historial del servicio en el rango, con las salidas finalizadas (las canceladas ya no tienen ocupación). */
+  async historialOcupacion(idservicio: number, desde: Date, hasta: Date) {
+    return db.ocupacion.findMany({
+      where: { idservicio, desde: { lte: hasta }, hasta: { gte: desde } },
+      include: { salida: { select: { nroSalida: true, estado: true } } },
+      orderBy: [{ desde: "asc" }, { idocupacion: "asc" }],
     });
-    return new Map(filas.map((f) => [f.idservicio, f._sum.cantidad ?? 0]));
   }
 }
+
+const SIN_FIN = new Date("9999-12-31T00:00:00.000Z");

@@ -90,8 +90,31 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     expect(resultado.aprobado).toBe(true);
   });
 
+  it("A1: el hotel se mira y se ocupa solo en las noches previas y posteriores del paquete", async () => {
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, nochesPrevias: 1, nochesPosteriores: 2 });
+    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 16 }]);
+    repo.crearSalida.mockResolvedValue({ idsalida: 9 });
+
+    await new SalidaService().crearSalida(dto({ idalojamiento: 4 }));
+
+    // Inicio en FECHA, 4 días: noche previa FECHA−1 y posteriores del último día (FECHA+3) al siguiente
+    const rangos = [
+      { desde: enDias(19), hasta: enDias(19) },
+      { desde: enDias(23), hasta: enDias(24) },
+    ];
+    expect(repo.buscarAlojamientosConBloqueo).toHaveBeenCalledWith(expect.anything(), rangos);
+    expect(repo.crearSalida).toHaveBeenCalledWith(expect.objectContaining({ idalojamiento: 4, rangosAlojamiento: rangos }));
+  });
+
+  it("A1: rechaza el hotel si no le alcanza lo disponible en esas noches", async () => {
+    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 15 }]);
+
+    await expect(new SalidaService().crearSalida(dto({ idalojamiento: 4 }))).rejects.toThrow("capacidad suficiente");
+    expect(repo.crearSalida).not.toHaveBeenCalled();
+  });
+
   it("exige elegir alojamiento si hay alguno que confirma por bloqueo", async () => {
-    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, alojamiento: { capacidadDisponible: 20 } }]);
+    repo.buscarAlojamientosConBloqueo.mockResolvedValue([{ idservicio: 4, disponible: 20 }]);
 
     await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("elegí uno");
   });

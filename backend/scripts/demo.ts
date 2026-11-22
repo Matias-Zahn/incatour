@@ -229,8 +229,8 @@ async function main() {
         const dominio = `${correo(nombre).replace(/\./g, "")}.com.pe`;
         const prov = await api("POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `${nombre} S.A.C.`, localidad: z.localidad, datosContacto: `reservas@${dominio}`, canalComunicacion: "Email" });
         const idproveedor = idDe(prov, "idproveedor")!;
-        // ponytail: la API descuenta del hotel las plazas de cada bloqueo y no las devuelve cuando la salida termina,
-        // así que la historia se opera con capacidad de sobra y al final se deja lo que el hotel tiene libre hoy
+        // La historia se opera con capacidad de sobra (varias salidas pueden compartir noches) y al final
+        // se deja lo que el hotel tiene libre hoy
         const s = await api("POST", `/proveedores/${idproveedor}/servicios`, {
           tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: 900, modalidadConfirmacion: z.modalidad,
         });
@@ -318,7 +318,7 @@ async function main() {
     // ==================== Operación ====================
     // Lo que la API sella con la hora de hoy; se corrige al final con la fecha de la historia
     const marcas = {
-      salidas: [] as { idsalida: number; virtual: string; fin: string; idbloqueo: string | null; cancelada: boolean }[],
+      salidas: [] as { idsalida: number; virtual: string; real: string; fin: string; idbloqueo: string | null; cancelada: boolean }[],
       reservas: [] as { idreserva: number; viajo: boolean; compra: string; cancelacion?: string }[],
       gestiones: [] as { idsolicitud: number; idservicio: number; fecha: string }[],
       resenias: [] as { idcliente: number; idsalida: number; fecha: string }[],
@@ -407,7 +407,7 @@ async function main() {
         // CU-37: la empresa cancela la salida y devuelve todo
         await api("POST", `/salidas/${idsalida}/cancelar`, { motivo: elegir(["Derrumbe en el sendero", "Paro regional en Cusco", "Cierre del sendero dispuesto por la autoridad"]) });
         for (const v of vendidas) v.marca.cancelacion = sumarDias(virtual, -10);
-        marcas.salidas.push({ idsalida, virtual, fin, idbloqueo: null, cancelada: true });
+        marcas.salidas.push({ idsalida, virtual, real, fin, idbloqueo: null, cancelada: true });
         continue;
       }
 
@@ -429,7 +429,7 @@ async function main() {
 
       // CU-40
       if (etapa === "publicada") {
-        marcas.salidas.push({ idsalida, virtual, fin, idbloqueo: null, cancelada: false });
+        marcas.salidas.push({ idsalida, virtual, real, fin, idbloqueo: null, cancelada: false });
         continue;
       }
       const panel = await api("GET", `/salidas/${idsalida}/asignacion`);
@@ -484,17 +484,22 @@ async function main() {
           for (const p of [...equipoGuias, ...equipoPorteadores]) {
             await api("POST", `/salidas/${idsalida}/evaluaciones`, { tipo: "PERSONAL", id: p.idpersonal, puntaje: elegir([5, 5, 4, 4, 3]) });
           }
-          const servicios = await db.salidaServicio.findMany({ where: { idsalida }, include: { servicio: true } });
+          const servicios = await db.ocupacion.findMany({ where: { idsalida, tipo: { not: "EQUIPAMIENTO" } }, include: { servicio: true } });
           for (const idproveedor of new Set(servicios.map((s) => s.servicio.idproveedor))) {
             await api("POST", `/salidas/${idsalida}/evaluaciones`, { tipo: "PROVEEDOR", id: idproveedor, puntaje: elegir([5, 4, 4, 3, 2]) });
           }
         }
       }
-      marcas.salidas.push({ idsalida, virtual, fin, idbloqueo: null, cancelada: false });
+      marcas.salidas.push({ idsalida, virtual, real, fin, idbloqueo: null, cancelada: false });
     }
 
-    for (const h of Object.values(hoteles).flat()) await api("PUT", `/servicios/${h.idservicio}`, { capacidadDisponible: h.plazasHoy });
     await llevarALaFechaReal(db, marcas, clientes, hoy);
+    // A1: el total del hotel queda en lo que tiene libre hoy más lo ocupado hoy, sin bajar del día más comprometido
+    for (const h of Object.values(hoteles).flat()) {
+      const { dias } = await api("GET", `/servicios/${h.idservicio}/ocupacion?desde=${hoy}&hasta=${sumarDias(hoy, 365)}`);
+      const total = Math.max(h.plazasHoy + dias[0].ocupado, ...dias.map((d: { ocupado: number }) => d.ocupado));
+      await api("PUT", `/servicios/${h.idservicio}`, { capacidadDisponible: total });
+    }
     await verificar(db, hoy);
     await mostrarPresentacion(db, hoy);
     console.log("\nUsuarios: admin@incatour.com / AdminIncaTour123 · juan@test.com / cliente123 · carlos.guia@incatour.com / guia12345");
@@ -508,7 +513,7 @@ async function main() {
 async function llevarALaFechaReal(
   db: PrismaClient,
   marcas: {
-    salidas: { idsalida: number; virtual: string; fin: string; cancelada: boolean }[];
+    salidas: { idsalida: number; virtual: string; real: string; fin: string; cancelada: boolean }[];
     reservas: { idreserva: number; viajo: boolean; compra: string; cancelacion?: string }[];
     gestiones: { idsolicitud: number; idservicio: number; fecha: string }[];
     resenias: { idcliente: number; idsalida: number; fecha: string }[];
@@ -553,6 +558,11 @@ async function llevarALaFechaReal(
       where: { idsalida: s.idsalida },
       data: { nroSalida: `SAL-${anio}-${String(numero).padStart(3, "0")}`, fechaInicio: new Date(s.virtual), fechaFin: new Date(s.fin) },
     });
+    // A1: la ocupación de hotel, transporte y equipo se creó con la fecha en que se operó: viaja con la salida
+    const corrimiento = Math.round((new Date(s.virtual).getTime() - new Date(s.real).getTime()) / (24 * H));
+    if (corrimiento) {
+      await db.$executeRaw`UPDATE public."Ocupacion" SET desde = desde + ${corrimiento}::int, hasta = hasta + ${corrimiento}::int WHERE idsalida = ${s.idsalida}`;
+    }
 
     const emision = instante(antesDe(sumarDias(s.virtual, -2), sumarDias(hoy, -1)), 11);
     await db.permisoPasajero.updateMany({ where: { reserva: { idsalida: s.idsalida } }, data: { fechaEmision: emision } });
@@ -595,10 +605,15 @@ async function verificar(db: PrismaClient, hoy: string) {
     include: {
       paquete: { include: { circuito: { include: { etapas: true } } } },
       avances: true,
+      ocupaciones: true,
       reservas: { include: { pagos: true, reembolsos: true, pasajeros: true, solicitudes: true, permisos: true } },
     },
   });
   for (const s of salidas) {
+    // A1: la ocupación viaja con la salida y la de una cancelada se borra
+    if (s.estado === "CANCELADA") exigir(s.ocupaciones.length === 0, `${s.nroSalida}: cancelada con ocupación`);
+    const transporte = s.ocupaciones.find((o) => o.tipo === "TRANSPORTE");
+    if (transporte) exigir(transporte.desde.getTime() === s.fechaInicio.getTime() && transporte.hasta.getTime() === s.fechaFin.getTime(), `${s.nroSalida}: transporte ocupado en otras fechas`);
     const confirmadas = s.reservas.filter((r) => r.estado === "CONFIRMADA");
     const vendidos = confirmadas.reduce((a, r) => a + r.cantidadPasajeros, 0);
     exigir(vendidos <= s.tamanoMaximo, `${s.nroSalida}: vendió ${vendidos} de ${s.tamanoMaximo}`);

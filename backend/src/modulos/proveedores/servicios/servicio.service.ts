@@ -1,6 +1,8 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
-import { CAMPOS_MODIFICAR, CrearServicioDto, FiltrosServicioDto, ModificarServicioDto } from "./servicio.dto";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, SALIDAS_ACTIVAS, TIPO_SERVICIO, TipoServicio, tipoDeServicio } from "../../../shared/constantes";
+import { hoyUTC } from "../../../shared/fechas";
+import { claveDia, OcupacionDias, ocupadoPorDia, totalDe } from "../../../shared/ocupacion";
+import { CAMPOS_MODIFICAR, CrearServicioDto, FiltrosServicioDto, ModificarServicioDto, RangoOcupacionDto } from "./servicio.dto";
 import { ServicioRepository } from "./servicio.repository";
 
 type ServicioCompleto = NonNullable<Awaited<ReturnType<ServicioRepository["findById"]>>>;
@@ -20,10 +22,9 @@ export class ServicioService {
     if (!proveedor) throw CustomError.notFound(`No se encontró el proveedor con ID ${idproveedor}.`);
 
     const servicios = await this.repository.findByProveedor(idproveedor, filtros.estado);
-    const idsEquipamiento = servicios.filter((s) => s.equipamiento).map((s) => s.idservicio);
-    const comprometidas = await this.repository.comprometidasPorServicio(idsEquipamiento);
+    const ocupaciones = await this.repository.ocupacionesDesdeHoy(servicios.map((s) => s.idservicio));
 
-    return servicios.map((s) => this.formatear(s, comprometidas.get(s.idservicio) ?? 0));
+    return servicios.map((s) => this.formatear(s, ocupaciones.filter((o) => o.idservicio === s.idservicio)));
   }
 
   // DCD: solicitarEdicionServicio. Devuelve los datos actuales + qué se puede editar y qué restricciones hay.
@@ -31,17 +32,37 @@ export class ServicioService {
     const servicio = await this.buscarOFallar(id);
     const tipo = tipoDeServicio(servicio) as TipoServicio;
 
-    const comprometida = tipo === TIPO_SERVICIO.EQUIPAMIENTO ? await this.repository.cantidadComprometida(id) : 0;
+    const ocupaciones = await this.repository.ocupacionesDesdeHoy([id]);
     const enUso = (await this.repository.contarSalidasActivas(id)) > 0;
     const garantiza = (await this.repository.contarGarantiasDePaquetesActivos(id)) > 0;
 
     return {
-      ...this.formatear(servicio, comprometida),
+      ...this.formatear(servicio, ocupaciones),
       edicion: {
         camposEditables: [...CAMPOS_BASE_EDITABLES, ...Object.keys(CAMPOS_MODIFICAR[tipo])],
         enUsoEnSalidasActivas: enUso,
         garantizaPaquetesActivos: garantiza,
       },
+    };
+  }
+
+  // A1: GET /api/servicios/:id/ocupacion. Lo ocupado y disponible de cada día y las salidas que lo usaron (historial)
+  async consultarOcupacion(id: number, { desde, hasta }: RangoOcupacionDto) {
+    const servicio = await this.buscarOFallar(id);
+    const historial = await this.repository.historialOcupacion(id, desde, hasta);
+    // Para el día solo cuentan las salidas activas; las finalizadas quedan en la lista como historial
+    const activas = historial.filter((o) => SALIDAS_ACTIVAS.includes(o.salida.estado));
+    const total = totalDe(servicio);
+    return {
+      total,
+      dias: [...ocupadoPorDia(activas, desde, hasta)].map(([fecha, ocupado]) => ({ fecha, ocupado, disponible: total - ocupado })),
+      ocupaciones: historial.map((o) => ({
+        nroSalida: o.salida.nroSalida,
+        desde: claveDia(o.desde),
+        hasta: claveDia(o.hasta),
+        cantidad: o.cantidad,
+        estadoSalida: o.salida.estado,
+      })),
     };
   }
 
@@ -65,7 +86,7 @@ export class ServicioService {
     }
 
     const creado = await this.repository.create(idproveedor, dto);
-    return this.formatear(creado, 0);
+    return this.formatear(creado);
   }
 
   // CU-20: Modificar servicio de un proveedor
@@ -93,20 +114,28 @@ export class ServicioService {
     }
 
     const actual = this.datosEspecificos(servicio, tipo);
-    let especifico: { [k: string]: any } = { ...dto.especifico };
+    const especifico: { [k: string]: any } = { ...dto.especifico };
 
-    // 2. Equipamiento: el stock es el inventario físico real (CU-20). No puede quedar debajo de lo comprometido.
-    if (tipo === TIPO_SERVICIO.EQUIPAMIENTO && especifico.inventarioTotal !== undefined) {
-      const comprometida = await this.repository.cantidadComprometida(id);
-      const total = especifico.inventarioTotal as number;
-      if (total < comprometida) {
+    // 2. A1: se edita el total (inventario o plazas). Subirlo es libre; bajarlo no puede dejarlo debajo del día
+    // de mayor ocupación de hoy en adelante. Las bajas por rotura o pérdida se registran en CU-41.
+    // ponytail: se controla fuera de la transacción de la ocupación; si dos admins chocan, mover esto a un lock del ServicioBase
+    const total = especifico.inventarioTotal ?? especifico.capacidadDisponible;
+    if (total !== undefined) {
+      const { pico } = usoDe(await this.repository.ocupacionesDesdeHoy([id]));
+      if (total < pico.ocupado) {
+        const unidad = tipo === TIPO_SERVICIO.ALOJAMIENTO ? "plazas" : "unidades";
         throw CustomError.badRequest(
-          `La nueva cantidad (${total}) es inferior a la comprometida en salidas activas (${comprometida}).`
+          `Hay ${pico.ocupado} ${unidad} comprometidas el ${pico.fecha.slice(8, 10)}/${pico.fecha.slice(5, 7)}: el total no puede quedar en ${total}.`
         );
       }
-      const { inventarioTotal, ...resto } = especifico;
-      // cantidadDisponible guarda lo que queda libre: inventario total menos lo ya comprometido
-      especifico = { ...resto, cantidadDisponible: total - comprometida };
+    }
+    // Bloque 8: con bloqueo de plazas el hotel necesita su capacidad
+    if (
+      tipo === TIPO_SERVICIO.ALOJAMIENTO &&
+      (especifico.modalidadConfirmacion ?? actual.modalidadConfirmacion) === MODALIDAD_BLOQUEO_PLAZAS &&
+      (especifico.capacidadDisponible ?? actual.plazasTotales) === null
+    ) {
+      throw CustomError.badRequest("Un alojamiento con bloqueo de plazas necesita la capacidad (capacidadDisponible).");
     }
 
     // 3. CAT-31/32: se edita en el lugar; lo que ya está en salidas activas no puede quedar inconsistente
@@ -152,9 +181,7 @@ export class ServicioService {
     }
 
     const actualizado = await this.repository.updateEnSitio(id, tipo, dto.base, especifico);
-    const comprometida =
-      tipo === TIPO_SERVICIO.EQUIPAMIENTO ? await this.repository.cantidadComprometida(id) : 0;
-    return { servicio: this.formatear(actualizado, comprometida) };
+    return { servicio: this.formatear(actualizado, await this.repository.ocupacionesDesdeHoy([id])) };
   }
 
   // CU-21: Baja lógica de servicio
@@ -182,7 +209,7 @@ export class ServicioService {
     }
 
     const baja = await this.repository.updateEstado(id, ESTADO.INACTIVO);
-    return this.formatear(baja, 0);
+    return this.formatear(baja);
   }
 
   // ----- helpers -----
@@ -202,21 +229,26 @@ export class ServicioService {
     return datos;
   }
 
-  private formatear(s: ServicioCompleto, comprometida: number) {
+  // A1: los nombres viejos se mantienen para el front: "disponible" es lo libre hoy y "comprometida", el pico de hoy en adelante
+  private formatear(s: ServicioCompleto, ocupaciones: OcupacionDias[] = []) {
     const tipo = tipoDeServicio(s) as TipoServicio;
     const datos = this.datosEspecificos(s, tipo);
+    const uso = usoDe(ocupaciones);
 
-    let disponibilidad: { [k: string]: number | string };
+    let disponibilidad: { [k: string]: number | string | null };
     switch (tipo) {
       case TIPO_SERVICIO.EQUIPAMIENTO:
         disponibilidad = {
-          cantidadDisponible: datos.cantidadDisponible,
-          cantidadComprometida: comprometida,
-          inventarioTotal: datos.cantidadDisponible + comprometida,
+          cantidadDisponible: datos.cantidadTotal - uso.hoy,
+          cantidadComprometida: uso.pico.ocupado,
+          inventarioTotal: datos.cantidadTotal,
         };
         break;
       case TIPO_SERVICIO.ALOJAMIENTO:
-        disponibilidad = { capacidadDisponible: datos.capacidadDisponible, modalidadConfirmacion: datos.modalidadConfirmacion };
+        disponibilidad = {
+          capacidadDisponible: datos.plazasTotales === null ? null : datos.plazasTotales - uso.hoy,
+          modalidadConfirmacion: datos.modalidadConfirmacion,
+        };
         break;
       case TIPO_SERVICIO.TRANSPORTE:
         disponibilidad = { capacidadVehiculo: datos.capacidadVehiculo };
@@ -239,3 +271,11 @@ export class ServicioService {
     };
   }
 }
+
+/** A1: lo ocupado hoy y el día de mayor ocupación de hoy en adelante. */
+export const usoDe = (ocupaciones: OcupacionDias[], hoy = hoyUTC()) => {
+  const fin = new Date(Math.max(hoy.getTime(), ...ocupaciones.map((o) => o.hasta.getTime())));
+  const dias = [...ocupadoPorDia(ocupaciones, hoy, fin)];
+  const [fecha, ocupado] = dias.reduce((pico, dia) => (dia[1] > pico[1] ? dia : pico));
+  return { hoy: dias[0]![1], pico: { fecha, ocupado } };
+};

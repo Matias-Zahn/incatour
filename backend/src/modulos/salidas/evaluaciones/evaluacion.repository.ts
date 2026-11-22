@@ -16,8 +16,7 @@ export interface FiltrosEvaluacion {
 const EVALUABLES = {
   personalAsignado: { include: { personal: { select: { idpersonal: true, nombreCompleto: true, rol: true } } } },
   // Proveedores que dieron servicio en la salida: alojamiento, transporte, tren o equipamiento
-  servicios: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
-  equipamientos: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
+  ocupaciones: { include: { servicio: { select: { proveedor: { select: { idproveedor: true, razonSocial: true } } } } } },
   evaluacionesPersonal: true,
   evaluacionesProveedores: true,
 } satisfies Prisma.SalidaInclude;
