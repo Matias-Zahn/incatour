@@ -239,9 +239,6 @@ function FormularioCrearSalida({
                             Crear salida planificada
                         </h2>
                     </div>
-                    <span className="inline-flex items-center rounded bg-marca-suave px-2.5 py-1 text-xs font-semibold text-navegacion">
-                        Perfil: ADMIN
-                    </span>
                 </div>
                 <p className="mt-1 text-sm text-texto-suave">
                     Ingresá los parámetros del contingente para calcular la dotación de
@@ -514,7 +511,7 @@ function FormularioCrearSalida({
                             esErrorAutoridadFA2 ? (
                                 <Alerta
                                     tipo="error"
-                                    titulo="Fallo de comunicación con la autoridad (FA2)"
+                                    titulo="Fallo de comunicación con la autoridad"
                                 >
                                     <div className="space-y-1.5 text-xs sm:text-sm">
                                         <p className="font-semibold text-peligro">
@@ -553,7 +550,7 @@ function FormularioCrearSalida({
                         ) : (
                             <Alerta
                                 tipo="error"
-                                titulo="Cupo insuficiente ante la autoridad (FA1)"
+                                titulo="Cupo insuficiente ante la autoridad"
                             >
                                 <div className="space-y-1.5 text-xs sm:text-sm">
                                     <p>

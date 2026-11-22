@@ -25,6 +25,27 @@ export function formatearFechaLocalCorta(iso?: string | null): string {
 }
 
 export function formatearRangoFechasUtc(inicio?: string | null, fin?: string | null): string {
+    const fInicio = aFecha(inicio);
+    const fFin = aFecha(fin);
+    if (!fInicio || !fFin) {
+        return `${formatearFechaUtcCorta(inicio)} – ${formatearFechaUtcCorta(fin)}`;
+    }
+    const mismoAnio = fInicio.getUTCFullYear() === fFin.getUTCFullYear();
+    const mismoMes = mismoAnio && fInicio.getUTCMonth() === fFin.getUTCMonth();
+    const mismoDia = mismoMes && fInicio.getUTCDate() === fFin.getUTCDate();
+    if (mismoDia) return formatearFechaUtcCorta(inicio);
+    if (mismoMes) {
+        const diaInicio = String(fInicio.getUTCDate()).padStart(2, "0");
+        return `${diaInicio}–${formatearFechaUtcCorta(fin)}`;
+    }
+    if (mismoAnio) {
+        const inicioCorto = fInicio.toLocaleDateString("es-AR", {
+            day: "2-digit",
+            month: "short",
+            timeZone: "UTC",
+        });
+        return `${inicioCorto} – ${formatearFechaUtcCorta(fin)}`;
+    }
     return `${formatearFechaUtcCorta(inicio)} – ${formatearFechaUtcCorta(fin)}`;
 }
 
@@ -56,3 +77,65 @@ export function formatearMonto(monto?: number | null, moneda?: string | null): s
 }
 
 export const formatearMontoUsd = (monto?: number | null) => formatearMonto(monto);
+
+// Etiquetas legibles para valores de sistema (B11: sin MAYÚSCULAS crudas en pantalla)
+const ESTADOS_REGISTRO: Record<string, string> = {
+    ACTIVO: "Activo",
+    INACTIVO: "Inactivo",
+};
+
+const TIPOS_SERVICIO_ETIQUETA: Record<string, string> = {
+    ALOJAMIENTO: "Alojamiento",
+    TRANSPORTE: "Transporte",
+    TREN: "Tren",
+    EQUIPAMIENTO: "Equipamiento",
+};
+
+const MODALIDADES_ETIQUETA: Record<string, string> = {
+    BLOQUEO_PLAZAS: "Bloqueo de plazas",
+    A_SOLICITUD: "A solicitud",
+};
+
+const GRAVEDADES_ETIQUETA: Record<string, string> = {
+    CRITICO: "Crítico",
+    ALTO: "Alto",
+    MEDIO: "Medio",
+    MODERADO: "Moderado",
+    BAJO: "Bajo",
+};
+
+const HABILITACIONES_ETIQUETA: Record<string, string> = {
+    VIGENTE: "Vigente",
+    VENCIDA: "Vencida",
+    SIN_DATOS: "Sin datos",
+};
+
+const ESTADOS_SOLICITUD_ETIQUETA: Record<string, string> = {
+    PENDIENTE: "Pendiente",
+    CONFIRMADA: "Confirmada",
+    CANCELADA: "Cancelada",
+    RECHAZADA: "Rechazada",
+};
+
+function buscarEtiqueta(mapa: Record<string, string>, valor?: string | null): string {
+    if (!valor) return "—";
+    return mapa[valor.toUpperCase()] ?? valor;
+}
+
+export const etiquetaEstadoRegistro = (estado?: string | null) =>
+    buscarEtiqueta(ESTADOS_REGISTRO, estado);
+
+export const etiquetaTipoServicio = (tipo?: string | null) =>
+    buscarEtiqueta(TIPOS_SERVICIO_ETIQUETA, tipo);
+
+export const etiquetaModalidad = (modalidad?: string | null) =>
+    buscarEtiqueta(MODALIDADES_ETIQUETA, modalidad);
+
+export const etiquetaGravedad = (nivel?: string | null) =>
+    buscarEtiqueta(GRAVEDADES_ETIQUETA, nivel);
+
+export const etiquetaHabilitacion = (situacion?: string | null) =>
+    buscarEtiqueta(HABILITACIONES_ETIQUETA, situacion);
+
+export const etiquetaEstadoSolicitud = (estado?: string | null) =>
+    buscarEtiqueta(ESTADOS_SOLICITUD_ETIQUETA, estado);

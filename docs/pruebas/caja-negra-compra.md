@@ -1,6 +1,6 @@
 # Prueba de caja negra: pantalla de compra (CU-30)
 
-**Por qué esta pantalla:** es la que más datos pide. Por cada pasajero: nombre, pasaporte, nacionalidad, vencimiento y equipaje. Por el pago: número, titular, vencimiento y CVV.
+**Por qué esta pantalla:** es la que más datos pide. Por cada pasajero: nombre, pasaporte, nacionalidad y vencimiento. Por el pago: número, titular, vencimiento y CVV. (El equipaje se pesa y cobra en persona, por lo que no forma parte de la compra online.)
 
 **Técnicas:** partición de equivalencia (PE) y análisis de valores límite (VL). Los casos se diseñaron a partir de las reglas del caso de uso, sin mirar la implementación, y se ejecutan en Chrome sobre la app real, como lo haría un cliente.
 
@@ -40,7 +40,6 @@ Los casos válidos compran de verdad y consumen lugares de la salida con más cu
 | Pasaporte | Texto único en la nómina | Vacío, repetido | |
 | Nacionalidad | Texto | Vacía | |
 | Vencimiento del pasaporte | Posterior al fin de la salida | Vacío, ya vencido, anterior o igual al fin | Fin − 1, fin, fin + 1 |
-| Equipaje (kg) | De 0 a 20 | Vacío, negativo, mayor a 20 | −0,5 / 0 / 20 / 20,5 |
 | Número de tarjeta | 15 o 16 dígitos, con o sin espacios | Vacío, con letras, otra longitud | 11, 14, 15, 16, 17 dígitos |
 | Titular | Texto | Vacío | |
 | Vencimiento de la tarjeta | MM/AA vigente | Sin barra, mes inexistente, vencida | Mes 13 |
@@ -61,9 +60,6 @@ La columna "Dato probado" indica lo único que cambia: el resto de los campos ll
 | CN-06 | PE | Pasaporte vencido (2020) | Tiene que vencer después del fin | OK |
 | CN-07 | VL | Vence el día anterior al fin | Tiene que vencer después del fin | OK |
 | CN-08 | VL | Vence el último día | Tiene que vencer después del fin | OK |
-| CN-09 | PE | Equipaje vacío | Indicá el peso del equipaje | OK |
-| CN-10 | VL | Equipaje −0,5 kg | No puede ser negativo | OK |
-| CN-11 | VL | Equipaje 20,5 kg | El máximo es 20 kg | OK |
 | CN-12 | PE | Tarjeta vacía | Número de tarjeta válido | OK |
 | CN-13 | VL | Tarjeta de 11 dígitos | Número de tarjeta válido | OK |
 | CN-14 | VL | Tarjeta de 14 dígitos | Pago rechazado: número inválido | OK |
@@ -81,8 +77,6 @@ La columna "Dato probado" indica lo único que cambia: el resto de los campos ll
 | CN-26 | PE | CVV 999 | Pago rechazado | OK |
 | CN-27 | PE | Todos los datos válidos | Reserva confirmada | OK |
 | CN-28 | VL | Vence el día siguiente al fin | Reserva confirmada | OK |
-| CN-29 | VL | Equipaje 0 kg | Reserva confirmada | OK |
-| CN-30 | VL | Equipaje 20 kg | Reserva confirmada | OK |
 | CN-31 | VL | Tarjeta de 15 dígitos | Reserva confirmada | OK |
 | CN-32 | VL | CVV de 4 dígitos | Reserva confirmada | OK |
 | CN-33 | PE | Tarjeta con espacios | Reserva confirmada | OK |
@@ -90,7 +84,7 @@ La columna "Dato probado" indica lo único que cambia: el resto de los campos ll
 
 ## Resultado
 
-**34 de 34 casos correctos.**
+**29 de 29 casos correctos** (se retiraron CN-09, CN-10, CN-11, CN-29 y CN-30 al eliminarse el cobro de equipaje online).
 
 ## Observaciones
 

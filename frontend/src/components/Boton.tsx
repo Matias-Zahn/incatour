@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from "react";
 
-type BotonVariante = "principal" | "secundario" | "peligro" | "fantasma";
+type BotonVariante = "principal" | "secundario" | "peligro" | "peligroSuave" | "fantasma";
 
 type BotonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
     variante?: BotonVariante;
@@ -14,8 +14,10 @@ const estilosPorVariante: Record<BotonVariante, string> = {
         "border border-borde bg-white text-texto hover:bg-fondo focus-visible:outline-marca",
     peligro:
         "bg-peligro text-white hover:bg-peligro/90 focus-visible:outline-peligro",
+    peligroSuave:
+        "bg-transparent text-peligro shadow-none hover:bg-peligro/10 focus-visible:outline-peligro",
     fantasma:
-        "bg-transparent text-texto hover:bg-fondo focus-visible:outline-marca",
+        "bg-transparent text-texto shadow-none hover:bg-fondo focus-visible:outline-marca",
 };
 
 function Boton({

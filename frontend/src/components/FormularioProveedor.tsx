@@ -8,6 +8,7 @@ import {
     type DatosProveedor,
     type Proveedor,
 } from "../services/proveedorService";
+import { etiquetaTipoServicio } from "../services/formato";
 
 type FormularioProveedorProps = {
     proveedorEnEdicion?: Proveedor | null;
@@ -64,7 +65,7 @@ function FormularioProveedor({
                 <label className="grid gap-2 text-sm font-semibold text-texto">
                     Tipo de proveedor
                     <select {...register("tipoProveedor")} className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20">
-                        {tiposProveedor.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                        {tiposProveedor.map((tipo) => <option key={tipo} value={tipo}>{etiquetaTipoServicio(tipo)}</option>)}
                     </select>
                     {errors.tipoProveedor ? <span className="text-xs font-normal text-peligro" role="alert">{errors.tipoProveedor.message}</span> : null}
                 </label>
@@ -84,8 +85,8 @@ function FormularioProveedor({
                     <label className="grid gap-2 text-sm font-semibold text-texto">
                         Estado
                         <select {...register("estado")} className="rounded-control border border-borde px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20">
-                            <option value="ACTIVO">ACTIVO</option>
-                            <option value="INACTIVO">INACTIVO</option>
+                            <option value="ACTIVO">Activo</option>
+                            <option value="INACTIVO">Inactivo</option>
                         </select>
                     </label>
                 ) : null}

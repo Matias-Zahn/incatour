@@ -91,8 +91,8 @@ describe("GestionReservaService.confirmarCancelacion con cambios en el medio (RE
 describe("GestionReservaService.obtenerReserva: desglose (RES-07)", () => {
   const detalle = (over: Record<string, unknown>) => ({
     idreserva: 1, nroReserva: "RES-1", estado: "CONFIRMADA", estadoAlojamiento: null, fechaRealizacion: new Date(),
-    cantidadPasajeros: 2, precioCongelado: 1650, condicionesComerciales: null,
-    temporadaAplicada: null, precioPaquetePorPersona: null, adicionalesEquipaje: null, moneda: null,
+    cantidadPasajeros: 2, precioCongelado: 1600, condicionesComerciales: null,
+    temporadaAplicada: null, precioPaquetePorPersona: null, moneda: null,
     cliente: { idusuario: 5, usuario: {} },
     salida: { fechaInicio: new Date("2030-06-10"), paquete: { tarifas: [] } },
     pagos: [], pasajeros: [], reembolsos: [], solicitudes: [], permisos: [],
@@ -100,13 +100,15 @@ describe("GestionReservaService.obtenerReserva: desglose (RES-07)", () => {
   });
   const usuario = { idusuario: 5, email: "a@b.com", rol: "CLIENTE" };
 
-  it("usa las columnas congeladas aunque la tarifa viva haya cambiado", async () => {
+  it("usa las columnas congeladas aunque la tarifa viva haya cambiado (sin adicionales de equipaje)", async () => {
     repo.findDetalle.mockResolvedValue(detalle({
-      temporadaAplicada: "Alta", precioPaquetePorPersona: 800, adicionalesEquipaje: 50,
+      temporadaAplicada: "Alta", precioPaquetePorPersona: 800,
       salida: { fechaInicio: new Date("2030-06-10"), paquete: { tarifas: [{ monto: 999, temporada: { nombre: "Otra", estado: "ACTIVO", fechaInicio: new Date("2030-01-01"), fechaFin: new Date("2030-12-31") } }] } },
     }));
     const r = await new GestionReservaService().obtenerReserva(1, usuario);
-    expect(r).toMatchObject({ temporadaAplicada: "Alta", precioUnitario: 800, precioPaquete: 1600, adicionalesEquipaje: 50 });
+    expect(r).toMatchObject({ temporadaAplicada: "Alta", precioUnitario: 800, precioPaquete: 1600 });
+    expect(r).not.toHaveProperty("adicionales");
+    expect(r).not.toHaveProperty("adicionalesEquipaje");
   });
 
   it("reserva vieja: reconstruye con la tarifa viva e ignora temporadas inactivas", async () => {
@@ -117,6 +119,8 @@ describe("GestionReservaService.obtenerReserva: desglose (RES-07)", () => {
       salida: { fechaInicio: new Date("2030-06-10"), paquete: { tarifas: [t("Vieja", "INACTIVO", 100), t("Alta", "ACTIVO", 800)] } },
     }));
     const r = await new GestionReservaService().obtenerReserva(1, usuario);
-    expect(r).toMatchObject({ temporadaAplicada: "Alta", precioUnitario: 800, adicionalesEquipaje: 50 });
+    expect(r).toMatchObject({ temporadaAplicada: "Alta", precioUnitario: 800, precioPaquete: 1600 });
+    expect(r).not.toHaveProperty("adicionales");
+    expect(r).not.toHaveProperty("adicionalesEquipaje");
   });
 });

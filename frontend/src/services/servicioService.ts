@@ -39,21 +39,35 @@ export const esquemaServicio = z
         ...camposComunes,
         categoria: z.string().trim().max(40).optional(),
         tipoHabitacion: z.string().trim().max(40).optional(),
-        capacidadDisponible: z.number().int().min(0, "No puede ser negativa.").max(5000, "No puede superar las 5000 plazas.").optional(),
-        modalidadConfirmacion: z.string().trim().optional(),
-        capacidadVehiculo: z.number().int().min(1, "Debe ser al menos 1.").max(60, "No puede superar los 60 asientos.").optional(),
-        pesoEquipajeIncluido: z
-            .number()
-            .min(0, "No puede ser negativo.")
-            .max(20, "El peso tope incluido no puede superar los 20 kg.")
+        capacidadDisponible: z
+            .number({ message: "Ingresá una capacidad numérica válida." })
+            .int("La capacidad debe ser un número entero.")
+            .min(1, "Debe ser al menos 1.")
+            .max(5000, "No puede superar las 5000 plazas.")
             .optional(),
-        costoPorKgExcedente: z.number().min(0, "No puede ser negativo.").max(1000, "No puede superar los 1000 por kg.").optional(),
+        modalidadConfirmacion: z.string().trim().optional(),
+        capacidadVehiculo: z
+            .number({ message: "Ingresá una capacidad numérica válida." })
+            .int("La capacidad debe ser un número entero.")
+            .min(1, "Debe ser al menos 1.")
+            .max(60, "No puede superar los 60 asientos.")
+            .optional(),
         horarioSalida: z.string().trim().optional(),
         horarioLlegada: z.string().trim().optional(),
         diasOperacion: z.string().trim().optional(),
         tipoEquipamiento: z.string().trim().max(60).optional(),
-        cantidadDisponible: z.number().int().min(0, "No puede ser negativa.").max(10000, "No puede superar las 10000 unidades.").optional(),
-        inventarioTotal: z.number().int().min(0, "No puede ser negativo.").max(10000, "No puede superar las 10000 unidades.").optional(),
+        cantidadDisponible: z
+            .number({ message: "Ingresá una cantidad numérica válida." })
+            .int("La cantidad debe ser un número entero.")
+            .min(0, "No puede ser negativa.")
+            .max(10000, "No puede superar las 10000 unidades.")
+            .optional(),
+        inventarioTotal: z
+            .number({ message: "Ingresá un inventario numérico válido." })
+            .int("El inventario debe ser un número entero.")
+            .min(0, "No puede ser negativo.")
+            .max(10000, "No puede superar las 10000 unidades.")
+            .optional(),
     })
     .superRefine((datos, contexto) => {
         const requeridos: Record<TipoServicio, [keyof DatosServicio, string][]> = {
@@ -63,11 +77,7 @@ export const esquemaServicio = z
                 ["capacidadDisponible", "La capacidad es obligatoria."],
                 ["modalidadConfirmacion", "La modalidad es obligatoria."],
             ],
-            TRANSPORTE: [
-                ["capacidadVehiculo", "La capacidad es obligatoria."],
-                ["pesoEquipajeIncluido", "El peso incluido es obligatorio."],
-                ["costoPorKgExcedente", "El costo excedente es obligatorio."],
-            ],
+            TRANSPORTE: [["capacidadVehiculo", "La capacidad es obligatoria."]],
             TREN: [
                 ["horarioSalida", "El horario de salida es obligatorio."],
                 ["horarioLlegada", "El horario de llegada es obligatorio."],
@@ -193,7 +203,7 @@ type ServicioApi = {
     estado: EstadoServicio;
     proveedor?: Servicio["proveedor"];
     datos: Record<string, string | number | null>;
-    disponibilidad: Record<string, string | number>;
+    disponibilidad: Record<string, string | number | null>;
     edicion?: EdicionServicio;
 };
 
@@ -207,7 +217,12 @@ type RespuestaModificarApi = {
 const extraer = <T,>(respuesta: RespuestaDatos<T>): T => respuesta.data;
 
 export function normalizarServicio(servicio: ServicioApi, idProveedorFallback = 0): Servicio {
-    const camposEspecificos = { ...servicio.datos, ...servicio.disponibilidad };
+    const camposEspecificos = Object.fromEntries(
+        Object.entries({ ...servicio.datos, ...servicio.disponibilidad }).map(([clave, valor]) => [
+            clave,
+            valor === null ? undefined : valor,
+        ]),
+    );
     const idproveedor =
         servicio.idproveedor ?? servicio.proveedor?.idproveedor ?? idProveedorFallback;
     return {
@@ -249,6 +264,9 @@ export function registrarServicio(
 ): Promise<Servicio> {
     const datosAlta: Partial<DatosServicio> = { ...datos };
     delete datosAlta.inventarioTotal;
+    if (datosAlta.tipo === "ALOJAMIENTO" && datosAlta.modalidadConfirmacion === "A_SOLICITUD") {
+        delete datosAlta.capacidadDisponible;
+    }
     if (datosAlta.tipo === "TREN" && datosAlta.diasOperacion) {
         datosAlta.diasOperacion = datosAlta.diasOperacion.trim().toUpperCase();
     }
@@ -276,6 +294,9 @@ export function modificarServicio(
     datos: ServicioModificar,
 ): Promise<ResultadoModificarServicio> {
     const cuerpo: ServicioModificar = { ...datos };
+    if (cuerpo.modalidadConfirmacion === "A_SOLICITUD") {
+        delete cuerpo.capacidadDisponible;
+    }
     if (cuerpo.diasOperacion) {
         cuerpo.diasOperacion = cuerpo.diasOperacion.trim().toUpperCase();
     }

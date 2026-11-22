@@ -34,12 +34,6 @@ export type SalidaDisponibleCatalogo = {
     nochesPrevias?: number;
     nochesPosteriores?: number;
     condiciones?: string | null;
-    equipajeTransporte?: EquipajeTransporteCatalogo | null;
-};
-
-export type EquipajeTransporteCatalogo = {
-    pesoEquipajeIncluido: number;
-    costoPorKgExcedente: number;
 };
 
 export type PaqueteCatalogoPublico = {
@@ -63,7 +57,6 @@ export type PaqueteCatalogoPublico = {
         tipoGarantia?: string;
     };
     serviciosAdicionales: string[];
-    equipajeTransporte?: EquipajeTransporteCatalogo | null;
     condiciones?: string | null;
     diasDisponibles?: string | null;
     precios: TarifaCatalogoPublico[];
@@ -77,10 +70,6 @@ export type PasajeroReservaInput = {
     fechaVencimientoPasaporte: string;
 };
 
-export type EquipajeReservaInput = {
-    pesoDeclarado: number;
-};
-
 export type TarjetaReservaInput = {
     numero: string;
     titular: string;
@@ -92,7 +81,6 @@ export type CrearReservaPayload = {
     idsalida: number;
     medioPago: string;
     pasajeros: PasajeroReservaInput[];
-    equipaje?: EquipajeReservaInput[];
     tarjeta: TarjetaReservaInput;
 };
 
@@ -174,7 +162,7 @@ export function useCrearReservaPaquete() {
 
 /**
  * CAT-30: el paquete tal como se vende en una salida. El catálogo describe el paquete de hoy (rige para salidas nuevas);
- * una salida ya publicada conserva su foto: garantía, noches, condiciones y franquicia de equipaje.
+ * una salida ya publicada conserva su foto: garantía, noches y condiciones.
  */
 export function paqueteDeSalida(paquete: PaqueteCatalogoPublico, salida: SalidaDisponibleCatalogo): PaqueteCatalogoPublico {
     return {
@@ -186,6 +174,5 @@ export function paqueteDeSalida(paquete: PaqueteCatalogoPublico, salida: SalidaD
             garantia: salida.garantia ?? paquete.nochesAlojamiento.garantia,
         },
         condiciones: salida.condiciones !== undefined ? salida.condiciones : paquete.condiciones,
-        equipajeTransporte: salida.equipajeTransporte !== undefined ? salida.equipajeTransporte : paquete.equipajeTransporte,
     };
 }

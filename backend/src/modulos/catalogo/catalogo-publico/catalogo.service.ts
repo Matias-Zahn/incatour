@@ -6,15 +6,13 @@ import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, tarifaDe
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
 import { obtenerImagenesDePaquete } from "../../../shared/upload/uploadPaquete.middleware";
 
-// CAT-29 / CAT-30: lo que se vende en una salida es su foto (CAT-05): garantía, noches, condiciones y franquicia de equipaje
+// CAT-29 / CAT-30: lo que se vende en una salida es su foto (CAT-05): garantía, noches y condiciones
 function definicionDeSalida(d: DefinicionPaquete) {
-  const transporte = d.servicios.find((sv) => sv.transporte)?.transporte ?? null;
   return {
     garantia: textoGarantia(d),
     nochesPrevias: d.nochesPrevias,
     nochesPosteriores: d.nochesPosteriores,
     condiciones: d.condiciones,
-    equipajeTransporte: transporte,
   };
 }
 
@@ -55,18 +53,6 @@ export class CatalogoService {
       // Extraemos información limpia de los servicios activos (CAT-09: filtrar solo servicios activos)
       const serviciosActivos = paquete.servicios.filter((s) => s.servicio.estado === "ACTIVO");
       const serviciosIncluidos = textosIncluye(serviciosActivos.map((s) => s.servicio));
-
-      // Extraemos la franquicia de equipaje si el paquete incluye un servicio de transporte activo
-      const transporteIncluido = serviciosActivos
-        .map((s) => s.servicio.transporte)
-        .find((t) => t !== null && t !== undefined);
-
-      const equipajeTransporte = transporteIncluido
-        ? {
-            pesoEquipajeIncluido: transporteIncluido.pesoEquipajeIncluido,
-            costoPorKgExcedente: transporteIncluido.costoPorKgExcedente,
-          }
-        : null;
 
       // CAT-29: la garantía del paquete (rige para las salidas nuevas); cada salida informa la suya, congelada (CAT-05)
       const garantía = textoGarantia(armarDefinicionPaquete(paquete));
@@ -154,7 +140,6 @@ export class CatalogoService {
         },
         serviciosAdicionales: serviciosIncluidos,
         serviciosIncluidos,
-        equipajeTransporte,
         condiciones: paquete.condiciones,
         diasDisponibles: paquete.diasDisponibles,
         precios: tarifasVigentes,

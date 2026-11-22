@@ -16,6 +16,7 @@ import {
     type Circuito,
     type DatosCircuito,
 } from "../../services/circuitoService";
+import { etiquetaEstadoRegistro } from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -410,11 +411,11 @@ function CircuitosPage() {
                                 titulo: "Estado",
                                 renderizar: (circuito) => (
                                     <span
-                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                             circuito.estado,
                                         )}`}
                                     >
-                                        {circuito.estado}
+                                        {etiquetaEstadoRegistro(circuito.estado)}
                                     </span>
                                 ),
                             },
@@ -425,6 +426,7 @@ function CircuitosPage() {
                                     <div className="flex flex-wrap gap-2">
                                         <Link
                                             to={`/gestion/circuitos/${circuito.idcircuito}/etapas`}
+                                            aria-label={`Ver etapas del circuito ${circuito.nombreCircuito}`}
                                             className="inline-flex items-center justify-center rounded-control border border-borde bg-white px-3 py-1.5 text-xs font-semibold text-texto shadow-sm transition-colors hover:bg-fondo"
                                         >
                                             Etapas
@@ -432,6 +434,7 @@ function CircuitosPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar circuito ${circuito.nombreCircuito}`}
                                             disabled={
                                                 circuito.estado === "INACTIVO"
                                             }
@@ -442,8 +445,9 @@ function CircuitosPage() {
                                             Editar
                                         </Boton>
                                         <Boton
-                                            variante="peligro"
+                                            variante="peligroSuave"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Dar de baja circuito ${circuito.nombreCircuito}`}
                                             disabled={
                                                 circuito.estado === "INACTIVO"
                                             }

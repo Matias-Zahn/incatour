@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-// Mismo tope que PESO_MAXIMO_DECLARADO_KG del back (backend/src/shared/constantes.ts)
-export const PESO_MAXIMO_DECLARADO_KG = 20;
-
 export const TARJETA_VACIA = { numero: "", titular: "", vencimiento: "", cvv: "" };
 
 /** Reglas de la compra (CU-30): dependen de la salida elegida, por eso el esquema se arma con su fin y su cupo */
@@ -15,10 +12,6 @@ export function crearEsquemaCompra(fechaFin: string, cupo: number, fechaFinTexto
             .string()
             .min(1, "Indicá el vencimiento del pasaporte.")
             .refine((f) => new Date(f) > new Date(fechaFin), `Tiene que vencer después del ${fechaFinTexto}.`),
-        pesoDeclarado: z
-            .number({ error: "Indicá el peso del equipaje." })
-            .min(0, "No puede ser negativo.")
-            .max(PESO_MAXIMO_DECLARADO_KG, `El máximo es ${PESO_MAXIMO_DECLARADO_KG} kg por pasajero.`),
     });
 
     return z.object({

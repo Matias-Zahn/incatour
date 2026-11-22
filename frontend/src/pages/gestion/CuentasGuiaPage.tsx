@@ -17,6 +17,11 @@ import {
     type FiltrosCuentaGuia,
 } from "../../services/cuentaGuiaService";
 import { usePersonal } from "../../services/personalService";
+import {
+    etiquetaEstadoRegistro,
+    etiquetaHabilitacion,
+    formatearFechaSalida,
+} from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -221,8 +226,8 @@ function CuentasGuiaPage() {
                         className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                     >
                         <option value="">Todas</option>
-                        <option value="VIGENTE">VIGENTE</option>
-                        <option value="VENCIDA">VENCIDA</option>
+                        <option value="VIGENTE">Vigente</option>
+                        <option value="VENCIDA">Vencida</option>
                     </select>
                 </label>
 
@@ -303,13 +308,13 @@ function CuentasGuiaPage() {
                                                           : "text-texto-suave"
                                                 }`}
                                             >
-                                                {cuenta.habilitacion.situacion}
+                                                {etiquetaHabilitacion(cuenta.habilitacion.situacion)}
                                             </span>
                                         </p>
                                         {cuenta.habilitacion.fechaHabilitacion ? (
                                             <p className="text-xs text-texto-suave">
                                                 Vence{" "}
-                                                {cuenta.habilitacion.fechaHabilitacion.slice(0, 10)}
+                                                {formatearFechaSalida(cuenta.habilitacion.fechaHabilitacion)}
                                             </p>
                                         ) : null}
                                     </div>
@@ -342,13 +347,13 @@ function CuentasGuiaPage() {
                                 titulo: "Estado cuenta",
                                 renderizar: (cuenta) => (
                                     <span
-                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                             cuenta.estado === "ACTIVO"
                                                 ? "bg-marca/10 text-marca"
                                                 : "bg-borde text-texto-suave"
                                         }`}
                                     >
-                                        {cuenta.estado}
+                                        {etiquetaEstadoRegistro(cuenta.estado)}
                                     </span>
                                 ),
                             },
@@ -357,8 +362,9 @@ function CuentasGuiaPage() {
                                 titulo: "Acciones",
                                 renderizar: (cuenta) => (
                                     <Boton
-                                        variante="peligro"
+                                        variante="peligroSuave"
                                         className="px-3 py-1.5 text-xs"
+                                        aria-label={`Dar de baja la cuenta de ${cuenta.guia.nombreCompleto}`}
                                         onClick={() => {
                                             darDeBaja.reset();
                                             setCuentaSeleccionada(cuenta);
@@ -372,7 +378,7 @@ function CuentasGuiaPage() {
                                                   : undefined
                                         }
                                     >
-                                        Dar de baja cuenta
+                                        Dar de baja
                                     </Boton>
                                 ),
                             },
