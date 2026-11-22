@@ -24,7 +24,7 @@ import {
     type Paquete,
 } from "../../services/paqueteService";
 import { temporadaVencida, useTemporadas } from "../../services/temporadaService";
-import { formatearMonto } from "../../services/formato";
+import { etiquetaEstadoRegistro, formatearMonto } from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
@@ -437,8 +437,8 @@ function PaquetesPage() {
             ) : null}
 
             {estado === "exito" && (paquetes.length > 0 || hayFiltrosActivos) ? (
-                <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta md:grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] md:items-end">
-                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                <div className="grid grid-cols-1 items-end gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta sm:grid-cols-2 xl:grid-cols-[1.4fr_0.9fr_1fr_1fr_auto]">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
                         Buscar paquete
                         <input
                             id="buscar-paquete"
@@ -448,11 +448,11 @@ function PaquetesPage() {
                                 manejarCambioBusqueda(evento.target.value)
                             }
                             placeholder="Código, nombre, circuito o garantía..."
-                            className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
                         />
                     </label>
 
-                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
                         Estado
                         <select
                             aria-label="Filtrar paquetes por estado"
@@ -466,15 +466,15 @@ function PaquetesPage() {
                                 );
                                 setPaginaActual(1);
                             }}
-                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         >
                             <option value="TODOS">Todos los estados</option>
                             <option value="ACTIVO">Activos</option>
-                            <option value="INACTIVO">Dados de baja (Inactivos)</option>
+                            <option value="INACTIVO">Inactivos</option>
                         </select>
                     </label>
 
-                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
                         Circuito
                         <select
                             aria-label="Filtrar paquetes por circuito"
@@ -483,7 +483,7 @@ function PaquetesPage() {
                                 setFiltroCircuito(Number(e.target.value));
                                 setPaginaActual(1);
                             }}
-                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         >
                             <option value={0}>Todos los circuitos</option>
                             {circuitos.map((c) => (
@@ -494,7 +494,7 @@ function PaquetesPage() {
                         </select>
                     </label>
 
-                    <label className="grid gap-1 text-xs font-semibold text-texto-suave">
+                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
                         Temporada
                         <select
                             aria-label="Filtrar paquetes por temporada"
@@ -503,7 +503,7 @@ function PaquetesPage() {
                                 setFiltroTemporada(Number(e.target.value));
                                 setPaginaActual(1);
                             }}
-                            className="rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
                         >
                             <option value={0}>Todas las temporadas</option>
                             {temporadas.filter((t) => !temporadaVencida(t)).map((t) => (
@@ -520,7 +520,7 @@ function PaquetesPage() {
                     {hayFiltrosActivos ? (
                         <Boton
                             variante="fantasma"
-                            className="px-3 py-2 text-xs text-texto-suave"
+                            className="justify-self-start px-3 py-2 text-xs text-texto-suave sm:col-span-2 xl:col-span-1"
                             onClick={limpiarTodosLosFiltros}
                         >
                             Limpiar filtros
@@ -704,11 +704,11 @@ function PaquetesPage() {
                                 titulo: "Estado",
                                 renderizar: (paquete) => (
                                     <span
-                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                             paquete.estado,
                                         )}`}
                                     >
-                                        {paquete.estado}
+                                        {etiquetaEstadoRegistro(paquete.estado)}
                                     </span>
                                 ),
                             },
@@ -720,6 +720,7 @@ function PaquetesPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Ver vista previa del paquete ${paquete.nombrePaquete}`}
                                             onClick={() =>
                                                 abrirVistaPrevia(paquete)
                                             }
@@ -729,6 +730,7 @@ function PaquetesPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar paquete ${paquete.nombrePaquete}`}
                                             disabled={
                                                 paquete.estado === "INACTIVO"
                                             }
@@ -741,6 +743,7 @@ function PaquetesPage() {
                                         <Boton
                                             variante="secundario"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Subir imágenes del paquete ${paquete.nombrePaquete}`}
                                             disabled={
                                                 paquete.estado === "INACTIVO" ||
                                                 (subirImagen.isPending &&
@@ -760,8 +763,9 @@ function PaquetesPage() {
                                                 : "Subir imágenes (1-5)"}
                                         </Boton>
                                         <Boton
-                                            variante="peligro"
+                                            variante="peligroSuave"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Dar de baja paquete ${paquete.nombrePaquete}`}
                                             disabled={
                                                 paquete.estado === "INACTIVO"
                                             }
@@ -832,11 +836,11 @@ function PaquetesPage() {
                                                     }
                                                 </span>
                                                 <span
-                                                    className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                                         paqueteVistaPrevia.estado,
                                                     )}`}
                                                 >
-                                                    {paqueteVistaPrevia.estado}
+                                                    {etiquetaEstadoRegistro(paqueteVistaPrevia.estado)}
                                                 </span>
                                                 <span
                                                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${

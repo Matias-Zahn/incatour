@@ -11,14 +11,17 @@ import {
     estilosEstadoSalida,
     fechaLocalHoy,
     formatearEstadoSalida,
-    formatearFechaSalida,
     useIncidentes,
     type IncidenteAdmin,
 } from "../../services/guiaService";
 import { useSalidas } from "../../services/salidaService";
 import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
-import { formatearFechaHora } from "../../services/formato";
+import {
+    etiquetaGravedad,
+    formatearFechaHora,
+    formatearFechaUtcCorta,
+} from "../../services/formato";
 
 const estiloGravedad: Record<string, string> = {
     CRITICO: "bg-peligro text-white",
@@ -35,7 +38,7 @@ function FilaIncidente({ incidente: inc }: { incidente: IncidenteAdmin }) {
                 <span
                     className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estiloGravedad[inc.nivelGravedad] ?? estiloGravedad.BAJO}`}
                 >
-                    {inc.nivelGravedad}
+                    {etiquetaGravedad(inc.nivelGravedad)}
                 </span>
                 <p className="text-sm font-semibold text-texto">
                     {inc.salida.nroSalida} · {inc.tipoIncidente}
@@ -176,7 +179,7 @@ function InicioGestionPage() {
                                         </p>
                                         <p className="mt-1 text-xs text-texto-suave">
                                             {salida.paquete.nombrePaquete} · {salida.nroSalida} ·{" "}
-                                            {formatearFechaSalida(salida.fechaInicio)}
+                                            {formatearFechaUtcCorta(salida.fechaInicio)}
                                         </p>
                                     </div>
                                     <div className="text-right">

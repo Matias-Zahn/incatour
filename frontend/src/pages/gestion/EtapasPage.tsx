@@ -15,6 +15,7 @@ import {
     type DatosEtapa,
     type Etapa,
 } from "../../services/etapaService";
+import { etiquetaEstadoRegistro } from "../../services/formato";
 
 function reenumerarSecuencia(lista: Etapa[], idcircuito: number): Etapa[] {
     return lista.map((etapa, indice) => ({
@@ -301,7 +302,7 @@ function EtapasPage() {
                             <option key={circuito.idcircuito} value={circuito.idcircuito}>
                                 {circuito.nombreCircuito} ({circuito.duracionDias} días ·{" "}
                                 {circuito.dificultad}
-                                {circuito.estado === "INACTIVO" ? " · INACTIVO" : ""})
+                                {circuito.estado === "INACTIVO" ? " · Inactivo" : ""})
                             </option>
                         ))}
                     </select>
@@ -324,13 +325,13 @@ function EtapasPage() {
                         <div>
                             <span className="font-semibold text-texto">Estado:</span>{" "}
                             <span
-                                className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                     circuitoSeleccionado.estado === "ACTIVO"
                                         ? "bg-marca/10 text-marca"
                                         : "bg-borde text-texto-suave"
                                 }`}
                             >
-                                {circuitoSeleccionado.estado}
+                                {etiquetaEstadoRegistro(circuitoSeleccionado.estado)}
                             </span>
                         </div>
                         <div>
@@ -345,9 +346,9 @@ function EtapasPage() {
             {circuitoInactivo ? (
                 <Alerta
                     tipo="informacion"
-                    titulo="Circuito inactivo (modo de solo lectura)"
+                    titulo="Circuito inactivo (solo lectura)"
                 >
-                    Este circuito se encuentra dado de baja (`INACTIVO`). Podés consultar su secuencia de etapas, pero no se admiten modificaciones.
+                    Este circuito está dado de baja. Podés consultar su secuencia de etapas, pero no se admiten modificaciones.
                 </Alerta>
             ) : null}
 

@@ -13,7 +13,10 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import Paginacion from "../../components/Paginacion";
 import Alerta from "../../components/Alerta";
-import { formatearFechaUtcCorta } from "../../services/formato";
+import {
+  etiquetaEstadoSolicitud,
+  formatearFechaUtcCorta,
+} from "../../services/formato";
 
 const POR_PAGINA = 6;
 
@@ -590,7 +593,7 @@ export function SolicitudesPage() {
                 titulo: "Estado",
                 renderizar: (s) => (
                   <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                    {s.estado}
+                    {etiquetaEstadoSolicitud(s.estado)}
                   </span>
                 ),
               },
@@ -601,6 +604,7 @@ export function SolicitudesPage() {
                   <Boton
                     variante="principal"
                     className="px-3 py-1.5 text-xs"
+                    aria-label={`Gestionar resolución de la solicitud ${s.nroSolicitud}`}
                     onClick={() => {
                       setMensajeExito(null);
                       setSolicitudEnGestion(s);

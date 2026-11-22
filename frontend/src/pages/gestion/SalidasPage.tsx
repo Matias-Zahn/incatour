@@ -20,8 +20,11 @@ import {
     fechaLocalHoy,
     formatearEstadoSalida,
     formatearFechaHora,
-    formatearFechaSalida,
 } from "../../services/guiaService";
+import {
+    formatearFechaUtcCorta,
+    formatearRangoFechasUtc,
+} from "../../services/formato";
 import { usePaquetes } from "../../services/paqueteService";
 import { usePersonal } from "../../services/personalService";
 import {
@@ -733,9 +736,9 @@ function SalidasPage() {
                         {fila.idbloqueo && (
                             <span
                                 className="inline-flex items-center whitespace-nowrap text-xs font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 max-md:hidden"
-                                title={`Bloqueo Serfor/Dircetur: ${fila.idbloqueo}`}
+                                title={`Bloqueo ante la autoridad: ${fila.idbloqueo}`}
                             >
-                                Bloq: {fila.idbloqueo}
+                                Bloqueo {fila.idbloqueo}
                             </span>
                         )}
                     </div>
@@ -800,15 +803,12 @@ function SalidasPage() {
 
                 return (
                     <div className="space-y-1 text-xs">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold text-texto whitespace-nowrap">
-                                {formatearFechaSalida(fila.fechaInicio)}
+                                {formatearRangoFechasUtc(fila.fechaInicio, fila.fechaFin)}
                             </span>
                             {badgeTiempo}
                         </div>
-                        <p className="text-texto-suave whitespace-nowrap">
-                            Hasta: {formatearFechaSalida(fila.fechaFin)}
-                        </p>
                         {fila.fechaHoraInicioReal ? (
                             <p className="text-texto-suave whitespace-nowrap">
                                 Inició: {formatearFechaHora(fila.fechaHoraInicioReal)}
@@ -866,7 +866,9 @@ function SalidasPage() {
                             {/* Al asignar recursos la venta se cierra y el stock queda en 0: no significa que se llenó */}
                             {fila.estado === "PUBLICADA" ? (
                                 <>
-                                    <span className="max-md:hidden">Disp: {fila.stockLocal}</span>
+                                    <span className="max-md:hidden">
+                                        {fila.stockLocal} {fila.stockLocal === 1 ? "libre" : "libres"}
+                                    </span>
                                     {confirmados === 0 && (
                                         <span className="text-amber-700 font-medium">Sin ventas</span>
                                     )}
@@ -890,6 +892,13 @@ function SalidasPage() {
                 const esperada = fila.etapaEsperada;
                 const desfasada = fila.etapaDesfasada;
                 const etapas = fila.paquete.circuito.etapas ?? [];
+                const totalEtapas = etapas.length;
+                const textoEsperada =
+                    esperada !== null
+                        ? totalEtapas > 0
+                            ? `Etapa ${esperada} de ${totalEtapas} esperada`
+                            : `Etapa ${esperada} esperada`
+                        : null;
                 const llegoA = etapas.find((e) => e.numeroOrden === informada);
                 const tramoHoy = etapas.find((e) => e.numeroOrden === esperada);
 
@@ -913,9 +922,9 @@ function SalidasPage() {
                                             <span>
                                                 {informada !== null ? `Etapa ${informada}` : "Sin informe"}
                                             </span>
-                                            {esperada !== null && (
+                                            {textoEsperada && (
                                                 <span className="font-normal text-amber-700">
-                                                    (Esp: {esperada})
+                                                    · {textoEsperada}
                                                 </span>
                                             )}
                                         </span>
@@ -927,9 +936,9 @@ function SalidasPage() {
                                     <div className="flex flex-col gap-0.5">
                                         <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 whitespace-nowrap">
                                             {informada !== null ? `Etapa ${informada}` : "Iniciada"}
-                                            {esperada !== null && (
+                                            {textoEsperada && (
                                                 <span className="ml-1 text-emerald-600">
-                                                    (Esp: {esperada})
+                                                    · {textoEsperada}
                                                 </span>
                                             )}
                                         </span>
@@ -1198,6 +1207,7 @@ function SalidasPage() {
                         {puedeAsignar && (
                             <button
                                 type="button"
+                                aria-label={`Asignar recursos a la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-marca text-white font-semibold text-xs shadow-sm hover:bg-marca-oscura transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
@@ -1211,6 +1221,7 @@ function SalidasPage() {
                             <div className="flex flex-col items-start gap-0.5">
                                 <button
                                     type="button"
+                                    aria-label={`Asignar recursos a la salida ${fila.nroSalida}`}
                                     disabled
                                     title="No se pueden asignar recursos ni emitir nómina sin pasajeros confirmados."
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 text-slate-400 font-semibold text-xs cursor-not-allowed border border-slate-200"
@@ -1226,6 +1237,7 @@ function SalidasPage() {
                         {puedeReemplazarPersonal && (
                             <button
                                 type="button"
+                                aria-label={`Reemplazar personal de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirReemplazo(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1237,6 +1249,7 @@ function SalidasPage() {
                         {puedeModificarLogistica && (
                             <button
                                 type="button"
+                                aria-label={`Modificar logística de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirModificarLogistica(fila)}
                                 className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1248,6 +1261,7 @@ function SalidasPage() {
                         {puedeLiberarSobrantes && (
                             <button
                                 type="button"
+                                aria-label={`Liberar lugares sobrantes de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() =>
                                     manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
@@ -1261,6 +1275,7 @@ function SalidasPage() {
                         {puedeCancelarSalida && (
                             <button
                                 type="button"
+                                aria-label={`Cancelar salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirCancelarSalida(fila)}
                                 className="text-rose-700 hover:text-rose-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1272,6 +1287,7 @@ function SalidasPage() {
                         {tieneBloqueoCanceladaPendiente && (
                             <button
                                 type="button"
+                                aria-label={`Reintentar liberar cupos de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() =>
                                     manejarReintentarLiberacionCupos(fila.idsalida, fila.nroSalida)
@@ -1288,6 +1304,7 @@ function SalidasPage() {
                         {tieneSolicitudes && (
                             <Link
                                 to="/gestion/solicitudes"
+                                aria-label={`Ver solicitudes de alojamiento de la salida ${fila.nroSalida}`}
                                 className="text-marca hover:underline"
                             >
                                 Ver solicitudes
@@ -1297,6 +1314,7 @@ function SalidasPage() {
                         {esFinalizada && (
                             <Link
                                 to="/gestion/evaluaciones"
+                                aria-label={`Evaluar salida ${fila.nroSalida}`}
                                 className="text-marca hover:underline"
                             >
                                 Evaluar
@@ -1306,6 +1324,7 @@ function SalidasPage() {
                         {puedeDevolverEquipamiento && (
                             <button
                                 type="button"
+                                aria-label={`Devolver equipamiento de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirDevolucionEquipamiento(fila)}
                                 className="text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1324,11 +1343,11 @@ function SalidasPage() {
             <header className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-texto-suave">
-                        Gestión de salidas
+                        Operaciones
                     </p>
-                    <h1 className="text-3xl font-bold text-navegacion">Consultar Salidas</h1>
+                    <h1 className="text-3xl font-bold text-navegacion">Salidas</h1>
                     <p className="mt-2 text-sm text-texto-suave">
-                        Visualizá y consultá las salidas programadas, su dotación de personal asignado y estado de avance.
+                        Seguí las salidas programadas, su personal asignado y el avance del recorrido.
                     </p>
                 </div>
                 {esAdmin ? (
@@ -1358,7 +1377,7 @@ function SalidasPage() {
                                 <>
                                     {" "}para el día{" "}
                                     <span className="font-semibold">
-                                        {formatearFechaSalida(mensajeExito.fechaInicio)}
+                                        {formatearFechaUtcCorta(mensajeExito.fechaInicio)}
                                     </span>
                                 </>
                             ) : null}
@@ -1873,7 +1892,7 @@ function SalidasPage() {
                                     {resultadoDevolucion.detalle.length === 1 ? "artículo" : "artículos"}
                                 </p>
                                 <p className="text-xs text-emerald-800 mt-0.5">
-                                    Trazabilidad asentada en auditoría #{resultadoDevolucion.auditoriaId} (RF-56)
+                                    Registrado en auditoría #{resultadoDevolucion.auditoriaId}
                                 </p>
                             </div>
 
@@ -1923,7 +1942,7 @@ function SalidasPage() {
                                 <span className="font-bold text-navegacion">
                                     {resultadoCancelacion.nroSalida}
                                 </span>{" "}
-                                pasó al estado <span className="font-bold text-rose-700">CANCELADA</span>.
+                                pasó al estado <span className="font-bold text-rose-700">Cancelada</span>.
                                 {resultadoCancelacion.reservasCanceladas !== undefined && (
                                     <>
                                         {" "}Se dieron de baja{" "}
@@ -1980,7 +1999,7 @@ function SalidasPage() {
             {advertenciaCancelacion503 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo={`Salida ${advertenciaCancelacion503.nroSalida} cancelada con cupos pendientes ante la autoridad (HTTP 503)`}
+                    titulo={`Salida ${advertenciaCancelacion503.nroSalida} cancelada con cupos pendientes ante la autoridad`}
                 >
                     <div className="space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2020,7 +2039,7 @@ function SalidasPage() {
             {salidasConAlertasOperativas.length > 0 ? (
                 <Alerta
                     tipo="advertencia"
-                    titulo="Advertencias operativas (RF-61)"
+                    titulo="Advertencias operativas"
                 >
                     <div className="space-y-2">
                         <p className="text-sm">

@@ -210,12 +210,17 @@ function ReservasGestionPage() {
                                 sinTituloEnCelular: true,
                                 renderizar: (r) => (
                                     <div className="flex flex-wrap gap-2">
-                                        <Boton className="px-3 py-1.5 text-xs" onClick={() => setIdDetalle(r.idreserva)}>
+                                        <Boton
+                                            className="px-3 py-1.5 text-xs"
+                                            aria-label={`Ver detalle de la reserva ${r.nroReserva}`}
+                                            onClick={() => setIdDetalle(r.idreserva)}
+                                        >
                                             Ver detalle
                                         </Boton>
                                         <Boton
                                             variante="secundario"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Descargar comprobante de la reserva ${r.nroReserva}`}
                                             onClick={() => descargarComprobante(r.idreserva)}
                                         >
                                             Comprobante

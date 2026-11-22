@@ -4,7 +4,7 @@ import Alerta from "./Alerta";
 import Boton from "./Boton";
 import { ErrorApi } from "../services/clienteApi";
 import { formatearMontoUsd } from "../services/clientePortalService";
-import { formatearFechaSalida } from "../services/guiaService";
+import { formatearFechaUtcCorta } from "../services/formato";
 import {
     useCancelarSalida,
     useImpactoCancelacion,
@@ -188,7 +188,7 @@ export function ModalCancelarSalida({
                         <p>
                             Fecha de inicio:{" "}
                             <span className="font-semibold text-texto">
-                                {formatearFechaSalida(salida.fechaInicio)}
+                                {formatearFechaUtcCorta(salida.fechaInicio)}
                             </span>
                         </p>
                     </div>

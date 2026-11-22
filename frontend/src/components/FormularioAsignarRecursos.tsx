@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
-import { formatearFechaSalida } from "../services/guiaService";
+import { formatearRangoFechasUtc } from "../services/formato";
 
 // ==========================================
 // Tipos del contrato CU-40 (Panel y Asignación)
@@ -283,9 +283,6 @@ export function FormularioAsignarRecursos({
                             Asignar recursos a la salida
                         </h2>
                     </div>
-                    <span className="inline-flex items-center rounded bg-marca-suave px-2.5 py-1 text-xs font-semibold text-navegacion">
-                        Perfil: ADMIN
-                    </span>
                 </div>
                 <p className="mt-1 text-sm text-texto-suave">
                     Definí la dotación definitiva de personal (guías y porteadores), seleccioná el
@@ -360,8 +357,7 @@ export function FormularioAsignarRecursos({
                             {salida.nroSalida}
                         </p>
                         <p className="text-xs text-texto-suave mt-0.5">
-                            {formatearFechaSalida(salida.fechaInicio)} al{" "}
-                            {formatearFechaSalida(salida.fechaFin)}
+                            {formatearRangoFechasUtc(salida.fechaInicio, salida.fechaFin)}
                         </p>
                     </div>
 

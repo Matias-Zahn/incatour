@@ -16,7 +16,11 @@ import {
     type DatosTemporada,
     type Temporada,
 } from "../../services/temporadaService";
-import { formatearFechaSalida } from "../../services/formato";
+import {
+    etiquetaEstadoRegistro,
+    formatearFechaSalida,
+    formatearFechaUtcCorta,
+} from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -283,24 +287,24 @@ function TemporadasPage() {
                                 clave: "fechaInicio",
                                 titulo: "Fecha de inicio",
                                 renderizar: (temporada) =>
-                                    formatearFechaSalida(temporada.fechaInicio),
+                                    formatearFechaUtcCorta(temporada.fechaInicio),
                             },
                             {
                                 clave: "fechaFin",
                                 titulo: "Fecha de fin",
                                 renderizar: (temporada) =>
-                                    formatearFechaSalida(temporada.fechaFin),
+                                    formatearFechaUtcCorta(temporada.fechaFin),
                             },
                             {
                                 clave: "estado",
                                 titulo: "Estado",
                                 renderizar: (temporada) => (
                                     <span
-                                        className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
                                             temporada.estado,
                                         )}`}
                                     >
-                                        {temporada.estado}
+                                        {etiquetaEstadoRegistro(temporada.estado)}
                                     </span>
                                 ),
                             },
@@ -312,6 +316,7 @@ function TemporadasPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar temporada ${temporada.nombre}`}
                                             disabled={
                                                 temporada.estado === "INACTIVO"
                                             }
@@ -322,8 +327,9 @@ function TemporadasPage() {
                                             Editar
                                         </Boton>
                                         <Boton
-                                            variante="peligro"
+                                            variante="peligroSuave"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Dar de baja temporada ${temporada.nombre}`}
                                             disabled={
                                                 temporada.estado === "INACTIVO"
                                             }

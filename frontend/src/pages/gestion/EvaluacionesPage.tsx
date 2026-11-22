@@ -16,7 +16,7 @@ import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
 import ListaPaginada from "../../components/ListaPaginada";
 import Alerta from "../../components/Alerta";
-import { formatearFechaLocalCorta, formatearFechaUtcCorta } from "../../services/formato";
+import { formatearFechaLocalCorta, formatearRangoFechasUtc } from "../../services/formato";
 
 
 const FILTROS_PUNTAJE: { label: string; min?: number; max?: number }[] = [
@@ -716,7 +716,7 @@ export function EvaluacionesPage() {
                         {s.paquete?.nombrePaquete ?? `Paquete #${s.idpaquete}`}
                       </div>
                       <div className="mt-1 text-xs text-texto-suave">
-                        {formatearFechaUtcCorta(s.fechaInicio)} al {formatearFechaUtcCorta(s.fechaFin)}
+                        {formatearRangoFechasUtc(s.fechaInicio, s.fechaFin)}
                       </div>
                     </button>
                   );

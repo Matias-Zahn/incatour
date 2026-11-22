@@ -23,6 +23,11 @@ import {
     type ResultadoCrearPersonal,
     type RolPersonal,
 } from "../../services/personalService";
+import {
+    etiquetaEstadoRegistro,
+    etiquetaHabilitacion,
+    formatearFechaSalida,
+} from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -357,7 +362,8 @@ function PersonalPage() {
                                     <div>
                                         <p className="font-medium text-texto">{persona.nroPasaporte}</p>
                                         <p className="text-xs text-texto-suave">
-                                            {persona.nacionalidad} · Vence {persona.fechaVencimientoPasaporte}
+                                            {persona.nacionalidad} · Vence{" "}
+                                            {formatearFechaSalida(persona.fechaVencimientoPasaporte)}
                                         </p>
                                     </div>
                                 ),
@@ -383,11 +389,11 @@ function PersonalPage() {
                                                         vigente ? "text-marca" : "text-peligro"
                                                     }`}
                                                 >
-                                                    {vigente ? "VIGENTE" : "VENCIDA"}
+                                                    {etiquetaHabilitacion(vigente ? "VIGENTE" : "VENCIDA")}
                                                 </span>
                                             </p>
                                             <p className="text-xs text-texto-suave">
-                                                Vence {persona.guia.fechaHabilitacion}
+                                                Vence {formatearFechaSalida(persona.guia.fechaHabilitacion)}
                                             </p>
                                         </div>
                                     );
@@ -399,13 +405,13 @@ function PersonalPage() {
                                 renderizar: (persona) => (
                                     <div className="flex flex-col items-start gap-1">
                                         <span
-                                            className={`inline-block lowercase first-letter:uppercase rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                                 persona.estado === "ACTIVO"
                                                     ? "bg-marca/10 text-marca"
                                                     : "bg-borde text-texto-suave"
                                             }`}
                                         >
-                                            {persona.estado}
+                                            {etiquetaEstadoRegistro(persona.estado)}
                                         </span>
                                         {persona.salidaEnCurso ? (
                                             <span className="text-xs font-semibold text-emerald-700">
@@ -423,6 +429,7 @@ function PersonalPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar a ${persona.nombreCompleto}`}
                                             onClick={() => abrirFormulario(persona)}
                                             disabled={persona.estado === "INACTIVO"}
                                             title={
@@ -434,8 +441,9 @@ function PersonalPage() {
                                             Editar
                                         </Boton>
                                         <Boton
-                                            variante="peligro"
+                                            variante="peligroSuave"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Dar de baja a ${persona.nombreCompleto}`}
                                             onClick={() => {
                                                 darDeBaja.reset();
                                                 setPersonalSeleccionado(persona);

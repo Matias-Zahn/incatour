@@ -19,6 +19,10 @@ import {
     type Servicio,
     type ServicioModificar,
 } from "../../services/servicioService";
+import {
+    etiquetaEstadoRegistro,
+    etiquetaTipoServicio,
+} from "../../services/formato";
 
 const ELEMENTOS_POR_PAGINA = 5;
 
@@ -232,8 +236,10 @@ function ServiciosPage() {
                         {proveedor?.razonSocial ?? "Servicios"}
                     </h1>
                     <p className="mt-2 text-sm text-texto-suave">
-                        Rubro: {tipoProveedor}
-                        {proveedor ? ` · Localidad: ${proveedor.localidad} · Estado: ${proveedor.estado}` : ""}
+                        Rubro: {etiquetaTipoServicio(tipoProveedor)}
+                        {proveedor
+                            ? ` · Localidad: ${proveedor.localidad} · Estado: ${etiquetaEstadoRegistro(proveedor.estado)}`
+                            : ""}
                     </p>
                 </div>
                 <Boton onClick={abrirAlta} disabled={proveedorInactivo}>
@@ -375,7 +381,21 @@ function ServiciosPage() {
                                 titulo: "Costo base",
                                 renderizar: (servicio) => `$${servicio.costoBase}`,
                             },
-                            { clave: "estado", titulo: "Estado" },
+                            {
+                                clave: "estado",
+                                titulo: "Estado",
+                                renderizar: (servicio) => (
+                                    <span
+                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            servicio.estado === "ACTIVO"
+                                                ? "bg-marca/10 text-marca"
+                                                : "bg-borde text-texto-suave"
+                                        }`}
+                                    >
+                                        {etiquetaEstadoRegistro(servicio.estado)}
+                                    </span>
+                                ),
+                            },
                             {
                                 clave: "id",
                                 titulo: "Acciones",
@@ -384,14 +404,16 @@ function ServiciosPage() {
                                         <Boton
                                             variante="fantasma"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Editar servicio ${servicio.nombreServicio}`}
                                             onClick={() => abrirEdicion(servicio)}
                                             disabled={servicio.estado === "INACTIVO"}
                                         >
                                             Editar
                                         </Boton>
                                         <Boton
-                                            variante="peligro"
+                                            variante="peligroSuave"
                                             className="px-3 py-1.5 text-xs"
+                                            aria-label={`Dar de baja servicio ${servicio.nombreServicio}`}
                                             onClick={() => {
                                                 darDeBaja.reset();
                                                 setSeleccionado(servicio);
