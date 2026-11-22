@@ -67,7 +67,7 @@ import { PaqueteController } from "./paquete.controller";
  *                   type: object
  *               localidadGarantizada:
  *                 type: string
- *                 description: "Sale desde" (B2), obligatoria en los dos tipos de garantía
+ *                 description: 'Sale desde (B2), obligatoria en los dos tipos de garantía'
  *               diasCierreVenta:
  *                 type: integer
  *                 description: La venta termina estos días antes del inicio (0 a 30, por defecto 2)
