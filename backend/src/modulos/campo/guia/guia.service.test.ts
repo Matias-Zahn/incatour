@@ -267,7 +267,7 @@ describe("GuiaService.registrarIncidente (CU-50)", () => {
     vi.clearAllMocks();
     repo.idPersonalDelUsuario.mockResolvedValue(7);
     repo.detalleSalida.mockResolvedValue(conPasajeros());
-    repo.registrarIncidente.mockImplementation(async (p) => p);
+    repo.registrarIncidente.mockImplementation(async (p) => ({ incidente: p, nuevo: true }));
     notificador.enviarEmailIncidenteCritico.mockResolvedValue(true);
   });
 
@@ -290,20 +290,10 @@ describe("GuiaService.registrarIncidente (CU-50)", () => {
       "Esguince severo"
     );
 
-    // Si el mismo incidente ya figuraba en la salida (reenvío por falta de señal), no duplica el mail
+    // Si la clave del dispositivo ya estaba guardada (reenvío por falta de señal), no duplica el mail
     notificador.enviarEmailIncidenteCritico.mockClear();
-    repo.detalleSalida.mockResolvedValue({
-      ...conPasajeros(),
-      incidentes: [
-        {
-          tipoIncidente: "SALUD",
-          descripcion: "Esguince severo",
-          nivelGravedad: "CRITICO",
-          fechaHoraOcurrencia: new Date("2026-01-11T10:00:00Z"),
-        },
-      ],
-    });
-    await new GuiaService().registrarIncidente(1, 2, incidente({ nivelGravedad: "CRITICO", descripcion: "Esguince severo" }));
+    repo.registrarIncidente.mockImplementation(async (p) => ({ incidente: p, nuevo: false }));
+    await new GuiaService().registrarIncidente(1, 2, incidente({ nivelGravedad: "CRITICO", descripcion: "Esguince severo", claveCliente: "off_123_abcde" }));
     expect(notificador.enviarEmailIncidenteCritico).not.toHaveBeenCalled();
   });
 

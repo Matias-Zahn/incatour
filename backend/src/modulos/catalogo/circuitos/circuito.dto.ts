@@ -8,6 +8,13 @@ const DIFICULTADES_VALIDAS: Record<string, string> = {
   ALTA: "Alta",
 };
 
+// Alerta SIN_AVANCES: cuántas horas puede pasar el grupo desde el inicio sin informar la primera etapa
+const HORAS_PRIMER_AVANCE_MAX = 72;
+const errorHorasPrimerAvance = (v: unknown) =>
+  v !== undefined && (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > HORAS_PRIMER_AVANCE_MAX)
+    ? `horasPrimerAvance debe ser un número entero entre 1 y ${HORAS_PRIMER_AVANCE_MAX}`
+    : undefined;
+
 export class CrearCircuitoDto {
   private constructor(
     public nombreCircuito: string,
@@ -15,12 +22,13 @@ export class CrearCircuitoDto {
     public dificultad: string,
     public minimoGuias: number,
     public parametrosPorteadores?: string,
+    public horasPrimerAvance?: number,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearCircuitoDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
 
-    const { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
+    const { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores, horasPrimerAvance } = obj;
 
     if (!nombreCircuito) return ["nombreCircuito es requerido"];
     if (typeof nombreCircuito !== "string") return ["nombreCircuito debe ser un texto"];
@@ -45,8 +53,10 @@ export class CrearCircuitoDto {
     if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") {
       return ["parametrosPorteadores debe ser un texto (ej. '1 por cada 2 pasajeros')"];
     }
+    const errorHoras = errorHorasPrimerAvance(horasPrimerAvance);
+    if (errorHoras) return [errorHoras];
 
-    return [undefined, new CrearCircuitoDto(nombreCircuito, duracionDias, dificultadNormalizada, minimoGuias, parametrosPorteadores)];
+    return [undefined, new CrearCircuitoDto(nombreCircuito, duracionDias, dificultadNormalizada, minimoGuias, parametrosPorteadores, horasPrimerAvance)];
   }
 }
 
@@ -57,15 +67,16 @@ export class ModificarCircuitoDto {
     public dificultad?: string,
     public minimoGuias?: number,
     public parametrosPorteadores?: string,
+    public horasPrimerAvance?: number,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarCircuitoDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido"];
 
-    let { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores } = obj;
+    let { nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores, horasPrimerAvance } = obj;
 
     // Al menos un campo debe venir
-    if (!nombreCircuito && duracionDias === undefined && !dificultad && minimoGuias === undefined && parametrosPorteadores === undefined) {
+    if (!nombreCircuito && duracionDias === undefined && !dificultad && minimoGuias === undefined && parametrosPorteadores === undefined && horasPrimerAvance === undefined) {
       return ["Debe enviar al menos un campo para modificar"];
     }
 
@@ -96,8 +107,10 @@ export class ModificarCircuitoDto {
     if (parametrosPorteadores != null && typeof parametrosPorteadores !== "string") {
       return ["parametrosPorteadores debe ser un texto (ej. '1 por cada 2 pasajeros')"];
     }
+    const errorHoras = errorHorasPrimerAvance(horasPrimerAvance);
+    if (errorHoras) return [errorHoras];
 
-    return [undefined, new ModificarCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores)];
+    return [undefined, new ModificarCircuitoDto(nombreCircuito, duracionDias, dificultad, minimoGuias, parametrosPorteadores, horasPrimerAvance)];
   }
 }
 

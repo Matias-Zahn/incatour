@@ -63,6 +63,7 @@ export class CircuitoRepository {
         dificultad: data.dificultad,
         minimoGuias: data.minimoGuias,
         parametrosPorteadores: data.parametrosPorteadores ?? null,
+        ...(data.horasPrimerAvance !== undefined && { horasPrimerAvance: data.horasPrimerAvance }),
         estado: "ACTIVO",
       },
       include: { etapas: true },
@@ -78,6 +79,7 @@ export class CircuitoRepository {
         ...(data.dificultad !== undefined && { dificultad: data.dificultad }),
         ...(data.minimoGuias !== undefined && { minimoGuias: data.minimoGuias }),
         ...(data.parametrosPorteadores !== undefined && { parametrosPorteadores: data.parametrosPorteadores }),
+        ...(data.horasPrimerAvance !== undefined && { horasPrimerAvance: data.horasPrimerAvance }),
       },
       include: { etapas: true },
     });

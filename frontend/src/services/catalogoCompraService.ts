@@ -24,6 +24,8 @@ export type SalidaDisponibleCatalogo = {
     fechaInicio: string;
     fechaFin: string;
     stockLocal: number;
+    /** 12.2: el grupo va entero a un hotel; es lo más que entra en una reserva */
+    maximoPorReserva?: number;
     tamanoMaximo: number;
     // null cuando ninguna temporada activa cubre la fecha de la salida
     precioPersona: number | null;

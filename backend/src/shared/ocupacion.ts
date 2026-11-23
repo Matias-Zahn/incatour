@@ -53,6 +53,16 @@ export const unaPorServicio = <T extends { idservicio: number }>(ocupaciones: T[
   ...new Map(ocupaciones.map((o) => [o.idservicio, o])).values(),
 ];
 
+/**
+ * 12.2: el grupo de una reserva va entero a un hotel, así que lo más que se puede comprar de una vez es el hotel con
+ * más plazas libres. Sin hoteles, o con uno a solicitud (sin tope), lo que queda en la salida.
+ * ponytail: el grupo no se reparte entre hoteles; si los clientes lo piden seguido, tabla ReservaAlojamiento
+ */
+export const maximoPorReserva = (stockLocal: number, hoteles: { plazasLibres: number | null }[]) =>
+  !hoteles.length || hoteles.some((h) => h.plazasLibres === null)
+    ? stockLocal
+    : Math.min(stockLocal, Math.max(...hoteles.map((h) => h.plazasLibres!)));
+
 /** Total del servicio: plazas del hotel, unidades del equipo o 1 vehículo. */
 export const totalDe = (s: {
   alojamiento?: { plazasTotales: number | null } | null;

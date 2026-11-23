@@ -1,6 +1,6 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { TIPO_SERVICIO, tipoDeServicio } from "../../../shared/constantes";
-import { claveDia, sumarDias } from "../../../shared/ocupacion";
+import { claveDia, maximoPorReserva, sumarDias, unaPorServicio } from "../../../shared/ocupacion";
 import { datosVenta } from "../../../shared/ventaAbierta";
 import { armarDefinicionPaquete, DefinicionPaquete, definicionEfectiva, tarifaDeSalida, textoGarantia } from "../../../shared/definicionPaquete";
 import { CatalogoRepository, FiltrosCatalogo } from "./catalogo.repository";
@@ -72,6 +72,7 @@ export class CatalogoService {
             fechaFin: s.fechaFin instanceof Date ? s.fechaFin.toISOString() : new Date(s.fechaFin).toISOString(),
             stockLocal: s.stockLocal,
             cupoDisponible: s.stockLocal,
+            maximoPorReserva: maximoPorReserva(s.stockLocal, unaPorServicio(s.ocupaciones ?? [])),
             tamanoMaximo: s.tamanoMaximo,
             precioPersona: tarifaSalida ? tarifaSalida.monto : null,
             moneda: tarifaSalida ? tarifaSalida.moneda : null,

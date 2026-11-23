@@ -282,6 +282,7 @@ model Circuito {
   dificultad            String
   minimoGuias           Int
   parametrosPorteadores String?
+  horasPrimerAvance     Int         @default(12) // alerta SIN_AVANCES: horas desde el inicio sin el primer avance
   estado                String      @default("ACTIVO")
   etapas                EtapaRuta[]
   paquetes              Paquete[]
@@ -388,9 +389,11 @@ model Incidente {
   nivelGravedad       String
   fechaHoraOcurrencia DateTime
   fechaHoraReporte    DateTime            @default(now())
+  claveCliente        String? // la genera el dispositivo del guía: un reenvío con la misma clave no duplica
   salida              Salida              @relation(fields: [idsalida], references: [idsalida])
   pasajeros           IncidentePasajero[]
 
+  @@unique([idsalida, claveCliente])
   @@schema("public")
 }
 

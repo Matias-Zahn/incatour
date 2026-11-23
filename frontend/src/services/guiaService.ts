@@ -276,6 +276,8 @@ export type RegistrarIncidentePayload = {
     nivelGravedad: NivelGravedad;
     fechaHoraOcurrencia: string;
     pasajerosAfectados?: number[];
+    /** La genera el dispositivo una vez: si se reenvía (sin señal), el back no lo duplica */
+    claveCliente?: string;
 };
 
 export type PasajeroAfectable = {
@@ -616,6 +618,11 @@ export function obtenerIncidentesOffline(idsalida: number): IncidenteOffline[] {
     } catch {
         return [];
     }
+}
+
+/** Una por incidente: viaja en el envío directo y en la cola sin señal, así un reenvío no lo duplica */
+export function nuevaClaveIncidente(): string {
+    return `inc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function guardarIncidenteOffline(idsalida: number, payload: RegistrarIncidentePayload): IncidenteOffline {

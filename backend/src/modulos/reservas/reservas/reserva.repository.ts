@@ -1,7 +1,7 @@
 import { db } from "../../../config/postgresDatabase";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_SALIDA, TIPO_SERVICIO } from "../../../shared/constantes";
-import { unaPorServicio } from "../../../shared/ocupacion";
+import { maximoPorReserva, unaPorServicio } from "../../../shared/ocupacion";
 import { devolverPlazas, recalcularEquipo } from "../../../shared/ocupacion.repository";
 import { PasajeroInput } from "./reserva.dto";
 
@@ -105,9 +105,12 @@ export class ReservaRepository {
       }
       const aSolicitud = hoteles.find((h) => !h.porStock);
       if (aSolicitud) return { hotel: aSolicitud };
-      // ponytail: un grupo no se parte entre hoteles; se parte si pasa seguido (bloque 12.2)
+      // El grupo no se parte entre hoteles (maximoPorReserva): se avisa cuántos entran juntos
       const { stockLocal } = (await tx.salida.findUnique({ where: { idsalida }, select: { stockLocal: true } }))!;
-      throw CustomError.badRequest(`Quedan ${stockLocal + cantidad} lugares, pero no en un mismo hotel.`);
+      const maximo = maximoPorReserva(stockLocal + cantidad, unaPorServicio(ocupaciones));
+      throw CustomError.badRequest(
+        `Quedan ${stockLocal + cantidad} lugares, pero no en un mismo hotel: en una reserva entran hasta ${maximo} pasajeros. Para más, hacé reservas separadas.`
+      );
     });
   }
 

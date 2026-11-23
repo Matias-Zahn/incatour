@@ -41,7 +41,10 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
     repo.contarSalidasActivas.mockResolvedValue(1);
     repo.contarGarantiasDePaquetesActivos.mockResolvedValue(0);
     repo.maxPasajerosConfirmadosEnSalidasActivas.mockResolvedValue(30);
-    repo.updateEnSitio.mockImplementation(async () => repo.findById.mock.results[0]!.value);
+    repo.updateEnSitio.mockImplementation(async (_id: number, _t: string, _b: object, _e: object, controlarTotal?: (o: unknown) => void) => {
+      controlarTotal?.(await repo.ocupacionesDesdeHoy());
+      return repo.findById.mock.results[0]!.value;
+    });
     repo.ocupacionesDesdeHoy.mockResolvedValue([]);
   });
 
@@ -50,7 +53,7 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
 
     const r = await new ServicioService().modificarServicio(5, dto({ capacidadVehiculo: 50 }));
 
-    expect(repo.updateEnSitio).toHaveBeenCalledWith(5, "TRANSPORTE", {}, { capacidadVehiculo: 50 });
+    expect(repo.updateEnSitio).toHaveBeenCalledWith(5, "TRANSPORTE", {}, { capacidadVehiculo: 50 }, undefined);
     expect(r).not.toHaveProperty("versionado");
   });
 
@@ -88,7 +91,7 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
 
     await new ServicioService().modificarServicio(6, dto({ nombreServicio: "Hotel Sol", capacidadDisponible: 25 }));
 
-    expect(repo.updateEnSitio).toHaveBeenCalledWith(6, "ALOJAMIENTO", { nombreServicio: "Hotel Sol" }, { capacidadDisponible: 25 });
+    expect(repo.updateEnSitio).toHaveBeenCalledWith(6, "ALOJAMIENTO", { nombreServicio: "Hotel Sol" }, { capacidadDisponible: 25 }, expect.any(Function));
   });
 
   it("A1: rechaza bajar el total del equipo por debajo del día más comprometido y avisa la fecha", async () => {
@@ -106,7 +109,7 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
       `Hay 28 unidades comprometidas el ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`
     );
     await new ServicioService().modificarServicio(7, dto({ inventarioTotal: 28 }));
-    expect(repo.updateEnSitio).toHaveBeenCalledWith(7, "EQUIPAMIENTO", {}, { inventarioTotal: 28 });
+    expect(repo.updateEnSitio).toHaveBeenCalledWith(7, "EQUIPAMIENTO", {}, { inventarioTotal: 28 }, expect.any(Function));
   });
 
   it("bloque 8: un hotel a solicitud sin plazas no puede pasar a bloqueo sin indicarlas", async () => {

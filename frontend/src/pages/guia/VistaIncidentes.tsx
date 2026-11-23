@@ -20,6 +20,7 @@ import {
     nivelesGravedad,
     obtenerHistorialLocalIncidentes,
     admiteRegistros,
+    nuevaClaveIncidente,
     tiposIncidente,
     usePasajerosSalida,
     useRegistrarIncidente,
@@ -173,6 +174,8 @@ export function VistaIncidentes({
             fechaHoraOcurrencia: fechaHoraIso,
             pasajerosAfectados:
                 pasajerosSeleccionados.length > 0 ? pasajerosSeleccionados : undefined,
+            // La misma clave va en el envío directo y en la cola sin señal: si la respuesta se pierde, no se duplica
+            claveCliente: nuevaClaveIncidente(),
         };
 
         function registrarEnHistorial(id: string) {

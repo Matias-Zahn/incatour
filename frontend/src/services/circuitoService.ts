@@ -34,6 +34,11 @@ export const esquemaCircuito = z.object({
         .int("El mínimo de guías debe ser un número entero.")
         .min(1, "El mínimo de guías debe ser de al menos 1.")
         .max(10, "El mínimo de guías no puede superar 10."),
+    horasPrimerAvance: z
+        .number({ message: "Ingresá una cantidad de horas válida." })
+        .int("Las horas deben ser un número entero.")
+        .min(1, "Tiene que ser al menos 1 hora.")
+        .max(72, "No puede superar las 72 horas."),
     parametrosPorteadores: z
         .string()
         .trim()
@@ -65,6 +70,7 @@ export type Circuito = {
     duracionDias: number;
     dificultad: string;
     minimoGuias: number;
+    horasPrimerAvance: number;
     parametrosPorteadores?: string | null;
     estado: "ACTIVO" | "INACTIVO";
     etapas?: EtapaCircuito[];

@@ -965,7 +965,8 @@ export async function salidas(ctx: Ctx) {
     ok("12.2 el primer grupo va al primer hotel y el segundo, que ya no entra, al segundo",
       (await hotelDe(c1.idreserva)) === hA.idservicio && (await hotelDe(c2.idreserva)) === hB.idservicio && c2.data?.hotel?.idservicio === hB.idservicio && c2.data?.estadoAlojamiento === "CONFIRMADO", JSON.stringify(c2.data));
     const rechazo = await ctx.back.llamar("POST", "/reservas", f.compra(idsalida, { n: 2 }), cli.token);
-    ok("12.2 quedan 2 lugares, uno en cada hotel: el grupo de 2 → 400", rechazo.status === 400 && rechazo.body?.error === "Quedan 2 lugares, pero no en un mismo hotel.", `${rechazo.status} ${resumenDe(rechazo)}`);
+    ok("12.2 quedan 2 lugares, uno en cada hotel: el grupo de 2 → 400", rechazo.status === 400 && /^Quedan 2 lugares, pero no en un mismo hotel: en una reserva entran hasta 1 pasajeros./.test(rechazo.body?.error ?? ""), `${rechazo.status} ${resumenDe(rechazo)}`);
+    ok("12.2 el catálogo avisa que en una reserva entra 1 (2 libres, 1 por hotel)", (await enCatalogo(pq.idpaquete, idsalida))?.maximoPorReserva === 1, JSON.stringify(await enCatalogo(pq.idpaquete, idsalida)));
     ok("12.2 el rechazo no tocó nada", (await salidaDb(idsalida)).stockLocal === 2 && (await libresDe(idsalida, hA.idservicio)) === 1 && (await libresDe(idsalida, hB.idservicio)) === 1 && (await db.reserva.count({ where: { idsalida } })) === 2);
     const c3 = await f.comprar(cli.token, idsalida, { n: 1 });
     ok("12.2 uno solo entra en el primer hotel", (await hotelDe(c3.idreserva)) === hA.idservicio && (await libresDe(idsalida, hA.idservicio)) === 0);

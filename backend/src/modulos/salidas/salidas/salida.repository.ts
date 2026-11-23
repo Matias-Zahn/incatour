@@ -56,7 +56,7 @@ export class SalidaRepository {
             nombrePaquete: true,
             circuito: {
               select: {
-                idcircuito: true, nombreCircuito: true, duracionDias: true, _count: { select: { etapas: true } },
+                idcircuito: true, nombreCircuito: true, duracionDias: true, horasPrimerAvance: true, _count: { select: { etapas: true } },
                 // Para mostrar dónde está el grupo, no solo el número de etapa
                 etapas: { select: { numeroOrden: true, puntoInicio: true, puntoFin: true }, orderBy: { numeroOrden: "asc" } },
               },

@@ -336,8 +336,6 @@ export function revisarRecursos(s: SalidaRevisable, equipo: DatosEquipo, vendido
 
 // RF-61: una salida está "próxima" si empieza dentro de estos días (supuesto del grupo, ver ERS)
 export const DIAS_ALERTA = 7;
-// ponytail: umbral único para todos los circuitos; si cada uno necesita otro, pasarlo a la etapa 1
-export const HORAS_ALERTA_PRIMER_AVANCE = 12;
 const HORA_MS = 60 * 60 * 1000;
 
 /**
@@ -346,7 +344,7 @@ const HORA_MS = 60 * 60 * 1000;
  * - etapaEsperada (solo EN_CURSO): reparto proporcional de las etapas en los días del circuito,
  *   porque el itinerario no guarda en qué día cae cada etapa (supuesto del grupo).
  * - alertas: con la salida a DIAS_ALERTA días o menos de empezar, solicitudes pendientes o permisos sin emitir;
- *   además, la que llegó a su fecha y el guía no inició, la iniciada sin avances después de HORAS_ALERTA_PRIMER_AVANCE
+ *   además, la que llegó a su fecha y el guía no inició, la iniciada sin avances después de las horasPrimerAvance de su circuito
  *   y la que sigue en curso pasado el día siguiente a su fin.
  */
 export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo = { totales: new Map(), filas: [] }) {
@@ -378,7 +376,7 @@ export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo
   if (porEmpezar && salida.fechaInicio <= hoy) alertas.push("SIN_INICIAR");
   if (salida.estado === ESTADO_SALIDA.EN_CURSO) {
     const horasDesdeInicio = salida.fechaHoraInicioReal ? (ahora.getTime() - salida.fechaHoraInicioReal.getTime()) / HORA_MS : 0;
-    if (!primerAvance && horasDesdeInicio > HORAS_ALERTA_PRIMER_AVANCE) alertas.push("SIN_AVANCES");
+    if (!primerAvance && horasDesdeInicio > salida.paquete.circuito.horasPrimerAvance) alertas.push("SIN_AVANCES");
     if (hoy.getTime() > salida.fechaFin.getTime() + DIA_MS) alertas.push("SIN_FINALIZAR");
   }
 

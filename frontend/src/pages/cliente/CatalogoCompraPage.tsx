@@ -338,7 +338,10 @@ function CatalogoCompraPage() {
     const paqueteVendido =
         paqueteEnCompra && salidaActiva ? paqueteDeSalida(paqueteEnCompra, salidaActiva) : paqueteEnCompra;
 
-    const cupoMaximo = salidaActiva?.stockLocal ?? 10;
+    const cupoMaximo = salidaActiva
+        ? Math.min(salidaActiva.stockLocal, salidaActiva.maximoPorReserva ?? salidaActiva.stockLocal)
+        : 10;
+    const topePorHotel = salidaActiva != null && cupoMaximo < salidaActiva.stockLocal;
     const {
         register,
         handleSubmit,
@@ -1077,6 +1080,13 @@ function CatalogoCompraPage() {
                                     </Boton>
                                 </div>
                             </div>
+
+                            {topePorHotel && pasajeros.length >= cupoMaximo ? (
+                                <p className="text-xs text-texto-suave">
+                                    En esta salida entran hasta {cupoMaximo} pasajeros por reserva, porque el grupo se aloja
+                                    junto en un mismo hotel. Para más, hacé otra reserva.
+                                </p>
+                            ) : null}
 
                             {errorNomina ? (
                                 <p role="alert" className="text-xs text-peligro">

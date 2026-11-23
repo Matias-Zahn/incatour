@@ -1,7 +1,7 @@
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO, ESTADO_RESERVA, ESTADO_SOLICITUD, SALIDAS_ACTIVAS, TipoServicio } from "../../../shared/constantes";
 import { hoyUTC } from "../../../shared/fechas";
-import { ocupacionesDe } from "../../../shared/ocupacion.repository";
+import { bloquearServicio, ocupacionesDe } from "../../../shared/ocupacion.repository";
 import { aColumnas, CrearServicioDto } from "./servicio.dto";
 
 const INCLUDE_COMPLETO = {
@@ -79,14 +79,27 @@ export class ServicioRepository {
   }
 
   // CU-20: modificación en el mismo registro
-  async updateEnSitio(id: number, tipo: TipoServicio, base: BaseServicio, especifico: Dato) {
-    return db.servicioBase.update({
-      where: { idservicio: id },
-      data: {
-        ...base,
-        ...(Object.keys(especifico).length > 0 && subtipoActualizar(tipo, aColumnas(especifico))),
-      },
-      include: INCLUDE_COMPLETO,
+  // controlarTotal corre con el ServicioBase bloqueado, sobre las ocupaciones de hoy en adelante (A1)
+  async updateEnSitio(
+    id: number,
+    tipo: TipoServicio,
+    base: BaseServicio,
+    especifico: Dato,
+    controlarTotal?: (ocupaciones: Awaited<ReturnType<typeof ocupacionesDe>>) => void
+  ) {
+    return db.$transaction(async (tx) => {
+      if (controlarTotal) {
+        await bloquearServicio(tx, id);
+        controlarTotal(await ocupacionesDe(tx, [id], hoyUTC(), SIN_FIN));
+      }
+      return tx.servicioBase.update({
+        where: { idservicio: id },
+        data: {
+          ...base,
+          ...(Object.keys(especifico).length > 0 && subtipoActualizar(tipo, aColumnas(especifico))),
+        },
+        include: INCLUDE_COMPLETO,
+      });
     });
   }
 
