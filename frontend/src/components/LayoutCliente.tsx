@@ -71,9 +71,12 @@ function LayoutCliente({ children }: LayoutClienteProps) {
     const ubicacion = useLocation();
     const [searchParams] = useSearchParams();
     const [modalSalirAbierto, setModalSalirAbierto] = useState(false);
-    const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
-    const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+    const [rutaCuentaAbierta, setRutaCuentaAbierta] = useState<string | null>(null);
+    const [rutaMovilAbierta, setRutaMovilAbierta] = useState<string | null>(null);
     const headerRef = useRef<HTMLElement>(null);
+
+    const menuCuentaAbierto = rutaCuentaAbierta === ubicacion.pathname;
+    const menuMovilAbierto = rutaMovilAbierta === ubicacion.pathname;
 
     const esVistaPreviaAdmin = searchParams.get("vista") === "admin";
     const tieneToken = Boolean(obtenerToken());
@@ -87,20 +90,15 @@ function LayoutCliente({ children }: LayoutClienteProps) {
     const rutaCatalogo = esVistaPreviaAdmin ? "/catalogo?vista=admin" : "/catalogo";
 
     useEffect(() => {
-        setMenuCuentaAbierto(false);
-        setMenuMovilAbierto(false);
-    }, [ubicacion.pathname]);
-
-    useEffect(() => {
         function manejarClickAfuera(evento: MouseEvent) {
             if (headerRef.current && !headerRef.current.contains(evento.target as Node)) {
-                setMenuCuentaAbierto(false);
+                setRutaCuentaAbierta(null);
             }
         }
         function manejarTecla(evento: KeyboardEvent) {
             if (evento.key === "Escape") {
-                setMenuCuentaAbierto(false);
-                setMenuMovilAbierto(false);
+                setRutaCuentaAbierta(null);
+                setRutaMovilAbierta(null);
             }
         }
         document.addEventListener("mousedown", manejarClickAfuera);
@@ -215,7 +213,13 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                     aria-expanded={menuCuentaAbierto}
                                     aria-haspopup="menu"
                                     aria-label="Menú de cuenta"
-                                    onClick={() => setMenuCuentaAbierto((prev) => !prev)}
+                                    onClick={() =>
+                                        setRutaCuentaAbierta((prev) =>
+                                            prev === ubicacion.pathname
+                                                ? null
+                                                : ubicacion.pathname,
+                                        )
+                                    }
                                     className={`flex cursor-pointer items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-sm transition ${
                                         menuCuentaAbierto
                                             ? "border-marca/50 bg-marca-suave/60 shadow-2xs"
@@ -269,7 +273,7 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                                 type="button"
                                                 role="menuitem"
                                                 onClick={() => {
-                                                    setMenuCuentaAbierto(false);
+                                                    setRutaCuentaAbierta(null);
                                                     setModalSalirAbierto(true);
                                                 }}
                                                 className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-peligro transition hover:bg-rose-50"
@@ -303,7 +307,13 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                             type="button"
                             aria-expanded={menuMovilAbierto}
                             aria-label={menuMovilAbierto ? "Cerrar menú" : "Abrir menú"}
-                            onClick={() => setMenuMovilAbierto((prev) => !prev)}
+                            onClick={() =>
+                                setRutaMovilAbierta((prev) =>
+                                    prev === ubicacion.pathname
+                                        ? null
+                                        : ubicacion.pathname,
+                                )
+                            }
                             className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-borde/90 bg-white text-navegacion transition hover:bg-fondo md:hidden"
                         >
                             {menuMovilAbierto ? <IconoCerrar /> : <IconoMenu />}

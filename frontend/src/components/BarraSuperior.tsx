@@ -303,9 +303,30 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
     const navegar = useNavigate();
     const ubicacion = useLocation();
 
-    const [menuAbierto, setMenuAbierto] = useState<string | null>(null);
-    const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+    const [menuEstado, setMenuEstado] = useState<{ id: string; ruta: string } | null>(null);
+    const [rutaMovilAbierta, setRutaMovilAbierta] = useState<string | null>(null);
     const [modalSalirAbierto, setModalSalirAbierto] = useState(false);
+
+    const menuAbierto = menuEstado?.ruta === ubicacion.pathname ? menuEstado.id : null;
+    const menuMovilAbierto = rutaMovilAbierta === ubicacion.pathname;
+
+    function abrirOCerrarMenu(id: string | null) {
+        setMenuEstado(id ? { id, ruta: ubicacion.pathname } : null);
+    }
+
+    function alternarMenu(id: string) {
+        setMenuEstado((prev) =>
+            prev && prev.ruta === ubicacion.pathname && prev.id === id
+                ? null
+                : { id, ruta: ubicacion.pathname },
+        );
+    }
+
+    function alternarMenuMovil() {
+        setRutaMovilAbierta((prev) =>
+            prev === ubicacion.pathname ? null : ubicacion.pathname,
+        );
+    }
 
     const contenedorNavRef = useRef<HTMLDivElement>(null);
 
@@ -319,23 +340,18 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
     const totalAvisos = Object.values(avisos).reduce((acc, n) => acc + n, 0);
 
     useEffect(() => {
-        setMenuAbierto(null);
-        setMenuMovilAbierto(false);
-    }, [ubicacion.pathname]);
-
-    useEffect(() => {
         function manejarClickAfuera(evento: MouseEvent) {
             if (
                 contenedorNavRef.current &&
                 !contenedorNavRef.current.contains(evento.target as Node)
             ) {
-                setMenuAbierto(null);
+                setMenuEstado(null);
             }
         }
         function manejarTecla(evento: KeyboardEvent) {
             if (evento.key === "Escape") {
-                setMenuAbierto(null);
-                setMenuMovilAbierto(false);
+                setMenuEstado(null);
+                setRutaMovilAbierta(null);
             }
         }
         document.addEventListener("mousedown", manejarClickAfuera);
@@ -409,7 +425,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                         to="/"
                         end
                         onMouseEnter={() => {
-                            if (hayGrupoDesplegado) setMenuAbierto(null);
+                            if (hayGrupoDesplegado) abrirOCerrarMenu(null);
                         }}
                         className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13.5px] tracking-[-0.01em] transition-all ${
                             inicioActivo
@@ -433,7 +449,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                                 onMouseEnter={() => {
                                     // Si ya había un menú abierto, pasar el cursor cambia suavemente de grupo
                                     if (hayGrupoDesplegado && menuAbierto !== grupo.id) {
-                                        setMenuAbierto(grupo.id);
+                                        abrirOCerrarMenu(grupo.id);
                                     }
                                 }}
                             >
@@ -441,11 +457,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                                     type="button"
                                     aria-expanded={abierto}
                                     aria-haspopup="menu"
-                                    onClick={() =>
-                                        setMenuAbierto((prev) =>
-                                            prev === grupo.id ? null : grupo.id,
-                                        )
-                                    }
+                                    onClick={() => alternarMenu(grupo.id)}
                                     className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13.5px] tracking-[-0.01em] transition-all ${
                                         activo || abierto
                                             ? "bg-white font-semibold text-navegacion shadow-[0_1px_3px_rgba(18,61,112,0.10)] ring-1 ring-navegacion/[0.06]"
@@ -540,11 +552,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                             aria-expanded={menuAbierto === "cuenta"}
                             aria-haspopup="menu"
                             aria-label="Menú de cuenta"
-                            onClick={() =>
-                                setMenuAbierto((prev) =>
-                                    prev === "cuenta" ? null : "cuenta",
-                                )
-                            }
+                            onClick={() => alternarMenu("cuenta")}
                             className={`flex cursor-pointer items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-sm transition ${
                                 menuAbierto === "cuenta"
                                     ? "border-marca/50 bg-marca-suave/60 shadow-2xs"
@@ -599,7 +607,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                                         type="button"
                                         role="menuitem"
                                         onClick={() => {
-                                            setMenuAbierto(null);
+                                            abrirOCerrarMenu(null);
                                             setModalSalirAbierto(true);
                                         }}
                                         className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-peligro transition hover:bg-rose-50"
@@ -617,7 +625,7 @@ function BarraSuperior({ seccion }: BarraSuperiorProps) {
                         type="button"
                         aria-expanded={menuMovilAbierto}
                         aria-label={menuMovilAbierto ? "Cerrar menú" : "Abrir menú"}
-                        onClick={() => setMenuMovilAbierto((prev) => !prev)}
+                        onClick={alternarMenuMovil}
                         className="relative inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-borde/90 bg-white text-navegacion transition hover:bg-fondo lg:hidden"
                     >
                         {menuMovilAbierto ? <IconoCerrar /> : <IconoMenu />}

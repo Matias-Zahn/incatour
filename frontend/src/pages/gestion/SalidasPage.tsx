@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
@@ -7,7 +7,12 @@ import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
-import Tabla from "../../components/Tabla";
+import MenuAccionesSalida, {
+    type AccionMenuSalida,
+} from "../../components/MenuAccionesSalida";
+import ModalDetalleSalida, {
+    type AlertaSalidaVisual,
+} from "../../components/ModalDetalleSalida";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
@@ -20,7 +25,6 @@ import {
     estilosEstadoSalida,
     fechaLocalHoy,
     formatearEstadoSalida,
-    formatearFechaHora,
 } from "../../services/guiaService";
 import {
     formatearFechaUtcCorta,
@@ -59,7 +63,7 @@ import { formatearMontoUsd } from "../../services/clientePortalService";
 import { obtenerUsuario } from "../../services/sesionService";
 import { listarSolicitudesPendientes } from "../../services/solicitudService";
 
-const ELEMENTOS_POR_PAGINA = 5;
+const ELEMENTOS_POR_PAGINA = 8;
 
 const ESTADOS_HISTORIAL = ["FINALIZADA", "CANCELADA"];
 
@@ -118,14 +122,12 @@ function extraerDetalleConfirmacion(error: unknown): DetalleConflictoConfirmacio
 }
 
 const DIA_MS = 1000 * 60 * 60 * 24;
-const diaLocal = (iso: string) => {
-    const f = new Date(iso);
-    return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
-};
 const diasEntre = (desde: string, hasta: string) => Math.round((new Date(hasta).getTime() - new Date(desde).getTime()) / DIA_MS);
 
+type VistaSalidas = "vigentes" | "alertas" | "confirmar" | "historial";
+
 /** Lo que está en curso va arriba y después lo más cercano; en el historial, lo más reciente primero */
-function ordenarSalidas(salidas: Salida[], vista: "vigentes" | "historial") {
+function ordenarSalidas(salidas: Salida[], vista: VistaSalidas) {
     return [...salidas].sort((a, b) => {
         if (vista === "historial") return b.fechaInicio.localeCompare(a.fechaInicio);
         return (
@@ -695,8 +697,10 @@ function SalidasPage() {
     const [filtroDesde, setFiltroDesde] = useState<string>("");
     const [filtroHasta, setFiltroHasta] = useState<string>("");
     const [filtroGuia, setFiltroGuia] = useState<number | "">("");
-    const [vista, setVista] = useState<"vigentes" | "historial">("vigentes");
+    const [vista, setVista] = useState<VistaSalidas>("vigentes");
     const [busqueda, setBusqueda] = useState("");
+    const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
+    const [salidaDetalle, setSalidaDetalle] = useState<Salida | null>(null);
     const [paginaActual, setPaginaActual] = useState(1);
 
     // Opciones para los selectores de filtros
@@ -721,6 +725,8 @@ function SalidasPage() {
         ...(filtroGuia !== "" ? { idguia: Number(filtroGuia) } : {}),
     };
 
+    // Comparte caché con BarraSuperior para mantener los KPIs estables al filtrar
+    const { data: todasLasSalidas = [] } = useSalidas();
     const {
         data: salidas = [],
         isPending,
@@ -746,19 +752,61 @@ function SalidasPage() {
         return contarSolicitudesPendientesPorSalida(solicitudesPendientes);
     }, [solicitudesPendientes]);
 
-    // Advertencias operativas basadas en salida.alertas provistas por el backend (RF-61)
-    const salidasConAlertasOperativas = useMemo(() => {
-        return salidas.filter((s) => Array.isArray(s.alertas) && s.alertas.length > 0);
-    }, [salidas]);
+    const hoyActual = fechaLocalHoy();
+
+    const esListaParaConfirmar = useCallback(
+        (s: Salida) => {
+            const fechaFutura = s.fechaInicio.slice(0, 10) > hoyActual;
+            const tieneAdvertenciaPendiente =
+                resultadoAsignacion?.advertencia !== undefined &&
+                resultadoAsignacion?.idsalida === s.idsalida;
+            return (
+                esAdmin &&
+                s.estado === "PUBLICADA" &&
+                fechaFutura &&
+                !tieneAdvertenciaPendiente &&
+                (s.puedeConfirmar === true ||
+                    (s.ventaAbierta === false && s.pasajerosConfirmados > 0))
+            );
+        },
+        [hoyActual, esAdmin, resultadoAsignacion],
+    );
+
+    const tieneAtencionPendiente = (s: Salida) =>
+        (Array.isArray(s.alertas) && s.alertas.length > 0) || s.etapaDesfasada === true;
+
+    // KPIs operativos estables sobre todas las salidas vigentes
+    const metricas = useMemo(() => {
+        const base = todasLasSalidas.length > 0 ? todasLasSalidas : salidas;
+        const enCurso = base.filter((s) => s.estado === "EN_CURSO");
+        const desfasadas = enCurso.filter((s) => s.etapaDesfasada === true).length;
+        const conAlertas = base.filter(tieneAtencionPendiente).length;
+        const paraConfirmar = base.filter(esListaParaConfirmar).length;
+        const publicadasAbiertas = base.filter(
+            (s) => s.estado === "PUBLICADA" && s.ventaAbierta !== false,
+        ).length;
+        return {
+            enCurso: enCurso.length,
+            desfasadas,
+            conAlertas,
+            paraConfirmar,
+            publicadasAbiertas,
+        };
+    }, [todasLasSalidas, salidas, esListaParaConfirmar]);
+
+    const cantidadFiltrosAvanzados = [
+        filtroCircuito !== "",
+        filtroPaquete !== "",
+        Boolean(filtroEstado),
+        Boolean(filtroDesde),
+        Boolean(filtroHasta),
+        filtroGuia !== "",
+    ].filter(Boolean).length;
 
     const hayFiltrosActivos =
-        filtroCircuito !== "" ||
-        filtroPaquete !== "" ||
-        Boolean(filtroEstado) ||
-        Boolean(filtroDesde) ||
-        Boolean(filtroHasta) ||
-        filtroGuia !== "" ||
-        Boolean(busqueda);
+        cantidadFiltrosAvanzados > 0 ||
+        Boolean(busqueda) ||
+        vista === "confirmar";
 
     function limpiarFiltros() {
         setFiltroCircuito("");
@@ -768,20 +816,34 @@ function SalidasPage() {
         setFiltroHasta("");
         setFiltroGuia("");
         setBusqueda("");
+        if (vista === "confirmar") setVista("vigentes");
         setPaginaActual(1);
     }
 
-    // El filtro de estado y la búsqueda piden algo puntual: miran todas las salidas, no solo las de la vista
+    // El filtro de estado y la búsqueda miran todas las salidas (número o paquete)
     const buscaEnTodas = Boolean(filtroEstado) || Boolean(busqueda.trim());
     const salidasVisibles = useMemo(() => {
         const termino = busqueda.trim().toLowerCase();
-        const elegidas = salidas.filter((s) =>
-            buscaEnTodas
-                ? s.nroSalida.toLowerCase().includes(termino)
-                : ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial"),
-        );
+        const elegidas = salidas.filter((s) => {
+            if (termino) {
+                const coincideNumero = s.nroSalida.toLowerCase().includes(termino);
+                const coincidePaquete = (s.paquete?.nombrePaquete ?? "")
+                    .toLowerCase()
+                    .includes(termino);
+                const coincideCodigo = (s.paquete?.nroPaquete ?? "")
+                    .toLowerCase()
+                    .includes(termino);
+                if (!coincideNumero && !coincidePaquete && !coincideCodigo) {
+                    return false;
+                }
+            }
+            if (buscaEnTodas) return true;
+            if (vista === "alertas") return tieneAtencionPendiente(s);
+            if (vista === "confirmar") return esListaParaConfirmar(s);
+            return ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial");
+        });
         return ordenarSalidas(elegidas, vista);
-    }, [salidas, vista, busqueda, buscaEnTodas]);
+    }, [salidas, vista, busqueda, buscaEnTodas, esListaParaConfirmar]);
 
     const estadoListado = isPending ? "cargando" : isError ? "error" : "exito";
     const totalPaginas = Math.max(1, Math.ceil(salidasVisibles.length / ELEMENTOS_POR_PAGINA));
@@ -792,655 +854,381 @@ function SalidasPage() {
     );
     const sinResultados = estadoListado === "exito" && salidasVisibles.length === 0;
 
-    const columnas = [
-        {
-            clave: "nroSalida" as const,
-            titulo: "Salida y Paquete",
-            renderizar: (fila: Salida) => (
-                <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-800">
-                            {fila.nroSalida}
-                        </span>
-                        {fila.idbloqueo && (
-                            <span
-                                className="inline-flex items-center whitespace-nowrap text-xs font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 max-md:hidden"
-                                title={`Bloqueo ante la autoridad: ${fila.idbloqueo}`}
-                            >
-                                Bloqueo {fila.idbloqueo}
-                            </span>
-                        )}
-                    </div>
-                    <p className="font-semibold text-sm text-texto leading-snug">
-                        {fila.paquete?.nombrePaquete ?? "—"}
-                    </p>
-                    <p className="text-xs text-texto-suave max-md:hidden">
-                        {fila.paquete?.nroPaquete ?? `Paquete #${fila.idpaquete}`}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            clave: "fechaInicio" as const,
-            titulo: "Fechas",
-            renderizar: (fila: Salida) => {
-                // El estado real manda: una salida entre sus fechas que el guía no inició no está "en curso"
-                const hoy = fechaLocalHoy();
-                const inicioStr = fila.fechaInicio.slice(0, 10);
-                const finStr = fila.fechaFin.slice(0, 10);
-                const alerta = (codigo: string) => fila.alertas?.includes(codigo);
-                const diasAntes =
-                    fila.estado === "FINALIZADA" && fila.fechaHoraFinReal
-                        ? diasEntre(diaLocal(fila.fechaHoraFinReal), finStr)
-                        : 0;
+    const algunaMutacionPendiente =
+        confirmarAsignacionMutation.isPending ||
+        liberarSobrantesMutation.isPending ||
+        confirmarReemplazoMutation.isPending ||
+        modificarLogisticaMutation.isPending ||
+        cancelarSalidaMutation.isPending;
 
-                let badgeTiempo = null;
-                if (fila.estado === "FINALIZADA") {
-                    badgeTiempo = (
-                        <span className="inline-block text-xs font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                            Concluida
-                        </span>
-                    );
-                } else if (alerta("SIN_FINALIZAR")) {
-                    badgeTiempo = (
-                        <span className="inline-block text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                            Vencida sin cerrar
-                        </span>
-                    );
-                } else if (fila.estado === "EN_CURSO") {
-                    badgeTiempo = (
-                        <span className="inline-block text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                            En curso
-                        </span>
-                    );
-                } else if (alerta("SIN_INICIAR")) {
-                    badgeTiempo = (
-                        <span className="inline-block text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                            {inicioStr === hoy ? "Debía salir hoy" : "Sin iniciar"}
-                        </span>
-                    );
-                } else if (fila.estado !== "CANCELADA") {
-                    const dias = diasEntre(hoy, inicioStr);
-                    if (dias > 0) {
-                        badgeTiempo = (
-                            <span className="inline-block text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
-                                En {dias} {dias === 1 ? "día" : "días"}
-                            </span>
-                        );
-                    }
-                }
+    function construirAlertasSalida(fila: Salida): AlertaSalidaVisual[] {
+        const lista: AlertaSalidaVisual[] = [];
+        const faltantes = fila.permisosFaltantes ?? 0;
+        const alertaPermisos = fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
+        const tieneSobrantes = (fila.lugaresPorLiberar ?? 0) > 0;
+        const alertaSol = fila.alertas?.includes("SOLICITUD_PENDIENTE");
+        const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
 
-                return (
-                    <div className="space-y-1 text-xs">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-texto whitespace-nowrap">
-                                {formatearRangoFechasUtc(fila.fechaInicio, fila.fechaFin)}
-                            </span>
-                            {badgeTiempo}
-                        </div>
-                        {fila.fechaHoraInicioReal ? (
-                            <p className="text-texto-suave whitespace-nowrap">
-                                Inició: {formatearFechaHora(fila.fechaHoraInicioReal)}
-                            </p>
-                        ) : null}
-                        {fila.fechaHoraInicioReal && fila.primerAvance ? (
-                            <p className="text-texto-suave whitespace-nowrap">
-                                1er avance a las{" "}
-                                {Math.max(0, Math.round((new Date(fila.primerAvance).getTime() - new Date(fila.fechaHoraInicioReal).getTime()) / 36e5))}{" "}
-                                h
-                            </p>
-                        ) : null}
-                        {diasAntes > 0 ? (
-                            <p className="font-semibold text-amber-800 whitespace-nowrap">
-                                Finalizó {diasAntes} {diasAntes === 1 ? "día" : "días"} antes
-                            </p>
-                        ) : null}
-                    </div>
-                );
+        for (const codigo of (fila.alertas ?? []).filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS)) {
+            const cfg = ALERTAS_OPERATIVAS_NUEVAS[codigo]!;
+            const aviso = fila.avisos?.find((av) => av.alerta === codigo);
+            const severidad =
+                codigo === "FALTA_RECURSO" || codigo === "PERSONAL_NO_APTO"
+                    ? "critica"
+                    : codigo === "PENDIENTE_CONFIRMAR"
+                      ? "info"
+                      : "advertencia";
+            lista.push({
+                clave: `op-${codigo}`,
+                etiqueta: cfg.etiqueta,
+                mensaje: aviso?.mensaje,
+                severidad,
+            });
+        }
+
+        for (const a of (fila.alertas ?? []).filter((x) => x in ALERTAS_RECORRIDO)) {
+            lista.push({
+                clave: `rec-${a}`,
+                etiqueta: ALERTAS_RECORRIDO[a]!,
+                severidad: "critica",
+            });
+        }
+
+        if (faltantes > 0) {
+            lista.push({
+                clave: "permisos",
+                etiqueta: alertaPermisos
+                    ? `${faltantes} ${faltantes === 1 ? "permiso sin emitir" : "permisos sin emitir"}`
+                    : `${faltantes} ${faltantes === 1 ? "permiso faltante" : "permisos faltantes"}`,
+                mensaje: alertaPermisos
+                    ? "Permisos sin emitir dentro de los 7 días previos al inicio."
+                    : undefined,
+                severidad: alertaPermisos ? "critica" : "advertencia",
+            });
+        }
+
+        if (tieneSobrantes) {
+            lista.push({
+                clave: "sobrantes",
+                etiqueta: `${fila.lugaresPorLiberar} ${fila.lugaresPorLiberar === 1 ? "sobrante" : "sobrantes"}`,
+                mensaje: `Hay ${fila.lugaresPorLiberar} lugares sobrantes del bloqueo pendientes de liberación.`,
+                severidad: "advertencia",
+            });
+        }
+
+        if (alertaSol) {
+            lista.push({
+                clave: "solicitudes",
+                etiqueta:
+                    cantSolicitudes !== undefined && cantSolicitudes > 0
+                        ? `${cantSolicitudes} sol. hotel`
+                        : "Sol. hotel pend.",
+                mensaje: "Solicitudes de alojamiento pendientes de confirmación hotelera.",
+                severidad: "info",
+                enlace: { to: "/gestion/solicitudes", texto: "Gestionar solicitudes" },
+            });
+        }
+
+        if (fila.estado === "EN_CURSO" && fila.etapaDesfasada) {
+            lista.push({
+                clave: "desfase",
+                etiqueta: "Recorrido desfasado",
+                mensaje: `Etapa informada: ${fila.etapaInformada ?? "sin informe"} · Etapa esperada: ${fila.etapaEsperada ?? "—"}.`,
+                severidad: "advertencia",
+            });
+        }
+
+        return lista;
+    }
+
+    function construirAccionesSalida(fila: Salida) {
+        const tieneSolicitudes =
+            fila.estado !== "CANCELADA" &&
+            ((solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
+                fila.alertas?.includes("SOLICITUD_PENDIENTE"));
+        const esFinalizada = fila.estado === "FINALIZADA";
+        const fechaFutura = fila.fechaInicio.slice(0, 10) > hoyActual;
+        const cantPersonal =
+            typeof fila.cantidadPersonal === "number"
+                ? fila.cantidadPersonal
+                : Array.isArray(fila.personalAsignado)
+                  ? fila.personalAsignado.length
+                  : 0;
+        const sinPersonal = cantPersonal === 0;
+        const tieneAdvertenciaPendiente =
+            resultadoAsignacion?.advertencia !== undefined &&
+            resultadoAsignacion?.idsalida === fila.idsalida;
+
+        const esPublicadaFutura =
+            esAdmin &&
+            fila.estado === "PUBLICADA" &&
+            fechaFutura &&
+            !tieneAdvertenciaPendiente;
+
+        const listaParaConfirmar = esListaParaConfirmar(fila);
+        const puedeRevisarConfirmacion = esPublicadaFutura && !listaParaConfirmar;
+        const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
+        const puedeLiberarSobrantes =
+            esAdmin && fila.estado === "CERRADA" && tieneSobrantesPendientes;
+        const estadoReemplazable =
+            fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
+        const puedeReemplazarPersonal =
+            esAdmin && estadoReemplazable && fechaFutura && !sinPersonal;
+        const puedeModificarLogistica =
+            esAdmin &&
+            (fila.estado === "PUBLICADA" || fila.estado === "CERRADA") &&
+            fechaFutura;
+        const puedeCancelarSalida =
+            esAdmin &&
+            (fila.estado === "PUBLICADA" || fila.estado === "CERRADA") &&
+            fechaFutura;
+        const tieneBloqueoCanceladaPendiente =
+            esAdmin && fila.estado === "CANCELADA" && Boolean(fila.idbloqueo);
+        const yaConcluyo =
+            esFinalizada || fila.fechaFin.slice(0, 10) <= hoyActual;
+        const puedeDevolverEquipamiento =
+            esAdmin && fila.estado !== "CANCELADA" && yaConcluyo;
+
+        const estaLiberandoEstaSalida =
+            liberarSobrantesMutation.isPending && idSalidaLiberando === fila.idsalida;
+
+        // Acción principal contextual (1 sola, clara)
+        let principal: {
+            etiqueta: string;
+            tono: "marca" | "advertencia" | "exito" | "neutro";
+            onClick: () => void;
+        };
+
+        if (listaParaConfirmar) {
+            principal = {
+                etiqueta: "Confirmar →",
+                tono: "marca",
+                onClick: () => abrirAsignacion(fila),
+            };
+        } else if (puedeLiberarSobrantes) {
+            principal = {
+                etiqueta: estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes",
+                tono: "advertencia",
+                onClick: () =>
+                    manejarReintentarLiberacion(fila.idsalida, fila.nroSalida),
+            };
+        } else if (tieneBloqueoCanceladaPendiente) {
+            principal = {
+                etiqueta:
+                    cancelarSalidaMutation.isPending &&
+                    idSalidaReintentandoCupos === fila.idsalida
+                        ? "Liberando..."
+                        : "Liberar cupos",
+                tono: "advertencia",
+                onClick: () =>
+                    manejarReintentarLiberacionCupos(fila.idsalida, fila.nroSalida),
+            };
+        } else if (puedeDevolverEquipamiento) {
+            principal = {
+                etiqueta: "Devolver equipo",
+                tono: "exito",
+                onClick: () => abrirDevolucionEquipamiento(fila),
+            };
+        } else {
+            principal = {
+                etiqueta: "Detalle",
+                tono: "neutro",
+                onClick: () => setSalidaDetalle(fila),
+            };
+        }
+
+        // Menú secundario completo (⋯)
+        const menu: AccionMenuSalida[] = [
+            {
+                tipo: "boton",
+                id: "ver-detalle",
+                etiqueta: "Ver detalle completo",
+                onClick: () => setSalidaDetalle(fila),
             },
-        },
-        {
-            clave: "tamanoMaximo" as const,
-            titulo: "Ocupación",
-            renderizar: (fila: Salida) => {
-                const confirmados = fila.pasajerosConfirmados ?? 0;
-                const maximo = fila.tamanoMaximo || 1;
-                const porcentaje = Math.min(100, Math.round((confirmados / maximo) * 100));
+        ];
 
-                let colorBarra = "bg-sky-500";
-                if (porcentaje >= 100) colorBarra = "bg-rose-500";
-                else if (porcentaje >= 60) colorBarra = "bg-emerald-500";
-                else if (porcentaje > 0) colorBarra = "bg-amber-500";
+        if (puedeRevisarConfirmacion) {
+            menu.push({
+                tipo: "boton",
+                id: "revisar-confirmacion",
+                etiqueta: "Revisar confirmación",
+                deshabilitado: algunaMutacionPendiente,
+                onClick: () => abrirAsignacion(fila),
+            });
+        }
+        if (puedeModificarLogistica) {
+            menu.push({
+                tipo: "boton",
+                id: "logistica",
+                etiqueta: "Modificar logística",
+                deshabilitado: algunaMutacionPendiente,
+                onClick: () => abrirModificarLogistica(fila),
+            });
+        }
+        if (puedeReemplazarPersonal) {
+            menu.push({
+                tipo: "boton",
+                id: "reemplazar-personal",
+                etiqueta: "Reemplazar personal",
+                deshabilitado: algunaMutacionPendiente,
+                onClick: () => abrirReemplazo(fila),
+            });
+        }
+        if (tieneSolicitudes) {
+            menu.push({
+                tipo: "enlace",
+                id: "solicitudes",
+                etiqueta: "Ver solicitudes de alojamiento",
+                to: "/gestion/solicitudes",
+            });
+        }
+        if (esFinalizada) {
+            menu.push({
+                tipo: "enlace",
+                id: "evaluar",
+                etiqueta: "Ir a evaluaciones",
+                to: "/gestion/evaluaciones",
+            });
+        }
+        if (puedeCancelarSalida) {
+            menu.push({
+                tipo: "boton",
+                id: "cancelar",
+                etiqueta: "Cancelar salida",
+                tono: "peligro",
+                deshabilitado: algunaMutacionPendiente,
+                onClick: () => abrirCancelarSalida(fila),
+            });
+        }
 
-                return (
-                    <div className="min-w-[130px] space-y-1 text-xs">
-                        <div className="flex items-baseline justify-between gap-2">
-                            <span className="font-bold text-sm text-texto">
-                                {confirmados}{" "}
-                                <span className="font-normal text-xs text-texto-suave">
-                                    / {fila.tamanoMaximo} pax
-                                </span>
-                            </span>
-                            <span className="font-semibold text-xs text-texto-suave">
-                                {porcentaje}%
-                            </span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div
-                                className={`h-full ${colorBarra} transition-all duration-300`}
-                                style={{ width: `${porcentaje}%` }}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-texto-suave">
-                            {/* Al asignar recursos la venta se cierra y el stock queda en 0: no significa que se llenó */}
-                            {fila.estado === "PUBLICADA" ? (
-                                <>
-                                    <span className="max-md:hidden">
-                                        {fila.stockLocal} {fila.stockLocal === 1 ? "libre" : "libres"}
-                                    </span>
-                                    {confirmados === 0 && (
-                                        <span className="text-amber-700 font-medium">Sin ventas</span>
-                                    )}
-                                    {fila.stockLocal === 0 && (
-                                        <span className="text-rose-600 font-semibold">Completo</span>
-                                    )}
-                                </>
-                            ) : (
-                                fila.estado !== "CANCELADA" && <span>Venta cerrada</span>
-                            )}
-                        </div>
-                    </div>
-                );
-            },
-        },
-        {
-            clave: "estado" as const,
-            titulo: "Estado y Avance",
-            renderizar: (fila: Salida) => {
-                const informada = fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
-                const esperada = fila.etapaEsperada;
-                const desfasada = fila.etapaDesfasada;
-                const etapas = fila.paquete.circuito.etapas ?? [];
-                const totalEtapas = etapas.length;
-                const textoEsperada =
-                    esperada !== null
-                        ? totalEtapas > 0
-                            ? `Etapa ${esperada} de ${totalEtapas} esperada`
-                            : `Etapa ${esperada} esperada`
-                        : null;
-                const llegoA = etapas.find((e) => e.numeroOrden === informada);
-                const tramoHoy = etapas.find((e) => e.numeroOrden === esperada);
+        // Acciones rápidas dentro del modal de detalle
+        const accionesDetalle: Array<{
+            id: string;
+            etiqueta: string;
+            variante?: "principal" | "secundario" | "peligro";
+            onClick: () => void;
+        }> = [];
 
-                return (
-                    <div className="space-y-1.5">
-                        <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estilosEstadoSalida(fila.estado)}`}
-                        >
-                            {formatearEstadoSalida(fila.estado)}
-                        </span>
+        if (listaParaConfirmar) {
+            accionesDetalle.push({
+                id: "confirmar",
+                etiqueta: "Confirmar salida →",
+                variante: "principal",
+                onClick: () => abrirAsignacion(fila),
+            });
+        } else if (puedeRevisarConfirmacion) {
+            accionesDetalle.push({
+                id: "revisar",
+                etiqueta: "Revisar confirmación",
+                variante: "secundario",
+                onClick: () => abrirAsignacion(fila),
+            });
+        }
+        if (puedeModificarLogistica) {
+            accionesDetalle.push({
+                id: "logistica",
+                etiqueta: "Modificar logística",
+                variante: "secundario",
+                onClick: () => abrirModificarLogistica(fila),
+            });
+        }
+        if (puedeReemplazarPersonal) {
+            accionesDetalle.push({
+                id: "reemplazo",
+                etiqueta: "Reemplazar personal",
+                variante: "secundario",
+                onClick: () => abrirReemplazo(fila),
+            });
+        }
+        if (puedeDevolverEquipamiento) {
+            accionesDetalle.push({
+                id: "devolver",
+                etiqueta: "Devolver equipamiento",
+                variante: "principal",
+                onClick: () => abrirDevolucionEquipamiento(fila),
+            });
+        }
+        if (puedeCancelarSalida) {
+            accionesDetalle.push({
+                id: "cancelar",
+                etiqueta: "Cancelar salida",
+                variante: "peligro",
+                onClick: () => abrirCancelarSalida(fila),
+            });
+        }
 
-                        {fila.estado === "EN_CURSO" && (
-                            <div className="text-xs">
-                                {desfasada ? (
-                                    <div className="flex flex-col gap-0.5">
-                                        <span
-                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 whitespace-nowrap"
-                                            title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
-                                        >
-                                            <span aria-hidden="true">⏱️</span>
-                                            <span>
-                                                {informada !== null ? `Etapa ${informada}` : "Sin informe"}
-                                            </span>
-                                            {textoEsperada && (
-                                                <span className="font-normal text-amber-700">
-                                                    · {textoEsperada}
-                                                </span>
-                                            )}
-                                        </span>
-                                        <span className="text-xs font-semibold text-amber-700">
-                                            Desfasada
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 whitespace-nowrap">
-                                            {informada !== null ? `Etapa ${informada}` : "Iniciada"}
-                                            {textoEsperada && (
-                                                <span className="ml-1 text-emerald-600">
-                                                    · {textoEsperada}
-                                                </span>
-                                            )}
-                                        </span>
-                                        <span className="text-xs text-emerald-700 font-medium">
-                                            Al día
-                                        </span>
-                                    </div>
-                                )}
-                                {(llegoA || tramoHoy) && (
-                                    <div className="mt-1 space-y-0.5 text-texto-suave">
-                                        {llegoA && <div>Llegó a: <span className="text-texto">{llegoA.puntoFin}</span></div>}
-                                        {tramoHoy && (
-                                            <div>
-                                                Hoy: {tramoHoy.puntoInicio} → {tramoHoy.puntoFin}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                );
-            },
-        },
-        {
-            clave: "personalAsignado" as const,
-            titulo: "Dotación y Personal",
-            renderizar: (fila: Salida) => {
-                const dotacion = dotacionDeSalida(fila);
-                const totalPersonal = fila.cantidadPersonal ?? dotacion.total;
-                const guias =
-                    Array.isArray(fila.guias) && fila.guias.length > 0
-                        ? fila.guias
-                        : nombresGuiasDeSalida(fila);
+        return { principal, menu, accionesDetalle };
+    }
 
-                if (totalPersonal === 0) {
-                    return (
-                        <div className="space-y-1 text-xs">
-                            <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                                Sin asignar
-                            </span>
-                        </div>
-                    );
-                }
+    function obtenerBadgeTiempo(fila: Salida) {
+        const inicioStr = fila.fechaInicio.slice(0, 10);
+        const alerta = (codigo: string) => fila.alertas?.includes(codigo);
 
-                return (
-                    <div className="space-y-1 text-xs">
-                        <div className="font-semibold text-texto">
-                            {totalPersonal} {totalPersonal === 1 ? "asignado" : "asignados"}
-                        </div>
-                        {dotacion.total > 0 && (
-                            <p className="text-xs text-texto-suave max-md:hidden">
-                                {dotacion.guias} {dotacion.guias === 1 ? "guía" : "guías"} ·{" "}
-                                {dotacion.porteadores}{" "}
-                                {dotacion.porteadores === 1 ? "porteador" : "porteadores"}
-                            </p>
-                        )}
-                        {guias.length > 0 && (
-                            <div className="pt-0.5">
-                                <p
-                                    className="text-xs font-medium text-texto truncate max-w-[170px]"
-                                    title={guias.join(", ")}
-                                >
-                                    <span className="text-texto-suave">Guías: </span>
-                                    {guias.join(", ")}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                );
-            },
-        },
-        {
-            clave: "permisosFaltantes" as const,
-            titulo: "Permisos y Alertas",
-            renderizar: (fila: Salida) => {
-                const faltantes = fila.permisosFaltantes ?? 0;
-                const alertaPermisos = fila.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
-                const tieneSobrantes = (fila.lugaresPorLiberar ?? 0) > 0;
-                const alertaSol = fila.alertas?.includes("SOLICITUD_PENDIENTE");
-                const cantSolicitudes = solicitudesPorSalida.get(fila.idsalida);
-
-                const alertasRecorrido = (fila.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO);
-                const alertasNuevas = (fila.alertas ?? []).filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS);
-                const sinNovedades =
-                    faltantes === 0 &&
-                    !tieneSobrantes &&
-                    !alertaSol &&
-                    !alertaPermisos &&
-                    alertasRecorrido.length === 0 &&
-                    alertasNuevas.length === 0;
-
-                if (sinNovedades) {
-                    return (
-                        <span className="inline-flex items-center gap-1 rounded bg-slate-50 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                            <span className="text-emerald-600">✓</span> Al día
-                        </span>
-                    );
-                }
-
-                return (
-                    <div className="flex flex-col gap-1 items-start text-xs">
-                        {alertasNuevas.map((codigo) => {
-                            const cfg = ALERTAS_OPERATIVAS_NUEVAS[codigo]!;
-                            const aviso = fila.avisos?.find((av) => av.alerta === codigo);
-                            return (
-                                <span
-                                    key={codigo}
-                                    title={aviso?.mensaje}
-                                    className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-bold ${cfg.estilo}`}
-                                >
-                                    <span>{cfg.etiqueta}</span>
-                                </span>
-                            );
-                        })}
-                        {alertasRecorrido.map((a) => (
-                            <span
-                                key={a}
-                                className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
-                            >
-                                <span aria-hidden="true">⚠️</span>
-                                <span>{ALERTAS_RECORRIDO[a]}</span>
-                            </span>
-                        ))}
-                        {faltantes > 0 &&
-                            (alertaPermisos ? (
-                                <span
-                                    className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-2 py-0.5 text-xs font-bold text-rose-900"
-                                    title="Alerta operativa: permisos sin emitir dentro de los 7 días previos al inicio"
-                                >
-                                    <span aria-hidden="true">⚠️</span>
-                                    <span>
-                                        {faltantes}{" "}
-                                        {faltantes === 1
-                                            ? "permiso sin emitir"
-                                            : "permisos sin emitir"}
-                                    </span>
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800">
-                                    {faltantes}{" "}
-                                    {faltantes === 1 ? "permiso faltante" : "permisos faltantes"}
-                                </span>
-                            ))}
-
-                        {tieneSobrantes && (
-                            <span
-                                title={`Hay ${fila.lugaresPorLiberar} lugares sobrantes del bloqueo pendientes de liberación`}
-                                className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2 py-0.5 text-xs font-semibold text-amber-900"
-                            >
-                                <span aria-hidden="true">⚠️</span>
-                                <span>
-                                    {fila.lugaresPorLiberar}{" "}
-                                    {fila.lugaresPorLiberar === 1 ? "sobrante" : "sobrantes"}
-                                </span>
-                            </span>
-                        )}
-
-                        {alertaSol && (
-                            <Link
-                                to="/gestion/solicitudes"
-                                title="Solicitudes de alojamiento pendientes en salida próxima (< 7 días)"
-                                className="inline-flex items-center gap-1 rounded bg-sky-100 border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-900 hover:bg-sky-200 transition-colors"
-                            >
-                                <span aria-hidden="true">🏨</span>
-                                <span>
-                                    {cantSolicitudes !== undefined && cantSolicitudes > 0
-                                        ? `${cantSolicitudes} sol. hotel`
-                                        : "Sol. hotel pend."}
-                                </span>
-                            </Link>
-                        )}
-                    </div>
-                );
-            },
-        },
-        {
-            clave: "idsalida" as const,
-            titulo: "Acciones",
-            renderizar: (fila: Salida) => {
-                // FE-44: una salida cancelada ya no tiene solicitudes para gestionar
-                const tieneSolicitudes =
-                    fila.estado !== "CANCELADA" &&
-                    ((solicitudesPorSalida.get(fila.idsalida) ?? 0) > 0 ||
-                        fila.alertas?.includes("SOLICITUD_PENDIENTE"));
-                const esFinalizada = fila.estado === "FINALIZADA";
-
-                // CU-40: Confirmar salida (revisar en cualquier momento mientras esté PUBLICADA, confirmar tras el corte)
-                const fechaFutura = fila.fechaInicio.slice(0, 10) > fechaLocalHoy();
-                const cantPersonal =
-                    typeof fila.cantidadPersonal === "number"
-                        ? fila.cantidadPersonal
-                        : Array.isArray(fila.personalAsignado)
-                        ? fila.personalAsignado.length
-                        : 0;
-                const sinPersonal = cantPersonal === 0;
-                const tieneAdvertenciaPendiente =
-                    resultadoAsignacion?.advertencia !== undefined &&
-                    resultadoAsignacion?.idsalida === fila.idsalida;
-
-                const esPublicadaFutura =
-                    esAdmin &&
-                    fila.estado === "PUBLICADA" &&
-                    fechaFutura &&
-                    !tieneAdvertenciaPendiente;
-
-                const listaParaConfirmar =
-                    esPublicadaFutura &&
-                    (fila.puedeConfirmar === true ||
-                        (fila.ventaAbierta === false && fila.pasajerosConfirmados > 0));
-                const puedeRevisarConfirmacion = esPublicadaFutura && !listaParaConfirmar;
-
-                const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
-                const puedeLiberarSobrantes =
-                    esAdmin && fila.estado === "CERRADA" && tieneSobrantesPendientes;
-
-                // CU-38: Reemplazar personal
-                const estadoReemplazable =
-                    fila.estado === "PUBLICADA" || fila.estado === "CERRADA";
-                const puedeReemplazarPersonal =
-                    esAdmin &&
-                    estadoReemplazable &&
-                    fechaFutura &&
-                    !sinPersonal;
-
-                // CU-39: Modificar logística (también en PUBLICADA — §9.2)
-                const puedeModificarLogistica =
-                    esAdmin &&
-                    (fila.estado === "PUBLICADA" || fila.estado === "CERRADA") &&
-                    fechaFutura;
-
-                // CU-37: Cancelar salida
-                const estadoCancelable =
-                    fila.estado === "PUBLICADA" ||
-                    fila.estado === "CERRADA";
-                const puedeCancelarSalida =
-                    esAdmin &&
-                    estadoCancelable &&
-                    fechaFutura;
-
-                // Salida ya cancelada con bloqueo pendiente de liberación ante la autoridad (por 503 previo)
-                const tieneBloqueoCanceladaPendiente =
-                    esAdmin &&
-                    fila.estado === "CANCELADA" &&
-                    Boolean(fila.idbloqueo);
-
-                // CU-41: Devolver equipamiento
-                const yaConcluyo =
-                    esFinalizada || fila.fechaFin.slice(0, 10) <= fechaLocalHoy();
-                const puedeDevolverEquipamiento =
-                    esAdmin &&
-                    fila.estado !== "CANCELADA" &&
-                    yaConcluyo;
-
-                if (
-                    !tieneSolicitudes &&
-                    !esFinalizada &&
-                    !listaParaConfirmar &&
-                    !puedeRevisarConfirmacion &&
-                    !puedeLiberarSobrantes &&
-                    !puedeReemplazarPersonal &&
-                    !puedeModificarLogistica &&
-                    !puedeCancelarSalida &&
-                    !tieneBloqueoCanceladaPendiente &&
-                    !puedeDevolverEquipamiento
-                ) {
-                    return <span className="text-xs text-texto-suave">—</span>;
-                }
-
-                const estaLiberandoEstaSalida =
-                    liberarSobrantesMutation.isPending && idSalidaLiberando === fila.idsalida;
-
-                const algunaMutacionPendiente =
-                    confirmarAsignacionMutation.isPending ||
-                    liberarSobrantesMutation.isPending ||
-                    confirmarReemplazoMutation.isPending ||
-                    modificarLogisticaMutation.isPending ||
-                    cancelarSalidaMutation.isPending;
-
-                return (
-                    <div className="flex flex-col gap-1.5 items-start text-xs font-semibold">
-                        {listaParaConfirmar && (
-                            <button
-                                type="button"
-                                aria-label={`Confirmar salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirAsignacion(fila)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-marca text-white font-semibold text-xs shadow-sm hover:bg-marca-oscura transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                                <span>Confirmar salida</span>
-                                <span aria-hidden="true">→</span>
-                            </button>
-                        )}
-
-                        {puedeRevisarConfirmacion && (
-                            <button
-                                type="button"
-                                aria-label={`Revisar confirmación de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirAsignacion(fila)}
-                                className="text-navegacion hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Revisar confirmación
-                            </button>
-                        )}
-
-                        {puedeReemplazarPersonal && (
-                            <button
-                                type="button"
-                                aria-label={`Reemplazar personal de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirReemplazo(fila)}
-                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Reemplazar personal
-                            </button>
-                        )}
-
-                        {puedeModificarLogistica && (
-                            <button
-                                type="button"
-                                aria-label={`Modificar logística de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirModificarLogistica(fila)}
-                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Modificar logística
-                            </button>
-                        )}
-
-                        {puedeLiberarSobrantes && (
-                            <button
-                                type="button"
-                                aria-label={`Liberar lugares sobrantes de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() =>
-                                    manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
-                                }
-                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
-                            </button>
-                        )}
-
-                        {puedeCancelarSalida && (
-                            <button
-                                type="button"
-                                aria-label={`Cancelar salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirCancelarSalida(fila)}
-                                className="text-rose-700 hover:text-rose-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Cancelar salida
-                            </button>
-                        )}
-
-                        {tieneBloqueoCanceladaPendiente && (
-                            <button
-                                type="button"
-                                aria-label={`Reintentar liberar cupos de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() =>
-                                    manejarReintentarLiberacionCupos(fila.idsalida, fila.nroSalida)
-                                }
-                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                {cancelarSalidaMutation.isPending &&
-                                idSalidaReintentandoCupos === fila.idsalida
-                                    ? "Liberando cupos..."
-                                    : "Reintentar liberar cupos"}
-                            </button>
-                        )}
-
-                        {tieneSolicitudes && (
-                            <Link
-                                to="/gestion/solicitudes"
-                                aria-label={`Ver solicitudes de alojamiento de la salida ${fila.nroSalida}`}
-                                className="text-marca hover:underline"
-                            >
-                                Ver solicitudes
-                            </Link>
-                        )}
-
-                        {esFinalizada && (
-                            <Link
-                                to="/gestion/evaluaciones"
-                                aria-label={`Evaluar salida ${fila.nroSalida}`}
-                                className="text-marca hover:underline"
-                            >
-                                Evaluar
-                            </Link>
-                        )}
-
-                        {puedeDevolverEquipamiento && (
-                            <button
-                                type="button"
-                                aria-label={`Devolver equipamiento de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirDevolucionEquipamiento(fila)}
-                                className="text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Devolver equipamiento
-                            </button>
-                        )}
-                    </div>
-                );
-            },
-        },
-    ];
+        if (fila.estado === "FINALIZADA") {
+            return { texto: "Concluida", estilo: "bg-slate-100 text-slate-600" };
+        }
+        if (alerta("SIN_FINALIZAR")) {
+            return { texto: "Vencida sin cerrar", estilo: "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-500/25" };
+        }
+        if (fila.estado === "EN_CURSO") {
+            return { texto: "En curso", estilo: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20" };
+        }
+        if (alerta("SIN_INICIAR")) {
+            return {
+                texto: inicioStr === hoyActual ? "Debía salir hoy" : "Sin iniciar",
+                estilo: "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-500/25",
+            };
+        }
+        if (fila.estado !== "CANCELADA") {
+            const dias = diasEntre(hoyActual, inicioStr);
+            if (dias > 0) {
+                return {
+                    texto: `En ${dias} ${dias === 1 ? "día" : "días"}`,
+                    estilo: "bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-500/20",
+                };
+            }
+        }
+        return null;
+    }
 
     return (
-        <section className="mx-auto max-w-7xl space-y-6">
+        <section className="mx-auto max-w-[1440px] space-y-5">
             <header className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                    <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-texto-suave">
-                        Operaciones
+                    <p className="text-xs font-bold uppercase tracking-wider text-marca-oscura">
+                        Operación diaria
                     </p>
-                    <h1 className="text-3xl font-bold text-navegacion">Salidas</h1>
-                    <p className="mt-2 text-sm text-texto-suave">
-                        Seguí las salidas programadas, su personal asignado y el avance del recorrido.
+                    <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-navegacion sm:text-3xl">
+                        Salidas
+                    </h1>
+                    <p className="mt-1 text-sm text-texto-suave">
+                        Programación, ocupación, alertas operativas y seguimiento en vivo.
                     </p>
                 </div>
                 {esAdmin ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Boton
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        {solicitudesPendientes.length > 0 ? (
+                            <Link
+                                to="/gestion/solicitudes"
+                                className="inline-flex items-center gap-1.5 rounded-full border border-borde bg-white px-3.5 py-2 text-xs font-semibold text-navegacion transition hover:border-marca/45 hover:bg-marca-suave/50"
+                            >
+                                <span>Solicitudes de hotel</span>
+                                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500/12 px-1.5 py-0.5 text-[11px] font-bold text-rose-700">
+                                    {solicitudesPendientes.length}
+                                </span>
+                            </Link>
+                        ) : null}
+                        <button
+                            type="button"
                             onClick={abrirFormulario}
                             disabled={
                                 confirmarAsignacionMutation.isPending ||
                                 liberarSobrantesMutation.isPending
                             }
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-r from-navegacion to-marca-oscura px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            + Nueva salida
-                        </Boton>
+                            <span>+ Nueva salida</span>
+                        </button>
                     </div>
                 ) : null}
             </header>
@@ -2140,82 +1928,153 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
-            {/* Advertencia operativa en salidas próximas (< 7 días) (RF-61) */}
-            {salidasConAlertasOperativas.length > 0 ? (
-                <Alerta
-                    tipo="advertencia"
-                    titulo="Para resolver antes de salir"
+            {/* 4 TARJETAS KPI CLICABLES */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado((prev) => (prev === "EN_CURSO" ? "" : "EN_CURSO"));
+                        setVista("vigentes");
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        filtroEstado === "EN_CURSO"
+                            ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
                 >
-                    <div className="space-y-2">
-                        <p className="text-sm">
-                            Se detectaron situaciones operativas pendientes en{" "}
-                            {salidasConAlertasOperativas.length}{" "}
-                            {salidasConAlertasOperativas.length === 1 ? "salida" : "salidas"}
-                            :
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            En curso ahora
                         </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                            {salidasConAlertasOperativas.map((s) => {
-                                const tieneSol = s.alertas?.includes("SOLICITUD_PENDIENTE");
-                                const tienePerm = s.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
-                                const delRecorrido = (s.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO).map((a) => ALERTAS_RECORRIDO[a]);
-                                const nuevas = (s.alertas ?? [])
-                                    .filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS)
-                                    .map((a) => {
-                                        const aviso = s.avisos?.find((av) => av.alerta === a);
-                                        return aviso?.mensaje || ALERTAS_OPERATIVAS_NUEVAS[a]!.etiqueta;
-                                    });
-                                const cantSol = solicitudesPorSalida.get(s.idsalida);
-
-                                return (
-                                    <div
-                                        key={s.idsalida}
-                                        className="inline-flex flex-wrap items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300"
-                                    >
-                                        <span>
-                                            {s.nroSalida} ({s.paquete?.nombrePaquete}):
-                                        </span>
-                                        {nuevas.length > 0 && (
-                                            <span className="text-amber-950 font-bold">{nuevas.join(" · ")}</span>
-                                        )}
-                                        {nuevas.length > 0 && (delRecorrido.length > 0 || tieneSol || tienePerm) && <span>·</span>}
-                                        {delRecorrido.length > 0 && (
-                                            <span className="text-rose-900 font-bold">{delRecorrido.join(" · ")}</span>
-                                        )}
-                                        {delRecorrido.length > 0 && (tieneSol || tienePerm) && <span>·</span>}
-                                        {tieneSol && (
-                                            <Link
-                                                to="/gestion/solicitudes"
-                                                className="font-bold underline hover:text-amber-950"
-                                            >
-                                                {cantSol
-                                                    ? `${cantSol} ${cantSol === 1 ? "solicitud pendiente" : "solicitudes pendientes"}`
-                                                    : "solicitud pendiente"}
-                                            </Link>
-                                        )}
-                                        {tieneSol && tienePerm && <span>·</span>}
-                                        {tienePerm && (
-                                            <span className="text-rose-900 font-bold">
-                                                {s.permisosFaltantes}{" "}
-                                                {s.permisosFaltantes === 1
-                                                    ? "permiso faltante"
-                                                    : "permisos faltantes"}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="pt-1">
-                            <Link
-                                to="/gestion/solicitudes"
-                                className="inline-flex items-center text-xs font-semibold text-amber-900 underline hover:text-amber-950"
-                            >
-                                Ir a Gestión de Solicitudes →
-                            </Link>
-                        </div>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.enCurso}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.desfasadas > 0 ? (
+                                <span className="font-semibold text-amber-700">
+                                    {metricas.desfasadas}{" "}
+                                    {metricas.desfasadas === 1 ? "desfasada" : "desfasadas"}
+                                </span>
+                            ) : metricas.enCurso > 0 ? (
+                                <span className="text-emerald-700 font-medium">Todas al día</span>
+                            ) : (
+                                "Sin salidas en ruta"
+                            )}
+                        </p>
                     </div>
-                </Alerta>
-            ) : null}
+                    <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado("");
+                        setVista((prev) => (prev === "alertas" ? "vigentes" : "alertas"));
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        !buscaEnTodas && vista === "alertas"
+                            ? "border-rose-400 bg-rose-50/40 ring-2 ring-rose-400/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Requieren atención
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.conAlertas}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.conAlertas > 0 ? (
+                                <span className="font-semibold text-rose-700">
+                                    Alertas, permisos o desfase
+                                </span>
+                            ) : (
+                                <span className="font-medium text-emerald-700">
+                                    Todo al día
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                    <span
+                        className={`grid size-8 place-items-center rounded-xl text-xs font-bold ring-1 ring-inset ${
+                            metricas.conAlertas > 0
+                                ? "bg-rose-50 text-rose-700 ring-rose-500/20"
+                                : "bg-fondo text-texto-suave ring-borde"
+                        }`}
+                    >
+                        !
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado("");
+                        setVista((prev) => (prev === "confirmar" ? "vigentes" : "confirmar"));
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        !buscaEnTodas && vista === "confirmar"
+                            ? "border-marca bg-marca-suave/50 ring-2 ring-marca/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Listas para confirmar
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.paraConfirmar}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.paraConfirmar > 0 ? (
+                                <span className="font-semibold text-marca-oscura">
+                                    Venta cerrada · emitir permisos
+                                </span>
+                            ) : (
+                                "Sin cierres pendientes"
+                            )}
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-marca-suave text-xs font-bold text-marca-oscura ring-1 ring-inset ring-marca/20">
+                        ✓
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado((prev) => (prev === "PUBLICADA" ? "" : "PUBLICADA"));
+                        setVista("vigentes");
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        filtroEstado === "PUBLICADA"
+                            ? "border-sky-500 bg-sky-50/40 ring-2 ring-sky-500/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Publicadas abiertas
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.publicadasAbiertas}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            Disponibles en catálogo público
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-sky-50 text-xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/20">
+                        ●
+                    </span>
+                </button>
+            </div>
 
             {rangoFechasInvalido ? (
                 <Alerta tipo="error" titulo="Rango de fechas inválido">
@@ -2223,199 +2082,283 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div role="tablist" aria-label="Vista de salidas" className="flex gap-2">
-                    {(["vigentes", "historial"] as const).map((opcion) => (
+            {/* BARRA DE HERRAMIENTAS COMPACTA + FILTROS COLAPSABLES */}
+            <div className="rounded-2xl border border-borde/80 bg-white p-3.5 shadow-[0_4px_16px_-8px_rgba(18,61,112,0.08)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* PÍLDORA SEGMENTADA DE VISTAS */}
+                    <div
+                        role="tablist"
+                        aria-label="Vista de salidas"
+                        className="inline-flex flex-wrap items-center gap-0.5 rounded-full bg-fondo p-1 ring-1 ring-borde/80"
+                    >
+                        {(
+                            [
+                                { clave: "vigentes", etiqueta: "Vigentes" },
+                                {
+                                    clave: "alertas",
+                                    etiqueta: "Con alertas",
+                                    contador: metricas.conAlertas,
+                                },
+                                { clave: "historial", etiqueta: "Historial" },
+                            ] as const
+                        ).map((tab) => {
+                            const activo = !buscaEnTodas && vista === tab.clave;
+                            return (
+                                <button
+                                    key={tab.clave}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activo}
+                                    disabled={buscaEnTodas}
+                                    onClick={() => {
+                                        setVista(tab.clave);
+                                        setPaginaActual(1);
+                                    }}
+                                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                        activo
+                                            ? "bg-white text-navegacion shadow-2xs ring-1 ring-navegacion/[0.06]"
+                                            : "text-texto-suave hover:text-navegacion"
+                                    }`}
+                                >
+                                    <span>{tab.etiqueta}</span>
+                                    {"contador" in tab && tab.contador > 0 ? (
+                                        <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-rose-500/12 px-1.5 text-[10.5px] font-bold leading-4 text-rose-700">
+                                            {tab.contador}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* BUSCADOR + BOTÓN DE FILTROS AVANZADOS */}
+                    <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
+                        <div className="relative min-w-[210px] flex-1 sm:w-64 sm:flex-initial">
+                            <label htmlFor="buscar-salida" className="sr-only">
+                                Buscar por número de salida o paquete
+                            </label>
+                            <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-texto-suave"
+                            >
+                                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.3-4.3" />
+                                </svg>
+                            </span>
+                            <input
+                                id="buscar-salida"
+                                type="search"
+                                value={busqueda}
+                                onChange={(evento) => {
+                                    setBusqueda(evento.target.value);
+                                    setPaginaActual(1);
+                                }}
+                                placeholder="Buscar SAL-2026 o paquete..."
+                                className="w-full rounded-xl border border-borde bg-fondo/50 py-2 pl-9 pr-3 text-xs font-medium text-navegacion outline-none placeholder:text-texto-suave/70 transition focus:border-marca focus:bg-white focus:ring-4 focus:ring-marca/15"
+                            />
+                        </div>
+
                         <button
-                            key={opcion}
                             type="button"
-                            role="tab"
-                            aria-selected={!buscaEnTodas && vista === opcion}
-                            disabled={buscaEnTodas}
-                            onClick={() => {
-                                setVista(opcion);
-                                setPaginaActual(1);
-                            }}
-                            className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
-                                !buscaEnTodas && vista === opcion
-                                    ? "border-primario bg-primario text-white"
-                                    : "border-borde bg-white text-texto-suave hover:bg-slate-100"
+                            aria-expanded={filtrosAvanzadosAbiertos}
+                            onClick={() => setFiltrosAvanzadosAbiertos((v) => !v)}
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
+                                filtrosAvanzadosAbiertos || cantidadFiltrosAvanzados > 0
+                                    ? "border-marca/45 bg-marca-suave/60 text-navegacion"
+                                    : "border-borde bg-white text-texto hover:bg-fondo"
                             }`}
                         >
-                            {opcion === "vigentes" ? "Vigentes" : "Historial"}
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <line x1="21" x2="14" y1="4" y2="4" />
+                                <line x1="10" x2="3" y1="4" y2="4" />
+                                <line x1="21" x2="12" y1="12" y2="12" />
+                                <line x1="8" x2="3" y1="12" y2="12" />
+                                <line x1="21" x2="16" y1="20" y2="20" />
+                                <line x1="12" x2="3" y1="20" y2="20" />
+                                <line x1="14" x2="14" y1="2" y2="6" />
+                                <line x1="8" x2="8" y1="10" y2="14" />
+                                <line x1="16" x2="16" y1="18" y2="22" />
+                            </svg>
+                            <span>Filtros</span>
+                            {cantidadFiltrosAvanzados > 0 ? (
+                                <span className="inline-flex size-4 items-center justify-center rounded-full bg-navegacion text-[10px] font-bold text-white">
+                                    {cantidadFiltrosAvanzados}
+                                </span>
+                            ) : null}
                         </button>
-                    ))}
+
+                        {hayFiltrosActivos ? (
+                            <button
+                                type="button"
+                                onClick={limpiarFiltros}
+                                className="cursor-pointer rounded-xl px-2.5 py-2 text-xs font-semibold text-marca-oscura transition hover:bg-marca-suave/60"
+                            >
+                                Limpiar
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
 
-                <div className="w-full max-w-sm">
-                    <label htmlFor="buscar-salida" className="sr-only">
-                        Buscar por número de salida
-                    </label>
-                    <input
-                        id="buscar-salida"
-                        type="search"
-                        value={busqueda}
-                        onChange={(evento) => {
-                            setBusqueda(evento.target.value);
-                            setPaginaActual(1);
-                        }}
-                        placeholder="Buscar por número de salida..."
-                        className="w-full rounded-control border border-borde bg-white px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    />
-                </div>
-            </div>
-
-            {/* Panel de Filtros */}
-            <div className="grid gap-3 rounded-tarjeta border border-borde bg-white p-4 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
-                <label
-                    htmlFor="filtro-circuito"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Circuito
-                    <select
-                        id="filtro-circuito"
-                        value={filtroCircuito}
-                        disabled={cargandoCircuitos}
-                        onChange={(evento) => {
-                            setFiltroCircuito(
-                                evento.target.value ? Number(evento.target.value) : "",
-                            );
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
-                    >
-                        <option value="">Todos los circuitos</option>
-                        {circuitos.map((c) => (
-                            <option key={c.idcircuito} value={c.idcircuito}>
-                                {c.nombreCircuito}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label
-                    htmlFor="filtro-paquete"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Paquete
-                    <select
-                        id="filtro-paquete"
-                        value={filtroPaquete}
-                        disabled={cargandoPaquetes}
-                        onChange={(evento) => {
-                            setFiltroPaquete(
-                                evento.target.value ? Number(evento.target.value) : "",
-                            );
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
-                    >
-                        <option value="">Todos los paquetes</option>
-                        {paquetesFiltro.map((p) => (
-                            <option key={p.idpaquete} value={p.idpaquete}>
-                                {p.nroPaquete} · {p.nombrePaquete}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label
-                    htmlFor="filtro-estado"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Estado
-                    <select
-                        id="filtro-estado"
-                        value={filtroEstado}
-                        onChange={(evento) => {
-                            setFiltroEstado(evento.target.value);
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    >
-                        <option value="">Todos los estados</option>
-                        {ESTADOS_SALIDA.map((item) => (
-                            <option key={item.valor} value={item.valor}>
-                                {item.etiqueta}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label
-                    htmlFor="filtro-desde"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Fecha desde
-                    <input
-                        id="filtro-desde"
-                        type="date"
-                        value={filtroDesde}
-                        onChange={(evento) => {
-                            setFiltroDesde(evento.target.value);
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    />
-                </label>
-
-                <label
-                    htmlFor="filtro-hasta"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Fecha hasta
-                    <input
-                        id="filtro-hasta"
-                        type="date"
-                        value={filtroHasta}
-                        onChange={(evento) => {
-                            setFiltroHasta(evento.target.value);
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                    />
-                </label>
-
-                <label
-                    htmlFor="filtro-guia"
-                    className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave"
-                >
-                    Guía asignado
-                    <select
-                        id="filtro-guia"
-                        value={filtroGuia}
-                        disabled={cargandoGuias}
-                        onChange={(evento) => {
-                            setFiltroGuia(
-                                evento.target.value ? Number(evento.target.value) : "",
-                            );
-                            setPaginaActual(1);
-                        }}
-                        className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-slate-50"
-                    >
-                        <option value="">Todos los guías</option>
-                        {personalGuias.map((g) => (
-                            <option key={g.idpersonal} value={g.idpersonal}>
-                                {g.nombreCompleto}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                {hayFiltrosActivos ? (
-                    <div className="flex justify-end sm:col-span-2 md:col-span-3 lg:col-span-6">
-                        <Boton
-                            variante="fantasma"
-                            className="text-xs text-texto-suave"
-                            onClick={limpiarFiltros}
+                {/* PANEL DESPLEGABLE DE FILTROS AVANZADOS */}
+                {filtrosAvanzadosAbiertos ? (
+                    <div className="animar-menu mt-3.5 grid gap-3 border-t border-borde/70 pt-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                        <label
+                            htmlFor="filtro-circuito"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
                         >
-                            Limpiar filtros
-                        </Boton>
+                            Circuito
+                            <select
+                                id="filtro-circuito"
+                                value={filtroCircuito}
+                                disabled={cargandoCircuitos}
+                                onChange={(evento) => {
+                                    setFiltroCircuito(
+                                        evento.target.value ? Number(evento.target.value) : "",
+                                    );
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15 disabled:bg-slate-50"
+                            >
+                                <option value="">Todos</option>
+                                {circuitos.map((c) => (
+                                    <option key={c.idcircuito} value={c.idcircuito}>
+                                        {c.nombreCircuito}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label
+                            htmlFor="filtro-paquete"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
+                        >
+                            Paquete
+                            <select
+                                id="filtro-paquete"
+                                value={filtroPaquete}
+                                disabled={cargandoPaquetes}
+                                onChange={(evento) => {
+                                    setFiltroPaquete(
+                                        evento.target.value ? Number(evento.target.value) : "",
+                                    );
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15 disabled:bg-slate-50"
+                            >
+                                <option value="">Todos</option>
+                                {paquetesFiltro.map((p) => (
+                                    <option key={p.idpaquete} value={p.idpaquete}>
+                                        {p.nroPaquete} · {p.nombrePaquete}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label
+                            htmlFor="filtro-estado"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
+                        >
+                            Estado
+                            <select
+                                id="filtro-estado"
+                                value={filtroEstado}
+                                onChange={(evento) => {
+                                    setFiltroEstado(evento.target.value);
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15"
+                            >
+                                <option value="">Todos</option>
+                                {ESTADOS_SALIDA.map((item) => (
+                                    <option key={item.valor} value={item.valor}>
+                                        {item.etiqueta}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label
+                            htmlFor="filtro-desde"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
+                        >
+                            Fecha desde
+                            <input
+                                id="filtro-desde"
+                                type="date"
+                                value={filtroDesde}
+                                onChange={(evento) => {
+                                    setFiltroDesde(evento.target.value);
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15"
+                            />
+                        </label>
+
+                        <label
+                            htmlFor="filtro-hasta"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
+                        >
+                            Fecha hasta
+                            <input
+                                id="filtro-hasta"
+                                type="date"
+                                value={filtroHasta}
+                                onChange={(evento) => {
+                                    setFiltroHasta(evento.target.value);
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15"
+                            />
+                        </label>
+
+                        <label
+                            htmlFor="filtro-guia"
+                            className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave"
+                        >
+                            Guía asignado
+                            <select
+                                id="filtro-guia"
+                                value={filtroGuia}
+                                disabled={cargandoGuias}
+                                onChange={(evento) => {
+                                    setFiltroGuia(
+                                        evento.target.value ? Number(evento.target.value) : "",
+                                    );
+                                    setPaginaActual(1);
+                                }}
+                                className="w-full min-w-0 rounded-xl border border-borde bg-white px-2.5 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15 disabled:bg-slate-50"
+                            >
+                                <option value="">Todos</option>
+                                {personalGuias.map((g) => (
+                                    <option key={g.idpersonal} value={g.idpersonal}>
+                                        {g.nombreCompleto}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                ) : null}
+
+                {/* CHIPS DE FILTRO ACTIVO CUANDO EL CAJÓN ESTÁ CERRADO */}
+                {!buscaEnTodas && vista === "confirmar" ? (
+                    <div className="mt-2.5 flex items-center gap-2 border-t border-borde/60 pt-2.5 text-xs">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-marca-suave px-2.5 py-0.5 font-semibold text-navegacion">
+                            Mostrando salidas listas para confirmar (CU-40)
+                            <button
+                                type="button"
+                                onClick={() => setVista("vigentes")}
+                                className="cursor-pointer text-marca-oscura hover:text-navegacion"
+                                aria-label="Quitar filtro de confirmación"
+                            >
+                                ✕
+                            </button>
+                        </span>
                     </div>
                 ) : null}
             </div>
 
-            {/* Listado y Estados */}
+            {/* LISTADO MODERNO DE 5 COLUMNAS */}
             {estadoListado !== "exito" ? (
                 <EstadoListado
                     estado={estadoListado}
@@ -2427,29 +2370,269 @@ function SalidasPage() {
                     mensaje={
                         hayFiltrosActivos
                             ? "No se encontraron salidas que coincidan con los filtros seleccionados."
-                            : salidas.length > 0
-                              ? `No hay salidas en ${vista === "vigentes" ? "vigentes" : "el historial"}.`
-                              : "Todavía no hay salidas registradas."
+                            : vista === "alertas"
+                              ? "No hay salidas con alertas operativas pendientes."
+                              : salidas.length > 0
+                                ? `No hay salidas en ${vista === "vigentes" ? "vigentes" : "el historial"}.`
+                                : "Todavía no hay salidas registradas."
                     }
                 />
             ) : (
                 <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-tarjeta">
-                        <div className="min-w-full w-full">
-                            <Tabla
-                                filas={salidasPaginadas}
-                                columnas={columnas}
-                                claseFila={(fila) => {
-                                    const tieneAlertas =
-                                        Array.isArray(fila.alertas) && fila.alertas.length > 0;
-                                    const tieneDesfase = fila.etapaDesfasada === true;
-                                    if (tieneAlertas || tieneDesfase) {
-                                        return "bg-amber-50/75 hover:bg-amber-100/60 transition-colors";
-                                    }
-                                    return undefined;
-                                }}
-                            />
-                        </div>
+                    <div className="overflow-x-auto rounded-2xl border border-borde/80 bg-white shadow-[0_6px_24px_-10px_rgba(18,61,112,0.08)] max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+                        <table className="w-full text-left max-md:block">
+                            <thead className="border-b border-borde/80 bg-fondo/80 text-[11px] font-bold uppercase tracking-wider text-texto-suave max-md:hidden">
+                                <tr>
+                                    <th className="px-5 py-3.5">Salida y fechas</th>
+                                    <th className="px-4 py-3.5">Estado y avance</th>
+                                    <th className="px-4 py-3.5">Ocupación y equipo</th>
+                                    <th className="px-4 py-3.5">Alertas</th>
+                                    <th className="px-5 py-3.5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-borde/70 max-md:flex max-md:flex-col max-md:gap-3 max-md:divide-y-0">
+                                {salidasPaginadas.map((fila) => {
+                                    const alertas = construirAlertasSalida(fila);
+                                    const { principal, menu } = construirAccionesSalida(fila);
+                                    const badgeTiempo = obtenerBadgeTiempo(fila);
+                                    const tieneCritica = alertas.some((a) => a.severidad === "critica");
+                                    const tieneAviso = alertas.length > 0;
+
+                                    const confirmados = fila.pasajerosConfirmados ?? 0;
+                                    const maximo = fila.tamanoMaximo || 1;
+                                    const porcentaje = Math.min(
+                                        100,
+                                        Math.round((confirmados / maximo) * 100),
+                                    );
+                                    const colorBarra =
+                                        porcentaje >= 100
+                                            ? "bg-rose-500"
+                                            : porcentaje >= 60
+                                              ? "bg-emerald-500"
+                                              : porcentaje > 0
+                                                ? "bg-amber-500"
+                                                : "bg-slate-300";
+
+                                    const dotacion = dotacionDeSalida(fila);
+                                    const totalPersonal = fila.cantidadPersonal ?? dotacion.total;
+                                    const guias =
+                                        Array.isArray(fila.guias) && fila.guias.length > 0
+                                            ? fila.guias
+                                            : nombresGuiasDeSalida(fila);
+
+                                    const informada =
+                                        fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
+                                    const totalEtapas =
+                                        fila.paquete?.circuito?.etapas?.length ?? 0;
+
+                                    const bordeAlerta = tieneCritica
+                                        ? "border-l-[3px] border-l-rose-500"
+                                        : tieneAviso
+                                          ? "border-l-[3px] border-l-amber-400"
+                                          : "border-l-[3px] border-l-transparent";
+
+                                    return (
+                                        <tr
+                                            key={fila.idsalida}
+                                            className={`group bg-white transition-colors hover:bg-fondo/45 max-md:block max-md:rounded-2xl max-md:border max-md:border-borde/80 max-md:p-4 max-md:shadow-xs ${bordeAlerta}`}
+                                        >
+                                            {/* COL 1: SALIDA Y FECHAS */}
+                                            <td className="px-5 py-4 align-middle max-md:block max-md:p-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSalidaDetalle(fila)}
+                                                    className="group/titulo cursor-pointer text-left"
+                                                >
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="font-mono text-xs font-bold text-navegacion transition group-hover/titulo:text-marca-oscura">
+                                                            {fila.nroSalida}
+                                                        </span>
+                                                        {badgeTiempo ? (
+                                                            <span
+                                                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeTiempo.estilo}`}
+                                                            >
+                                                                {badgeTiempo.texto}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                    <p className="mt-1 text-sm font-semibold leading-snug text-texto transition group-hover/titulo:text-navegacion">
+                                                        {fila.paquete?.nombrePaquete ?? "—"}
+                                                    </p>
+                                                    <p className="mt-0.5 text-xs text-texto-suave">
+                                                        {formatearRangoFechasUtc(
+                                                            fila.fechaInicio,
+                                                            fila.fechaFin,
+                                                        )}
+                                                    </p>
+                                                </button>
+                                            </td>
+
+                                            {/* COL 2: ESTADO Y AVANCE */}
+                                            <td className="px-4 py-4 align-middle max-md:mt-3 max-md:flex max-md:items-center max-md:justify-between max-md:p-0">
+                                                <span className="text-[11px] font-bold uppercase tracking-wider text-texto-suave md:hidden">
+                                                    Estado
+                                                </span>
+                                                <div className="flex flex-col items-start gap-1.5 max-md:items-end">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estilosEstadoSalida(fila.estado)}`}
+                                                    >
+                                                        {formatearEstadoSalida(fila.estado)}
+                                                    </span>
+                                                    {fila.estado === "EN_CURSO" ? (
+                                                        <span
+                                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                                                fila.etapaDesfasada
+                                                                    ? "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-500/25"
+                                                                    : "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20"
+                                                            }`}
+                                                        >
+                                                            {informada !== null
+                                                                ? `Etapa ${informada}${totalEtapas > 0 ? `/${totalEtapas}` : ""}`
+                                                                : "Iniciada"}{" "}
+                                                            ·{" "}
+                                                            {fila.etapaDesfasada
+                                                                ? "Desfasada"
+                                                                : "Al día"}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+
+                                            {/* COL 3: OCUPACIÓN Y EQUIPO */}
+                                            <td className="px-4 py-4 align-middle max-md:mt-3 max-md:block max-md:p-0">
+                                                <div className="min-w-[155px] space-y-1.5 text-xs">
+                                                    <div className="flex items-baseline justify-between gap-2">
+                                                        <span className="font-bold text-navegacion">
+                                                            {confirmados}
+                                                            <span className="font-normal text-texto-suave">
+                                                                /{fila.tamanoMaximo} pax
+                                                            </span>
+                                                        </span>
+                                                        <span className="text-[11px] font-semibold text-texto-suave">
+                                                            {porcentaje}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-fondo ring-1 ring-borde/50">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-300 ${colorBarra}`}
+                                                            style={{ width: `${porcentaje}%` }}
+                                                        />
+                                                    </div>
+                                                    <p
+                                                        className="truncate text-[11.5px] text-texto-suave max-w-[190px]"
+                                                        title={
+                                                            guias.length > 0
+                                                                ? `Guías: ${guias.join(", ")} (${totalPersonal} en total)`
+                                                                : undefined
+                                                        }
+                                                    >
+                                                        {totalPersonal === 0 ? (
+                                                            <span>Sin personal asignado</span>
+                                                        ) : guias.length > 0 ? (
+                                                            <>
+                                                                <span className="font-medium text-texto">
+                                                                    {guias[0]}
+                                                                </span>
+                                                                {totalPersonal > 1
+                                                                    ? ` · +${totalPersonal - 1}`
+                                                                    : ""}
+                                                            </>
+                                                        ) : (
+                                                            <span>
+                                                                {totalPersonal}{" "}
+                                                                {totalPersonal === 1
+                                                                    ? "asignado"
+                                                                    : "asignados"}
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </td>
+
+                                            {/* COL 4: ALERTAS (MÁX 2 PILLS + +N) */}
+                                            <td className="px-4 py-4 align-middle max-md:mt-3 max-md:block max-md:p-0">
+                                                {alertas.length === 0 ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-fondo px-2.5 py-0.5 text-xs font-medium text-texto-suave">
+                                                        <span className="text-exito">✓</span> Al día
+                                                    </span>
+                                                ) : (
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {alertas.slice(0, 2).map((alerta) => (
+                                                            <button
+                                                                key={alerta.clave}
+                                                                type="button"
+                                                                title={alerta.mensaje ?? alerta.etiqueta}
+                                                                onClick={() => setSalidaDetalle(fila)}
+                                                                className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset transition hover:brightness-95 ${
+                                                                    alerta.severidad === "critica"
+                                                                        ? "bg-rose-50 text-rose-800 ring-rose-500/25"
+                                                                        : alerta.severidad === "advertencia"
+                                                                          ? "bg-amber-50 text-amber-900 ring-amber-500/25"
+                                                                          : "bg-sky-50 text-sky-800 ring-sky-500/25"
+                                                                }`}
+                                                            >
+                                                                <span
+                                                                    className={`size-1.5 rounded-full ${
+                                                                        alerta.severidad === "critica"
+                                                                            ? "bg-rose-500"
+                                                                            : alerta.severidad === "advertencia"
+                                                                              ? "bg-amber-500"
+                                                                              : "bg-sky-500"
+                                                                    }`}
+                                                                    aria-hidden="true"
+                                                                />
+                                                                <span>{alerta.etiqueta}</span>
+                                                            </button>
+                                                        ))}
+                                                        {alertas.length > 2 ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSalidaDetalle(fila)}
+                                                                className="cursor-pointer rounded-full bg-fondo px-2 py-0.5 text-[11px] font-bold text-navegacion ring-1 ring-borde transition hover:bg-marca-suave"
+                                                                title={`Ver los ${alertas.length} avisos`}
+                                                            >
+                                                                +{alertas.length - 2}
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* COL 5: ACCIÓN PRINCIPAL + MENÚ ⋯ */}
+                                            <td className="px-5 py-4 align-middle max-md:mt-3.5 max-md:border-t max-md:border-borde/70 max-md:px-0 max-md:pb-0 max-md:pt-3">
+                                                <div className="flex items-center justify-end gap-2 max-md:justify-between">
+                                                    {principal ? (
+                                                        <button
+                                                            type="button"
+                                                            disabled={algunaMutacionPendiente}
+                                                            onClick={principal.onClick}
+                                                            className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                                                principal.tono === "marca"
+                                                                    ? "bg-gradient-to-r from-navegacion to-marca-oscura text-white shadow-2xs hover:brightness-110"
+                                                                    : principal.tono === "advertencia"
+                                                                      ? "bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-500/30 hover:bg-amber-100"
+                                                                      : principal.tono === "exito"
+                                                                        ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/25 hover:bg-emerald-100"
+                                                                        : "border border-borde bg-white text-navegacion hover:bg-fondo"
+                                                            }`}
+                                                        >
+                                                            {principal.etiqueta}
+                                                        </button>
+                                                    ) : null}
+
+                                                    <MenuAccionesSalida
+                                                        nroSalida={fila.nroSalida}
+                                                        acciones={menu}
+                                                        deshabilitado={algunaMutacionPendiente}
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
 
                     <Paginacion
@@ -2460,6 +2643,16 @@ function SalidasPage() {
                     />
                 </div>
             )}
+
+            {/* MODAL DE DETALLE RÁPIDO DE SALIDA */}
+            {salidaDetalle ? (
+                <ModalDetalleSalida
+                    salida={salidaDetalle}
+                    alertas={construirAlertasSalida(salidaDetalle)}
+                    acciones={construirAccionesSalida(salidaDetalle).accionesDetalle}
+                    onCerrar={() => setSalidaDetalle(null)}
+                />
+            ) : null}
 
             <DialogoConfirmacion
                 abierto={payloadConfirmarAsignacion !== null}
