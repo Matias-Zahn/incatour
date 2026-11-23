@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Modal from "../../components/Modal";
 import { useNavigate } from "react-router-dom";
 import Alerta from "../../components/Alerta";
@@ -6,8 +6,10 @@ import Boton from "../../components/Boton";
 import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import EstadoListado from "../../components/EstadoListado";
 import FormularioPaquete from "../../components/FormularioPaquete";
+import MenuAccionesSalida, {
+    type AccionMenuSalida,
+} from "../../components/MenuAccionesSalida";
 import Paginacion from "../../components/Paginacion";
-import Tabla from "../../components/Tabla";
 import { useCircuitos } from "../../services/circuitoService";
 import {
     formatearDiasLegibles,
@@ -26,10 +28,98 @@ import {
 import { temporadaVencida, useTemporadas } from "../../services/temporadaService";
 import { etiquetaEstadoRegistro, formatearMonto } from "../../services/formato";
 
-const ELEMENTOS_POR_PAGINA = 5;
+const ELEMENTOS_POR_PAGINA = 9;
 const FORMATOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
 const TAMANO_MAXIMO_IMAGEN_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGENES_PAQUETE = 5;
+
+function IconoTarjetas() {
+    return (
+        <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect width="7" height="7" x="3" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="14" rx="1" />
+            <rect width="7" height="7" x="3" y="14" rx="1" />
+        </svg>
+    );
+}
+
+function IconoTabla() {
+    return (
+        <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="8" x2="21" y1="6" y2="6" />
+            <line x1="8" x2="21" y1="12" y2="12" />
+            <line x1="8" x2="21" y1="18" y2="18" />
+            <line x1="3" x2="3.01" y1="6" y2="6" />
+            <line x1="3" x2="3.01" y1="12" y2="12" />
+            <line x1="3" x2="3.01" y1="18" y2="18" />
+        </svg>
+    );
+}
+
+function IconoCamara() {
+    return (
+        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+            <circle cx="12" cy="13" r="3" />
+        </svg>
+    );
+}
+
+type MenuPaqueteProps = {
+    paquete: Paquete;
+    subiendoEste: boolean;
+    onVistaPrevia: () => void;
+    onSubirImagenes: () => void;
+    onDarDeBaja: () => void;
+};
+
+function MenuPaquete({
+    paquete,
+    subiendoEste,
+    onVistaPrevia,
+    onSubirImagenes,
+    onDarDeBaja,
+}: MenuPaqueteProps) {
+    const inactivo = paquete.estado === "INACTIVO";
+    const acciones: AccionMenuSalida[] = [
+        {
+            tipo: "boton",
+            id: "vista-previa",
+            etiqueta: "Vista previa y detalle",
+            onClick: onVistaPrevia,
+        },
+        {
+            tipo: "enlace",
+            id: "ver-tienda",
+            etiqueta: "Ver en tienda cliente",
+            to: `/catalogo?vista=admin&paquete=${paquete.idpaquete}`,
+        },
+    ];
+
+    if (!inactivo) {
+        acciones.push({
+            tipo: "boton",
+            id: "subir-imagenes",
+            etiqueta: subiendoEste
+                ? "Subiendo imágenes..."
+                : "Cambiar imágenes (1-5)",
+            deshabilitado: subiendoEste,
+            onClick: onSubirImagenes,
+        });
+        acciones.push({
+            tipo: "boton",
+            id: "dar-de-baja",
+            etiqueta: "Dar de baja",
+            tono: "peligro",
+            onClick: onDarDeBaja,
+        });
+    }
+
+    return (
+        <MenuAccionesSalida nroSalida={paquete.nroPaquete} acciones={acciones} />
+    );
+}
 
 function esGarantiaEstablecimiento(tipoGarantia: string): boolean {
     return tipoGarantia.toUpperCase().includes("ESTABLECIMIENTO");
@@ -66,7 +156,14 @@ function PaquetesPage() {
     >("TODOS");
     const [filtroCircuito, setFiltroCircuito] = useState<number>(0);
     const [filtroTemporada, setFiltroTemporada] = useState<number>(0);
+    const [soloPendientes, setSoloPendientes] = useState(false);
+    const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] =
+        useState(false);
+    const [vistaPresentacion, setVistaPresentacion] = useState<
+        "tarjetas" | "tabla"
+    >("tarjetas");
 
+    const { data: todosLosPaquetes = [] } = usePaquetes({ estado: "TODOS" });
     const {
         data: paquetes = [],
         isPending,
@@ -308,22 +405,44 @@ function PaquetesPage() {
         });
     }
 
+    const tienePendienteComercial = (paquete: Paquete) =>
+        paquete.estado === "ACTIVO" &&
+        (paquete.faltaTransporte === true ||
+            tarifasVigentes(paquete).length === 0);
+
+    const metricasPaquetes = useMemo(() => {
+        const base = todosLosPaquetes.length > 0 ? todosLosPaquetes : paquetes;
+        const activos = base.filter((p) => p.estado === "ACTIVO").length;
+        const inactivos = base.filter((p) => p.estado === "INACTIVO").length;
+        const pendientes = base.filter(tienePendienteComercial).length;
+        return { total: base.length, activos, inactivos, pendientes };
+    }, [todosLosPaquetes, paquetes]);
+
     const terminoLimpio = busqueda.trim().toLowerCase();
+    const cantidadFiltrosAvanzados = [
+        filtroCircuito > 0,
+        filtroTemporada > 0,
+    ].filter(Boolean).length;
     const hayFiltrosActivos =
         Boolean(terminoLimpio) ||
         filtroEstado !== "TODOS" ||
         filtroCircuito > 0 ||
-        filtroTemporada > 0;
+        filtroTemporada > 0 ||
+        soloPendientes;
 
     function limpiarTodosLosFiltros() {
         setBusqueda("");
         setFiltroEstado("TODOS");
         setFiltroCircuito(0);
         setFiltroTemporada(0);
+        setSoloPendientes(false);
         setPaginaActual(1);
     }
 
     const paquetesFiltrados = paquetes.filter((paquete) => {
+        if (soloPendientes && !tienePendienteComercial(paquete)) {
+            return false;
+        }
         if (
             filtroTemporada > 0 &&
             !paquete.tarifas?.some((t) => t.idtemporada === filtroTemporada)
@@ -345,7 +464,8 @@ function PaquetesPage() {
         1,
         Math.ceil(paquetesFiltrados.length / ELEMENTOS_POR_PAGINA),
     );
-    const indiceInicio = (paginaActual - 1) * ELEMENTOS_POR_PAGINA;
+    const paginaValida = Math.min(paginaActual, totalPaginas);
+    const indiceInicio = (paginaValida - 1) * ELEMENTOS_POR_PAGINA;
     const paquetesPaginados = paquetesFiltrados.slice(
         indiceInicio,
         indiceInicio + ELEMENTOS_POR_PAGINA,
@@ -359,31 +479,60 @@ function PaquetesPage() {
         !sinPaquetesRegistrados &&
         paquetesFiltrados.length === 0;
 
+    function resumenGarantia(paquete: Paquete): string {
+        const porEst = esGarantiaEstablecimiento(paquete.tipoGarantia);
+        if (porEst) {
+            const nombres = (paquete.garantiasEstablecimiento ?? [])
+                .map((g) => g.servicio?.nombreServicio)
+                .filter(Boolean);
+            return nombres.length > 0
+                ? nombres.join(", ")
+                : "Establecimiento garantizado";
+        }
+        return (
+            [
+                paquete.categoriaGarantizada,
+                paquete.localidadGarantizada,
+                paquete.tipoHabitacionGarantizada
+                    ? `Hab. ${paquete.tipoHabitacionGarantizada}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(" · ") || "Categoría garantizada"
+        );
+    }
+
     return (
-        <section className="mx-auto max-w-7xl space-y-6">
+        <section className="mx-auto max-w-[1440px] space-y-5">
             <header className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                    <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-texto-suave">
+                    <p className="text-xs font-bold uppercase tracking-wider text-marca-oscura">
                         Catálogo comercial
                     </p>
-                    <h1 className="text-3xl font-bold text-navegacion">
+                    <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-navegacion sm:text-3xl">
                         Paquetes turísticos
                     </h1>
-                    <p className="mt-2 text-sm text-texto-suave">
-                        Administrá los paquetes comerciales, sus garantías de alojamiento y tarifas por temporada.
+                    <p className="mt-1 text-sm text-texto-suave">
+                        Oferta comercial, galerías, garantías de alojamiento y tarifas por temporada.
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    <Boton
-                        variante="secundario"
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                        type="button"
                         onClick={() => navegar("/catalogo?vista=admin")}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-borde bg-white px-3.5 py-2 text-xs font-semibold text-navegacion transition hover:border-marca/45 hover:bg-marca-suave/50"
                     >
-                        👁 Ver tienda como cliente
-                    </Boton>
-                    <Boton onClick={() => abrirFormulario()}>
-                        Nuevo paquete turístico
-                    </Boton>
+                        <span>Ver tienda como cliente</span>
+                        <span aria-hidden="true">↗</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => abrirFormulario()}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-r from-navegacion to-marca-oscura px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:brightness-110"
+                    >
+                        <span>+ Nuevo paquete</span>
+                    </button>
                 </div>
             </header>
 
@@ -446,99 +595,331 @@ function PaquetesPage() {
                 </Alerta>
             ) : null}
 
+            {/* 3 TARJETAS KPI CLICABLES */}
+            <div className="grid gap-3 sm:grid-cols-3">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSoloPendientes(false);
+                        setFiltroEstado((prev) =>
+                            prev === "ACTIVO" ? "TODOS" : "ACTIVO",
+                        );
+                        setPaginaActual(1);
+                    }}
+                    className={`flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        filtroEstado === "ACTIVO" && !soloPendientes
+                            ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Activos en tienda
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricasPaquetes.activos}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            Visibles en el catálogo público
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSoloPendientes((prev) => !prev);
+                        setFiltroEstado("TODOS");
+                        setPaginaActual(1);
+                    }}
+                    className={`flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        soloPendientes
+                            ? "border-amber-400 bg-amber-50/50 ring-2 ring-amber-400/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Con pendientes
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricasPaquetes.pendientes}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricasPaquetes.pendientes > 0 ? (
+                                <span className="font-semibold text-amber-800">
+                                    Sin tarifas vigentes o sin transporte
+                                </span>
+                            ) : (
+                                <span className="font-medium text-emerald-700">
+                                    Todos completos para vender
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                    <span
+                        className={`grid size-8 place-items-center rounded-xl text-xs font-bold ring-1 ring-inset ${
+                            metricasPaquetes.pendientes > 0
+                                ? "bg-amber-50 text-amber-800 ring-amber-500/25"
+                                : "bg-fondo text-texto-suave ring-borde"
+                        }`}
+                    >
+                        !
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSoloPendientes(false);
+                        setFiltroEstado((prev) =>
+                            prev === "INACTIVO" ? "TODOS" : "INACTIVO",
+                        );
+                        setPaginaActual(1);
+                    }}
+                    className={`flex cursor-pointer items-start justify-between rounded-2xl border p-4 text-left transition ${
+                        filtroEstado === "INACTIVO"
+                            ? "border-slate-400 bg-slate-50 ring-2 ring-slate-400/20"
+                            : "border-borde/80 bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Inactivos
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricasPaquetes.inactivos}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            Dados de baja del catálogo
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-fondo text-xs font-bold text-texto-suave ring-1 ring-inset ring-borde">
+                        —
+                    </span>
+                </button>
+            </div>
+
+            {/* BARRA DE HERRAMIENTAS DE 1 FILA + FILTROS COLAPSABLES */}
             {estado === "exito" && (paquetes.length > 0 || hayFiltrosActivos) ? (
-                <div className="grid grid-cols-1 items-end gap-3 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta sm:grid-cols-2 xl:grid-cols-[1.4fr_0.9fr_1fr_1fr_auto]">
-                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
-                        Buscar paquete
-                        <input
-                            id="buscar-paquete"
-                            type="search"
-                            value={busqueda}
-                            onChange={(evento) =>
-                                manejarCambioBusqueda(evento.target.value)
-                            }
-                            placeholder="Código, nombre, circuito o garantía..."
-                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3.5 py-2 text-sm font-normal text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        />
-                    </label>
-
-                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
-                        Estado
-                        <select
+                <div className="rounded-2xl border border-borde/80 bg-white p-3.5 shadow-[0_4px_16px_-8px_rgba(18,61,112,0.08)]">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        {/* CÁPSULA SEGMENTADA DE ESTADOS */}
+                        <div
+                            role="tablist"
                             aria-label="Filtrar paquetes por estado"
-                            value={filtroEstado}
-                            onChange={(e) => {
-                                setFiltroEstado(
-                                    e.target.value as
-                                        | "ACTIVO"
-                                        | "INACTIVO"
-                                        | "TODOS",
+                            className="inline-flex items-center gap-0.5 rounded-full bg-fondo p-1 ring-1 ring-borde/80"
+                        >
+                            {(
+                                [
+                                    { valor: "TODOS", etiqueta: "Todos" },
+                                    { valor: "ACTIVO", etiqueta: "Activos" },
+                                    { valor: "INACTIVO", etiqueta: "Inactivos" },
+                                ] as const
+                            ).map((op) => {
+                                const activo =
+                                    !soloPendientes && filtroEstado === op.valor;
+                                return (
+                                    <button
+                                        key={op.valor}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={activo}
+                                        onClick={() => {
+                                            setSoloPendientes(false);
+                                            setFiltroEstado(op.valor);
+                                            setPaginaActual(1);
+                                        }}
+                                        className={`cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                                            activo
+                                                ? "bg-white text-navegacion shadow-2xs ring-1 ring-navegacion/[0.06]"
+                                                : "text-texto-suave hover:text-navegacion"
+                                        }`}
+                                    >
+                                        {op.etiqueta}
+                                    </button>
                                 );
-                                setPaginaActual(1);
-                            }}
-                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        >
-                            <option value="TODOS">Todos los estados</option>
-                            <option value="ACTIVO">Activos</option>
-                            <option value="INACTIVO">Inactivos</option>
-                        </select>
-                    </label>
+                            })}
+                        </div>
 
-                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
-                        Circuito
-                        <select
-                            aria-label="Filtrar paquetes por circuito"
-                            value={filtroCircuito}
-                            onChange={(e) => {
-                                setFiltroCircuito(Number(e.target.value));
-                                setPaginaActual(1);
-                            }}
-                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        >
-                            <option value={0}>Todos los circuitos</option>
-                            {circuitos.map((c) => (
-                                <option key={c.idcircuito} value={c.idcircuito}>
-                                    {c.nombreCircuito}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label className="grid min-w-0 gap-1 text-xs font-semibold text-texto-suave">
-                        Temporada
-                        <select
-                            aria-label="Filtrar paquetes por temporada"
-                            value={filtroTemporada}
-                            onChange={(e) => {
-                                setFiltroTemporada(Number(e.target.value));
-                                setPaginaActual(1);
-                            }}
-                            className="w-full min-w-0 rounded-control border border-borde bg-white px-3 py-2 text-sm font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
-                        >
-                            <option value={0}>Todas las temporadas</option>
-                            {temporadas.filter((t) => !temporadaVencida(t)).map((t) => (
-                                <option
-                                    key={t.idtemporada}
-                                    value={t.idtemporada}
+                        {/* BUSCADOR + FILTROS + SWITCH TARJETAS/TABLA */}
+                        <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
+                            <div className="relative min-w-[210px] flex-1 sm:w-64 sm:flex-initial">
+                                <label htmlFor="buscar-paquete" className="sr-only">
+                                    Buscar paquete
+                                </label>
+                                <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-texto-suave"
                                 >
-                                    {t.nombre}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                                    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <path d="m21 21-4.3-4.3" />
+                                    </svg>
+                                </span>
+                                <input
+                                    id="buscar-paquete"
+                                    type="search"
+                                    value={busqueda}
+                                    onChange={(evento) =>
+                                        manejarCambioBusqueda(evento.target.value)
+                                    }
+                                    placeholder="Buscar código, nombre o circuito..."
+                                    className="w-full rounded-xl border border-borde bg-fondo/50 py-2 pl-9 pr-3 text-xs font-medium text-navegacion outline-none placeholder:text-texto-suave/70 transition focus:border-marca focus:bg-white focus:ring-4 focus:ring-marca/15"
+                                />
+                            </div>
 
-                    {hayFiltrosActivos ? (
-                        <Boton
-                            variante="fantasma"
-                            className="justify-self-start px-3 py-2 text-xs text-texto-suave sm:col-span-2 xl:col-span-1"
-                            onClick={limpiarTodosLosFiltros}
-                        >
-                            Limpiar filtros
-                        </Boton>
+                            <button
+                                type="button"
+                                aria-expanded={filtrosAvanzadosAbiertos}
+                                onClick={() =>
+                                    setFiltrosAvanzadosAbiertos((v) => !v)
+                                }
+                                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
+                                    filtrosAvanzadosAbiertos ||
+                                    cantidadFiltrosAvanzados > 0
+                                        ? "border-marca/45 bg-marca-suave/60 text-navegacion"
+                                        : "border-borde bg-white text-texto hover:bg-fondo"
+                                }`}
+                            >
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <line x1="21" x2="14" y1="4" y2="4" />
+                                    <line x1="10" x2="3" y1="4" y2="4" />
+                                    <line x1="21" x2="12" y1="12" y2="12" />
+                                    <line x1="8" x2="3" y1="12" y2="12" />
+                                    <line x1="21" x2="16" y1="20" y2="20" />
+                                    <line x1="12" x2="3" y1="20" y2="20" />
+                                    <line x1="14" x2="14" y1="2" y2="6" />
+                                    <line x1="8" x2="8" y1="10" y2="14" />
+                                    <line x1="16" x2="16" y1="18" y2="22" />
+                                </svg>
+                                <span>Filtros</span>
+                                {cantidadFiltrosAvanzados > 0 ? (
+                                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-navegacion text-[10px] font-bold text-white">
+                                        {cantidadFiltrosAvanzados}
+                                    </span>
+                                ) : null}
+                            </button>
+
+                            {/* SWITCH TARJETAS | TABLA */}
+                            <div
+                                role="group"
+                                aria-label="Modo de visualización"
+                                className="inline-flex items-center rounded-xl bg-fondo p-0.5 ring-1 ring-borde/80"
+                            >
+                                <button
+                                    type="button"
+                                    aria-pressed={vistaPresentacion === "tarjetas"}
+                                    onClick={() => setVistaPresentacion("tarjetas")}
+                                    title="Vista en tarjetas"
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                                        vistaPresentacion === "tarjetas"
+                                            ? "bg-white text-navegacion shadow-2xs"
+                                            : "text-texto-suave hover:text-navegacion"
+                                    }`}
+                                >
+                                    <IconoTarjetas />
+                                    <span className="hidden sm:inline">Tarjetas</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-pressed={vistaPresentacion === "tabla"}
+                                    onClick={() => setVistaPresentacion("tabla")}
+                                    title="Vista en tabla"
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                                        vistaPresentacion === "tabla"
+                                            ? "bg-white text-navegacion shadow-2xs"
+                                            : "text-texto-suave hover:text-navegacion"
+                                    }`}
+                                >
+                                    <IconoTabla />
+                                    <span className="hidden sm:inline">Tabla</span>
+                                </button>
+                            </div>
+
+                            {hayFiltrosActivos ? (
+                                <button
+                                    type="button"
+                                    onClick={limpiarTodosLosFiltros}
+                                    className="cursor-pointer rounded-xl px-2.5 py-2 text-xs font-semibold text-marca-oscura transition hover:bg-marca-suave/60"
+                                >
+                                    Limpiar
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    {filtrosAvanzadosAbiertos ? (
+                        <div className="animar-menu mt-3.5 grid gap-3 border-t border-borde/70 pt-3.5 sm:grid-cols-2">
+                            <label className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave">
+                                Circuito
+                                <select
+                                    aria-label="Filtrar paquetes por circuito"
+                                    value={filtroCircuito}
+                                    onChange={(e) => {
+                                        setFiltroCircuito(Number(e.target.value));
+                                        setPaginaActual(1);
+                                    }}
+                                    className="w-full min-w-0 rounded-xl border border-borde bg-white px-3 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15"
+                                >
+                                    <option value={0}>Todos los circuitos</option>
+                                    {circuitos.map((c) => (
+                                        <option key={c.idcircuito} value={c.idcircuito}>
+                                            {c.nombreCircuito}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="grid min-w-0 gap-1 text-[11px] font-semibold uppercase tracking-wide text-texto-suave">
+                                Temporada con tarifa cargada
+                                <select
+                                    aria-label="Filtrar paquetes por temporada"
+                                    value={filtroTemporada}
+                                    onChange={(e) => {
+                                        setFiltroTemporada(Number(e.target.value));
+                                        setPaginaActual(1);
+                                    }}
+                                    className="w-full min-w-0 rounded-xl border border-borde bg-white px-3 py-2 text-xs font-medium normal-case tracking-normal text-navegacion outline-none focus:border-marca focus:ring-4 focus:ring-marca/15"
+                                >
+                                    <option value={0}>Todas las temporadas</option>
+                                    {temporadas
+                                        .filter((t) => !temporadaVencida(t))
+                                        .map((t) => (
+                                            <option
+                                                key={t.idtemporada}
+                                                value={t.idtemporada}
+                                            >
+                                                {t.nombre}
+                                            </option>
+                                        ))}
+                                </select>
+                            </label>
+                        </div>
+                    ) : null}
+
+                    {soloPendientes ? (
+                        <div className="mt-2.5 flex items-center gap-2 border-t border-borde/60 pt-2.5 text-xs">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 font-semibold text-amber-900 ring-1 ring-inset ring-amber-500/25">
+                                Mostrando paquetes con pendientes comerciales
+                                <button
+                                    type="button"
+                                    onClick={() => setSoloPendientes(false)}
+                                    className="cursor-pointer text-amber-800 hover:text-amber-950"
+                                    aria-label="Quitar filtro de pendientes"
+                                >
+                                    ✕
+                                </button>
+                            </span>
+                        </div>
                     ) : null}
                 </div>
             ) : null}
 
+            {/* CONTENIDO: TARJETAS (POR DEFECTO) O TABLA LIMPIA */}
             {estado !== "exito" ? (
                 <EstadoListado
                     estado={estado}
@@ -554,47 +935,317 @@ function PaquetesPage() {
                     estado="vacio"
                     mensaje="No se encontraron paquetes que coincidan con los filtros seleccionados."
                 />
-            ) : (
-                <div className="overflow-x-auto">
-                    <Tabla
-                        filas={paquetesPaginados}
-                        columnas={[
-                            {
-                                clave: "nombrePaquete",
-                                titulo: "Paquete",
-                                renderizar: (paquete) => {
-                                    const galeria = obtenerGaleriaPaquete(paquete);
-                                    const urlPortada = resolverUrlImagenPaquete(
-                                        galeria[0],
-                                    );
-                                    return (
-                                        <div className="flex items-start gap-3">
+            ) : vistaPresentacion === "tarjetas" ? (
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {paquetesPaginados.map((paquete) => {
+                        const galeria = obtenerGaleriaPaquete(paquete);
+                        const urlPortada = resolverUrlImagenPaquete(galeria[0]);
+                        const vigentes = tarifasVigentes(paquete);
+                        const tarifaMin =
+                            vigentes.length > 0
+                                ? vigentes.reduce(
+                                      (min, t) =>
+                                          t.monto < min.monto ? t : min,
+                                      vigentes[0],
+                                  )
+                                : null;
+                        const porEst = esGarantiaEstablecimiento(
+                            paquete.tipoGarantia,
+                        );
+                        const inactivo = paquete.estado === "INACTIVO";
+                        const subiendoEste =
+                            subirImagen.isPending &&
+                            idPaqueteParaImagen === paquete.idpaquete;
+
+                        return (
+                            <article
+                                key={paquete.idpaquete}
+                                className={`group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_6px_24px_-10px_rgba(18,61,112,0.09)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-14px_rgba(18,61,112,0.16)] ${
+                                    inactivo
+                                        ? "border-borde/70 opacity-85"
+                                        : "border-borde/80"
+                                }`}
+                            >
+                                {/* PORTADA */}
+                                <div
+                                    onClick={() => abrirVistaPrevia(paquete)}
+                                    className="relative h-44 cursor-pointer overflow-hidden bg-navegacion/10"
+                                >
+                                    <img
+                                        src={urlPortada}
+                                        alt={paquete.nombrePaquete}
+                                        loading="lazy"
+                                        className={`size-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                            inactivo ? "grayscale-[45%]" : ""
+                                        }`}
+                                    />
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 bg-gradient-to-t from-[#081c36]/75 via-[#081c36]/15 to-[#081c36]/25"
+                                    />
+
+                                    <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span
+                                                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-2xs backdrop-blur-md ${
+                                                    inactivo
+                                                        ? "bg-slate-800/80 text-white"
+                                                        : "bg-emerald-500/90 text-white"
+                                                }`}
+                                            >
+                                                {etiquetaEstadoRegistro(paquete.estado)}
+                                            </span>
+                                            {paquete.faltaTransporte ? (
+                                                <span className="rounded-full bg-amber-400/95 px-2.5 py-0.5 text-[11px] font-bold text-navegacion shadow-2xs">
+                                                    Falta transporte
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <span className="shrink-0 rounded-full bg-black/40 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-white/95 backdrop-blur-md">
+                                            {paquete.nroPaquete}
+                                        </span>
+                                    </div>
+
+                                    <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+                                            <IconoCamara />
+                                            {galeria.length}{" "}
+                                            {galeria.length === 1 ? "foto" : "fotos"}
+                                        </span>
+
+                                        {!inactivo ? (
                                             <button
                                                 type="button"
-                                                onClick={() =>
-                                                    abrirVistaPrevia(paquete)
-                                                }
-                                                title="Ver vista previa y galería del paquete"
-                                                className="group relative shrink-0 overflow-hidden rounded-control border border-borde bg-fondo"
+                                                disabled={subiendoEste}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    iniciarSubidaImagenRapida(paquete);
+                                                }}
+                                                className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/25 bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md transition hover:bg-white/25 disabled:opacity-50"
                                             >
-                                                <img
-                                                    src={urlPortada}
-                                                    alt={paquete.nombrePaquete}
-                                                    className="h-14 w-20 object-cover transition group-hover:scale-105"
-                                                />
-                                                <span className="absolute right-1 bottom-1 rounded bg-navegacion/85 px-1.5 py-0.5 text-xs font-bold text-white">
-                                                    {galeria.length}{" "}
-                                                    {galeria.length === 1
-                                                        ? "foto"
-                                                        : "fotos"}
-                                                </span>
+                                                {subiendoEste
+                                                    ? "Subiendo..."
+                                                    : "Cambiar fotos"}
                                             </button>
+                                        ) : null}
+                                    </div>
+                                </div>
 
+                                {/* CUERPO */}
+                                <div className="flex flex-1 flex-col justify-between gap-4 p-5">
+                                    <div className="space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="rounded bg-marca-activa px-2 py-0.5 text-xs font-bold text-marca-oscura">
-                                                        {paquete.nroPaquete}
-                                                    </span>
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-marca-oscura">
+                                                    {paquete.circuito?.nombreCircuito ??
+                                                        `Circuito #${paquete.idcircuito}`}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        abrirVistaPrevia(paquete)
+                                                    }
+                                                    className="mt-0.5 cursor-pointer text-left text-lg font-bold leading-snug tracking-tight text-navegacion transition hover:text-marca-oscura"
+                                                >
+                                                    {paquete.nombrePaquete}
+                                                </button>
+                                                {paquete.localidadGarantizada ? (
+                                                    <p className="mt-0.5 text-xs text-texto-suave">
+                                                        Sale desde{" "}
+                                                        <strong className="font-semibold text-texto">
+                                                            {paquete.localidadGarantizada}
+                                                        </strong>
+                                                        {paquete.diasCierreVenta != null
+                                                            ? paquete.diasCierreVenta === 0
+                                                                ? " · Cierra el mismo día"
+                                                                : ` · Cierra ${paquete.diasCierreVenta} ${paquete.diasCierreVenta === 1 ? "día" : "días"} antes`
+                                                            : ""}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+
+                                            {tarifaMin ? (
+                                                <div className="shrink-0 rounded-xl bg-fondo/80 px-2.5 py-1.5 text-right ring-1 ring-borde/70">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-texto-suave">
+                                                        Desde
+                                                    </p>
+                                                    <p className="whitespace-nowrap text-base font-bold text-navegacion">
+                                                        {formatearMonto(
+                                                            tarifaMin.monto,
+                                                            tarifaMin.moneda,
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            ) : null}
+                                        </div>
+
+                                        {/* GARANTÍA Y NOCHES */}
+                                        <div className="rounded-xl border border-borde/70 bg-fondo/45 px-3 py-2.5 text-xs">
+                                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                                <span
+                                                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                                        porEst
+                                                            ? "bg-emerald-50 text-exito"
+                                                            : "bg-marca-suave text-marca-oscura"
+                                                    }`}
+                                                >
+                                                    {porEst
+                                                        ? "Por establecimiento"
+                                                        : "Por categoría"}
+                                                </span>
+                                                <span className="text-[11px] font-medium text-texto-suave">
+                                                    {paquete.nochesPrevias} prev. ·{" "}
+                                                    {paquete.nochesPosteriores} post.
+                                                </span>
+                                            </div>
+                                            <p className="mt-1.5 truncate font-medium text-navegacion" title={resumenGarantia(paquete)}>
+                                                {resumenGarantia(paquete)}
+                                            </p>
+                                            {paquete.diasDisponibles ? (
+                                                <p className="mt-0.5 text-[11px] text-texto-suave">
+                                                    Salidas:{" "}
+                                                    {formatearDiasLegibles(
+                                                        paquete.diasDisponibles,
+                                                    )}
+                                                </p>
+                                            ) : null}
+                                        </div>
+
+                                        {/* TARIFAS VIGENTES */}
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {vigentes.length > 0 ? (
+                                                <>
+                                                    {vigentes
+                                                        .slice(0, 3)
+                                                        .map((tarifa) => (
+                                                            <span
+                                                                key={
+                                                                    tarifa.idtemporada
+                                                                }
+                                                                className="inline-flex items-center rounded-lg border border-borde/75 bg-white px-2 py-0.5 text-[11px] font-medium text-texto-suave"
+                                                            >
+                                                                {tarifa.temporada
+                                                                    ?.nombre ??
+                                                                    `Temp. #${tarifa.idtemporada}`}
+                                                                :
+                                                                <strong className="ml-1 font-semibold text-navegacion">
+                                                                    {formatearMonto(
+                                                                        tarifa.monto,
+                                                                        tarifa.moneda,
+                                                                    )}
+                                                                </strong>
+                                                            </span>
+                                                        ))}
+                                                    {vigentes.length > 3 ? (
+                                                        <span className="text-[11px] font-semibold text-texto-suave">
+                                                            +{vigentes.length - 3}
+                                                        </span>
+                                                    ) : null}
+                                                </>
+                                            ) : (
+                                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-500/20">
+                                                    Sin tarifas vigentes
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* PIE DE TARJETA */}
+                                <div className="flex items-center justify-between gap-2 border-t border-borde/70 bg-fondo/30 px-5 py-3">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={inactivo}
+                                            onClick={() => abrirFormulario(paquete)}
+                                            className="cursor-pointer rounded-lg bg-gradient-to-r from-navegacion to-marca-oscura px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => abrirVistaPrevia(paquete)}
+                                            className="cursor-pointer rounded-lg border border-borde bg-white px-3 py-1.5 text-xs font-semibold text-navegacion transition hover:bg-fondo"
+                                        >
+                                            Vista previa
+                                        </button>
+                                    </div>
+
+                                    <MenuPaquete
+                                        paquete={paquete}
+                                        subiendoEste={subiendoEste}
+                                        onVistaPrevia={() =>
+                                            abrirVistaPrevia(paquete)
+                                        }
+                                        onSubirImagenes={() =>
+                                            iniciarSubidaImagenRapida(paquete)
+                                        }
+                                        onDarDeBaja={() =>
+                                            abrirDialogoBaja(paquete)
+                                        }
+                                    />
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
+            ) : (
+                /* VISTA TABLA LIMPIA (5 COLUMNAS) */
+                <div className="overflow-x-auto rounded-2xl border border-borde/80 bg-white shadow-[0_6px_24px_-10px_rgba(18,61,112,0.08)] max-md:overflow-visible max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+                    <table className="w-full text-left max-md:block">
+                        <thead className="border-b border-borde/80 bg-fondo/80 text-[11px] font-bold uppercase tracking-wider text-texto-suave max-md:hidden">
+                            <tr>
+                                <th className="px-5 py-3.5">Paquete y circuito</th>
+                                <th className="px-4 py-3.5">Alojamiento</th>
+                                <th className="px-4 py-3.5">Tarifas vigentes</th>
+                                <th className="px-4 py-3.5">Estado</th>
+                                <th className="px-5 py-3.5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-borde/70 max-md:flex max-md:flex-col max-md:gap-3 max-md:divide-y-0">
+                            {paquetesPaginados.map((paquete) => {
+                                const galeria = obtenerGaleriaPaquete(paquete);
+                                const urlPortada = resolverUrlImagenPaquete(
+                                    galeria[0],
+                                );
+                                const vigentes = tarifasVigentes(paquete);
+                                const porEst = esGarantiaEstablecimiento(
+                                    paquete.tipoGarantia,
+                                );
+                                const inactivo = paquete.estado === "INACTIVO";
+
+                                return (
+                                    <tr
+                                        key={paquete.idpaquete}
+                                        className="bg-white transition-colors hover:bg-fondo/45 max-md:block max-md:rounded-2xl max-md:border max-md:border-borde/80 max-md:p-4 max-md:shadow-xs"
+                                    >
+                                        <td className="px-5 py-3.5 align-middle max-md:block max-md:p-0">
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        abrirVistaPrevia(paquete)
+                                                    }
+                                                    className="group relative shrink-0 cursor-pointer overflow-hidden rounded-xl border border-borde bg-fondo"
+                                                >
+                                                    <img
+                                                        src={urlPortada}
+                                                        alt={paquete.nombrePaquete}
+                                                        className="h-12 w-16 object-cover transition group-hover:scale-105"
+                                                    />
+                                                </button>
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <span className="font-mono text-xs font-bold text-marca-oscura">
+                                                            {paquete.nroPaquete}
+                                                        </span>
+                                                        {paquete.faltaTransporte ? (
+                                                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-500/20">
+                                                                Falta transporte
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -602,225 +1253,151 @@ function PaquetesPage() {
                                                                 paquete,
                                                             )
                                                         }
-                                                        className="text-left font-semibold text-texto hover:text-marca-oscura hover:underline"
+                                                        className="cursor-pointer text-left text-sm font-semibold text-navegacion hover:text-marca-oscura"
                                                     >
                                                         {paquete.nombrePaquete}
                                                     </button>
-                                                    {paquete.faltaTransporte ? (
-                                                        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                                                            Falta transporte
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                                {paquete.localidadGarantizada ? (
-                                                    <p className="mt-0.5 text-xs text-texto-suave">
-                                                        Sale desde{" "}
-                                                        <span className="font-medium text-texto">
-                                                            {paquete.localidadGarantizada}
-                                                        </span>
-                                                        {paquete.diasCierreVenta != null
-                                                            ? ` · Cierre ${paquete.diasCierreVenta} d antes`
+                                                    <p className="text-xs text-texto-suave">
+                                                        {paquete.circuito
+                                                            ?.nombreCircuito ??
+                                                            `Circuito #${paquete.idcircuito}`}
+                                                        {paquete.localidadGarantizada
+                                                            ? ` · Sale desde ${paquete.localidadGarantizada}`
                                                             : ""}
                                                     </p>
-                                                ) : null}
-                                                {paquete.condiciones ? (
-                                                    <p className="mt-1 line-clamp-2 text-xs text-texto-suave">
-                                                        {paquete.condiciones}
-                                                    </p>
-                                                ) : null}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                },
-                            },
-                            {
-                                clave: "idcircuito",
-                                titulo: "Circuito y noches",
-                                renderizar: (paquete) => (
-                                    <div>
-                                        <p className="text-sm font-medium text-texto">
-                                            {paquete.circuito?.nombreCircuito ??
-                                                `Circuito #${paquete.idcircuito}`}
-                                        </p>
-                                        <p className="mt-0.5 text-xs text-texto-suave">
-                                            {paquete.nochesPrevias} prev. ·{" "}
-                                            {paquete.nochesPosteriores} post.
-                                            {paquete.diasDisponibles
-                                                ? ` · ${formatearDiasLegibles(
-                                                      paquete.diasDisponibles,
-                                                  )}`
-                                                : ""}
-                                        </p>
-                                    </div>
-                                ),
-                            },
-                            {
-                                clave: "tipoGarantia",
-                                titulo: "Garantía de alojamiento",
-                                renderizar: (paquete) => {
-                                    const porEst = esGarantiaEstablecimiento(
-                                        paquete.tipoGarantia,
-                                    );
-                                    return (
-                                        <div>
+                                        </td>
+
+                                        <td className="px-4 py-3.5 align-middle max-md:mt-3 max-md:block max-md:p-0">
                                             <span
-                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                                                     porEst
-                                                        ? "bg-green-50 text-exito"
-                                                        : "bg-marca-activa text-marca-oscura"
+                                                        ? "bg-emerald-50 text-exito"
+                                                        : "bg-marca-suave text-marca-oscura"
                                                 }`}
                                             >
                                                 {porEst
                                                     ? "Por establecimiento"
                                                     : "Por categoría"}
                                             </span>
-                                            {!porEst &&
-                                            (paquete.categoriaGarantizada ||
-                                                paquete.localidadGarantizada) ? (
-                                                <p className="mt-1 text-xs text-texto-suave">
-                                                    {[
-                                                        paquete.categoriaGarantizada,
-                                                        paquete.localidadGarantizada,
-                                                        paquete.tipoHabitacionGarantizada
-                                                            ? `Hab. ${paquete.tipoHabitacionGarantizada}`
-                                                            : null,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(" · ")}
-                                                </p>
-                                            ) : null}
-                                            {porEst && paquete.garantiasEstablecimiento?.length ? (
-                                                <p className="mt-1 text-xs text-texto-suave">
-                                                    {paquete.garantiasEstablecimiento
-                                                        .map((g) => g.servicio?.nombreServicio)
-                                                        .filter(Boolean)
-                                                        .join(", ")}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    );
-                                },
-                            },
-                            {
-                                clave: "tarifas",
-                                titulo: "Tarifas vigentes",
-                                renderizar: (paquete) => (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {tarifasVigentes(paquete).length > 0 ? (
-                                            tarifasVigentes(paquete).slice(0, TARIFAS_EN_LISTADO).map((tarifa) => (
-                                                <span
-                                                    key={tarifa.idtemporada}
-                                                    className="inline-flex items-center rounded-control border border-borde bg-fondo px-2.5 py-1 text-xs font-semibold text-texto"
+                                            <p className="mt-1 text-xs text-texto">
+                                                {resumenGarantia(paquete)}
+                                            </p>
+                                            <p className="text-[11px] text-texto-suave">
+                                                {paquete.nochesPrevias} prev. ·{" "}
+                                                {paquete.nochesPosteriores} post.
+                                            </p>
+                                        </td>
+
+                                        <td className="px-4 py-3.5 align-middle max-md:mt-3 max-md:block max-md:p-0">
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {vigentes.length > 0 ? (
+                                                    <>
+                                                        {vigentes
+                                                            .slice(
+                                                                0,
+                                                                TARIFAS_EN_LISTADO,
+                                                            )
+                                                            .map((tarifa) => (
+                                                                <span
+                                                                    key={
+                                                                        tarifa.idtemporada
+                                                                    }
+                                                                    className="inline-flex items-center rounded-lg border border-borde/80 bg-fondo/60 px-2 py-0.5 text-xs text-texto-suave"
+                                                                >
+                                                                    {tarifa
+                                                                        .temporada
+                                                                        ?.nombre ??
+                                                                        `Temp. #${tarifa.idtemporada}`}
+                                                                    :
+                                                                    <strong className="ml-1 text-navegacion">
+                                                                        {formatearMonto(
+                                                                            tarifa.monto,
+                                                                            tarifa.moneda,
+                                                                        )}
+                                                                    </strong>
+                                                                </span>
+                                                            ))}
+                                                        {vigentes.length >
+                                                        TARIFAS_EN_LISTADO ? (
+                                                            <span className="text-xs font-semibold text-texto-suave">
+                                                                +
+                                                                {vigentes.length -
+                                                                    TARIFAS_EN_LISTADO}
+                                                            </span>
+                                                        ) : null}
+                                                    </>
+                                                ) : (
+                                                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                                        Sin tarifas
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        <td className="px-4 py-3.5 align-middle max-md:mt-3 max-md:block max-md:p-0">
+                                            <span
+                                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
+                                                    paquete.estado,
+                                                )}`}
+                                            >
+                                                {etiquetaEstadoRegistro(
+                                                    paquete.estado,
+                                                )}
+                                            </span>
+                                        </td>
+
+                                        <td className="px-5 py-3.5 align-middle max-md:mt-3 max-md:border-t max-md:border-borde/70 max-md:px-0 max-md:pb-0 max-md:pt-3">
+                                            <div className="flex items-center justify-end gap-2 max-md:justify-between">
+                                                <button
+                                                    type="button"
+                                                    disabled={inactivo}
+                                                    onClick={() =>
+                                                        abrirFormulario(paquete)
+                                                    }
+                                                    className="cursor-pointer rounded-lg border border-borde bg-white px-3 py-1.5 text-xs font-semibold text-navegacion transition hover:bg-fondo disabled:cursor-not-allowed disabled:opacity-40"
                                                 >
-                                                    {tarifa.temporada?.nombre ??
-                                                        `Temp. #${tarifa.idtemporada}`}
-                                                    :{" "}
-                                                    <strong className="ml-1 text-navegacion">
-                                                        {formatearMonto(tarifa.monto, tarifa.moneda)}
-                                                    </strong>
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="text-xs text-texto-suave">
-                                                Sin tarifas vigentes
-                                            </span>
-                                        )}
-                                        {tarifasVigentes(paquete).length > TARIFAS_EN_LISTADO ? (
-                                            <span className="inline-flex items-center px-1 py-1 text-xs font-semibold text-texto-suave">
-                                                +{tarifasVigentes(paquete).length - TARIFAS_EN_LISTADO}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                ),
-                            },
-                            {
-                                clave: "estado",
-                                titulo: "Estado",
-                                renderizar: (paquete) => (
-                                    <span
-                                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${estiloEstado(
-                                            paquete.estado,
-                                        )}`}
-                                    >
-                                        {etiquetaEstadoRegistro(paquete.estado)}
-                                    </span>
-                                ),
-                            },
-                            {
-                                clave: "id",
-                                titulo: "Acciones",
-                                renderizar: (paquete) => (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Boton
-                                            variante="fantasma"
-                                            className="px-3 py-1.5 text-xs"
-                                            aria-label={`Ver vista previa del paquete ${paquete.nombrePaquete}`}
-                                            onClick={() =>
-                                                abrirVistaPrevia(paquete)
-                                            }
-                                        >
-                                            Vista previa
-                                        </Boton>
-                                        <Boton
-                                            variante="fantasma"
-                                            className="px-3 py-1.5 text-xs"
-                                            aria-label={`Editar paquete ${paquete.nombrePaquete}`}
-                                            disabled={
-                                                paquete.estado === "INACTIVO"
-                                            }
-                                            onClick={() =>
-                                                abrirFormulario(paquete)
-                                            }
-                                        >
-                                            Editar
-                                        </Boton>
-                                        <Boton
-                                            variante="secundario"
-                                            className="px-3 py-1.5 text-xs"
-                                            aria-label={`Subir imágenes del paquete ${paquete.nombrePaquete}`}
-                                            disabled={
-                                                paquete.estado === "INACTIVO" ||
-                                                (subirImagen.isPending &&
-                                                    idPaqueteParaImagen ===
-                                                        paquete.idpaquete)
-                                            }
-                                            onClick={() =>
-                                                iniciarSubidaImagenRapida(
-                                                    paquete,
-                                                )
-                                            }
-                                        >
-                                            {subirImagen.isPending &&
-                                            idPaqueteParaImagen ===
-                                                paquete.idpaquete
-                                                ? "Subiendo..."
-                                                : "Subir imágenes (1-5)"}
-                                        </Boton>
-                                        <Boton
-                                            variante="peligroSuave"
-                                            className="px-3 py-1.5 text-xs"
-                                            aria-label={`Dar de baja paquete ${paquete.nombrePaquete}`}
-                                            disabled={
-                                                paquete.estado === "INACTIVO"
-                                            }
-                                            onClick={() =>
-                                                abrirDialogoBaja(paquete)
-                                            }
-                                        >
-                                            Dar de baja
-                                        </Boton>
-                                    </div>
-                                ),
-                            },
-                        ]}
-                    />
+                                                    Editar
+                                                </button>
+                                                <MenuPaquete
+                                                    paquete={paquete}
+                                                    subiendoEste={
+                                                        subirImagen.isPending &&
+                                                        idPaqueteParaImagen ===
+                                                            paquete.idpaquete
+                                                    }
+                                                    onVistaPrevia={() =>
+                                                        abrirVistaPrevia(
+                                                            paquete,
+                                                        )
+                                                    }
+                                                    onSubirImagenes={() =>
+                                                        iniciarSubidaImagenRapida(
+                                                            paquete,
+                                                        )
+                                                    }
+                                                    onDarDeBaja={() =>
+                                                        abrirDialogoBaja(
+                                                            paquete,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
             {estado === "exito" && paquetesFiltrados.length > 0 ? (
                 <Paginacion
-                    paginaActual={paginaActual}
+                    paginaActual={paginaValida}
                     totalPaginas={totalPaginas}
+                    total={paquetesFiltrados.length}
                     onCambiarPagina={setPaginaActual}
                 />
             ) : null}
