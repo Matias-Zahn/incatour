@@ -1,3 +1,4 @@
+import { Tent } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { admiteRegistros, formatearEstadoSalidaGuia, formatearFechaHora, type AvanceOffline, type DetalleSalidaGuia } from "../../services/guiaService";
 import { IconoMapa, IconoMontana } from "./IconosGuia";
@@ -92,8 +93,8 @@ export function VistaRecorridos({ detalleSalida, avancesPendientes }: VistaRecor
                                             </span>
                                         </div>
                                         {etapa.campamentoPrevisto ? (
-                                            <p className="mt-1 text-xs text-texto-suave">
-                                                🏕 Campamento previsto: <b>{etapa.campamentoPrevisto}</b>
+                                            <p className="mt-1 flex items-center gap-1 text-xs text-texto-suave">
+                                                <Tent className="h-3.5 w-3.5 shrink-0" aria-hidden /> Campamento previsto: <b>{etapa.campamentoPrevisto}</b>
                                             </p>
                                         ) : null}
                                         {etapa.fechaHoraLlegada ? (

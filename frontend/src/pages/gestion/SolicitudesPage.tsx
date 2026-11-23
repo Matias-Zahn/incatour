@@ -1,3 +1,4 @@
+import { BedDouble, Check, Hotel, MapPin, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import Modal from "../../components/Modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -145,7 +146,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
             className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
             aria-label="Cerrar"
           >
-            ✕
+            <X className="h-4 w-4 shrink-0" aria-hidden />
           </button>
         </div>
 
@@ -183,25 +184,25 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-borde pt-3">
             <span className="text-xs font-medium text-texto-suave">Criterios garantizados:</span>
             {esGarantiaEstablecimiento(solicitud.garantia.tipoGarantia) && (
-              <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
-                🏨 Hotel garantizado
+              <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario gap-1">
+                <Hotel className="h-3.5 w-3.5 shrink-0" aria-hidden /> Hotel garantizado
                 {solicitud.garantia.establecimiento ? `: ${solicitud.garantia.establecimiento}` : ""}
               </span>
             )}
-            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
-              📍 Localidad:{" "}
+            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario gap-1">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden /> Localidad:{" "}
               {opciones?.criteriosGarantizados.localidad ??
                 solicitud.garantia.localidad ??
                 "Sin especificar"}
             </span>
-            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
-              ⭐ Categoría:{" "}
+            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario gap-1">
+              <Star className="h-3.5 w-3.5 shrink-0" aria-hidden /> Categoría:{" "}
               {opciones?.criteriosGarantizados.categoria ??
                 solicitud.garantia.categoria ??
                 "Sin especificar"}
             </span>
-            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario">
-              🛏️ Habitación:{" "}
+            <span className="inline-flex items-center rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-medium text-primario gap-1">
+              <BedDouble className="h-3.5 w-3.5 shrink-0" aria-hidden /> Habitación:{" "}
               {opciones?.criteriosGarantizados.tipoHabitacion ??
                 solicitud.garantia.tipoHabitacion ??
                 "Sin especificar"}
@@ -267,7 +268,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                               : "border-borde bg-white"
                           }`}
                         >
-                          {activo ? "✓" : ""}
+                          {activo ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : null}
                         </span>
                       </div>
                       <span className="mt-1 text-xs text-texto-suave">
@@ -303,8 +304,8 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                       : "border-borde bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <div className="text-sm font-semibold text-texto">
-                    ✓ Confirmar aceptación (ACEPTADA)
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-texto">
+                    <Check className="h-4 w-4 text-exito shrink-0" aria-hidden /> Confirmar aceptación (ACEPTADA)
                   </div>
                   <p className="mt-1 text-xs text-texto-suave">
                     El hotel confirma las {solicitud.cantidadPlazas} plaza(s). La solicitud pasa a
@@ -324,8 +325,8 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                       : "border-borde bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <div className="text-sm font-semibold text-texto">
-                    ✕ Registrar rechazo (RECHAZADA)
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-texto">
+                    <X className="h-4 w-4 text-peligro shrink-0" aria-hidden /> Registrar rechazo (RECHAZADA)
                   </div>
                   <p className="mt-1 text-xs text-texto-suave">
                     El hotel no tiene cupo. Se excluye este hotel y se crea automáticamente una

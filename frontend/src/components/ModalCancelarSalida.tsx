@@ -1,3 +1,4 @@
+import { Mail, TriangleAlert } from "lucide-react";
 import { useCallback, useId, useState } from "react";
 import Modal from "./Modal";
 import Alerta from "./Alerta";
@@ -163,7 +164,7 @@ export function ModalCancelarSalida({
                 <div className="border-b border-borde pb-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5 rounded bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 uppercase tracking-wider">
-                            <span aria-hidden="true">⚠️</span> Acción irreversible
+                            <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden /> Acción irreversible
                         </span>
                         <span className="text-xs font-semibold text-texto-suave">
                             Cancelación de salida
@@ -339,7 +340,7 @@ export function ModalCancelarSalida({
                                     <div className="text-xs text-texto-suave pt-1 border-t border-rose-200/60">
                                         {impacto.notificaAClientes ? (
                                             <p className="flex items-center gap-1.5 text-slate-700 font-medium">
-                                                <span aria-hidden="true">📧</span>
+                                                <Mail className="h-4 w-4 shrink-0" aria-hidden />
                                                 Se enviará un correo electrónico automático a los titulares de las{" "}
                                                 {impacto.reservasAfectadas} reservas informando el motivo, el reintegro
                                                 y salidas alternativas disponibles.

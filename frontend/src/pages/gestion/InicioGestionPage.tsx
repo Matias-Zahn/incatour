@@ -1,3 +1,4 @@
+import { Eye } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -116,7 +117,7 @@ function InicioGestionPage() {
                         variante="secundario"
                         onClick={() => navigate("/catalogo?vista=admin")}
                     >
-                        👁 Ver tienda como cliente
+                        <Eye className="h-4 w-4 shrink-0" aria-hidden /> Ver tienda como cliente
                     </Boton>
                     <Boton onClick={() => navigate("/gestion/paquetes")}>
                         Gestionar paquetes turísticos

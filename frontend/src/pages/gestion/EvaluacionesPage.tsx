@@ -1,3 +1,4 @@
+import { ChartColumn, Star, X } from "lucide-react";
 import { useState } from "react";
 import Modal from "../../components/Modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -109,7 +110,7 @@ function ModalCalificarEvaluado({
             className="rounded-lg p-1 text-texto-suave hover:bg-slate-100 hover:text-texto"
             aria-label="Cerrar"
           >
-            ✕
+            <X className="h-4 w-4 shrink-0" aria-hidden />
           </button>
         </div>
 
@@ -324,7 +325,7 @@ export function EvaluacionesPage() {
                 : "text-texto-suave hover:bg-slate-100 hover:text-texto"
             }`}
           >
-            📊 Consultar reseñas y evaluaciones
+            <span className="inline-flex items-center gap-1.5"><ChartColumn className="h-3.5 w-3.5 shrink-0" aria-hidden /> Consultar reseñas y evaluaciones</span>
           </button>
           <button
             type="button"
@@ -335,7 +336,7 @@ export function EvaluacionesPage() {
                 : "text-texto-suave hover:bg-slate-100 hover:text-texto"
             }`}
           >
-            ⭐ Evaluar salida finalizada
+            <span className="inline-flex items-center gap-1.5"><Star className="h-3.5 w-3.5 shrink-0" aria-hidden /> Evaluar salida finalizada</span>
           </button>
         </div>
       </div>

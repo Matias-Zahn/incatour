@@ -1,3 +1,4 @@
+import { Check, PackageCheck, X } from "lucide-react";
 import { useCallback, useId, useMemo, useState } from "react";
 import Modal from "./Modal";
 import { useIsMutating } from "@tanstack/react-query";
@@ -266,9 +267,9 @@ function FormularioDevolucionContenido({
                                         <div>
                                             <label
                                                 htmlFor={`buen-estado-${item.idservicio}`}
-                                                className="block text-xs font-semibold text-emerald-900 mb-1"
+                                                className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-900"
                                             >
-                                                ✓ En buen estado (reintegra stock):
+                                                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden /> En buen estado (reintegra stock):
                                             </label>
                                             <input
                                                 id={`buen-estado-${item.idservicio}`}
@@ -290,9 +291,9 @@ function FormularioDevolucionContenido({
                                         <div>
                                             <label
                                                 htmlFor={`daniada-${item.idservicio}`}
-                                                className="block text-xs font-semibold text-rose-900 mb-1"
+                                                className="mb-1 flex items-center gap-1 text-xs font-semibold text-rose-900"
                                             >
-                                                ✕ Dañado / Extraviado (no reintegra):
+                                                <X className="h-3.5 w-3.5 shrink-0" aria-hidden /> Dañado / Extraviado (no reintegra):
                                             </label>
                                             <input
                                                 id={`daniada-${item.idservicio}`}
@@ -506,7 +507,7 @@ export function ModalDevolucionEquipamiento({
                 <div className="border-b border-borde pb-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5 rounded bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                            <span aria-hidden="true">📦</span> Inspección e reintegro a stock
+                            <PackageCheck className="h-3.5 w-3.5 shrink-0" aria-hidden /> Inspección y reintegro a stock
                         </span>
                     </div>
 

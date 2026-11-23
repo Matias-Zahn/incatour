@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import Boton from "./Boton";
 import EstadoListado from "./EstadoListado";
 import Modal from "./Modal";
@@ -48,9 +49,9 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                 <button
                     type="button"
                     onClick={() => onCerrar()}
-                    className="rounded-control border border-borde px-2.5 py-1 text-xs font-semibold text-texto-suave hover:bg-fondo"
+                    className="inline-flex items-center gap-1 rounded-control border border-borde px-2.5 py-1 text-xs font-semibold text-texto-suave hover:bg-fondo"
                 >
-                    ✕ Cerrar
+                    <X className="h-3.5 w-3.5 shrink-0" aria-hidden /> Cerrar
                 </button>
             </div>
 
