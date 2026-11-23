@@ -6,7 +6,7 @@ import { IconoSalir } from "../pages/guia/IconosGuia";
 import { cerrarSesion } from "../services/autenticacionService";
 import logoIncaTour from "../assets/logo-incatour.png";
 import { criticosEnCurso, useIncidentes } from "../services/guiaService";
-import { useSalidas } from "../services/salidaService";
+import { salidaRequiereAtencion, useSalidas } from "../services/salidaService";
 import { obtenerUsuario } from "../services/sesionService";
 import { listarSolicitudesPendientes } from "../services/solicitudService";
 
@@ -288,7 +288,7 @@ function useAvisosGestion(): Record<string, number> {
     const incidentes = useIncidentes().data ?? [];
     return {
         "/": criticosEnCurso(incidentes, salidas).length,
-        "/gestion/salidas": salidas.filter((s) => s.alertas?.length > 0).length,
+        "/gestion/salidas": salidas.filter(salidaRequiereAtencion).length,
         "/gestion/solicitudes": solicitudes.length,
     };
 }

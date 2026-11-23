@@ -35,8 +35,10 @@ import { usePersonal } from "../../services/personalService";
 import {
     clavesSalidas,
     contarSolicitudesPendientesPorSalida,
+    diasFinalizadaAntes,
     dotacionDeSalida,
     nombresGuiasDeSalida,
+    salidaRequiereAtencion,
     useConfirmarAsignacion,
     useConfirmarReemplazo,
     useCrearSalida,
@@ -772,15 +774,12 @@ function SalidasPage() {
         [hoyActual, esAdmin, resultadoAsignacion],
     );
 
-    const tieneAtencionPendiente = (s: Salida) =>
-        (Array.isArray(s.alertas) && s.alertas.length > 0) || s.etapaDesfasada === true;
-
     // KPIs operativos estables sobre todas las salidas vigentes
     const metricas = useMemo(() => {
         const base = todasLasSalidas.length > 0 ? todasLasSalidas : salidas;
         const enCurso = base.filter((s) => s.estado === "EN_CURSO");
         const desfasadas = enCurso.filter((s) => s.etapaDesfasada === true).length;
-        const conAlertas = base.filter(tieneAtencionPendiente).length;
+        const conAlertas = base.filter(salidaRequiereAtencion).length;
         const paraConfirmar = base.filter(esListaParaConfirmar).length;
         const publicadasAbiertas = base.filter(
             (s) => s.estado === "PUBLICADA" && s.ventaAbierta !== false,
@@ -838,7 +837,7 @@ function SalidasPage() {
                 }
             }
             if (buscaEnTodas) return true;
-            if (vista === "alertas") return tieneAtencionPendiente(s);
+            if (vista === "alertas") return salidaRequiereAtencion(s);
             if (vista === "confirmar") return esListaParaConfirmar(s);
             return ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial");
         });
@@ -2425,6 +2424,7 @@ function SalidasPage() {
                                         fila.etapaInformada ?? fila.ultimaEtapaAlcanzada;
                                     const totalEtapas =
                                         fila.paquete?.circuito?.etapas?.length ?? 0;
+                                    const diasAntes = diasFinalizadaAntes(fila);
 
                                     const bordeAlerta = tieneCritica
                                         ? "border-l-[3px] border-l-rose-500"
@@ -2465,6 +2465,12 @@ function SalidasPage() {
                                                             fila.fechaFin,
                                                         )}
                                                     </p>
+                                                    {diasAntes > 0 ? (
+                                                        <p className="mt-1 text-xs font-semibold text-amber-800">
+                                                            Finalizó {diasAntes}{" "}
+                                                            {diasAntes === 1 ? "día" : "días"} antes
+                                                        </p>
+                                                    ) : null}
                                                 </button>
                                             </td>
 

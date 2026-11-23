@@ -1056,7 +1056,9 @@ function PaquetesPage() {
                                                             {paquete.localidadGarantizada}
                                                         </strong>
                                                         {paquete.diasCierreVenta != null
-                                                            ? ` · Cierre ${paquete.diasCierreVenta} d antes`
+                                                            ? paquete.diasCierreVenta === 0
+                                                                ? " · Cierra el mismo día"
+                                                                : ` · Cierra ${paquete.diasCierreVenta} ${paquete.diasCierreVenta === 1 ? "día" : "días"} antes`
                                                             : ""}
                                                     </p>
                                                 ) : null}

@@ -721,10 +721,10 @@ function CatalogoCompraPage() {
                         </div>
 
                         <h1 className="mt-4 max-w-2xl text-3xl font-bold leading-[1.12] tracking-tight text-white sm:text-4xl lg:text-[42px]">
-                            Descubrí el Camino Inca con salidas confirmadas.
+                            Descubrí el Camino Inca con salidas programadas.
                         </h1>
                         <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-[15px]">
-                            Compará recorridos día por día, elegí tu fecha con cupos en tiempo real y reservá online con guías habilitados, alojamiento y equipamiento incluidos.
+                            Compará recorridos día por día, elegí tu fecha con cupos en tiempo real y reservá online con guías habilitados y servicios detallados en cada expedición.
                         </p>
 
                         <div className="mt-6 flex flex-wrap items-center gap-2.5 text-xs">
@@ -735,9 +735,6 @@ function CatalogoCompraPage() {
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 font-medium text-white/95 backdrop-blur-md">
                                 <strong className="font-bold text-emerald-300">{totalSalidasAbiertas}</strong>{" "}
                                 {totalSalidasAbiertas === 1 ? "salida abierta" : "salidas abiertas"}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 font-medium text-white/90 backdrop-blur-md">
-                                Precio final sin cargos ocultos de equipaje
                             </span>
                         </div>
                     </div>
@@ -1153,7 +1150,7 @@ function CatalogoCompraPage() {
 
                         {/* Sin salidas no hay nada que cargar: se ocultan los pasos 2 y 3 */}
                         {salidasDelPaquete.length > 0 ? (<>
-                        {/* PASO 2: NÓMINA DE PASAJEROS Y EQUIPAJE */}
+                        {/* PASO 2: NÓMINA DE PASAJEROS */}
                         <div className="space-y-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">

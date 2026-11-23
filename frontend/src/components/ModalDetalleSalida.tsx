@@ -7,6 +7,7 @@ import {
 } from "../services/guiaService";
 import { formatearRangoFechasUtc } from "../services/formato";
 import {
+    diasFinalizadaAntes,
     dotacionDeSalida,
     nombresGuiasDeSalida,
     type Salida,
@@ -56,6 +57,8 @@ function ModalDetalleSalida({
     const etapas = salida.paquete?.circuito?.etapas ?? [];
     const llegoA = etapas.find((e) => e.numeroOrden === informada);
     const tramoHoy = etapas.find((e) => e.numeroOrden === esperada);
+
+    const diasAntes = diasFinalizadaAntes(salida);
 
     const horasPrimerAvance =
         salida.fechaHoraInicioReal && salida.primerAvance
@@ -194,13 +197,31 @@ function ModalDetalleSalida({
                                         : "Al día"}
                                 </span>
                             </div>
-                        ) : salida.fechaHoraInicioReal ? (
-                            <p className="mt-1 text-xs text-texto">
-                                Inició:{" "}
-                                <strong>
-                                    {formatearFechaHora(salida.fechaHoraInicioReal)}
-                                </strong>
-                            </p>
+                        ) : salida.fechaHoraInicioReal || salida.fechaHoraFinReal ? (
+                            <div className="mt-1 space-y-1 text-xs text-texto">
+                                {salida.fechaHoraInicioReal ? (
+                                    <p>
+                                        Inició:{" "}
+                                        <strong>
+                                            {formatearFechaHora(salida.fechaHoraInicioReal)}
+                                        </strong>
+                                    </p>
+                                ) : null}
+                                {salida.fechaHoraFinReal ? (
+                                    <p>
+                                        Finalizó:{" "}
+                                        <strong>
+                                            {formatearFechaHora(salida.fechaHoraFinReal)}
+                                        </strong>
+                                    </p>
+                                ) : null}
+                                {diasAntes > 0 ? (
+                                    <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                                        Finalizó {diasAntes}{" "}
+                                        {diasAntes === 1 ? "día" : "días"} antes
+                                    </span>
+                                ) : null}
+                            </div>
                         ) : (
                             <p className="mt-1.5 text-xs text-texto-suave">
                                 Aún sin inicio registrado en campo.
