@@ -1,3 +1,4 @@
+import { Backpack, Bus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import Alerta from "./Alerta";
 import Boton from "./Boton";
@@ -437,7 +438,7 @@ export function FormularioModificarLogistica({
             <div className="rounded-lg border border-borde p-4 space-y-4 bg-slate-50/50">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borde pb-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-base" aria-hidden="true">🚐</span>
+                        <Bus className="h-5 w-5 text-marca shrink-0" aria-hidden />
                         <h3 className="text-sm font-bold text-texto uppercase tracking-wide">
                             Servicio de Transporte
                         </h3>
@@ -602,7 +603,7 @@ export function FormularioModificarLogistica({
             <div className="rounded-lg border border-borde p-4 space-y-4 bg-slate-50/50">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borde pb-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-base" aria-hidden="true">🎒</span>
+                        <Backpack className="h-5 w-5 text-marca shrink-0" aria-hidden />
                         <h3 className="text-sm font-bold text-texto uppercase tracking-wide">
                             Equipamiento Asignado
                         </h3>
