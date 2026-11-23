@@ -112,66 +112,73 @@ function ModalOcupacionServicio({
                     </Alerta>
                 ) : data ? (
                     <div className="space-y-5">
-                        {/* Tabla día por día */}
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-bold text-navegacion">
-                                Disponibilidad diaria ({data.dias.length} días)
-                            </h3>
-                            <div className="max-h-64 overflow-y-auto rounded-control border border-borde">
-                                <table className="min-w-full divide-y divide-borde text-left text-xs">
-                                    <thead className="sticky top-0 bg-slate-50 font-semibold text-texto-suave">
-                                        <tr>
-                                            <th className="px-3 py-2">Día</th>
-                                            <th className="px-3 py-2 text-right">Ocupado</th>
-                                            <th className="px-3 py-2 text-right">Disponible</th>
-                                            <th className="px-3 py-2">Salidas</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-borde bg-white">
-                                        {data.dias.map((dia) => {
-                                            const salidasDia = salidasPorDia(dia.fecha);
-                                            const deficit =
-                                                dia.disponible !== null && dia.disponible < 0;
-                                            return (
-                                                <tr
-                                                    key={dia.fecha}
-                                                    className={deficit ? "bg-rose-50/70" : undefined}
-                                                >
-                                                    <td className="px-3 py-1.5 font-medium text-texto whitespace-nowrap">
-                                                        {formatearFechaUtcCorta(dia.fecha)}
-                                                    </td>
-                                                    <td className="px-3 py-1.5 text-right font-semibold">
-                                                        {dia.ocupado}
-                                                    </td>
-                                                    <td
-                                                        className={`px-3 py-1.5 text-right font-bold ${
-                                                            deficit
-                                                                ? "text-peligro"
-                                                                : "text-emerald-700"
-                                                        }`}
-                                                    >
-                                                        {dia.disponible === null
-                                                            ? "A solicitud"
-                                                            : deficit
-                                                              ? `${dia.disponible} (faltan ${Math.abs(dia.disponible)})`
-                                                              : dia.disponible}
-                                                    </td>
-                                                    <td className="px-3 py-1.5 text-texto-suave">
-                                                        {salidasDia.length > 0
-                                                            ? salidasDia
-                                                                  .map(
-                                                                      (s) =>
-                                                                          `${s.nroSalida} (${s.cantidad})`,
-                                                                  )
-                                                                  .join(", ")
-                                                            : "—"}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                        {/* Calendario: un mes por bloque, el número grande es lo disponible ese día */}
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <h3 className="text-sm font-bold text-navegacion">
+                                    Disponibles por día
+                                </h3>
+                                <p className="flex flex-wrap gap-3 text-[11px] text-texto-suave">
+                                    <span><span className="font-bold text-emerald-700">9</span> disponibles</span>
+                                    <span><span className="font-bold text-amber-700">0</span> sin stock</span>
+                                    <span><span className="font-bold text-peligro">-2</span> faltan</span>
+                                </p>
                             </div>
+                            {Object.entries(
+                                data.dias.reduce<Record<string, typeof data.dias>>((meses, dia) => {
+                                    (meses[dia.fecha.slice(0, 7)] ??= []).push(dia);
+                                    return meses;
+                                }, {}),
+                            ).map(([mes, dias]) => {
+                                // lunes primero: cuántas celdas vacías van antes del primer día
+                                const hueco = (new Date(dias[0].fecha + "T12:00:00Z").getUTCDay() + 6) % 7;
+                                return (
+                                    <div key={mes}>
+                                        <p className="mb-1.5 text-xs font-bold text-navegacion first-letter:uppercase">
+                                            {new Date(mes + "-15T12:00:00Z").toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" })}
+                                        </p>
+                                        <div className="grid grid-cols-7 gap-1 text-center">
+                                            {["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"].map((d) => (
+                                                <span key={d} className="text-[10px] font-semibold uppercase text-texto-suave">{d}</span>
+                                            ))}
+                                            {Array.from({ length: hueco }, (_, i) => <span key={`h${i}`} />)}
+                                            {dias.map((dia) => {
+                                                const salidasDia = salidasPorDia(dia.fecha);
+                                                const libre = dia.disponible;
+                                                const color =
+                                                    libre === null ? "text-texto-suave"
+                                                    : libre < 0 ? "text-peligro"
+                                                    : libre === 0 ? "text-amber-700"
+                                                    : "text-emerald-700";
+                                                const fondo =
+                                                    libre !== null && libre < 0 ? "border-peligro/40 bg-rose-50"
+                                                    : libre === 0 ? "border-amber-300 bg-amber-50"
+                                                    : dia.ocupado > 0 ? "border-borde bg-fondo/60"
+                                                    : "border-borde bg-white";
+                                                const detalle = `${formatearFechaUtcCorta(dia.fecha)}: ${
+                                                    libre === null ? "a solicitud" : `${libre} disponibles, ${dia.ocupado} en uso`
+                                                }${salidasDia.length ? ` · ${salidasDia.map((s) => `${s.nroSalida} (${s.cantidad})`).join(", ")}` : ""}`;
+                                                return (
+                                                    <div
+                                                        key={dia.fecha}
+                                                        title={detalle}
+                                                        aria-label={detalle}
+                                                        className={`rounded-control border px-1 py-1.5 ${fondo} ${dia.fecha === isoHoyLocal() ? "ring-2 ring-marca/40" : ""}`}
+                                                    >
+                                                        <p className="text-left text-[10px] text-texto-suave">{Number(dia.fecha.slice(8))}</p>
+                                                        <p className={`text-lg font-bold leading-tight ${color}`}>
+                                                            {libre === null ? "—" : libre}
+                                                        </p>
+                                                        <p className="truncate text-[10px] text-texto-suave">
+                                                            {salidasDia.length ? salidasDia.map((s) => s.nroSalida.slice(-3)).join(" ") : " "}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* Historial de salidas */}
