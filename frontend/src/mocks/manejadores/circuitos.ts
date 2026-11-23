@@ -73,6 +73,7 @@ export const manejadoresCircuitos = [
             duracionDias,
             dificultad,
             minimoGuias,
+            horasPrimerAvance: Number(cuerpo.horasPrimerAvance ?? 12),
             parametrosPorteadores: cuerpo.parametrosPorteadores?.trim() || null,
             estado: "ACTIVO",
             etapas: [],
@@ -153,6 +154,10 @@ export const manejadoresCircuitos = [
                 cuerpo.minimoGuias !== undefined
                     ? Number(cuerpo.minimoGuias)
                     : actual.minimoGuias,
+            horasPrimerAvance:
+                cuerpo.horasPrimerAvance !== undefined
+                    ? Number(cuerpo.horasPrimerAvance)
+                    : actual.horasPrimerAvance,
             parametrosPorteadores:
                 cuerpo.parametrosPorteadores !== undefined
                     ? cuerpo.parametrosPorteadores.trim() || null

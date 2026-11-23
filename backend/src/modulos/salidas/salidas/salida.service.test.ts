@@ -52,7 +52,7 @@ const dto = (extra = {}) =>
 const creada = {
   idsalida: 9, estado: "PUBLICADA", fechaInicio: enDias(20), fechaFin: enDias(23), tamanoMaximo: 16, diasCierreVenta: 2,
   definicionPaquete: null, avances: [], permisos: [], reservas: [], personalAsignado: [], ocupaciones: [],
-  paquete: { circuito: { duracionDias: 4, _count: { etapas: 0 } } },
+  paquete: { circuito: { duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 0 } } },
 };
 const equipoVacio = { totales: new Map(), filas: [] };
 const mocksDeAlta = () => {
@@ -316,7 +316,7 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       fechaHoraInicioReal: null,
       ultimaEtapaAlcanzada: null,
       avances: [],
-      paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, _count: { etapas: 4 } } },
+      paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 4 } } },
       diasCierreVenta: 2,
       tamanoMaximo: 8,
       definicionPaquete: null,
@@ -382,6 +382,17 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       AHORA
     );
     expect(conAvance).toMatchObject({ alertas: [], primerAvance: new Date("2026-11-14T15:00:00Z") });
+  });
+
+  it("SIN_AVANCES: el umbral es el del circuito (11 h sin avances alerta con 6, no con 12)", () => {
+    const iniciada = { estado: "EN_CURSO", fechaInicio: new Date("2026-11-15"), fechaHoraInicioReal: new Date("2026-11-15T01:00:00Z") };
+    const conUmbral = (horasPrimerAvance: number) =>
+      resumirSalida(
+        listada({ ...iniciada, paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance, _count: { etapas: 4 } } } }),
+        AHORA
+      ).alertas;
+    expect(conUmbral(6)).toContain("SIN_AVANCES");
+    expect(conUmbral(12)).not.toContain("SIN_AVANCES");
   });
 
   it("B4: venta abierta hasta fechaInicio − diasCierreVenta − 1", () => {

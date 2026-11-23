@@ -39,10 +39,11 @@ export class RegistrarIncidenteDto {
     public nivelGravedad: string,
     public fechaHoraOcurrencia: Date,
     public pasajerosAfectados: number[],
+    public claveCliente?: string,
   ) {}
 
   public static create(obj: { [key: string]: any }): [string | undefined, RegistrarIncidenteDto?] {
-    const { tipoIncidente, descripcion, nivelGravedad, fechaHoraOcurrencia, pasajerosAfectados = [] } = obj;
+    const { tipoIncidente, descripcion, nivelGravedad, fechaHoraOcurrencia, pasajerosAfectados = [], claveCliente } = obj;
 
     if (!(TIPO_INCIDENTE as readonly string[]).includes(tipoIncidente)) {
       return [`tipoIncidente debe ser uno de: ${TIPO_INCIDENTE.join(", ")}`];
@@ -65,10 +66,13 @@ export class RegistrarIncidenteDto {
     ) {
       return ["pasajerosAfectados debe ser una lista de ids de pasajero sin repetir"];
     }
+    if (claveCliente !== undefined && (typeof claveCliente !== "string" || !/^[\w-]{8,64}$/.test(claveCliente))) {
+      return ["claveCliente debe tener entre 8 y 64 letras, números, guiones o guiones bajos"];
+    }
 
     return [
       undefined,
-      new RegistrarIncidenteDto(tipoIncidente, descripcion.trim(), nivelGravedad, ocurrencia, pasajerosAfectados),
+      new RegistrarIncidenteDto(tipoIncidente, descripcion.trim(), nivelGravedad, ocurrencia, pasajerosAfectados, claveCliente),
     ];
   }
 }

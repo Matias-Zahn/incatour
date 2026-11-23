@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../../config/postgresDatabase";
 import { ESTADO_RESERVA, ESTADO_SALIDA } from "../../../shared/constantes";
 
@@ -111,34 +112,34 @@ export class GuiaRepository {
     nivelGravedad: string;
     fechaHoraOcurrencia: Date;
     pasajerosAfectados: number[];
+    claveCliente?: string | undefined;
   }) {
     const include = { pasajeros: { include: { pasajero: { select: { nombreCompleto: true } } } } } as const;
-    // Si el guía reenvía porque se perdió la respuesta (sin señal), el mismo incidente ya está guardado: se devuelve ese.
-    // ponytail: la clave es el contenido (salida, tipo, gravedad, texto y hora); dos reenvíos simultáneos podrían
-    // pasar los dos, en ese caso hace falta una clave de idempotencia única en la tabla.
-    const existente = await db.incidente.findFirst({
-      where: {
-        idsalida: p.idsalida,
-        tipoIncidente: p.tipoIncidente,
-        descripcion: p.descripcion,
-        nivelGravedad: p.nivelGravedad,
-        fechaHoraOcurrencia: p.fechaHoraOcurrencia,
-      },
-      include,
-    });
-    if (existente) return existente;
-
-    return db.incidente.create({
-      data: {
-        idsalida: p.idsalida,
-        tipoIncidente: p.tipoIncidente,
-        descripcion: p.descripcion,
-        nivelGravedad: p.nivelGravedad,
-        fechaHoraOcurrencia: p.fechaHoraOcurrencia,
-        pasajeros: { create: p.pasajerosAfectados.map((idpasajero) => ({ idpasajero })) },
-      },
-      include,
-    });
+    try {
+      const incidente = await db.incidente.create({
+        data: {
+          idsalida: p.idsalida,
+          tipoIncidente: p.tipoIncidente,
+          descripcion: p.descripcion,
+          nivelGravedad: p.nivelGravedad,
+          fechaHoraOcurrencia: p.fechaHoraOcurrencia,
+          claveCliente: p.claveCliente ?? null,
+          pasajeros: { create: p.pasajerosAfectados.map((idpasajero) => ({ idpasajero })) },
+        },
+        include,
+      });
+      return { incidente, nuevo: true };
+    } catch (e) {
+      // Reenvío porque se perdió la respuesta (sin señal): la clave única ya está guardada y se devuelve ese incidente
+      if (p.claveCliente && e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const incidente = await db.incidente.findUniqueOrThrow({
+          where: { idsalida_claveCliente: { idsalida: p.idsalida, claveCliente: p.claveCliente } },
+          include,
+        });
+        return { incidente, nuevo: false };
+      }
+      throw e;
+    }
   }
 
   // CU-50 paso 17: las alertas del panel del administrador son los incidentes, del más reciente al más viejo

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { disponibleEnRango, ocupadoPorDia, rangosDe, totalDe } from "./ocupacion";
+import { disponibleEnRango, maximoPorReserva, ocupadoPorDia, rangosDe, totalDe } from "./ocupacion";
+
+describe("maximoPorReserva (12.2)", () => {
+  it("es el hotel con más plazas libres, sin pasar lo que queda en la salida", () => {
+    expect(maximoPorReserva(5, [{ plazasLibres: 1 }, { plazasLibres: 3 }])).toBe(3);
+    expect(maximoPorReserva(2, [{ plazasLibres: 4 }])).toBe(2);
+    expect(maximoPorReserva(5, [{ plazasLibres: 0 }])).toBe(0);
+  });
+  it("sin hoteles o con uno a solicitud, lo que queda en la salida", () => {
+    expect(maximoPorReserva(5, [])).toBe(5);
+    expect(maximoPorReserva(5, [{ plazasLibres: 1 }, { plazasLibres: null }])).toBe(5);
+  });
+});
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 const oc = (desde: string, hasta: string, cantidad: number) => ({ desde: d(desde), hasta: d(hasta), cantidad });

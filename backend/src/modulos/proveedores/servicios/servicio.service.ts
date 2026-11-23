@@ -118,17 +118,20 @@ export class ServicioService {
 
     // 2. A1: se edita el total (inventario o plazas). Subirlo es libre; bajarlo no puede dejarlo debajo del día
     // de mayor ocupación de hoy en adelante. Las bajas por rotura o pérdida se registran en CU-41.
-    // ponytail: se controla fuera de la transacción de la ocupación; si dos admins chocan, mover esto a un lock del ServicioBase
+    // Se controla dentro de la transacción del guardado, con el ServicioBase bloqueado: quien ocupa lo bloquea también.
     const total = especifico.inventarioTotal ?? especifico.capacidadDisponible;
-    if (total !== undefined) {
-      const { pico } = usoDe(await this.repository.ocupacionesDesdeHoy([id]));
-      if (total < pico.ocupado) {
-        const unidad = tipo === TIPO_SERVICIO.ALOJAMIENTO ? "plazas" : "unidades";
-        throw CustomError.badRequest(
-          `Hay ${pico.ocupado} ${unidad} comprometidas el ${pico.fecha.slice(8, 10)}/${pico.fecha.slice(5, 7)}: el total no puede quedar en ${total}.`
-        );
-      }
-    }
+    const controlarTotal =
+      total === undefined
+        ? undefined
+        : (ocupaciones: OcupacionDias[]) => {
+            const { pico } = usoDe(ocupaciones);
+            if (total < pico.ocupado) {
+              const unidad = tipo === TIPO_SERVICIO.ALOJAMIENTO ? "plazas" : "unidades";
+              throw CustomError.badRequest(
+                `Hay ${pico.ocupado} ${unidad} comprometidas el ${pico.fecha.slice(8, 10)}/${pico.fecha.slice(5, 7)}: el total no puede quedar en ${total}.`
+              );
+            }
+          };
     // Bloque 8: con bloqueo de plazas el hotel necesita su capacidad
     if (
       tipo === TIPO_SERVICIO.ALOJAMIENTO &&
@@ -180,7 +183,7 @@ export class ServicioService {
       }
     }
 
-    const actualizado = await this.repository.updateEnSitio(id, tipo, dto.base, especifico);
+    const actualizado = await this.repository.updateEnSitio(id, tipo, dto.base, especifico, controlarTotal);
     return { servicio: this.formatear(actualizado, await this.repository.ocupacionesDesdeHoy([id])) };
   }
 

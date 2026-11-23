@@ -85,6 +85,8 @@ export class CatalogoRepository {
           orderBy: {
             fechaInicio: "asc",
           },
+          // 12.2: plazas libres de cada hotel de la salida, para el máximo de pasajeros por reserva
+          include: { ocupaciones: { where: { tipo: "ALOJAMIENTO" }, select: { idservicio: true, plazasLibres: true } } },
         },
         garantiasEstablecimiento: {
           include: {

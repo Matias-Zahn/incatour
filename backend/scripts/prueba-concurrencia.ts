@@ -104,9 +104,49 @@ async function main() {
     console.log(`  confirmados: ${grupos.filter((r) => r.status === "fulfilled").length}  en B: ${enB}  libres A/B: ${await libres(hotelA!)}/${await libres(hotelB!)}  stock: ${finalH.stockLocal}`);
     console.log(`  rechazo: ${rechazo?.reason?.message}`);
     const okHotel = grupos.filter((r) => r.status === "fulfilled").length === 1 && enB === 1 && (await libres(hotelA!)) === 1 && (await libres(hotelB!)) === 0 &&
-      finalH.stockLocal === 2 && /^Quedan \d lugares, pero no en un mismo hotel\.$/.test(rechazo?.reason?.message ?? "");
+      finalH.stockLocal === 2 && /^Quedan 2 lugares, pero no en un mismo hotel: en una reserva entran hasta 1 pasajeros\./.test(rechazo?.reason?.message ?? "");
     console.log(okHotel ? "✅ OK: el grupo no se partió ni se sobrevendió el hotel" : "❌ FALLÓ: el hotel quedó mal repartido");
-    process.exitCode = ok && okHotel ? 0 : 1;
+
+    // Límite A1: un admin baja el total mientras otra operación ocupa ese mismo equipo. La ocupación bloquea el
+    // ServicioBase y tarda; el guardado espera el bloqueo y ve las 6 unidades ya ocupadas, así que no puede bajar a 5
+    const { ServicioService } = await import("../src/modulos/proveedores/servicios/servicio.service.js");
+    const { ModificarServicioDto } = await import("../src/modulos/proveedores/servicios/servicio.dto.js");
+    const { disponible, ocupar } = await import("../src/shared/ocupacion.repository.js");
+    const bastones = await db.servicioBase.create({
+      data: { idproveedor: carpa.idproveedor, nombreServicio: `Bastones CONC ${prueba}`, costoBase: 1, estado: "ACTIVO", localidad: carpa.localidad, equipamiento: { create: { tipoEquipamiento: "Bastón", cantidadTotal: 10 } } },
+    });
+    const rangos = [{ desde: new Date("2026-12-28"), hasta: new Date("2027-01-02") }];
+    const ocupacion = db.$transaction(async (tx) => {
+      if ((await disponible(tx, bastones.idservicio, rangos)) < 6) throw new Error("sin stock");
+      await new Promise((r) => setTimeout(r, 400));
+      await ocupar(tx, { idservicio: bastones.idservicio, idsalida: salida.idsalida, tipo: "EQUIPAMIENTO", rangos, cantidad: 6 });
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    const [, baja] = ModificarServicioDto.create({ inventarioTotal: 5 });
+    const [ocupo, bajo] = await Promise.allSettled([ocupacion, new ServicioService().modificarServicio(bastones.idservicio, baja!)]);
+    const totalFinal = (await db.servicioEquipamiento.findUniqueOrThrow({ where: { idservicio: bastones.idservicio } })).cantidadTotal;
+    console.log("Bajar el total a 5 mientras se ocupan 6 de 10");
+    console.log(`  ocupación: ${ocupo.status}  baja: ${bajo.status === "rejected" ? bajo.reason?.message : "aceptada"}  total final: ${totalFinal}`);
+    const okTotal = ocupo.status === "fulfilled" && bajo.status === "rejected" && /Hay 6 unidades comprometidas/.test(bajo.reason?.message ?? "") && totalFinal === 10;
+    console.log(okTotal ? "✅ OK: el total no quedó debajo de lo ocupado" : "❌ FALLÓ: el total quedó debajo de lo ocupado");
+
+    // Límite CU-50: el guía reenvía el mismo incidente dos veces a la vez (se perdió la respuesta). Con la misma clave
+    // del dispositivo queda uno solo y el segundo devuelve el mismo
+    const { GuiaRepository } = await import("../src/modulos/campo/guia/guia.repository.js");
+    const guia = new GuiaRepository();
+    const reenvio = () =>
+      guia.registrarIncidente({
+        idsalida: salida.idsalida, tipoIncidente: "SALUD", descripcion: "Reenvío simultáneo", nivelGravedad: "CRITICO",
+        fechaHoraOcurrencia: new Date(), pasajerosAfectados: [], claveCliente: `off_${prueba}_conc`,
+      });
+    const envios = await Promise.allSettled([reenvio(), reenvio(), reenvio()]);
+    const filas = await db.incidente.count({ where: { idsalida: salida.idsalida, claveCliente: `off_${prueba}_conc` } });
+    const nuevos = envios.filter((r) => r.status === "fulfilled" && r.value.nuevo).length;
+    console.log("Tres reenvíos simultáneos del mismo incidente");
+    console.log(`  respondidos: ${envios.filter((r) => r.status === "fulfilled").length}  nuevos: ${nuevos}  filas: ${filas}`);
+    const okIncidente = envios.every((r) => r.status === "fulfilled") && nuevos === 1 && filas === 1;
+    console.log(okIncidente ? "✅ OK: quedó un solo incidente" : "❌ FALLÓ: el incidente se duplicó");
+    process.exitCode = ok && okHotel && okTotal && okIncidente ? 0 : 1;
   } finally {
     // La base es de la prueba: se resetea en la próxima corrida, no hace falta limpiar
     await db.$disconnect();

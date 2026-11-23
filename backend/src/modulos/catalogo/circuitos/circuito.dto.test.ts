@@ -11,6 +11,15 @@ describe("CrearCircuitoDto", () => {
     expect(dto).toMatchObject({ ...base, parametrosPorteadores: "1 cada 2" });
   });
 
+  it("horasPrimerAvance es opcional, entero entre 1 y 72 (también al modificar)", () => {
+    expect(CrearCircuitoDto.create(base)[1]?.horasPrimerAvance).toBeUndefined();
+    expect(CrearCircuitoDto.create({ ...base, horasPrimerAvance: 6 })[1]?.horasPrimerAvance).toBe(6);
+    expect(CrearCircuitoDto.create({ ...base, horasPrimerAvance: 0 })[0]).toMatch("entre 1 y 72");
+    expect(CrearCircuitoDto.create({ ...base, horasPrimerAvance: 73 })[0]).toMatch("entre 1 y 72");
+    expect(ModificarCircuitoDto.create({ horasPrimerAvance: 24 })).toEqual([undefined, expect.objectContaining({ horasPrimerAvance: 24 })]);
+    expect(ModificarCircuitoDto.create({ horasPrimerAvance: 1.5 })[0]).toMatch("entre 1 y 72");
+  });
+
   it("normaliza la dificultad a Baja, Media o Alta sin importar mayúsculas", () => {
     expect(CrearCircuitoDto.create({ ...base, dificultad: "baja" })[1]?.dificultad).toBe("Baja");
     expect(CrearCircuitoDto.create({ ...base, dificultad: "MEDIA" })[1]?.dificultad).toBe("Media");

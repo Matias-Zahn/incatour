@@ -38,6 +38,7 @@ function valoresPorDefecto(circuito?: Circuito | null): DatosCircuito {
         duracionDias: circuito?.duracionDias ?? 1,
         dificultad: circuito?.dificultad ?? "Media",
         minimoGuias: circuito?.minimoGuias ?? 1,
+        horasPrimerAvance: circuito?.horasPrimerAvance ?? 12,
         parametrosPorteadores: circuito?.parametrosPorteadores ?? "",
     };
 }
@@ -112,6 +113,7 @@ function FormularioCircuito({
             "dificultad",
             "duracionDias",
             "minimoGuias",
+            "horasPrimerAvance",
             "parametrosPorteadores",
         ]);
         if (valido) {
@@ -313,6 +315,34 @@ function FormularioCircuito({
                                     role="alert"
                                 >
                                     {errors.minimoGuias.message}
+                                </span>
+                            ) : null}
+                        </label>
+
+                        <label className="grid gap-2 text-sm font-semibold text-texto">
+                            Horas para el primer avance
+                            <input
+                                type="number"
+                                min={1}
+                                max={72}
+                                step={1}
+                                {...register("horasPrimerAvance", { valueAsNumber: true })}
+                                className={`rounded-control border px-3 py-2 font-normal outline-none focus:ring-2 ${
+                                    errors.horasPrimerAvance
+                                        ? "border-peligro focus:border-peligro focus:ring-peligro/20"
+                                        : "border-borde focus:border-marca focus:ring-marca/20"
+                                }`}
+                                placeholder="Ej. 12"
+                            />
+                            <span className="text-xs font-normal text-texto-suave">
+                                Si el guía no informa la primera etapa en ese tiempo desde que inició la salida, se avisa en Salidas.
+                            </span>
+                            {errors.horasPrimerAvance ? (
+                                <span
+                                    className="text-xs font-normal text-peligro"
+                                    role="alert"
+                                >
+                                    {errors.horasPrimerAvance.message}
                                 </span>
                             ) : null}
                         </label>
