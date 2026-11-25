@@ -36,7 +36,7 @@ test("B8: crear un hotel a solicitud sin plazas funciona y no envía capacidadDi
     // 4. Completar los datos dejando plazas vacío en BLOQUEO_PLAZAS, luego cambiar a A_SOLICITUD
     await page.getByLabel("Nombre del servicio").fill(nombreHotel);
     await page.getByLabel("Localidad").fill("Cusco");
-    await page.getByLabel("Costo base").fill("95");
+    await page.getByLabel("Costo por noche y por persona (USD)").fill("95");
     await page.getByLabel("Categoría").selectOption("3 Estrellas");
     await page.getByLabel("Tipo de habitación").fill("Doble");
 

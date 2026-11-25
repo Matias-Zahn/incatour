@@ -44,6 +44,14 @@ const valoresIniciales = (
     ...(tipo === "ALOJAMIENTO" ? { modalidadConfirmacion: "BLOQUEO_PLAZAS" } : {}),
 });
 
+// La unidad que asume el simulador de costo del paquete (costoPaquete.ts)
+const ETIQUETA_COSTO: Record<string, string> = {
+    ALOJAMIENTO: "Costo por noche y por persona (USD)",
+    TRANSPORTE: "Costo por salida (USD)",
+    TREN: "Costo por pasajero (USD)",
+    EQUIPAMIENTO: "Costo de uso por unidad y por salida (USD)",
+};
+
 function FormularioServicio({
     servicioEnEdicion,
     cargandoEdicion = false,
@@ -241,7 +249,7 @@ function FormularioServicio({
                 {([
                     ["nombreServicio", "Nombre del servicio", "Ej. Hotel Valle Sagrado"],
                     ["localidad", "Localidad", "Ej. Cusco"],
-                    ["costoBase", "Costo base", "0.00"],
+                    ["costoBase", ETIQUETA_COSTO[tipoProveedor] ?? "Costo base (USD)", "0.00"],
                 ] as const).map(([nombre, etiqueta, placeholder]) => {
                     const deshabilitado =
                         !esCampoEditable(nombre) ||
