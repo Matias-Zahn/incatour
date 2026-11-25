@@ -8,11 +8,11 @@ export interface PrecioTemporada {
   moneda: string;
 }
 
-/** B2: un equipo del paquete con su regla: "1 carpa cada 2 pasajeros" = { cantidad: 1, cadaPasajeros: 2 }. */
+/** B2: un equipo del paquete con su regla: "1 carpa cada 2 pasajeros" = { cantidad: 1, cadaPasajeros: 2 }; null = cantidad fija por salida. */
 export interface EquipoPaquete {
   idservicio: number;
   cantidad: number;
-  cadaPasajeros: number;
+  cadaPasajeros: number | null;
 }
 
 /** B2: los servicios del paquete, uno por tipo. undefined = no viene (en el PUT, ese tipo no se toca). */
@@ -39,14 +39,14 @@ function validarServicios(obj: { [key: string]: any }, alta: boolean): [string |
     for (let i = 0; i < equipo.length; i++) {
       const e = equipo[i];
       if (!esId(e?.idservicio)) return [`equipo[${i}]: idservicio debe ser un número entero mayor a 0.`];
-      if (!enRango(e.cantidad, 1, TOPES.reglaEquipo) || !enRango(e.cadaPasajeros, 1, TOPES.reglaEquipo)) {
+      if (!enRango(e.cantidad, 1, TOPES.reglaEquipo) || (e.cadaPasajeros != null && !enRango(e.cadaPasajeros, 1, TOPES.reglaEquipo))) {
         return [`equipo[${i}]: cantidad y cadaPasajeros deben ser enteros entre 1 y ${TOPES.reglaEquipo}.`];
       }
       if (vistos.has(e.idservicio)) return [`equipo repite el servicio ${e.idservicio}.`];
       vistos.add(e.idservicio);
     }
   }
-  const lista = equipo?.map((e: EquipoPaquete) => ({ idservicio: e.idservicio, cantidad: e.cantidad, cadaPasajeros: e.cadaPasajeros }));
+  const lista = equipo?.map((e: EquipoPaquete) => ({ idservicio: e.idservicio, cantidad: e.cantidad, cadaPasajeros: e.cadaPasajeros ?? null }));
   return [undefined, { idtransporte, idtren: alta ? (idtren ?? null) : idtren, equipo: lista ?? (alta ? [] : undefined) }];
 }
 

@@ -11,6 +11,11 @@ describe("equipo (B4, 12.1, A2b)", () => {
     expect(necesidad(3, carpa)).toBe(2);
     expect(tamanoQueAlcanza(3, carpa)).toBe(6);
   });
+  it("fija por salida: la cantidad apenas viaja uno, sin importar cuántos", () => {
+    const comedor = { ...carpa, cantidad: 1, cadaPasajeros: null };
+    expect([necesidad(0, comedor), necesidad(1, comedor), necesidad(40, comedor)]).toEqual([0, 1, 1]);
+    expect(tamanoQueAlcanza(0, comedor)).toBe(0);
+  });
   it("una salida publicada proyecta lo de vendida completa; una confirmada, lo ocupado", () => {
     const definicionPaquete = { servicios: [{ ...carpa, tipo: "EQUIPAMIENTO" }] };
     expect(demandaProyectada({ idservicio: 7, cantidad: 1, salida: { estado: "PUBLICADA", tamanoMaximo: 8, definicionPaquete } })).toBe(4);
