@@ -59,6 +59,9 @@ export class CatalogoService {
         transporte?.pesoEquipajeIncluido != null
           ? { kgIncluidos: transporte.pesoEquipajeIncluido, costoPorKgExcedente: transporte.costoPorKgExcedente ?? null }
           : null;
+      // Solo informativo: lo que carga el porteador por pasajero en el sendero
+      const equipajePorteador =
+        paquete.kgPorteador != null ? { kgIncluidos: paquete.kgPorteador, costoPorKgExcedente: paquete.costoKgExcedentePorteador ?? null } : null;
 
       // CAT-29: la garantía del paquete (rige para las salidas nuevas); cada salida informa la suya, congelada (CAT-05)
       const garantía = textoGarantia(armarDefinicionPaquete(paquete));
@@ -148,6 +151,7 @@ export class CatalogoService {
         serviciosAdicionales: serviciosIncluidos,
         serviciosIncluidos,
         equipaje,
+        equipajePorteador,
         condiciones: paquete.condiciones,
         diasDisponibles: paquete.diasDisponibles,
         precios: tarifasVigentes,

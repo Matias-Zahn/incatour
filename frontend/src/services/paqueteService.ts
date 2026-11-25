@@ -191,6 +191,8 @@ export type Paquete = {
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string | null;
     diasCierreVenta?: number;
+    kgPorteador?: number | null;
+    costoKgExcedentePorteador?: number | null;
     faltaTransporte?: boolean;
     calendarioSalidas?: CalendarioSalidasPaquete;
     imagenPrincipal?: string;
@@ -249,6 +251,8 @@ export type DatosCrearPaquete = {
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
     diasCierreVenta?: number;
+    kgPorteador?: number | null;
+    costoKgExcedentePorteador?: number | null;
     idtransporte: number;
     idtren?: number | null;
     equipo?: ItemEquipoPaquete[];
@@ -269,6 +273,8 @@ export type DatosModificarPaquete = {
     diasMinimosReintegro?: number | null;
     diasDisponibles?: string;
     diasCierreVenta?: number;
+    kgPorteador?: number | null;
+    costoKgExcedentePorteador?: number | null;
     idtransporte?: number;
     idtren?: number | null;
     equipo?: ItemEquipoPaquete[];

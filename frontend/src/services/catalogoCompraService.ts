@@ -67,6 +67,8 @@ export type PaqueteCatalogoPublico = {
     serviciosIncluidos?: string[];
     /** Solo informativo: el equipaje se pesa y cobra en persona */
     equipaje?: { kgIncluidos: number; costoPorKgExcedente: number | null } | null;
+    /** Solo informativo: lo que carga el porteador por pasajero en el sendero */
+    equipajePorteador?: { kgIncluidos: number; costoPorKgExcedente: number | null } | null;
     condiciones?: string | null;
     diasDisponibles?: string | null;
     precios: TarifaCatalogoPublico[];

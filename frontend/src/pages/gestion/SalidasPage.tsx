@@ -192,7 +192,6 @@ function SalidasPage() {
         isPending: cargandoAsignacion,
         isFetching: recargandoAsignacion,
         error: errorAsignacion,
-        refetch: recargarAsignacion,
     } = usePanelAsignacion(salidaParaAsignar?.idsalida ?? null);
 
     const confirmarAsignacionMutation = useConfirmarAsignacion();
@@ -874,25 +873,25 @@ function SalidasPage() {
                 return (
                     <div className="space-y-1 text-xs">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-texto whitespace-nowrap">
+                            <span className="font-semibold text-texto">
                                 {formatearRangoFechasUtc(fila.fechaInicio, fila.fechaFin)}
                             </span>
                             {badgeTiempo}
                         </div>
                         {fila.fechaHoraInicioReal ? (
-                            <p className="text-texto-suave whitespace-nowrap">
+                            <p className="text-texto-suave">
                                 Inició: {formatearFechaHora(fila.fechaHoraInicioReal)}
                             </p>
                         ) : null}
                         {fila.fechaHoraInicioReal && fila.primerAvance ? (
-                            <p className="text-texto-suave whitespace-nowrap">
+                            <p className="text-texto-suave">
                                 1er avance a las{" "}
                                 {Math.max(0, Math.round((new Date(fila.primerAvance).getTime() - new Date(fila.fechaHoraInicioReal).getTime()) / 36e5))}{" "}
                                 h
                             </p>
                         ) : null}
                         {diasAntes > 0 ? (
-                            <p className="font-semibold text-amber-800 whitespace-nowrap">
+                            <p className="font-semibold text-amber-800">
                                 Finalizó {diasAntes} {diasAntes === 1 ? "día" : "días"} antes
                             </p>
                         ) : null}
@@ -933,14 +932,16 @@ function SalidasPage() {
                             />
                         </div>
                         {fila.precioPorPasajero ? (
-                            <p className="text-xs text-texto-suave whitespace-nowrap">
+                            <p className="text-xs text-texto-suave">
                                 <span className="font-semibold text-texto">
                                     {formatearMonto(fila.precioPorPasajero.monto, fila.precioPorPasajero.moneda)}
                                 </span>{" "}
                                 / pax ({fila.precioPorPasajero.temporada})
-                                {fila.totalVendido
-                                    ? ` · ${formatearMonto(fila.totalVendido, fila.precioPorPasajero.moneda)} vendidos`
-                                    : ""}
+                                {fila.totalVendido ? (
+                                    <span className="block">
+                                        {formatearMonto(fila.totalVendido, fila.precioPorPasajero.moneda)} vendidos
+                                    </span>
+                                ) : null}
                             </p>
                         ) : null}
                         <div className="flex items-center justify-between text-xs text-texto-suave">
@@ -990,13 +991,17 @@ function SalidasPage() {
                         >
                             {formatearEstadoSalida(fila.estado)}
                         </span>
+                        {/* B4: la venta termina sola por fecha; la salida sigue Publicada hasta que el admin la confirma */}
+                        {fila.estado === "PUBLICADA" && fila.ventaAbierta === false ? (
+                            <span className="block text-xs font-semibold text-amber-800">Venta terminada · falta confirmar</span>
+                        ) : null}
 
                         {fila.estado === "EN_CURSO" && (
                             <div className="text-xs">
                                 {desfasada ? (
                                     <div className="flex flex-col gap-0.5">
                                         <span
-                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 whitespace-nowrap"
+                                            className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900"
                                             title="Discrepancia entre la etapa informada por el guía y la etapa esperada según itinerario"
                                         >
                                             <span aria-hidden="true">⏱️</span>
@@ -1015,7 +1020,7 @@ function SalidasPage() {
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-0.5">
-                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 whitespace-nowrap">
+                                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                                             {informada !== null ? `Etapa ${informada}` : "Iniciada"}
                                             {textoEsperada && (
                                                 <span className="ml-1 text-emerald-600">
@@ -1901,7 +1906,6 @@ function SalidasPage() {
                             errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
                         }
                         detalleErrorConfirmacion={detalleErrorConfirmacion}
-                        onRecargarDatos={() => recargarAsignacion()}
                         onConfirmar={manejarSolicitarConfirmacionAsignacion}
                         onCancelar={cerrarAsignacion}
                         onAbrirReemplazo={() => abrirReemplazo(salidaParaAsignar)}

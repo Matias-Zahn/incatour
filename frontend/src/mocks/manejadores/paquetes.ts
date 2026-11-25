@@ -165,13 +165,13 @@ export const manejadoresPaquetes = [
                             (s.categoria ?? "").toLowerCase() === categoria &&
                             (s.tipoHabitacion ?? "").toLowerCase() === habitacion,
                     )
-                    .sort((a, b) => b.costoBase - a.costoBase);
+                    .sort((a, b) => a.costoBase - b.costoBase);
                 const masCaro = candidatos[0];
                 if (masCaro) {
                     desglose.push({
                         tipo: "ALOJAMIENTO",
                         idservicio: masCaro.idservicio,
-                        nombreServicio: `${masCaro.nombreServicio} (más caro de la categoría)`,
+                        nombreServicio: `${masCaro.nombreServicio} (más económico de la categoría)`,
                         costoBase: masCaro.costoBase,
                         calculo: `${masCaro.costoBase} × ${noches} ${noches === 1 ? "noche" : "noches"}`,
                         porPasajero: redondear2(masCaro.costoBase * noches),

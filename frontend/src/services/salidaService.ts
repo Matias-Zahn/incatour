@@ -156,6 +156,8 @@ export type AlojamientoOpcion = {
     modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD";
     capacidadDisponible: number | null;
     alcanza: boolean;
+    /** Costo por plaza y por noche */
+    costoPorNoche?: number;
 };
 
 export type TransporteOpcion = {
@@ -165,6 +167,8 @@ export type TransporteOpcion = {
     delPaquete: boolean;
     libre: boolean;
     alcanza: boolean;
+    /** Cuánto encarece por pasajero respecto del transporte del paquete (0 si no cuesta más) */
+    encarecePorPasajero?: number;
 };
 
 export type PersonalLibreOpcion = {
@@ -227,6 +231,8 @@ export type OpcionesSalidaDto = {
     cupoAutoridad: CupoAutoridadOpciones | null;
     tarifa: TarifaCongeladaSalida;
     plazasNecesarias: number;
+    /** Noches previas + posteriores del paquete */
+    nochesHotel?: number;
     alojamientos: AlojamientoOpcion[];
     transportes: TransporteOpcion[];
     personal: {
@@ -251,6 +257,8 @@ export type DatosCrearSalida = {
     idtransporte: number;
     personalIds: number[];
     diasCierreVenta?: number;
+    /** Precio por pasajero ajustado en la revisión; sin él se congela la tarifa de la temporada */
+    precioPorPasajero?: number;
 };
 
 type RespuestaOpcionesSalidaApi = {
@@ -509,6 +517,8 @@ export type EquipamientoLogisticaItem = {
     tipoEquipamiento: string | null;
     cantidad: number;
     proveedor: ProveedorLogistica;
+    /** Equipo del paquete: la cantidad la calcula la regla con los vendidos; solo se reemplaza por otro del mismo tipo */
+    segunRegla?: boolean;
 };
 
 export type TransporteLogisticaItem = {
@@ -527,6 +537,8 @@ export type PanelLogistica = {
     equipamiento: EquipamientoLogisticaItem[];
     transporte: TransporteLogisticaItem | null;
     requerimientosSinAsignar: string[];
+    /** El paquete fija el equipo: no se agregan artículos sueltos */
+    equipoDelPaquete?: boolean;
 };
 
 type RespuestaPanelLogisticaApi = {
@@ -830,6 +842,9 @@ export async function crearSalida(
     };
     if (datos.diasCierreVenta !== undefined) {
         cuerpo.diasCierreVenta = datos.diasCierreVenta;
+    }
+    if (datos.precioPorPasajero !== undefined) {
+        cuerpo.precioPorPasajero = datos.precioPorPasajero;
     }
 
     const respuesta = await solicitarApi<RespuestaCrearSalidaApi>("/salidas", {

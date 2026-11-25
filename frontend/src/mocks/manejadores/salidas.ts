@@ -97,11 +97,13 @@ const panelLogistica = (s: SalidaApi): PanelLogistica => {
             tipoEquipamiento: e.tipoEquipamiento,
             cantidad: e.cantidadAsignada,
             proveedor: proveedorMock,
+            segunRegla: true, // el equipo de los mocks es el del paquete
         })),
         transporte: transporte
             ? { idservicio: transporte.idservicio, nombreServicio: transporte.servicio.nombreServicio, comprobanteReserva: transporte.comprobanteReserva, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" } }
             : null,
         requerimientosSinAsignar: [],
+        equipoDelPaquete: (equipamientoSalidasMock[s.idsalida] ?? []).length > 0,
     };
 };
 

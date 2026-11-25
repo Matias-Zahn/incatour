@@ -135,7 +135,7 @@ export class SalidaRepository {
     };
     const hoteles = await db.servicioBase.findMany({
       where,
-      select: { idservicio: true, nombreServicio: true, localidad: true, alojamiento: true },
+      select: { idservicio: true, nombreServicio: true, localidad: true, costoBase: true, alojamiento: true },
       orderBy: { nombreServicio: "asc" },
     });
     const libres = await disponibles(db, hoteles, rangos);

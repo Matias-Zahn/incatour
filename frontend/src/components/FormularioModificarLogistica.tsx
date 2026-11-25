@@ -74,6 +74,9 @@ export function FormularioModificarLogistica({
         Record<number, { cantidad: number; quitado: boolean }>
     >({});
 
+    // Equipo del paquete: artículo original -> el que lo reemplaza (hereda su regla)
+    const [reemplazosRegla, setReemplazosRegla] = useState<Record<number, number>>({});
+
     // Nuevos equipamientos agregados a la salida
     const [nuevosEquipamientos, setNuevosEquipamientos] = useState<ItemNuevoEquipamientoForm[]>([]);
 
@@ -180,6 +183,20 @@ export function FormularioModificarLogistica({
         // Equipamiento original
         for (const eq of datosLogistica?.equipamiento ?? []) {
             const estado = estadoOriginalEquipamiento[eq.idservicio];
+            if (eq.segunRegla) {
+                const idNuevo = reemplazosRegla[eq.idservicio];
+                if (idNuevo) {
+                    const sel = equipamientos.find((e) => e.idservicio === idNuevo);
+                    desasignar.push({ tipo: "EQUIPAMIENTO", idservicio: eq.idservicio });
+                    // La cantidad la pone el back con la regla del paquete
+                    nuevos.push({ tipo: "EQUIPAMIENTO", idservicio: idNuevo, cantidad: 1 });
+                    resumen.push({
+                        tipo: "modificar",
+                        detalle: `Reemplazar ${eq.nombreServicio} por ${sel?.nombreServicio ?? "otro"} (${sel?.proveedor?.razonSocial ?? ""}); la cantidad sigue la regla del paquete`,
+                    });
+                }
+                continue;
+            }
             if (estado?.quitado) {
                 desasignar.push({ tipo: "EQUIPAMIENTO", idservicio: eq.idservicio });
                 resumen.push({
@@ -228,6 +245,8 @@ export function FormularioModificarLogistica({
         transportes,
         estadoOriginalEquipamiento,
         nuevosEquipamientos,
+        reemplazosRegla,
+        equipamientos,
     ]);
 
     // Validaciones para habilitar el guardado
@@ -659,7 +678,11 @@ export function FormularioModificarLogistica({
                                             <td className="p-2.5 text-texto-suave">{eq.proveedor?.razonSocial}</td>
                                             <td className="p-2.5 text-texto-suave">{eq.tipoEquipamiento || "—"}</td>
                                             <td className="p-2.5 text-center">
-                                                {estaQuitado ? (
+                                                {eq.segunRegla ? (
+                                                    <span title="La calcula la regla del paquete con los pasajeros vendidos">
+                                                        {eq.cantidad} <span className="text-xs text-texto-suave">· según la regla</span>
+                                                    </span>
+                                                ) : estaQuitado ? (
                                                     <span className="line-through text-texto-suave">{eq.cantidad}</span>
                                                 ) : (
                                                     <div className="inline-flex items-center gap-1.5">
@@ -682,6 +705,44 @@ export function FormularioModificarLogistica({
                                                 )}
                                             </td>
                                             <td className="p-2.5 text-right">
+                                                {eq.segunRegla ? (() => {
+                                                    // Solo otro artículo del mismo tipo que no esté ya en la salida
+                                                    const alternativas = equipamientos.filter(
+                                                        (o) =>
+                                                            o.idservicio !== eq.idservicio &&
+                                                            o.disponibilidad?.tipoEquipamiento === eq.tipoEquipamiento &&
+                                                            !eqActual.some((a) => a.idservicio === o.idservicio),
+                                                    );
+                                                    if (alternativas.length === 0) {
+                                                        return (
+                                                            <span className="text-xs text-texto-suave" title="No hay otro artículo del mismo tipo cargado en Proveedores">
+                                                                Sin reemplazos del mismo tipo
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <select
+                                                            aria-label={`Reemplazar ${eq.nombreServicio}`}
+                                                            value={reemplazosRegla[eq.idservicio] ?? ""}
+                                                            onChange={(e) => {
+                                                                const id = e.target.value ? Number(e.target.value) : null;
+                                                                setReemplazosRegla((prev) => {
+                                                                    const resto = { ...prev };
+                                                                    delete resto[eq.idservicio];
+                                                                    return id ? { ...resto, [eq.idservicio]: id } : resto;
+                                                                });
+                                                            }}
+                                                            className="max-w-[220px] rounded border border-borde p-1 text-xs text-texto focus:border-marca focus:outline-none"
+                                                        >
+                                                            <option value="">Conservar</option>
+                                                            {alternativas.map((o) => (
+                                                                <option key={o.idservicio} value={o.idservicio}>
+                                                                    Reemplazar por {o.nombreServicio} — {o.proveedor?.razonSocial}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    );
+                                                })() : (
                                                 <button
                                                     type="button"
                                                     onClick={() => manejarAlternarQuitarOriginal(eq.idservicio, eq.cantidad)}
@@ -693,6 +754,7 @@ export function FormularioModificarLogistica({
                                                 >
                                                     {estaQuitado ? "Restaurar" : "Quitar"}
                                                 </button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -758,6 +820,11 @@ export function FormularioModificarLogistica({
                 )}
 
                 {/* Formulario para agregar otro servicio de equipamiento */}
+                {datosLogistica.equipoDelPaquete ? (
+                    <p className="rounded border border-borde bg-white p-3 text-xs text-texto-suave">
+                        El equipo lo fija el paquete y su cantidad se calcula sola con los pasajeros vendidos. Si un proveedor falla, reemplazá el artículo por otro del mismo tipo.
+                    </p>
+                ) : (
                 <div className="bg-white rounded border border-borde p-3 space-y-3">
                     <span className="text-xs font-bold text-texto uppercase tracking-wide block">
                         Agregar equipamiento adicional
@@ -824,6 +891,7 @@ export function FormularioModificarLogistica({
                         </div>
                     )}
                 </div>
+                )}
             </div>
 
             {/* ========================================================== */}

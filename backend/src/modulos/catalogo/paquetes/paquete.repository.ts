@@ -81,6 +81,8 @@ export class PaqueteRepository {
       diasDisponibles?: string | undefined;
       diasMinimosReintegro?: number | null | undefined;
       diasCierreVenta?: number | undefined;
+      kgPorteador?: number | null | undefined;
+      costoKgExcedentePorteador?: number | null | undefined;
     },
     matrizPrecios: PrecioTemporada[],
     servicios: FilaServicio[],
@@ -103,6 +105,8 @@ export class PaqueteRepository {
           diasDisponibles: data.diasDisponibles || null,
           diasMinimosReintegro: data.diasMinimosReintegro ?? null,
           ...(data.diasCierreVenta !== undefined && { diasCierreVenta: data.diasCierreVenta }),
+          kgPorteador: data.kgPorteador ?? null,
+          costoKgExcedentePorteador: data.costoKgExcedentePorteador ?? null,
         },
       });
 

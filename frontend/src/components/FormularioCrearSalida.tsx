@@ -7,6 +7,7 @@ import AsistentePasos, { type DefinicionPaso } from "./AsistentePasos";
 import Boton from "./Boton";
 import {
     formatearFechaUtcCorta,
+    formatearMonto,
     formatearRangoFechasUtc,
 } from "../services/formato";
 import {
@@ -123,6 +124,8 @@ function FormularioCrearSalida({
     const idForm = useId();
     const [pasoActual, setPasoActual] = useState(0);
     const [opciones, setOpciones] = useState<OpcionesSalidaDto | null>(null);
+    // Precio por pasajero de la salida: vacío = la tarifa del paquete para esa temporada
+    const [precioAjustado, setPrecioAjustado] = useState("");
     const [cargandoOpciones, setCargandoOpciones] = useState(false);
     const [errorPaso, setErrorPaso] = useState("");
 
@@ -219,6 +222,25 @@ function FormularioCrearSalida({
     );
 
     const plazasNecesarias = opciones?.plazasNecesarias ?? 0;
+
+    // Cuántas plazas aporta cada hotel elegido, en el orden de llenado del back: los de bloqueo en el orden en que se
+    // marcaron y uno a solicitud cubre lo que falte. Un hotel que no aporta nada no se puede elegir.
+    const aportes = useMemo(() => {
+        const mapa = new Map<number, number>();
+        let faltan = plazasNecesarias;
+        for (const h of hotelesElegidosObjetos.filter((x) => x.modalidadConfirmacion === "BLOQUEO_PLAZAS")) {
+            const plazas = Math.min(h.capacidadDisponible ?? 0, faltan);
+            mapa.set(h.idservicio, plazas);
+            faltan -= plazas;
+        }
+        for (const h of hotelesElegidosObjetos.filter((x) => x.modalidadConfirmacion === "A_SOLICITUD")) {
+            mapa.set(h.idservicio, faltan);
+        }
+        return mapa;
+    }, [hotelesElegidosObjetos, plazasNecesarias]);
+    const hotelSinAporte = hotelesElegidosObjetos.find(
+        (h) => h.modalidadConfirmacion === "BLOQUEO_PLAZAS" && (aportes.get(h.idservicio) ?? 0) === 0,
+    );
 
     // §14 (FA3): si ningún hotel ni combinación de hoteles disponibles cubre plazasNecesarias,
     // el back permite crear la salida sin hotel y sube el corte sugerido a 5 días.
@@ -365,6 +387,7 @@ function FormularioCrearSalida({
                     tamanoMaximo: Number(valores.tamanoMaximo),
                 });
                 setOpciones(resp);
+                setPrecioAjustado(""); // otra fecha u otro paquete: vuelve a la tarifa
                 inicializarSeleccionesDesdeOpciones(resp);
                 setPasoActual(1);
             } catch (err) {
@@ -388,6 +411,10 @@ function FormularioCrearSalida({
             }
             if (plazasNecesarias > 0 && !esSinHotelFA3 && hotelesSeleccionados.length === 0) {
                 setErrorPaso("Elegí al menos un hotel para cubrir las plazas del grupo.");
+                return;
+            }
+            if (hotelSinAporte) {
+                setErrorPaso(`${hotelSinAporte.nombreServicio} no hace falta: el grupo ya está cubierto. Desmarcalo.`);
                 return;
             }
             if (!plazasCubiertasOk) {
@@ -481,10 +508,34 @@ function FormularioCrearSalida({
             idtransporte: idtransporteSeleccionado,
             personalIds: personalSeleccionadoIds,
             diasCierreVenta,
+            ...(precioAjustado.trim() !== "" && precioFinal !== opciones.tarifa?.monto && { precioPorPasajero: precioFinal }),
         });
     }
 
+    // Lo que la logística elegida cuesta de más por pasajero respecto de la referencia del paquete:
+    // el transporte contra el del paquete, y el hotel contra el más económico de la garantía (precio "desde")
+    const extraTransporte = transporteElegido?.encarecePorPasajero ?? 0;
+    const extraHotel = useMemo(() => {
+        if (!opciones || !opciones.nochesHotel || opciones.plazasNecesarias === 0) return 0;
+        const costos = opciones.alojamientos.map((h) => h.costoPorNoche).filter((c): c is number => c != null);
+        if (costos.length === 0) return 0;
+        const referencia = Math.min(...costos);
+        // Mismo orden de llenado que el back: cada hotel con bloqueo cubre lo libre; uno a solicitud, lo que falte
+        let resto = opciones.tamanoMaximo;
+        let extra = 0;
+        for (const h of hotelesElegidosObjetos) {
+            const cubre = h.capacidadDisponible === null ? resto : Math.min(h.capacidadDisponible, resto);
+            extra += cubre * ((h.costoPorNoche ?? referencia) - referencia);
+            resto -= cubre;
+        }
+        return Math.round(((extra * opciones.nochesHotel) / opciones.tamanoMaximo) * 100) / 100;
+    }, [opciones, hotelesElegidosObjetos]);
+    const extraLogistica = Math.round((extraTransporte + extraHotel) * 100) / 100;
+    const precioFinal = precioAjustado.trim() === "" ? (opciones?.tarifa?.monto ?? 0) : Number(precioAjustado);
+    const precioValido = precioFinal > 0;
+
     const puedeConfirmarFinal =
+        precioValido &&
         Boolean(opciones) &&
         !cupoAutoridadInsuficiente &&
         equipoBloqueante.length === 0 &&
@@ -749,18 +800,24 @@ function FormularioCrearSalida({
                                     {opciones.alojamientos.map((hotel) => {
                                         const marcado = hotelesSeleccionados.includes(hotel.idservicio);
                                         const esSolicitud = hotel.modalidadConfirmacion === "A_SOLICITUD";
+                                        // Con el grupo cubierto, otro hotel no aportaría plazas
+                                        const cubierto = !marcado && plazasCubiertasOk && hotelesSeleccionados.length > 0;
+                                        const aporte = aportes.get(hotel.idservicio);
                                         return (
                                             <label
                                                 key={hotel.idservicio}
-                                                className={`flex items-start gap-3 rounded-control border p-3 cursor-pointer transition-colors ${
+                                                className={`flex items-start gap-3 rounded-control border p-3 transition-colors ${
                                                     marcado
-                                                        ? "border-marca bg-marca-suave/30"
-                                                        : "border-borde bg-white hover:border-marca/40"
+                                                        ? "cursor-pointer border-marca bg-marca-suave/30"
+                                                        : cubierto
+                                                          ? "cursor-not-allowed border-borde bg-slate-50 opacity-60"
+                                                          : "cursor-pointer border-borde bg-white hover:border-marca/40"
                                                 }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={marcado}
+                                                    disabled={cubierto}
                                                     onChange={() => alternarHotel(hotel.idservicio)}
                                                     className="mt-1 h-4 w-4 rounded border-borde text-marca focus:ring-marca"
                                                 />
@@ -784,7 +841,17 @@ function FormularioCrearSalida({
                                                     <p className="mt-0.5 text-texto-suave">
                                                         {hotel.localidad}
                                                         {hotel.categoria ? ` · ${hotel.categoria}` : ""}
+                                                        {hotel.costoPorNoche != null ? ` · ${formatearMonto(hotel.costoPorNoche)} por noche` : ""}
                                                     </p>
+                                                    {marcado && aporte !== undefined ? (
+                                                        <p className={`mt-0.5 font-semibold ${aporte > 0 ? "text-marca-oscura" : "text-peligro"}`}>
+                                                            {aporte > 0
+                                                                ? `Aporta ${aporte} ${aporte === 1 ? "plaza" : "plazas"}`
+                                                                : "No aporta plazas: desmarcalo"}
+                                                        </p>
+                                                    ) : cubierto ? (
+                                                        <p className="mt-0.5 text-texto-suave">El grupo ya está cubierto</p>
+                                                    ) : null}
                                                 </div>
                                             </label>
                                         );
@@ -875,6 +942,13 @@ function FormularioCrearSalida({
                                                     ) : !trans.alcanza ? (
                                                         <span className="ml-2 font-semibold text-peligro">
                                                             · Insuficiente para {opciones.totalLugares} lugares
+                                                        </span>
+                                                    ) : trans.encarecePorPasajero ? (
+                                                        <span
+                                                            className="ml-2 text-amber-800"
+                                                            title="Cuesta más que el transporte del paquete: la diferencia por pasajero sale del margen"
+                                                        >
+                                                            · +{formatearMonto(trans.encarecePorPasajero)} por pasajero
                                                         </span>
                                                     ) : null}
                                                 </p>
@@ -1067,15 +1141,50 @@ function FormularioCrearSalida({
                                 </p>
                             </div>
                             <div>
-                                <span className="text-texto-suave">Tarifa congelada</span>
-                                <p className="font-semibold text-texto">
-                                    USD {opciones.tarifa.monto} / pasajero ({opciones.tarifa.temporada})
-                                </p>
+                                <label className="text-texto-suave" htmlFor="precio-salida">
+                                    Precio por pasajero (se congela al guardar)
+                                </label>
+                                <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="font-semibold text-texto">USD</span>
+                                    <input
+                                        id="precio-salida"
+                                        type="number"
+                                        min={1}
+                                        step="0.01"
+                                        value={precioAjustado === "" ? opciones.tarifa.monto : precioAjustado}
+                                        onChange={(e) => setPrecioAjustado(e.target.value)}
+                                        className="w-28 rounded-control border border-borde bg-white px-2 py-1 text-sm font-semibold text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    />
+                                </div>
                                 <p className="text-xs text-texto-suave">
-                                    Si se llena: {opciones.tamanoMaximo} × USD {opciones.tarifa.monto} ={" "}
-                                    <strong className="text-texto">
-                                        USD {(opciones.tamanoMaximo * opciones.tarifa.monto).toLocaleString("es-AR")}
-                                    </strong>
+                                    Tarifa del paquete: USD {opciones.tarifa.monto} ({opciones.tarifa.temporada})
+                                </p>
+                                {extraLogistica > 0 ? (
+                                    <p className="mt-1 text-xs text-amber-800">
+                                        La logística elegida cuesta {formatearMonto(extraLogistica)} más por pasajero que la referencia del paquete
+                                        {extraHotel > 0 && extraTransporte > 0
+                                            ? ` (hotel ${formatearMonto(extraHotel)}, transporte ${formatearMonto(extraTransporte)})`
+                                            : extraHotel > 0
+                                              ? " (por el hotel)"
+                                              : " (por el transporte)"}
+                                        .{" "}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setPrecioAjustado(String(Math.round((opciones.tarifa!.monto + extraLogistica) * 100) / 100))
+                                            }
+                                            className="font-semibold text-marca underline hover:text-marca-oscura"
+                                        >
+                                            Sumar al precio
+                                        </button>
+                                    </p>
+                                ) : null}
+                                {!precioValido ? (
+                                    <p className="text-xs font-semibold text-peligro">El precio tiene que ser mayor a 0.</p>
+                                ) : null}
+                                <p className="text-xs text-texto-suave">
+                                    Si se llena: {opciones.tamanoMaximo} × {formatearMonto(precioFinal)} ={" "}
+                                    <strong className="text-texto">{formatearMonto(opciones.tamanoMaximo * precioFinal)}</strong>
                                 </p>
                             </div>
                             <div>
