@@ -156,6 +156,8 @@ export type AlojamientoOpcion = {
     modalidadConfirmacion: "BLOQUEO_PLAZAS" | "A_SOLICITUD";
     capacidadDisponible: number | null;
     alcanza: boolean;
+    /** Costo por plaza y por noche */
+    costoPorNoche?: number;
 };
 
 export type TransporteOpcion = {
@@ -229,6 +231,8 @@ export type OpcionesSalidaDto = {
     cupoAutoridad: CupoAutoridadOpciones | null;
     tarifa: TarifaCongeladaSalida;
     plazasNecesarias: number;
+    /** Noches previas + posteriores del paquete */
+    nochesHotel?: number;
     alojamientos: AlojamientoOpcion[];
     transportes: TransporteOpcion[];
     personal: {

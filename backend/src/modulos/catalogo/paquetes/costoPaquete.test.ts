@@ -123,9 +123,9 @@ describe("SimularCostoDto (B5)", () => {
 describe("simularCostoPaquete (B5 — integración con servicios)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("por categoría elige el hotel más caro de los que cumplen", async () => {
+  it("por categoría toma como referencia el hotel más económico de los que cumplen (precio desde)", async () => {
     dbMock.servicioBase.findMany.mockResolvedValue([
-      { idservicio: 11, nombreServicio: "Hotel Caro", costoBase: 120 },
+      { idservicio: 11, nombreServicio: "Hotel Económico", costoBase: 120 },
     ]);
     dbMock.servicioBase.findUnique.mockResolvedValue({
       idservicio: 20,
@@ -150,6 +150,7 @@ describe("simularCostoPaquete (B5 — integración con servicios)", () => {
     expect(r.costoPorPasajero).toBe(280); // 120*2 + 400/10
     expect(r.desglose[0]?.idservicio).toBe(11);
     expect(r.avisos).toEqual([]);
+    expect(dbMock.servicioBase.findMany).toHaveBeenCalledWith(expect.objectContaining({ orderBy: { costoBase: "asc" } }));
   });
 
   it("avisa si ningún hotel cumple la categoría en la localidad", async () => {

@@ -300,15 +300,17 @@ export async function simularCostoPaquete(dto: SimularCostoBody): Promise<Result
               },
             },
           },
-          orderBy: { costoBase: "desc" },
+          // Precio "desde": la referencia es el hotel más económico que cumple; si la salida usa uno más caro,
+          // su revisión avisa la diferencia por pasajero y el admin la suma al precio antes de vender
+          orderBy: { costoBase: "asc" },
           take: 1,
         });
-        const masCaro = candidatos[0];
-        if (masCaro) {
+        const referencia = candidatos[0];
+        if (referencia) {
           hotel = {
-            idservicio: masCaro.idservicio,
-            nombreServicio: `${masCaro.nombreServicio} (más caro de la categoría)`,
-            costoBase: masCaro.costoBase,
+            idservicio: referencia.idservicio,
+            nombreServicio: `${referencia.nombreServicio} (más económico de la categoría)`,
+            costoBase: referencia.costoBase,
           };
         } else {
           avisoHotel = `Ningún hotel de ${localidad} cumple ${categoria} · ${tipoHabitacion}: el costo no incluye el hotel`;

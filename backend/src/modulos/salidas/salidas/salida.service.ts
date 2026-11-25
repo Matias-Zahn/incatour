@@ -60,6 +60,7 @@ export class SalidaService {
       cupoAutoridad: libres === null ? null : { lugaresDisponibles: libres, alcanza: libres >= totalLugares },
       tarifa: p.tarifa,
       plazasNecesarias: p.rangosAlojamiento.length ? dto.tamanoMaximo : 0,
+      nochesHotel: paquete.nochesPrevias + paquete.nochesPosteriores, // para la diferencia de costo del hotel elegido
       alojamientos: p.alojamientos.map((a) => ({
         idservicio: a.idservicio,
         nombreServicio: a.nombreServicio,
@@ -67,6 +68,7 @@ export class SalidaService {
         categoria: a.alojamiento?.categoria,
         modalidadConfirmacion: a.alojamiento?.modalidadConfirmacion,
         capacidadDisponible: a.disponible, // A1: lo disponible en las noches de la salida; null a solicitud
+        costoPorNoche: a.costoBase, // por plaza: varía entre los hoteles que cumplen la garantía
         alcanza: a.disponible === null || a.disponible >= dto.tamanoMaximo, // decisión 10: el a solicitud cubre lo que falte
       })),
       transportes: p.transportes.map((t) => ({

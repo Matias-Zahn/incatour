@@ -92,6 +92,10 @@ const EQUIPOS: [string, string, number, number][] = [
 // Catálogo de base que ningún paquete usa (otras habitaciones, otro tren, más artículos): el sistema se ve poblado
 // [nombre, localidad, categoría, tipo de habitación, costo por noche, modalidad, plazas (solo bloqueo), canal]
 const HOTELES_EXTRA: [string, string, string, string, number, "BLOQUEO_PLAZAS" | "A_SOLICITUD", number | null, string][] = [
+  // Cusco 3★ doble con costos distintos: el más económico es la referencia del precio "desde"; elegir uno más caro
+  // en la salida hace que la revisión avise la diferencia por pasajero
+  ["Hostal Inti Wasi Cusco", "Cusco", "3 Estrellas", "Doble", 40, "BLOQUEO_PLAZAS", 20, "WhatsApp"],
+  ["Hotel Plaza Regocijo", "Cusco", "3 Estrellas", "Doble", 78, "BLOQUEO_PLAZAS", 24, "Email"],
   ["Palacio Inka Cusco", "Cusco", "5 Estrellas", "Suite", 260, "A_SOLICITUD", null, "Email"],
   ["Casa Andina Cusco Plaza", "Cusco", "4 Estrellas", "Matrimonial", 140, "BLOQUEO_PLAZAS", 20, "Email"],
   ["Hostal Qorikancha", "Cusco", "3 Estrellas", "Triple", 45, "BLOQUEO_PLAZAS", 15, "WhatsApp"],

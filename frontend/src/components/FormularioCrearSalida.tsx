@@ -489,8 +489,25 @@ function FormularioCrearSalida({
         });
     }
 
-    // Lo que la logística elegida cuesta de más por pasajero respecto de la referencia del paquete
-    const extraLogistica = transporteElegido?.encarecePorPasajero ?? 0;
+    // Lo que la logística elegida cuesta de más por pasajero respecto de la referencia del paquete:
+    // el transporte contra el del paquete, y el hotel contra el más económico de la garantía (precio "desde")
+    const extraTransporte = transporteElegido?.encarecePorPasajero ?? 0;
+    const extraHotel = useMemo(() => {
+        if (!opciones || !opciones.nochesHotel || opciones.plazasNecesarias === 0) return 0;
+        const costos = opciones.alojamientos.map((h) => h.costoPorNoche).filter((c): c is number => c != null);
+        if (costos.length === 0) return 0;
+        const referencia = Math.min(...costos);
+        // Mismo orden de llenado que el back: cada hotel con bloqueo cubre lo libre; uno a solicitud, lo que falte
+        let resto = opciones.tamanoMaximo;
+        let extra = 0;
+        for (const h of hotelesElegidosObjetos) {
+            const cubre = h.capacidadDisponible === null ? resto : Math.min(h.capacidadDisponible, resto);
+            extra += cubre * ((h.costoPorNoche ?? referencia) - referencia);
+            resto -= cubre;
+        }
+        return Math.round(((extra * opciones.nochesHotel) / opciones.tamanoMaximo) * 100) / 100;
+    }, [opciones, hotelesElegidosObjetos]);
+    const extraLogistica = Math.round((extraTransporte + extraHotel) * 100) / 100;
     const precioFinal = precioAjustado.trim() === "" ? (opciones?.tarifa?.monto ?? 0) : Number(precioAjustado);
     const precioValido = precioFinal > 0;
 
@@ -795,6 +812,7 @@ function FormularioCrearSalida({
                                                     <p className="mt-0.5 text-texto-suave">
                                                         {hotel.localidad}
                                                         {hotel.categoria ? ` · ${hotel.categoria}` : ""}
+                                                        {hotel.costoPorNoche != null ? ` · ${formatearMonto(hotel.costoPorNoche)} por noche` : ""}
                                                     </p>
                                                 </div>
                                             </label>
@@ -1105,7 +1123,13 @@ function FormularioCrearSalida({
                                 </p>
                                 {extraLogistica > 0 ? (
                                     <p className="mt-1 text-xs text-amber-800">
-                                        La logística elegida cuesta {formatearMonto(extraLogistica)} más por pasajero que la referencia del paquete.{" "}
+                                        La logística elegida cuesta {formatearMonto(extraLogistica)} más por pasajero que la referencia del paquete
+                                        {extraHotel > 0 && extraTransporte > 0
+                                            ? ` (hotel ${formatearMonto(extraHotel)}, transporte ${formatearMonto(extraTransporte)})`
+                                            : extraHotel > 0
+                                              ? " (por el hotel)"
+                                              : " (por el transporte)"}
+                                        .{" "}
                                         <button
                                             type="button"
                                             onClick={() =>
