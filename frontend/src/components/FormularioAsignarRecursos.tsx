@@ -617,10 +617,12 @@ export function FormularioAsignarRecursos({
                             <thead className="bg-slate-50 font-semibold text-texto-suave">
                                 <tr>
                                     <th className="px-3 py-2">Artículo</th>
-                                    <th className="px-3 py-2">Tipo</th>
-                                    <th className="px-3 py-2 text-right">Necesita</th>
-                                    <th className="px-3 py-2 text-right">Ocupado</th>
-                                    <th className="px-3 py-2 text-right">Falta</th>
+                                    <th className="px-3 py-2">Regla</th>
+                                    <th className="px-3 py-2 text-right">
+                                        Necesita para {pasajerosConfirmados}{" "}
+                                        {pasajerosConfirmados === 1 ? "pasajero" : "pasajeros"}
+                                    </th>
+                                    <th className="px-3 py-2 text-right">Estado</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-borde bg-white">
@@ -630,10 +632,19 @@ export function FormularioAsignarRecursos({
                                             {item.nombreServicio}
                                         </td>
                                         <td className="px-3 py-2 text-texto-suave">
-                                            {item.tipoEquipamiento ?? "—"}
+                                            {item.cadaPasajeros
+                                                ? `${item.cantidad} cada ${item.cadaPasajeros} pax`
+                                                : `${item.cantidad} por salida`}
                                         </td>
-                                        <td className="px-3 py-2 text-right">{item.necesita}</td>
-                                        <td className="px-3 py-2 text-right">{item.ocupado}</td>
+                                        <td className="px-3 py-2 text-right">
+                                            {item.necesita}
+                                            {/* Solo se separan si se cambió a mano en logística */}
+                                            {item.ocupado !== item.necesita ? (
+                                                <span className="block text-[11px] text-texto-suave">
+                                                    reservados {item.ocupado}
+                                                </span>
+                                            ) : null}
+                                        </td>
                                         <td
                                             className={`px-3 py-2 text-right font-bold ${
                                                 item.falta > 0
@@ -641,7 +652,9 @@ export function FormularioAsignarRecursos({
                                                     : "text-emerald-700"
                                             }`}
                                         >
-                                            {item.falta > 0 ? `Faltan ${item.falta}` : "OK"}
+                                            {item.falta > 0
+                                                ? `Faltan ${item.falta}${item.fechaFalta ? ` (stock el ${formatearFechaUtcCorta(item.fechaFalta)})` : ""}`
+                                                : "OK"}
                                         </td>
                                     </tr>
                                 ))}

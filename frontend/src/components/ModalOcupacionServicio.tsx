@@ -67,7 +67,9 @@ function ModalOcupacionServicio({
                             {data
                                 ? data.total === null
                                     ? "Modalidad a solicitud (sin tope fijo de plazas)."
-                                    : `Capacidad total: ${data.total} ${servicio.tipo === "ALOJAMIENTO" ? "plazas" : servicio.tipo === "TRANSPORTE" ? "vehículo" : "unidades"}.`
+                                    : servicio.tipo === "ALOJAMIENTO"
+                                      ? `Bloqueo contratado: ${data.total} plazas por noche.`
+                                      : `Capacidad total: ${data.total} ${servicio.tipo === "TRANSPORTE" ? "vehículo" : "unidades"}.`
                                 : "Consultando ocupación por fecha..."}
                         </p>
                     </div>
@@ -110,6 +112,13 @@ function ModalOcupacionServicio({
                     <Alerta tipo="error" titulo="No se pudo consultar la ocupación">
                         {error?.message}
                     </Alerta>
+                ) : data && !data.dias.some((d) => d.ocupado > 0) ? (
+                    // ponytail: el bloqueo vale todos los días; con vigencia por fechas (cambio de modelo) esto mostraría solo las contratadas
+                    <Alerta titulo="Sin salidas en estas fechas">
+                        Ninguna salida usa este servicio entre las fechas elegidas
+                        {data.total === null ? "." : `: ${data.total === 1 ? "está libre" : `las ${data.total} ${servicio.tipo === "ALOJAMIENTO" ? "plazas" : "unidades"} están libres`} todos los días.`}{" "}
+                        Cambiá el rango para ver otro período.
+                    </Alerta>
                 ) : data ? (
                     <div className="space-y-5">
                         {/* Calendario: un mes por bloque, el número grande es lo disponible ese día */}
@@ -119,6 +128,7 @@ function ModalOcupacionServicio({
                                     Disponibles por día
                                 </h3>
                                 <p className="flex flex-wrap gap-3 text-[11px] text-texto-suave">
+                                    <span><span className="font-bold text-texto-suave/50">9</span> sin salidas</span>
                                     <span><span className="font-bold text-emerald-700">9</span> disponibles</span>
                                     <span><span className="font-bold text-amber-700">0</span> sin stock</span>
                                     <span><span className="font-bold text-peligro">-2</span> faltan</span>
@@ -149,7 +159,8 @@ function ModalOcupacionServicio({
                                                     libre === null ? "text-texto-suave"
                                                     : libre < 0 ? "text-peligro"
                                                     : libre === 0 ? "text-amber-700"
-                                                    : "text-emerald-700";
+                                                    : dia.ocupado > 0 ? "text-emerald-700"
+                                                    : "text-texto-suave/50"; // sin uso: el bloqueo entero, sin destacar
                                                 const fondo =
                                                     libre !== null && libre < 0 ? "border-peligro/40 bg-rose-50"
                                                     : libre === 0 ? "border-amber-300 bg-amber-50"

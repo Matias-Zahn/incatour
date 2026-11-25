@@ -1050,7 +1050,7 @@ function SalidasPage() {
             menu.push({
                 tipo: "boton",
                 id: "revisar-confirmacion",
-                etiqueta: "Revisar confirmación",
+                etiqueta: "Ver qué falta para confirmar",
                 deshabilitado: algunaMutacionPendiente,
                 onClick: () => abrirAsignacion(fila),
             });
@@ -1118,7 +1118,7 @@ function SalidasPage() {
         } else if (puedeRevisarConfirmacion) {
             accionesDetalle.push({
                 id: "revisar",
-                etiqueta: "Revisar confirmación",
+                etiqueta: "Ver qué falta para confirmar",
                 variante: "secundario",
                 onClick: () => abrirAsignacion(fila),
             });
