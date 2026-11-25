@@ -55,7 +55,9 @@ export const TOPES = {
   montoTarifa: 10_000_000, // igual que costoBase
   tamanoSalida: 100,
   diasCierreVenta: 30,
-  reglaEquipo: 100, // cantidad y cadaPasajeros de cada equipo del paquete
+  reglaEquipo: 100,
+  pesoEquipaje: 50, // kg de equipaje incluidos por pasajero
+  costoPorKgExcedente: 1000, // cantidad y cadaPasajeros de cada equipo del paquete
 } as const;
 
 export const TIPO_SERVICIO = {

@@ -29,6 +29,10 @@ const vNumero = (min: number, max?: number): Validador => (v, c) => {
   return [undefined, v];
 };
 
+/** Campo opcional: null lo borra, y al crear puede faltar. */
+const vOpcional = (validar: Validador): Validador =>
+  Object.assign((v: any, c: string) => (v === null ? [undefined, null] : validar(v, c)) as [string | undefined, any?], { opcional: true });
+
 const vHora: Validador = (v, c) =>
   typeof v === "string" && REGEX_HORA.test(v) ? [undefined, v] : [`${c} debe tener el formato HH:MM.`];
 
@@ -58,7 +62,10 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
     modalidadConfirmacion: vModalidad,
   },
   TRANSPORTE: {
-    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo), // B6: el equipaje se cobra en persona; sus campos, si llegan, se ignoran
+    capacidadVehiculo: vEntero(1, TOPES.capacidadVehiculo),
+    // B6: el equipaje se pesa y cobra en persona; estos dos solo se informan al cliente
+    pesoEquipajeIncluido: vOpcional(vNumero(0, TOPES.pesoEquipaje)),
+    costoPorKgExcedente: vOpcional(vNumero(0, TOPES.costoPorKgExcedente)),
   },
   TREN: {
     horarioSalida: vHora,
@@ -100,7 +107,7 @@ const validarCampos = (
   const limpio: { [k: string]: any } = {};
   for (const [campo, validar] of Object.entries(campos)) {
     if (obj[campo] === undefined) {
-      if (exigirTodos) return [`${campo} es requerido.`];
+      if (exigirTodos && !("opcional" in validar)) return [`${campo} es requerido.`];
       continue;
     }
     const [error, valor] = validar(obj[campo], campo);

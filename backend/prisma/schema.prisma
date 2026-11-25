@@ -507,6 +507,8 @@ model ServicioAlojamiento {
 model ServicioTransporte {
   idservicio           Int          @id
   capacidadVehiculo    Int
+  pesoEquipajeIncluido Float? // solo informativo: el equipaje se pesa y cobra en persona
+  costoPorKgExcedente  Float?
   servicio             ServicioBase @relation(fields: [idservicio], references: [idservicio])
 
   @@schema("public")

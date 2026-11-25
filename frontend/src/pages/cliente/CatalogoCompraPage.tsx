@@ -145,6 +145,15 @@ const TARJETAS_PRUEBA = [
 ];
 
 
+/** Solo informativo: el equipaje se pesa y cobra en persona, no en la compra. */
+function textoEquipaje(e: { kgIncluidos: number; costoPorKgExcedente: number | null }): string {
+    const excedente =
+        e.costoPorKgExcedente != null
+            ? ` El excedente se paga en persona: USD ${e.costoPorKgExcedente} por kg.`
+            : " El excedente se paga en persona.";
+    return `Equipaje incluido: ${e.kgIncluidos} kg por pasajero.${excedente}`;
+}
+
 function sumarDiasIso(iso: string, dias: number): string {
     const fecha = new Date(iso);
     if (Number.isNaN(fecha.getTime())) return iso;
@@ -1054,6 +1063,11 @@ function CatalogoCompraPage() {
                                                 : "fin del recorrido"}
                                             .
                                         </p>
+                                        {paqueteEnCompra?.equipaje ? (
+                                            <p className="text-xs text-texto-suave">
+                                                {textoEquipaje(paqueteEnCompra.equipaje)}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -2223,6 +2237,11 @@ function CatalogoCompraPage() {
                                                         Servicios base de trekking guiado incluidos.
                                                     </p>
                                                 )}
+                                                {paqueteDetalle.equipaje ? (
+                                                    <p className="text-texto">
+                                                        {textoEquipaje(paqueteDetalle.equipaje)}
+                                                    </p>
+                                                ) : null}
                                             </div>
 
                                             {/* ALOJAMIENTO Y CONDICIONES */}

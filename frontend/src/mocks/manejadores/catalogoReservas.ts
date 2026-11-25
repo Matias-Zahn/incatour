@@ -123,6 +123,7 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             "IncaRail Expedition (sale 06:10, llega 07:45)",
             "Carpa de alta montaña 4 estaciones",
         ],
+        equipaje: { kgIncluidos: 15, costoPorKgExcedente: 2.5 },
         serviciosIncluidos: [
             "Minibus Sprinter",
             "IncaRail Expedition (sale 06:10, llega 07:45)",
@@ -180,6 +181,7 @@ const catalogoMockInicial: PaqueteCatalogoPublico[] = [
             "Bus Cusco - Km 82",
             "IncaRail Voyager (sale 06:10, llega 07:45)",
         ],
+        equipaje: { kgIncluidos: 15, costoPorKgExcedente: 2.5 },
         serviciosIncluidos: [
             "Bus Cusco - Km 82",
             "IncaRail Voyager (sale 06:10, llega 07:45)",

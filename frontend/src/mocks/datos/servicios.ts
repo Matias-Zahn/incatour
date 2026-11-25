@@ -27,6 +27,8 @@ export const serviciosSemilla: Servicio[] = [
         localidad: "Cusco",
         estado: "ACTIVO",
         capacidadVehiculo: 24,
+        pesoEquipajeIncluido: 15,
+        costoPorKgExcedente: 2.5,
     },
     {
         id: 3,

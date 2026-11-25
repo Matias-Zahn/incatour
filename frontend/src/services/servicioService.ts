@@ -52,6 +52,17 @@ export const esquemaServicio = z
             .min(1, "Debe ser al menos 1.")
             .max(60, "No puede superar los 60 asientos.")
             .optional(),
+        // Solo informativo para el cliente: el equipaje se pesa y cobra en persona
+        pesoEquipajeIncluido: z
+            .number({ message: "Ingresá un peso numérico válido." })
+            .min(0, "No puede ser negativo.")
+            .max(50, "No puede superar los 50 kg.")
+            .optional(),
+        costoPorKgExcedente: z
+            .number({ message: "Ingresá un costo numérico válido." })
+            .min(0, "No puede ser negativo.")
+            .max(1000, "No puede superar los 1000 por kg.")
+            .optional(),
         horarioSalida: z.string().trim().optional(),
         horarioLlegada: z.string().trim().optional(),
         diasOperacion: z.string().trim().optional(),
