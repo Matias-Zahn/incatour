@@ -1,8 +1,8 @@
 import { CustomError } from "../../../error/CustomError";
-import { COBERTURA_MINIMA_STOCK, ESTADO, ESTADO_SALIDA, SALIDAS_ACTIVAS, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { COBERTURA_MINIMA_STOCK, ESTADO, ESTADO_SALIDA, redondear2, SALIDAS_ACTIVAS, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { codigoDia, diasDe, fechaCorta, hoyUTC } from "../../../shared/fechas";
 import { claveDia, rangosDe, unaPorServicio } from "../../../shared/ocupacion";
-import { armarDefinicionPaquete, DefinicionPaquete, tarifaVigente } from "../../../shared/definicionPaquete";
+import { armarDefinicionPaquete, DefinicionPaquete, tarifaDeSalida, tarifaVigente } from "../../../shared/definicionPaquete";
 import { controlEquipo, FilaEquipo, reglasEquipo, tamanoQueAlcanza } from "../../../shared/equipo";
 import { motivoNoApto, noAptos } from "../../../shared/aptitud";
 import { corteDeVenta, datosVenta, motivoFechaInvalida } from "../../../shared/ventaAbierta";
@@ -349,7 +349,11 @@ const HORA_MS = 60 * 60 * 1000;
  */
 export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo = { totales: new Map(), filas: [] }) {
   const { reservas, permisos, avances, ocupaciones, ...salida } = s;
+  const { tarifas, ...paquete } = salida.paquete;
   const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
+  // 12.5: el precio al que se vende; lo vendido suma lo que pagó cada reserva (su precio congelado)
+  const tarifa = tarifaDeSalida(salida, tarifas);
+  const totalVendido = redondear2(reservas.reduce((t, r) => t + r.precioCongelado, 0));
   const cantidadPersonal = salida.personalAsignado.length;
   const emitidos = permisos.length + reservas.reduce((t, r) => t + r.permisos.length, 0);
   const permisosFaltantes = Math.max(0, pasajerosConfirmados + cantidadPersonal - emitidos);
@@ -396,7 +400,10 @@ export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo
 
   return {
     ...salida,
+    paquete,
     ...venta,
+    precioPorPasajero: tarifa ? { monto: tarifa.monto, moneda: tarifa.moneda, temporada: tarifa.temporada } : null,
+    totalVendido,
     puedeConfirmar,
     // Decisión 12 del contrato: la forma de SalidaServicio, armada desde Ocupacion (el hotel, una vez aunque ocupe dos tramos)
     servicios: unaPorServicio(ocupaciones).map((o) => ({

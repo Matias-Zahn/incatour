@@ -28,6 +28,7 @@ import {
 } from "../../services/guiaService";
 import {
     formatearFechaUtcCorta,
+    formatearMonto,
     formatearRangoFechasUtc,
 } from "../../services/formato";
 import { usePaquetes } from "../../services/paqueteService";
@@ -2525,6 +2526,17 @@ function SalidasPage() {
                                                             style={{ width: `${porcentaje}%` }}
                                                         />
                                                     </div>
+                                                    {fila.precioPorPasajero ? (
+                                                        <p className="text-[11.5px] text-texto-suave">
+                                                            <span className="font-medium text-texto">
+                                                                {formatearMonto(fila.precioPorPasajero.monto, fila.precioPorPasajero.moneda)}
+                                                            </span>{" "}
+                                                            / pax
+                                                            {fila.totalVendido
+                                                                ? ` · ${formatearMonto(fila.totalVendido, fila.precioPorPasajero.moneda)} vendidos`
+                                                                : ""}
+                                                        </p>
+                                                    ) : null}
                                                     <p
                                                         className="truncate text-[11.5px] text-texto-suave max-w-[190px]"
                                                         title={

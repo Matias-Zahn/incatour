@@ -52,7 +52,7 @@ const dto = (extra = {}) =>
 const creada = {
   idsalida: 9, estado: "PUBLICADA", fechaInicio: enDias(20), fechaFin: enDias(23), tamanoMaximo: 16, diasCierreVenta: 2,
   definicionPaquete: null, avances: [], permisos: [], reservas: [], personalAsignado: [], ocupaciones: [],
-  paquete: { circuito: { duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 0 } } },
+  paquete: { tarifas: [], circuito: { duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 0 } } },
 };
 const equipoVacio = { totales: new Map(), filas: [] };
 const mocksDeAlta = () => {
@@ -316,14 +316,14 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
       fechaHoraInicioReal: null,
       ultimaEtapaAlcanzada: null,
       avances: [],
-      paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 4 } } },
+      paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", tarifas: [], circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 4 } } },
       diasCierreVenta: 2,
       tamanoMaximo: 8,
       definicionPaquete: null,
       personalAsignado: [],
       ocupaciones: [{ idsalida: 1, idservicio: 5, tipo: "TRANSPORTE", comprobanteReserva: null, servicio: { nombreServicio: "Bus", transporte: { capacidadVehiculo: 20 } } }],
       permisos: [],
-      reservas: [{ _count: { pasajeros: 3 }, permisos: [], solicitudes: [], ...reserva }],
+      reservas: [{ precioCongelado: 2400, _count: { pasajeros: 3 }, permisos: [], solicitudes: [], ...reserva }],
       ...extra,
     }) as unknown as Parameters<typeof resumirSalida>[0];
 
@@ -337,6 +337,19 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
     );
     expect(r).toMatchObject({ pasajerosConfirmados: 3, cantidadPersonal: 2, guias: ["Rosa"], permisosFaltantes: 2 });
     expect(r).not.toHaveProperty("reservas");
+  });
+
+  it("12.5: informa el precio congelado y lo vendido; sin congelar, el del paquete vivo para su fecha", () => {
+    const congelada = { idtemporada: 1, temporada: "Alta", monto: 800, moneda: "USD" };
+    expect(resumirSalida(listada({ definicionPaquete: { tarifa: congelada } }), AHORA)).toMatchObject({
+      precioPorPasajero: { monto: 800, moneda: "USD", temporada: "Alta" },
+      totalVendido: 2400,
+    });
+    const temporada = { idtemporada: 2, nombre: "Baja", estado: "ACTIVO", fechaInicio: new Date("2026-11-01"), fechaFin: new Date("2026-11-30") };
+    const viva = listada({ paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", tarifas: [{ monto: 700, moneda: "USD", temporada }], circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance: 12, _count: { etapas: 4 } } } });
+    const r = resumirSalida(viva, AHORA);
+    expect(r.precioPorPasajero).toEqual({ monto: 700, moneda: "USD", temporada: "Baja" });
+    expect(r.paquete).not.toHaveProperty("tarifas");
   });
 
   it("RF-61: a 7 días o menos alerta solicitudes pendientes y permisos sin emitir", () => {
@@ -388,7 +401,7 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
     const iniciada = { estado: "EN_CURSO", fechaInicio: new Date("2026-11-15"), fechaHoraInicioReal: new Date("2026-11-15T01:00:00Z") };
     const conUmbral = (horasPrimerAvance: number) =>
       resumirSalida(
-        listada({ ...iniciada, paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance, _count: { etapas: 4 } } } }),
+        listada({ ...iniciada, paquete: { nroPaquete: "PAQ-1", nombrePaquete: "Inca", tarifas: [], circuito: { idcircuito: 1, nombreCircuito: "C", duracionDias: 4, horasPrimerAvance, _count: { etapas: 4 } } } }),
         AHORA
       ).alertas;
     expect(conUmbral(6)).toContain("SIN_AVANCES");
