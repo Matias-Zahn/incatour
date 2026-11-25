@@ -35,7 +35,8 @@ export class AsignacionService {
       pasajerosConfirmados: vendidos,
       dotacionRequerida: dotacion,
       personal: recursos.personal.map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol, apto: !p.motivo, motivo: p.motivo })),
-      porteadoresSobrantes: porteadoresDeMas(salida, dotacion.porteadores).length, // se desasignan al confirmar
+      porteadoresSobrantes: cuantosPorteadoresSobran(salida, dotacion.porteadores), // el admin elige cuáles se desasignan al confirmar
+      porteadoresSugeridosALiberar: await this.sugerirPorteadoresALiberar(salida, dotacion.porteadores),
       // 12.2: los pasajeros que la compra mandó a cada hotel
       hoteles: ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
         idservicio: o.idservicio,
@@ -63,7 +64,8 @@ export class AsignacionService {
   }
 
   // CU-40 pasos 4 a 15: confirmar (body vacío, decisión 15). personalIds: solo para una salida sin personal (anterior a la etapa 3)
-  async confirmarAsignacion(idsalida: number, personalIds?: number[]) {
+  // porteadoresALiberar: los que el admin elige quitar cuando sobran para lo vendido (decisión 5)
+  async confirmarAsignacion(idsalida: number, personalIds?: number[], porteadoresALiberar?: number[]) {
     if (personalIds) await this.asignarPersonalFaltante(idsalida, personalIds);
     const { salida, sobrantes, dotacion, motivoNoConfirmable, bloqueaPorRecursos, pendientes, faltantes } = await this.prepararConfirmacion(idsalida);
     if (motivoNoConfirmable) {
@@ -74,8 +76,10 @@ export class AsignacionService {
     // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue.
     // El personal vencido ya frenó la confirmación como no apto (12.3)
     // Los porteadores se asignaron por el máximo (decisión 5): los que sobran para los vendidos se desasignan,
-    // no llevan permiso y su lugar se libera con los sobrantes
-    const quitados = porteadoresDeMas(salida, dotacion.porteadores);
+    // no llevan permiso y su lugar se libera con los sobrantes. Quiénes, lo elige el admin
+    const quitados = porteadoresALiberar
+      ? elegirPorteadoresALiberar(salida, dotacion.porteadores, porteadoresALiberar)
+      : await this.sugerirPorteadoresALiberar(salida, dotacion.porteadores);
     const nominaCompleta = armarNomina(salida, salida.personalAsignado.filter((a) => !quitados.includes(a.idpersonal)).map((a) => a.personal));
     const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte <= salida.fechaFin);
     const nomina = nominaCompleta.filter((t) => !vencidos.includes(t));
@@ -172,6 +176,15 @@ export class AsignacionService {
     await this.repository.asignarPersonal(salida, personalIds);
   }
 
+  /** Si el admin no elige, se liberan los que más salidas tienen ese mes: así no quedan afuera siempre los mismos. */
+  private async sugerirPorteadoresALiberar(salida: SalidaParaAsignar, necesarios: number) {
+    const sobran = cuantosPorteadoresSobran(salida, necesarios);
+    if (!sobran) return [];
+    const asignados = porteadoresDe(salida);
+    const delMes = await this.repository.salidasEnElMes(asignados, salida.fechaInicio);
+    return [...asignados].sort((a, b) => (delMes.get(b) ?? 0) - (delMes.get(a) ?? 0) || a - b).slice(0, sobran);
+  }
+
   // true si quedaron liberados (o si otro pedido ya los tomó); false si la autoridad falló
   private async liberar(idbloqueo: string, idsalida: number, n: number) {
     if (!(await this.repository.tomarSobrantes(idsalida, n))) return true;
@@ -235,13 +248,26 @@ export class AsignacionService {
   }
 }
 
-/** Los porteadores que sobran para lo vendido. ponytail: se quitan los de id más alto; sin orden de asignación guardado */
-const porteadoresDeMas = (salida: SalidaParaAsignar, necesarios: number) =>
-  salida.personalAsignado
-    .filter((a) => a.personal.rol === ROL_PORTEADOR)
-    .map((a) => a.idpersonal)
-    .sort((a, b) => b - a)
-    .slice(0, Math.max(0, salida.personalAsignado.filter((a) => a.personal.rol === ROL_PORTEADOR).length - necesarios));
+const porteadoresDe = (salida: SalidaParaAsignar) =>
+  salida.personalAsignado.filter((a) => a.personal.rol === ROL_PORTEADOR).map((a) => a.idpersonal);
+const cuantosPorteadoresSobran = (salida: SalidaParaAsignar, necesarios: number) => Math.max(0, porteadoresDe(salida).length - necesarios);
+
+/** Los porteadores que el admin eligió liberar: tienen que ser de la salida y exactamente los que sobran. */
+function elegirPorteadoresALiberar(salida: SalidaParaAsignar, necesarios: number, elegidos: number[] = []) {
+  const sobran = cuantosPorteadoresSobran(salida, necesarios);
+  const asignados = porteadoresDe(salida);
+  if (elegidos.some((id) => !asignados.includes(id))) {
+    throw CustomError.badRequest("Solo se pueden liberar porteadores asignados a esta salida");
+  }
+  if (elegidos.length !== sobran) {
+    throw CustomError.badRequest(
+      sobran === 0
+        ? "No sobran porteadores para lo vendido: no hay que liberar ninguno"
+        : `Sobran ${sobran} ${sobran === 1 ? "porteador" : "porteadores"} para lo vendido: elegí ${sobran === 1 ? "cuál se libera" : "cuáles se liberan"}`
+    );
+  }
+  return elegidos;
+}
 
 // Nómina completa (paso 14): pasajeros de las reservas confirmadas y personal asignado
 const MOTIVO_PASAPORTE_VENCIDO = "Pasaporte vence antes de finalizar el recorrido";

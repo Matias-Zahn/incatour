@@ -36,6 +36,7 @@ export class AsignacionRoutes {
      *                 dotacionRequerida: { guias: 2, porteadores: 2 }
      *                 personal: [{ idpersonal: 1, nombreCompleto: Carlos Mamani, rol: Guía, apto: true, motivo: null }]
      *                 porteadoresSobrantes: 2
+     *                 porteadoresSugeridosALiberar: [12, 15]
      *                 transporte: { idservicio: 3, nombreServicio: Minibus Sprinter, capacidadVehiculo: 15, alcanza: true }
      *                 equipo: [{ idservicio: 5, nombreServicio: Carpas, tipoEquipamiento: Carpa, necesita: 2, ocupado: 2, falta: 0 }]
      *                 faltantes: []
@@ -53,6 +54,8 @@ export class AsignacionRoutes {
      *       "Rechazado", sin número, y la respuesta lo informa en `rechazados`. El lugar de un pasajero rechazado se libera
      *       con los sobrantes; el de un personal rechazado queda reservado para su reemplazo (CU-38).
      *       Una salida creada sin personal (antes de la etapa 3) lo recibe en `personalIds` (aptos y libres); con personal, 400.
+     *       Si sobran porteadores para lo vendido, `porteadoresALiberar` dice cuáles se desasignan (exactamente los que sobran);
+     *       sin él se liberan los que más salidas tienen en el mes. Los liberados no llevan permiso y su lugar se libera.
      *     tags: [Salidas]
      *     security:
      *       - BearerAuth: []
@@ -65,6 +68,7 @@ export class AsignacionRoutes {
      *             type: object
      *             properties:
      *               personalIds: { type: array, items: { type: integer }, example: [1, 4, 5], description: "Solo para una salida sin personal." }
+     *               porteadoresALiberar: { type: array, items: { type: integer }, example: [12], description: "Los porteadores que sobran para lo vendido y se desasignan." }
      *     responses:
      *       200: { description: "Asignación confirmada. Informa los permisos emitidos, los rechazados (`rechazados`: tipo, id, nombreCompleto y motivo), que son los que rechazó la autoridad y los pasajeros con el pasaporte vencido antes del fin del recorrido (SAL-21), y los lugares liberados. Si la autoridad no liberó los sobrantes, trae `advertencia` y se reintenta con POST /liberar-sobrantes." }
      *       400: { description: La venta sigue abierta, la salida ya está confirmada, ya inició o no tiene pasajeros. }

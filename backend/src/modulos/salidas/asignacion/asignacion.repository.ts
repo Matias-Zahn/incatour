@@ -72,6 +72,18 @@ export class AsignacionRepository {
     return ids.filter((id) => !libres.has(id));
   }
 
+  /** Cuántas salidas no canceladas tiene cada persona que empiezan en el mes de `fecha` (el mismo criterio que CU-36). */
+  async salidasEnElMes(ids: number[], fecha: Date) {
+    const inicioMes = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1));
+    const finMes = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, 1));
+    const delMes = await db.asignacionPersonal.groupBy({
+      by: ["idpersonal"],
+      where: { idpersonal: { in: ids }, salida: { estado: { not: ESTADO_SALIDA.CANCELADA }, fechaInicio: { gte: inicioMes, lt: finMes } } },
+      _count: true,
+    });
+    return new Map(delMes.map((g) => [g.idpersonal, g._count]));
+  }
+
   async buscarPersonal(ids: number[]) {
     return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: { include: { usuario: true } } } });
   }

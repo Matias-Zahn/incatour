@@ -342,6 +342,8 @@ export type PanelConfirmacion = {
     dotacionRequerida: DotacionRequerida;
     personal: PersonalConfirmacionItem[];
     porteadoresSobrantes: number;
+    /** Los que el sistema propone liberar (los de más salidas en el mes); el admin puede cambiarlos */
+    porteadoresSugeridosALiberar?: number[];
     hoteles: HotelConfirmacionItem[];
     transporte: TransporteConfirmacionItem | null;
     equipo: EquipoConfirmacionItem[];
@@ -363,6 +365,8 @@ type RespuestaPanelAsignacionApi = {
  */
 export type PayloadConfirmarAsignacion = {
     personalIds?: number[];
+    /** Los porteadores que sobran para lo vendido y se desasignan al confirmar */
+    porteadoresALiberar?: number[];
 };
 
 export type ParametrosConfirmarAsignacion = {

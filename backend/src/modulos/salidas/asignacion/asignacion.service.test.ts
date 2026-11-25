@@ -4,7 +4,7 @@ import { AsignacionService } from "./asignacion.service";
 
 // vi.mock se ejecuta antes que los imports: lo que usan los mocks se declara con vi.hoisted
 const { repo, salidas, actual } = vi.hoisted(() => ({
-  repo: { buscarSalida: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn(), buscarPersonal: vi.fn(), asignarPersonal: vi.fn() },
+  repo: { buscarSalida: vi.fn(), confirmar: vi.fn(), tomarSobrantes: vi.fn(), devolverSobrantes: vi.fn(), buscarPersonal: vi.fn(), asignarPersonal: vi.fn(), salidasEnElMes: vi.fn() },
   salidas: { cargarEquipoDe: vi.fn() },
   actual: { autoridad: null as unknown },
 }));
@@ -55,6 +55,7 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     salidas.cargarEquipoDe.mockResolvedValue({ totales: new Map(), filas: [] });
     repo.tomarSobrantes.mockResolvedValue(true);
     repo.devolverSobrantes.mockResolvedValue(undefined);
+    repo.salidasEnElMes.mockResolvedValue(new Map());
   });
 
   afterEach(() => vi.useRealTimers());
@@ -128,15 +129,30 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
   });
 
-  it("decisión 5: con 1 vendido sobra un porteador: se desasigna, no lleva permiso y su lugar se libera", async () => {
+  it("decisión 5: con 1 vendido sobra un porteador: el admin elige cuál se desasigna, sin permiso y con su lugar liberado", async () => {
     repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1)]));
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
+    const servicio = new AsignacionService();
 
-    const r = await new AsignacionService().confirmarAsignacion(2);
+    await expect(servicio.confirmarAsignacion(2, undefined, [])).rejects.toThrow("Sobran 1 porteador para lo vendido: elegí cuál se libera");
+    await expect(servicio.confirmarAsignacion(2, undefined, [1])).rejects.toThrow("Solo se pueden liberar porteadores asignados");
+    expect(repo.confirmar).not.toHaveBeenCalled();
+
+    const r = await servicio.confirmarAsignacion(2, undefined, [3]);
 
     expect(r.porteadoresLiberados).toBe(1);
-    expect(r.permisosEmitidos).toBe(4); // 1 pasajero + 2 guías + 1 porteador
-    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ porteadoresQuitados: [4], lugaresPorLiberar: 8 }));
+    expect(r.permisosEmitidos).toBe(4); // 1 pasajero + 2 guías + el porteador 4
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ porteadoresQuitados: [3], lugaresPorLiberar: 8 }));
+  });
+
+  it("decisión 5: si el admin no elige, se libera el porteador con más salidas en el mes", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1)]));
+    repo.confirmar.mockResolvedValue({ idsalida: 2 });
+    repo.salidasEnElMes.mockResolvedValue(new Map([[3, 4], [4, 1]]));
+
+    await new AsignacionService().confirmarAsignacion(2);
+
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ porteadoresQuitados: [3] }));
   });
 
   it("SAL-09: si la autoridad no libera los sobrantes, quedan pendientes y se reintentan", async () => {
