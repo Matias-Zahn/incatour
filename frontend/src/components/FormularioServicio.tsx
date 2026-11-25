@@ -164,6 +164,16 @@ function FormularioServicio({
                 etiqueta: "Capacidad del vehículo",
                 tipo: "number",
             },
+            {
+                nombre: "pesoEquipajeIncluido",
+                etiqueta: "Equipaje incluido por pasajero (kg, opcional)",
+                tipo: "number",
+            },
+            {
+                nombre: "costoPorKgExcedente",
+                etiqueta: "Excedente por kg (USD, opcional; se paga en persona)",
+                tipo: "number",
+            },
         ],
         TREN: [
             { nombre: "horarioSalida", etiqueta: "Horario de salida", tipo: "time" },

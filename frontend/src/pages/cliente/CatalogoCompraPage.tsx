@@ -6,7 +6,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Alerta from "../../components/Alerta";
 import Boton from "../../components/Boton";
 import EstadoListado from "../../components/EstadoListado";
-import portadaMachuPicchu from "../../assets/portada-machu-picchu.jpg";
 import {
     paqueteDeSalida,
     useCatalogoPublico,
@@ -146,6 +145,15 @@ const TARJETAS_PRUEBA = [
 ];
 
 
+/** Solo informativo: el equipaje se pesa y cobra en persona, no en la compra. */
+function textoEquipaje(e: { kgIncluidos: number; costoPorKgExcedente: number | null }): string {
+    const excedente =
+        e.costoPorKgExcedente != null
+            ? ` El excedente se paga en persona: USD ${e.costoPorKgExcedente} por kg.`
+            : " El excedente se paga en persona.";
+    return `Equipaje incluido: ${e.kgIncluidos} kg por pasajero.${excedente}`;
+}
+
 function sumarDiasIso(iso: string, dias: number): string {
     const fecha = new Date(iso);
     if (Number.isNaN(fecha.getTime())) return iso;
@@ -237,82 +245,6 @@ const sufijoAleatorio = () => Math.floor(10 + Math.random() * 89);
 function pasajeroDePrueba(indice: number): PasajeroFormulario {
     const { nroPasaporteBase, ...plantilla } = PASAJEROS_PRUEBA[indice % PASAJEROS_PRUEBA.length];
     return { ...plantilla, nroPasaporte: `${nroPasaporteBase}${sufijoAleatorio()}` };
-}
-
-function estiloDificultad(dificultad: string): string {
-    const norm = dificultad.trim().toUpperCase();
-    if (norm === "BAJA") return "bg-emerald-500/90 text-white";
-    if (norm === "MEDIA") return "bg-amber-500/90 text-white";
-    return "bg-rose-600/90 text-white";
-}
-
-function IconoBuscar() {
-    return (
-        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-        </svg>
-    );
-}
-
-function IconoPin() {
-    return (
-        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-            <circle cx="12" cy="10" r="3" />
-        </svg>
-    );
-}
-
-function IconoHotel() {
-    return (
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-            <path d="M9 22v-4h6v4" />
-            <path d="M8 6h.01" />
-            <path d="M16 6h.01" />
-            <path d="M12 6h.01" />
-            <path d="M12 10h.01" />
-            <path d="M12 14h.01" />
-            <path d="M16 10h.01" />
-            <path d="M16 14h.01" />
-            <path d="M8 10h.01" />
-            <path d="M8 14h.01" />
-        </svg>
-    );
-}
-
-function IconoCamara() {
-    return (
-        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-            <circle cx="12" cy="13" r="3" />
-        </svg>
-    );
-}
-
-function IconoCheck() {
-    return (
-        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20 6 9 17l-5-5" />
-        </svg>
-    );
-}
-
-function IconoFiltros() {
-    return (
-        <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="21" x2="14" y1="4" y2="4" />
-            <line x1="10" x2="3" y1="4" y2="4" />
-            <line x1="21" x2="12" y1="12" y2="12" />
-            <line x1="8" x2="3" y1="12" y2="12" />
-            <line x1="21" x2="16" y1="20" y2="20" />
-            <line x1="12" x2="3" y1="20" y2="20" />
-            <line x1="14" x2="14" y1="2" y2="6" />
-            <line x1="8" x2="8" y1="10" y2="14" />
-            <line x1="16" x2="16" y1="18" y2="22" />
-        </svg>
-    );
 }
 
 function CatalogoCompraPage() {
@@ -668,10 +600,6 @@ function CatalogoCompraPage() {
     });
 
     const estadoCarga = isPending ? "cargando" : isError ? "error" : "exito";
-    const totalSalidasAbiertas = paquetes.reduce(
-        (acc, p) => acc + (p.salidasDisponibles ?? []).filter(salidaComprable).length,
-        0,
-    );
     const paquetePreseleccionadoNoActivo =
         idPaquetePreseleccionado > 0 &&
         estadoCarga === "exito" &&
@@ -692,91 +620,52 @@ function CatalogoCompraPage() {
                 </Alerta>
             ) : null}
 
-            {/* ENCABEZADO: HERO EDITORIAL EN ESCAPARATE / HEADER ENFOCADO EN COMPRA */}
-            {!paqueteEnCompra && !reservaConfirmada ? (
-                <header className="relative overflow-hidden rounded-3xl bg-navegacion text-white shadow-[0_20px_50px_-18px_rgba(18,61,112,0.45)]">
-                    <img
-                        src={portadaMachuPicchu}
-                        alt=""
-                        aria-hidden="true"
-                        className="absolute inset-0 size-full object-cover object-center opacity-55"
-                    />
-                    <div
-                        aria-hidden="true"
-                        className="absolute inset-0 bg-gradient-to-r from-[#081c36]/95 via-[#0d2d54]/80 to-[#081c36]/40"
-                    />
-                    <div
-                        aria-hidden="true"
-                        className="absolute inset-0 bg-gradient-to-t from-[#081c36]/80 via-transparent to-transparent"
-                    />
-
-                    <div className="relative z-10 px-6 pb-14 pt-8 sm:px-10 sm:pb-16 sm:pt-10">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-marca/25 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-100 backdrop-blur-md">
-                                <span className="size-1.5 rounded-full bg-[#16d6dc]" aria-hidden="true" />
-                                Expediciones guiadas · Cusco y Machu Picchu
+            {/* ENCABEZADO DEL PORTAL COMERCIAL */}
+            <header className="flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
+                <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-marca-activa px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-marca-oscura">
+                            {esAdmin
+                                ? paqueteEnCompra || reservaConfirmada
+                                    ? "Compra de Paquete"
+                                    : "Catálogo Público"
+                                : paqueteEnCompra || reservaConfirmada
+                                  ? "Reserva de Paquete"
+                                  : "Catálogo de Paquetes"}
+                        </span>
+                        {esVistaPreviaAdmin ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                                👁 Vista previa de lo que ve el cliente
                             </span>
-                            {esVistaPreviaAdmin ? (
-                                <span className="rounded-full border border-amber-300/40 bg-amber-400/20 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur-md">
-                                    Vista previa de lo que ve el cliente
-                                </span>
-                            ) : null}
-                        </div>
-
-                        <h1 className="mt-4 max-w-2xl text-3xl font-bold leading-[1.12] tracking-tight text-white sm:text-4xl lg:text-[42px]">
-                            Descubrí el Camino Inca con salidas programadas.
-                        </h1>
-                        <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-[15px]">
-                            Compará recorridos día por día, elegí tu fecha con cupos en tiempo real y reservá online con guías habilitados y servicios detallados en cada expedición.
-                        </p>
-
-                        <div className="mt-6 flex flex-wrap items-center gap-2.5 text-xs">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 font-medium text-white/95 backdrop-blur-md">
-                                <strong className="font-bold text-cyan-200">{paquetes.length}</strong>{" "}
-                                {paquetes.length === 1 ? "expedición activa" : "expediciones activas"}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 font-medium text-white/95 backdrop-blur-md">
-                                <strong className="font-bold text-emerald-300">{totalSalidasAbiertas}</strong>{" "}
-                                {totalSalidasAbiertas === 1 ? "salida abierta" : "salidas abiertas"}
-                            </span>
-                        </div>
+                        ) : null}
                     </div>
-                </header>
-            ) : (
-                <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-borde bg-white p-6 shadow-tarjeta">
-                    <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-marca-activa px-3 py-0.5 text-xs font-bold uppercase tracking-wide text-marca-oscura">
-                                {esAdmin ? "Compra de Paquete" : "Reserva de Paquete"}
-                            </span>
-                            {esVistaPreviaAdmin ? (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
-                                    Vista previa de lo que ve el cliente
-                                </span>
-                            ) : null}
-                        </div>
-                        <h1 className="mt-2 text-2xl font-bold tracking-tight text-navegacion sm:text-3xl">
-                            {reservaConfirmada
-                                ? "¡Reserva confirmada exitosamente!"
-                                : `Reservar: ${paqueteEnCompra?.nombre}`}
-                        </h1>
-                        <p className="mt-1 text-sm text-texto-suave">
-                            {reservaConfirmada
-                                ? "Tu pago fue aprobado y los cupos quedaron reservados a tu nombre."
-                                : "Seleccioná tu fecha de salida, completá los datos de los pasajeros y aboná con tarjeta para confirmar tu lugar al instante."}
-                        </p>
-                    </div>
+                    <h1 className="mt-2 text-3xl font-bold text-navegacion">
+                        {reservaConfirmada
+                            ? "¡Reserva confirmada exitosamente!"
+                            : paqueteEnCompra
+                              ? `Reservar paquete: ${paqueteEnCompra.nombre}`
+                              : "Catálogo de paquetes turísticos"}
+                    </h1>
+                    <p className="mt-1 text-sm text-texto-suave">
+                        {reservaConfirmada
+                            ? "Tu pago fue aprobado y los cupos quedaron reservados a tu nombre."
+                            : paqueteEnCompra
+                              ? "Seleccioná tu fecha de salida, completá los datos de los pasajeros y aboná con tarjeta para confirmar tu lugar al instante."
+                              : "Explorá nuestros circuitos guiados por el Camino del Inca, revisá el itinerario día por día y reservá tu próxima salida online."}
+                    </p>
+                </div>
 
+                {paqueteEnCompra || reservaConfirmada ? (
                     <div className="flex flex-wrap gap-2">
                         <Boton
                             variante="secundario"
                             onClick={volverAlEscaparate}
                         >
-                            ← Volver al catálogo
+                            ← Volver al catálogo de paquetes
                         </Boton>
                     </div>
-                </header>
-            )}
+                ) : null}
+            </header>
 
             {/* VISTA A: COMPROBANTE DE RESERVA CONFIRMADA (CU-30 EXITOSO) */}
             {reservaConfirmada ? (
@@ -1153,7 +1042,7 @@ function CatalogoCompraPage() {
 
                         {/* Sin salidas no hay nada que cargar: se ocultan los pasos 2 y 3 */}
                         {salidasDelPaquete.length > 0 ? (<>
-                        {/* PASO 2: NÓMINA DE PASAJEROS */}
+                        {/* PASO 2: NÓMINA DE PASAJEROS Y EQUIPAJE */}
                         <div className="space-y-4 rounded-tarjeta border border-borde bg-white p-6 shadow-tarjeta">
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">
@@ -1174,6 +1063,11 @@ function CatalogoCompraPage() {
                                                 : "fin del recorrido"}
                                             .
                                         </p>
+                                        {paqueteEnCompra?.equipaje ? (
+                                            <p className="text-xs text-texto-suave">
+                                                {textoEquipaje(paqueteEnCompra.equipaje)}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -1639,139 +1533,116 @@ function CatalogoCompraPage() {
             {/* VISTA C: ESCAPARATE DEL CATÁLOGO PÚBLICO (CU-26) */}
             {!reservaConfirmada && !paqueteEnCompra ? (
                 <>
-                    {/* DOCK FLOTANTE DE BÚSQUEDA Y FILTROS */}
-                    <div className="relative z-10 -mt-12 mx-2 rounded-2xl border border-borde/80 bg-white/95 p-4 shadow-[0_18px_40px_-14px_rgba(18,61,112,0.16)] backdrop-blur-xl sm:mx-4 sm:p-5">
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/* BUSCADOR */}
-                            <div className="relative min-w-0 basis-64 flex-1">
-                                <label
-                                    htmlFor="buscar-catalogo"
-                                    className="sr-only"
-                                >
-                                    Buscar en el catálogo de paquetes
-                                </label>
-                                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-texto-suave">
-                                    <IconoBuscar />
-                                </span>
-                                <input
-                                    id="buscar-catalogo"
-                                    type="search"
-                                    value={busqueda}
-                                    onChange={(e) => setBusqueda(e.target.value)}
-                                    placeholder="Buscar por destino, circuito, paquete o código…"
-                                    className="w-full rounded-xl border border-borde bg-fondo/50 py-2.5 pl-10 pr-3.5 text-sm text-navegacion outline-none placeholder:text-texto-suave/70 transition focus:border-marca focus:bg-white focus:ring-4 focus:ring-marca/15"
-                                />
-                            </div>
-
-                            <button
-                                type="button"
-                                aria-expanded={filtrosAbiertos}
-                                onClick={() => setFiltrosAbiertos(!filtrosAbiertos)}
-                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-borde bg-white px-3.5 py-2.5 text-xs font-semibold text-navegacion transition hover:bg-fondo md:hidden"
+                    {/* BARRA DE BÚSQUEDA Y FILTROS */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
+                        <div className="relative min-w-0 basis-64 flex-1">
+                            <label
+                                htmlFor="buscar-catalogo"
+                                className="sr-only"
                             >
-                                <IconoFiltros />
-                                <span>Filtros</span>
-                                {hayFiltrosActivos ? (
-                                    <span className="size-1.5 rounded-full bg-marca" />
-                                ) : null}
-                            </button>
-
-                            {/* PÍLDORA SEGMENTADA DE DIFICULTAD */}
-                            <div
-                                className={`flex flex-wrap items-center gap-2.5 ${filtrosAbiertos ? "" : "max-md:hidden"}`}
-                            >
-                                <div
-                                    role="group"
-                                    aria-label="Filtrar por dificultad"
-                                    className="inline-flex items-center gap-0.5 rounded-full bg-fondo p-1 ring-1 ring-borde/80 text-xs"
-                                >
-                                    {(["TODAS", "BAJA", "MEDIA", "ALTA"] as const).map(
-                                        (dif) => (
-                                            <button
-                                                key={dif}
-                                                type="button"
-                                                onClick={() => setFiltroDificultad(dif)}
-                                                className={`cursor-pointer rounded-full px-3 py-1 font-semibold transition ${
-                                                    filtroDificultad === dif
-                                                        ? "bg-white text-navegacion shadow-2xs ring-1 ring-navegacion/[0.06]"
-                                                        : "text-texto-suave hover:text-navegacion"
-                                                }`}
-                                            >
-                                                {dif === "TODAS"
-                                                    ? "Todas"
-                                                    : dif.charAt(0) +
-                                                      dif.slice(1).toLowerCase()}
-                                            </button>
-                                        ),
-                                    )}
-                                </div>
-
-                                <label
-                                    className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-                                        soloConSalidas
-                                            ? "border-marca/40 bg-marca-suave text-navegacion"
-                                            : "border-borde bg-white text-texto hover:bg-fondo"
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={soloConSalidas}
-                                        onChange={(e) =>
-                                            setSoloConSalidas(e.target.checked)
-                                        }
-                                        className="size-3.5 accent-marca"
-                                    />
-                                    Solo salidas abiertas
-                                </label>
-                            </div>
+                                Buscar en el catálogo de paquetes
+                            </label>
+                            <input
+                                id="buscar-catalogo"
+                                type="search"
+                                value={busqueda}
+                                onChange={(e) => setBusqueda(e.target.value)}
+                                placeholder="Buscar paquete, circuito o código…"
+                                className="w-full rounded-control border border-borde bg-fondo/50 px-3.5 py-2 text-sm text-texto outline-none placeholder:text-texto-suave focus:border-marca focus:bg-white focus:ring-2 focus:ring-marca/20"
+                            />
                         </div>
 
-                        {/* FILA SECUNDARIA: DURACIÓN Y FECHAS */}
-                        <div
-                            className={`mt-3.5 flex flex-wrap items-end justify-between gap-3 border-t border-borde/70 pt-3.5 text-xs ${filtrosAbiertos ? "" : "max-md:hidden"}`}
+                        <button
+                            type="button"
+                            aria-expanded={filtrosAbiertos}
+                            onClick={() => setFiltrosAbiertos(!filtrosAbiertos)}
+                            className="rounded-control border border-borde px-3 py-2 text-xs font-semibold text-texto md:hidden"
                         >
-                            <div className="flex flex-wrap items-end gap-3">
-                                <label className="grid gap-1 font-semibold text-texto-suave">
-                                    Duración del circuito
-                                    <select
-                                        value={filtroDuracion}
-                                        onChange={(e) =>
-                                            setFiltroDuracion(e.target.value)
-                                        }
-                                        className="rounded-xl border border-borde bg-white px-3 py-1.5 text-xs font-medium text-navegacion outline-none transition focus:border-marca focus:ring-4 focus:ring-marca/15"
+                            Filtros{hayFiltrosActivos ? " (activos)" : ""}
+                        </button>
+
+                        <div className={`flex flex-wrap items-center gap-3 ${filtrosAbiertos ? "" : "max-md:hidden"}`}>
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span className="font-semibold text-texto-suave">
+                                    Dificultad:
+                                </span>
+                                {[
+                                    "TODAS",
+                                    "BAJA",
+                                    "MEDIA",
+                                    "ALTA",
+                                ].map((dif) => (
+                                    <button
+                                        key={dif}
+                                        type="button"
+                                        onClick={() => setFiltroDificultad(dif)}
+                                        className={`rounded-full px-2.5 py-1 font-semibold transition ${
+                                            filtroDificultad === dif
+                                                ? "bg-marca text-white"
+                                                : "bg-fondo text-texto-suave hover:bg-marca-suave hover:text-marca-oscura"
+                                        }`}
                                     >
-                                        <option value="TODAS">Cualquier duración</option>
-                                        <option value="HASTA_3">Hasta 3 días</option>
-                                        <option value="4_A_5">4 a 5 días</option>
-                                        <option value="6_O_MAS">6 días o más</option>
-                                    </select>
-                                </label>
-                                <label className="grid gap-1 font-semibold text-texto-suave">
-                                    Salidas desde
-                                    <input
-                                        type="date"
-                                        value={fechaDesde}
-                                        max={fechaHasta || undefined}
-                                        onChange={(e) =>
-                                            setFechaDesde(e.target.value)
-                                        }
-                                        className="rounded-xl border border-borde bg-white px-3 py-1.5 text-xs font-medium text-navegacion outline-none transition focus:border-marca focus:ring-4 focus:ring-marca/15"
-                                    />
-                                </label>
-                                <label className="grid gap-1 font-semibold text-texto-suave">
-                                    Salidas hasta
-                                    <input
-                                        type="date"
-                                        value={fechaHasta}
-                                        min={fechaDesde || undefined}
-                                        onChange={(e) =>
-                                            setFechaHasta(e.target.value)
-                                        }
-                                        className="rounded-xl border border-borde bg-white px-3 py-1.5 text-xs font-medium text-navegacion outline-none transition focus:border-marca focus:ring-4 focus:ring-marca/15"
-                                    />
-                                </label>
+                                        {dif === "TODAS"
+                                            ? "Todas"
+                                            : dif.charAt(0) +
+                                              dif.slice(1).toLowerCase()}
+                                    </button>
+                                ))}
                             </div>
 
+                            <label className="flex cursor-pointer items-center gap-2 rounded-control border border-borde bg-fondo/60 px-3 py-1.5 text-xs font-semibold text-texto">
+                                <input
+                                    type="checkbox"
+                                    checked={soloConSalidas}
+                                    onChange={(e) =>
+                                        setSoloConSalidas(e.target.checked)
+                                    }
+                                    className="size-4 accent-marca"
+                                />
+                                Solo con salidas abiertas
+                            </label>
+                        </div>
+
+                        <div className={`flex w-full flex-wrap items-end gap-3 border-t border-borde pt-3 text-xs ${filtrosAbiertos ? "" : "max-md:hidden"}`}>
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Duración del circuito
+                                <select
+                                    value={filtroDuracion}
+                                    onChange={(e) =>
+                                        setFiltroDuracion(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                >
+                                    <option value="TODAS">Todas</option>
+                                    <option value="HASTA_3">Hasta 3 días</option>
+                                    <option value="4_A_5">4 a 5 días</option>
+                                    <option value="6_O_MAS">6 días o más</option>
+                                </select>
+                            </label>
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Salidas desde
+                                <input
+                                    type="date"
+                                    value={fechaDesde}
+                                    max={fechaHasta || undefined}
+                                    onChange={(e) =>
+                                        setFechaDesde(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
+                            <label className="grid gap-1 font-semibold text-texto-suave">
+                                Salidas hasta
+                                <input
+                                    type="date"
+                                    value={fechaHasta}
+                                    min={fechaDesde || undefined}
+                                    onChange={(e) =>
+                                        setFechaHasta(e.target.value)
+                                    }
+                                    className="rounded-control border border-borde bg-white px-2.5 py-1.5 text-xs font-normal text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                />
+                            </label>
                             {hayFiltrosActivos ? (
                                 <button
                                     type="button"
@@ -1783,31 +1654,13 @@ function CatalogoCompraPage() {
                                         setFechaHasta("");
                                         setSoloConSalidas(false);
                                     }}
-                                    className="cursor-pointer rounded-full bg-fondo px-3 py-1.5 text-xs font-semibold text-marca-oscura transition hover:bg-marca-suave"
+                                    className="rounded-control px-3 py-1.5 font-semibold text-marca-oscura hover:underline"
                                 >
-                                    Limpiar filtros ✕
+                                    Limpiar filtros
                                 </button>
                             ) : null}
                         </div>
                     </div>
-
-                    {/* BARRA DE RESULTADOS */}
-                    {estadoCarga === "exito" && paquetes.length > 0 ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-texto-suave">
-                            <p>
-                                Mostrando{" "}
-                                <strong className="font-semibold text-navegacion">
-                                    {paquetesFiltrados.length}
-                                </strong>{" "}
-                                {paquetesFiltrados.length === 1
-                                    ? "paquete turístico"
-                                    : "paquetes turísticos"}
-                                {hayFiltrosActivos
-                                    ? ` de ${paquetes.length} disponibles`
-                                    : ""}
-                            </p>
-                        </div>
-                    ) : null}
 
                     {estadoCarga !== "exito" ? (
                         <EstadoListado
@@ -1823,414 +1676,240 @@ function CatalogoCompraPage() {
                             estado="vacio"
                             mensaje="No se encontraron paquetes turísticos con los filtros seleccionados."
                         />
-                    ) : (() => {
-                        const paquetesDisponibles = paquetesFiltrados.filter(
-                            (p) =>
-                                (p.salidasDisponibles ?? [])
+                    ) : (
+                        <div className="grid gap-6 md:grid-cols-2">
+                            {paquetesFiltrados.map((paquete) => {
+                                const galeria =
+                                    obtenerImagenesPaqueteCatalogo(paquete);
+                                const urlPortada = resolverUrlImagenPaquete(
+                                    galeria[0],
+                                );
+                                const tarifaMinima = paquete.precios.reduce(
+                                    (min, actual) =>
+                                        actual.precio < min.precio
+                                            ? actual
+                                            : min,
+                                    paquete.precios[0],
+                                );
+                                const salidasConCupo = (
+                                    paquete.salidasDisponibles ?? []
+                                )
                                     .filter(salidaEnRango)
-                                    .some(salidaComprable),
-                        );
-                        const paquetesProximamente = paquetesFiltrados.filter(
-                            (p) =>
-                                !(p.salidasDisponibles ?? [])
-                                    .filter(salidaEnRango)
-                                    .some(salidaComprable),
-                        );
+                                    .filter(salidaComprable);
+                                const diasTotales =
+                                    paquete.circuito.dias +
+                                    paquete.nochesAlojamiento.previas +
+                                    paquete.nochesAlojamiento.posteriores;
 
-                        const renderTarjetaPaquete = (
-                            paquete: PaqueteCatalogoPublico,
-                            esProximamente: boolean,
-                        ) => {
-                            const galeria =
-                                obtenerImagenesPaqueteCatalogo(paquete);
-                            const urlPortada = resolverUrlImagenPaquete(
-                                galeria[0],
-                            );
-                            const tarifaMinima = paquete.precios.reduce(
-                                (min, actual) =>
-                                    actual.precio < min.precio ? actual : min,
-                                paquete.precios[0],
-                            );
-                            const salidasEnRango = (
-                                paquete.salidasDisponibles ?? []
-                            ).filter(salidaEnRango);
-                            const salidasConCupo =
-                                salidasEnRango.filter(salidaComprable);
-                            const diasTotales =
-                                paquete.circuito.dias +
-                                paquete.nochesAlojamiento.previas +
-                                paquete.nochesAlojamiento.posteriores;
-                            const proximaSalida = salidasConCupo[0] ?? null;
-                            const tieneSalidasCerradas =
-                                esProximamente && salidasEnRango.length > 0;
+                                const esPreseleccionado =
+                                    idPaquetePreseleccionado > 0 &&
+                                    paquete.id === idPaquetePreseleccionado;
 
-                            const esPreseleccionado =
-                                idPaquetePreseleccionado > 0 &&
-                                paquete.id === idPaquetePreseleccionado;
-
-                            return (
-                                <article
-                                    key={paquete.id}
-                                    className={`group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_6px_24px_-8px_rgba(18,61,112,0.09)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_44px_-16px_rgba(18,61,112,0.20)] ${
-                                        esPreseleccionado
-                                            ? "border-marca ring-2 ring-marca/40"
-                                            : esProximamente
-                                              ? "border-borde/75 bg-white/95"
-                                              : "border-borde/80"
-                                    }`}
-                                >
-                                    {/* FOTOGRAFÍA DE PORTADA */}
-                                    <div
-                                        onClick={() =>
-                                            abrirDetallePaquete(paquete)
-                                        }
-                                        className="relative h-64 cursor-pointer overflow-hidden bg-navegacion/10"
+                                return (
+                                    <article
+                                        key={paquete.id}
+                                        className={`flex flex-col overflow-hidden rounded-tarjeta border bg-white shadow-tarjeta transition hover:shadow-md ${
+                                            esPreseleccionado
+                                                ? "border-marca ring-2 ring-marca/40"
+                                                : "border-borde"
+                                        }`}
                                     >
-                                        <img
-                                            src={urlPortada}
-                                            alt={paquete.nombre}
-                                            loading="lazy"
-                                            className={`size-full object-cover transition-all duration-500 ease-out group-hover:scale-105 ${
-                                                esProximamente
-                                                    ? "saturate-[0.78] group-hover:saturate-100"
-                                                    : ""
-                                            }`}
-                                        />
-                                        <div
-                                            aria-hidden="true"
-                                            className="absolute inset-0 bg-gradient-to-t from-[#081c36]/80 via-[#081c36]/15 to-[#081c36]/25"
-                                        />
-
-                                        {/* BADGES SUPERIORES */}
-                                        <div className="absolute inset-x-3.5 top-3.5 flex items-start justify-between gap-2">
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                {esProximamente ? (
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-navegacion/90 px-3 py-1 text-[11px] font-bold tracking-wide text-white shadow-xs backdrop-blur-md">
-                                                        <span
-                                                            className="size-1.5 rounded-full bg-cyan-300"
-                                                            aria-hidden="true"
-                                                        />
-                                                        Próximamente
-                                                    </span>
-                                                ) : null}
-                                                <span
-                                                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide shadow-xs backdrop-blur-md ${estiloDificultad(paquete.circuito.dificultad)}`}
-                                                >
-                                                    Dificultad{" "}
-                                                    {paquete.circuito.dificultad}
+                                        <div className="relative h-56 overflow-hidden bg-fondo">
+                                            <img
+                                                src={urlPortada}
+                                                alt={paquete.nombre}
+                                                loading="lazy"
+                                                className="h-full w-full object-cover"
+                                            />
+                                            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                                                <span className="rounded bg-navegacion/90 px-2.5 py-1 text-xs font-bold text-white">
+                                                    {paquete.codigo}
                                                 </span>
-                                                <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-navegacion shadow-xs backdrop-blur-md">
-                                                    {diasTotales} días ·{" "}
-                                                    {paquete.circuito.dias} de
-                                                    trekking
+                                                <span className="rounded bg-marca px-2.5 py-1 text-xs font-bold text-white">
+                                                    {diasTotales} días totales ·
+                                                    Dif.{" "}
+                                                    {
+                                                        paquete.circuito
+                                                            .dificultad
+                                                    }
                                                 </span>
                                                 {esPreseleccionado ? (
-                                                    <span className="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-extrabold text-navegacion shadow-xs">
+                                                    <span className="rounded bg-amber-400 px-2.5 py-1 text-xs font-extrabold text-navegacion">
                                                         ★ Previsualizando
                                                     </span>
                                                 ) : null}
                                             </div>
-
-                                            <span className="shrink-0 rounded-full bg-black/35 px-2.5 py-1 font-mono text-[11px] font-semibold text-white/90 backdrop-blur-md">
-                                                {paquete.codigo}
-                                            </span>
-                                        </div>
-
-                                        {/* PIE DE PORTADA: SALE DESDE + GALERÍA */}
-                                        <div className="absolute inset-x-3.5 bottom-3.5 flex items-end justify-between gap-2">
-                                            {paquete.saleDesde ? (
-                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
-                                                    <IconoPin />
-                                                    Sale desde {paquete.saleDesde}
-                                                </span>
-                                            ) : (
-                                                <span />
-                                            )}
-
                                             <button
                                                 type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    abrirDetallePaquete(paquete);
-                                                }}
-                                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/25"
+                                                onClick={() =>
+                                                    abrirDetallePaquete(paquete)
+                                                }
+                                                className="absolute right-3 bottom-3 rounded-full bg-navegacion/85 px-3 py-1 text-xs font-bold text-white hover:bg-navegacion"
                                             >
-                                                <IconoCamara />
-                                                <span>
-                                                    {galeria.length}{" "}
-                                                    {galeria.length === 1
-                                                        ? "foto"
-                                                        : "fotos"}
-                                                </span>
+                                                📷 {galeria.length}{" "}
+                                                {galeria.length === 1
+                                                    ? "foto"
+                                                    : "fotos"}{" "}
+                                                · Ver galería
                                             </button>
                                         </div>
-                                    </div>
 
-                                    {/* CUERPO DE LA TARJETA */}
-                                    <div className="flex flex-1 flex-col justify-between gap-5 p-5 sm:p-6">
-                                        <div className="space-y-4">
-                                            {/* TÍTULO + PRECIO */}
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className="min-w-0">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-marca-oscura">
-                                                        {paquete.circuito.nombre}
-                                                    </p>
-                                                    <h2 className="mt-0.5 text-xl font-bold tracking-tight text-navegacion transition-colors group-hover:text-marca-oscura">
-                                                        {paquete.nombre}
-                                                    </h2>
-                                                    <p className="mt-1 text-xs leading-relaxed text-texto-suave">
-                                                        {paquete.circuito.recorrido ||
-                                                            "Cusco → Camino del Inca → Machu Picchu"}
-                                                    </p>
+                                        <div className="flex flex-1 flex-col justify-between space-y-4 p-6">
+                                            <div className="space-y-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-xs font-semibold uppercase tracking-wide text-marca-oscura">
+                                                            {
+                                                                paquete.circuito
+                                                                    .nombre
+                                                            }
+                                                        </p>
+                                                        <h2 className="text-xl font-bold text-navegacion">
+                                                            {paquete.nombre}
+                                                        </h2>
+                                                        {paquete.saleDesde ? (
+                                                            <p className="mt-0.5 text-xs font-medium text-texto-suave">
+                                                                Sale desde {paquete.saleDesde}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
+
+                                                    {tarifaMinima ? (
+                                                        <div className="text-right">
+                                                            <p className="text-xs text-texto-suave">
+                                                                Desde
+                                                            </p>
+                                                            <p className="whitespace-nowrap text-xl font-bold text-navegacion">
+                                                                {formatearMonto(tarifaMinima.precio, tarifaMinima.moneda)}
+                                                            </p>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
 
-                                                {tarifaMinima ? (
-                                                    <div className="shrink-0 rounded-xl bg-fondo/80 px-3 py-2 text-right ring-1 ring-borde/70">
-                                                        <p className="text-[10px] font-semibold uppercase tracking-wider text-texto-suave">
-                                                            Desde
+                                                <p className="text-xs text-texto-suave">
+                                                    <strong className="text-texto">
+                                                        Recorrido:
+                                                    </strong>{" "}
+                                                    {paquete.circuito
+                                                        .recorrido ||
+                                                        "Cusco -> Camino del Inca -> Machu Picchu"}
+                                                </p>
+
+                                                <div className="grid grid-cols-2 gap-2 rounded-control border border-borde bg-fondo/50 p-3 text-xs">
+                                                    <div>
+                                                        <p className="text-texto-suave">
+                                                            Alojamiento
+                                                            garantizado
                                                         </p>
-                                                        <p className="whitespace-nowrap text-xl font-bold leading-tight tracking-tight text-navegacion">
-                                                            {formatearMonto(
-                                                                tarifaMinima.precio,
-                                                                tarifaMinima.moneda,
-                                                            )}
-                                                        </p>
-                                                        <p className="text-[10px] text-texto-suave">
-                                                            por persona
+                                                        <p className="font-semibold text-texto">
+                                                            {
+                                                                paquete
+                                                                    .nochesAlojamiento
+                                                                    .garantia
+                                                            }
                                                         </p>
                                                     </div>
-                                                ) : null}
-                                            </div>
-
-                                            {/* ALOJAMIENTO GARANTIZADO */}
-                                            <div className="flex items-start gap-2.5 rounded-xl border border-borde/70 bg-fondo/50 px-3.5 py-2.5 text-xs">
-                                                <span className="mt-0.5 shrink-0 text-marca-oscura">
-                                                    <IconoHotel />
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <p className="font-semibold text-navegacion">
-                                                        {
-                                                            paquete
-                                                                .nochesAlojamiento
-                                                                .garantia
-                                                        }
-                                                    </p>
-                                                    <p className="mt-0.5 text-texto-suave">
-                                                        {textoNoches(
-                                                            paquete
-                                                                .nochesAlojamiento
-                                                                .previas,
-                                                            paquete
-                                                                .nochesAlojamiento
-                                                                .posteriores,
-                                                        )}
-                                                        {paquete.diasDisponibles
-                                                            ? ` · Salidas: ${formatearDiasLegibles(paquete.diasDisponibles)}`
-                                                            : ""}
-                                                    </p>
+                                                    <div>
+                                                        <p className="text-texto-suave">
+                                                            Noches de hotel
+                                                        </p>
+                                                        <p className="font-semibold text-texto">
+                                                            {textoNoches(
+                                                                paquete.nochesAlojamiento.previas,
+                                                                paquete.nochesAlojamiento.posteriores,
+                                                            )}
+                                                            {paquete.diasDisponibles
+                                                                ? ` · ${formatearDiasLegibles(paquete.diasDisponibles)}`
+                                                                : ""}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            {/* INCLUYE */}
-                                            {paquete.serviciosAdicionales.length >
-                                            0 ? (
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
-                                                        Incluye
-                                                    </p>
+                                                {paquete.serviciosAdicionales
+                                                    .length > 0 ? (
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {paquete.serviciosAdicionales.map(
                                                             (serv) => (
                                                                 <span
                                                                     key={serv}
-                                                                    className="inline-flex items-center gap-1 rounded-lg border border-borde/70 bg-white px-2.5 py-1 text-[11.5px] font-medium text-texto"
+                                                                    className="rounded-full border border-borde bg-fondo px-2.5 py-0.5 text-xs font-medium text-texto"
                                                                 >
-                                                                    <span className="shrink-0 text-exito">
-                                                                        <IconoCheck />
-                                                                    </span>
-                                                                    <span>
-                                                                        {serv}
-                                                                    </span>
+                                                                    ✓ {serv}
                                                                 </span>
                                                             ),
                                                         )}
                                                     </div>
-                                                </div>
-                                            ) : null}
-                                        </div>
+                                                ) : null}
+                                            </div>
 
-                                        {/* PIE DE TARJETA: DISPONIBILIDAD + ACCIONES */}
-                                        <div className="space-y-3 border-t border-borde/70 pt-4">
-                                            {!esProximamente && proximaSalida ? (
-                                                <>
-                                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-exito">
-                                                            <span
-                                                                className="size-2 rounded-full bg-exito"
-                                                                aria-hidden="true"
-                                                            />
-                                                            {salidasConCupo.length}{" "}
+                                            <div className="space-y-3 border-t border-borde pt-4">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="font-semibold text-texto-suave">
+                                                        Salidas disponibles para
+                                                        compra:
+                                                    </span>
+                                                    {salidasConCupo.length >
+                                                    0 ? (
+                                                        <span className="rounded-full bg-green-50 px-2.5 py-0.5 font-bold text-exito">
+                                                            {
+                                                                salidasConCupo.length
+                                                            }{" "}
                                                             {salidasConCupo.length ===
                                                             1
                                                                 ? "salida abierta"
-                                                                : "salidas abiertas"}
-                                                        </span>
-                                                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-600/15">
-                                                            Próxima:{" "}
-                                                            {formatearFechaUtcCorta(
-                                                                proximaSalida.fechaInicio,
-                                                            )}{" "}
-                                                            ·{" "}
+                                                                : "salidas abiertas"}{" "}
+                                                            (
                                                             {
-                                                                proximaSalida.stockLocal
+                                                                salidasConCupo[0]
+                                                                    .stockLocal
                                                             }{" "}
-                                                            cupos
+                                                            cupos en{" "}
+                                                            {formatearFechaUtcCorta(
+                                                                salidasConCupo[0]
+                                                                    .fechaInicio,
+                                                            )}
+                                                            )
                                                         </span>
-                                                    </div>
-
-                                                    {salidaSinReintegro(
-                                                        proximaSalida,
-                                                    ) ? (
-                                                        <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11.5px] font-medium text-amber-900 ring-1 ring-inset ring-amber-500/20">
-                                                            Aviso: la próxima fecha ya no tiene reintegro por cancelación.
-                                                        </p>
-                                                    ) : null}
-
-                                                    <div className="flex items-center gap-2.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                abrirDetallePaquete(
-                                                                    paquete,
-                                                                )
-                                                            }
-                                                            className="flex-1 cursor-pointer rounded-xl border border-borde bg-white px-4 py-2.5 text-sm font-semibold text-navegacion transition hover:border-navegacion/30 hover:bg-fondo"
-                                                        >
-                                                            Ver itinerario
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                iniciarCompraPaquete(
-                                                                    paquete,
-                                                                )
-                                                            }
-                                                            className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-navegacion to-marca-oscura px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:brightness-110"
-                                                        >
-                                                            Reservar →
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="flex items-center justify-between gap-2 text-xs">
-                                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-navegacion/[0.06] px-2.5 py-1 font-medium text-navegacion/80">
-                                                            <span
-                                                                className="size-1.5 rounded-full bg-marca"
-                                                                aria-hidden="true"
-                                                            />
-                                                            {tieneSalidasCerradas
-                                                                ? "Fechas recientes cerradas o agotadas · nuevas fechas próximamente"
-                                                                : "Nuevas fechas de salida próximamente"}
+                                                    ) : (
+                                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-texto-suave">
+                                                            Sin salidas abiertas
                                                         </span>
-                                                    </div>
+                                                    )}
+                                                </div>
 
-                                                    <button
-                                                        type="button"
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Boton
+                                                        variante="secundario"
+                                                        className="flex-1"
                                                         onClick={() =>
                                                             abrirDetallePaquete(
                                                                 paquete,
                                                             )
                                                         }
-                                                        className="w-full cursor-pointer rounded-xl border border-borde bg-fondo/50 px-4 py-2.5 text-sm font-semibold text-navegacion transition hover:border-marca/45 hover:bg-marca-suave/50"
                                                     >
-                                                        Ver itinerario y detalles →
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </article>
-                            );
-                        };
-
-                        return (
-                            <div className="space-y-12">
-                                {paquetesDisponibles.length > 0 ? (
-                                    <div className="space-y-5">
-                                        {paquetesProximamente.length > 0 ? (
-                                            <div className="flex flex-wrap items-end justify-between gap-2 px-1">
-                                                <div>
-                                                    <h2 className="text-xl font-bold tracking-tight text-navegacion">
-                                                        Disponibles para reservar
-                                                    </h2>
-                                                    <p className="text-xs text-texto-suave">
-                                                        Expediciones con salidas abiertas y cupos confirmables online.
-                                                    </p>
+                                                        Ver itinerario y detalle
+                                                    </Boton>
+                                                    <Boton
+                                                        className="flex-1"
+                                                        disabled={salidasConCupo.length === 0}
+                                                        onClick={() =>
+                                                            iniciarCompraPaquete(
+                                                                paquete,
+                                                            )
+                                                        }
+                                                    >
+                                                        {salidasConCupo.length === 0
+                                                            ? "Sin salidas disponibles"
+                                                            : "Comprar paquete"}
+                                                    </Boton>
                                                 </div>
-                                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-exito ring-1 ring-inset ring-emerald-600/15">
-                                                    {paquetesDisponibles.length}{" "}
-                                                    {paquetesDisponibles.length === 1
-                                                        ? "paquete disponible"
-                                                        : "paquetes disponibles"}
-                                                </span>
                                             </div>
-                                        ) : null}
-
-                                        <div className="grid gap-7 md:grid-cols-2">
-                                            {paquetesDisponibles.map((p) =>
-                                                renderTarjetaPaquete(p, false),
-                                            )}
                                         </div>
-                                    </div>
-                                ) : null}
-
-                                {paquetesProximamente.length > 0 ? (
-                                    <section
-                                        aria-labelledby="titulo-proximamente"
-                                        className={`space-y-5 ${
-                                            paquetesDisponibles.length > 0
-                                                ? "border-t border-borde/80 pt-10"
-                                                : ""
-                                        }`}
-                                    >
-                                        <div className="flex flex-wrap items-end justify-between gap-3 px-1">
-                                            <div>
-                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-navegacion/[0.07] px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-navegacion">
-                                                    <span
-                                                        className="size-1.5 rounded-full bg-marca"
-                                                        aria-hidden="true"
-                                                    />
-                                                    Próximamente
-                                                </span>
-                                                <h2
-                                                    id="titulo-proximamente"
-                                                    className="mt-2 text-xl font-bold tracking-tight text-navegacion"
-                                                >
-                                                    Próximas expediciones
-                                                </h2>
-                                                <p className="mt-0.5 text-xs text-texto-suave">
-                                                    Todavía no tienen fechas abiertas para compra, pero podés explorar el recorrido, el alojamiento y lo que incluyen.
-                                                </p>
-                                            </div>
-                                            <span className="rounded-full bg-fondo px-3 py-1 text-xs font-semibold text-texto-suave ring-1 ring-borde/80">
-                                                {paquetesProximamente.length}{" "}
-                                                {paquetesProximamente.length === 1
-                                                    ? "expedición"
-                                                    : "expediciones"}
-                                            </span>
-                                        </div>
-
-                                        <div className="grid gap-7 md:grid-cols-2">
-                                            {paquetesProximamente.map((p) =>
-                                                renderTarjetaPaquete(p, true),
-                                            )}
-                                        </div>
-                                    </section>
-                                ) : null}
-                            </div>
-                        );
-                    })()}
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    )}
                 </>
             ) : null}
 
@@ -2268,53 +1947,40 @@ function CatalogoCompraPage() {
 
                             return (
                                 <>
-                                    <div className="flex items-start justify-between gap-4 border-b border-borde/80 bg-white px-6 py-5">
-                                        <div className="min-w-0">
+                                    <div className="flex items-start justify-between gap-4 border-b border-borde p-6">
+                                        <div>
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-bold text-navegacion">
-                                                    {paqueteDetalle.circuito.nombre}
+                                                <span className="flex items-center gap-1 rounded bg-marca px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
+                                                    🏔️ {paqueteDetalle.circuito.nombre}
                                                 </span>
-                                                <span
-                                                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${estiloDificultad(paqueteDetalle.circuito.dificultad)}`}
-                                                >
-                                                    Dificultad{" "}
-                                                    {paqueteDetalle.circuito.dificultad}
-                                                </span>
-                                                <span className="rounded-full bg-fondo px-2.5 py-0.5 text-xs font-semibold text-texto-suave">
-                                                    {diasTotalesDetalle} días totales
-                                                </span>
-                                                <span className="font-mono text-xs text-texto-suave">
+                                                <span className="rounded border border-borde bg-fondo px-2 py-0.5 font-mono text-xs font-semibold text-texto-suave">
                                                     {paqueteDetalle.codigo}
                                                 </span>
-                                            </div>
-                                            <h2 className="mt-2 text-2xl font-bold tracking-tight text-navegacion">
-                                                {paqueteDetalle.nombre}
-                                            </h2>
-                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-texto-suave">
-                                                {paqueteDetalle.saleDesde ? (
-                                                    <span className="inline-flex items-center gap-1 font-semibold text-marca-oscura">
-                                                        <IconoPin />
-                                                        Sale desde {paqueteDetalle.saleDesde}
-                                                    </span>
-                                                ) : null}
-                                                <span>
-                                                    {paqueteDetalle.circuito.recorrido ||
-                                                        "Cusco → Camino del Inca → Machu Picchu"}
+                                                <span className="text-xs font-semibold text-texto-suave">
+                                                    · {diasTotalesDetalle} días totales · Dificultad{" "}
+                                                    {paqueteDetalle.circuito.dificultad}
                                                 </span>
                                             </div>
+                                            <h2 className="mt-1.5 text-2xl font-bold text-navegacion">
+                                                {paqueteDetalle.nombre}
+                                            </h2>
+                                            {paqueteDetalle.saleDesde ? (
+                                                <p className="mt-0.5 text-xs font-semibold text-marca-oscura">
+                                                    Sale desde {paqueteDetalle.saleDesde}
+                                                </p>
+                                            ) : null}
+                                            <p className="mt-1 text-xs text-texto-suave">
+                                                <strong className="text-texto">Recorrido:</strong>{" "}
+                                                {paqueteDetalle.circuito.recorrido ||
+                                                    "Cusco -> Camino del Inca -> Machu Picchu"}
+                                            </p>
                                         </div>
-
-                                        <div className="flex shrink-0 items-center gap-4">
+                                        <div className="flex items-center gap-4">
                                             {tarifaMinimaDetalle ? (
-                                                <div className="rounded-xl bg-fondo/80 px-3.5 py-2 text-right ring-1 ring-borde/70 max-sm:hidden">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-texto-suave">
-                                                        Desde
-                                                    </p>
-                                                    <p className="text-xl font-bold leading-tight text-navegacion">
-                                                        {formatearMonto(
-                                                            tarifaMinimaDetalle.precio,
-                                                            tarifaMinimaDetalle.moneda,
-                                                        )}
+                                                <div className="text-right max-sm:hidden">
+                                                    <p className="text-xs text-texto-suave">Tarifa desde</p>
+                                                    <p className="text-2xl font-bold text-navegacion">
+                                                        {formatearMonto(tarifaMinimaDetalle.precio, tarifaMinimaDetalle.moneda)}
                                                     </p>
                                                 </div>
                                             ) : null}
@@ -2323,18 +1989,16 @@ function CatalogoCompraPage() {
                                                 onClick={() =>
                                                     setPaqueteDetalle(null)
                                                 }
-                                                aria-label="Cerrar detalle"
-                                                className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-borde bg-white text-sm font-semibold text-texto-suave transition hover:bg-fondo hover:text-navegacion"
+                                                className="rounded-control border border-borde px-3 py-1.5 text-xs font-semibold text-texto-suave hover:bg-fondo"
                                             >
-                                                ✕
+                                                ✕ Cerrar
                                             </button>
                                         </div>
                                     </div>
 
                                     <div className="grid gap-6 p-6 lg:grid-cols-[1.15fr_1fr]">
-                                        <div className="space-y-5">
-                                            {/* GALERÍA */}
-                                            <div className="relative overflow-hidden rounded-2xl border border-borde/80 bg-fondo">
+                                        <div className="space-y-4">
+                                            <div className="relative overflow-hidden rounded-tarjeta border border-borde bg-fondo">
                                                 <img
                                                     src={resolverUrlImagenPaquete(
                                                         galeria[idxSeguro],
@@ -2342,39 +2006,10 @@ function CatalogoCompraPage() {
                                                     alt={paqueteDetalle.nombre}
                                                     className="h-72 w-full object-cover"
                                                 />
-                                                <span className="absolute left-3 top-3 rounded-full bg-black/50 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                                                <span className="absolute top-3 left-3 rounded-full bg-navegacion/85 px-3 py-1 text-xs font-bold text-white">
                                                     Foto {idxSeguro + 1} de{" "}
                                                     {galeria.length}
                                                 </span>
-                                                {galeria.length > 1 ? (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            aria-label="Foto anterior"
-                                                            onClick={() =>
-                                                                setIndiceFotoDetalle(
-                                                                    (idxSeguro - 1 + galeria.length) %
-                                                                        galeria.length,
-                                                                )
-                                                            }
-                                                            className="absolute left-3 top-1/2 grid size-9 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-white/85 text-navegacion shadow-md backdrop-blur-sm transition hover:bg-white"
-                                                        >
-                                                            ‹
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            aria-label="Foto siguiente"
-                                                            onClick={() =>
-                                                                setIndiceFotoDetalle(
-                                                                    (idxSeguro + 1) % galeria.length,
-                                                                )
-                                                            }
-                                                            className="absolute right-3 top-1/2 grid size-9 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-white/85 text-navegacion shadow-md backdrop-blur-sm transition hover:bg-white"
-                                                        >
-                                                            ›
-                                                        </button>
-                                                    </>
-                                                ) : null}
                                             </div>
 
                                             {galeria.length > 1 ? (
@@ -2388,10 +2023,11 @@ function CatalogoCompraPage() {
                                                                     idx,
                                                                 )
                                                             }
-                                                            className={`cursor-pointer overflow-hidden rounded-xl border transition ${
-                                                                idx === idxSeguro
+                                                            className={`overflow-hidden rounded-control border ${
+                                                                idx ===
+                                                                idxSeguro
                                                                     ? "border-marca ring-2 ring-marca/30"
-                                                                    : "border-borde opacity-70 hover:opacity-100"
+                                                                    : "border-borde opacity-75"
                                                             }`}
                                                         >
                                                             <img
@@ -2407,275 +2043,255 @@ function CatalogoCompraPage() {
                                             ) : null}
 
                                             {/* DURACIÓN Y SALIDAS HABITUALES */}
-                                            <div className="grid grid-cols-2 gap-3 text-xs">
-                                                <div className="rounded-xl border border-borde/80 bg-fondo/50 p-3.5">
-                                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-texto-suave">
-                                                        Duración total
-                                                    </p>
-                                                    <p className="mt-1 font-bold text-navegacion">
-                                                        {diasTotalesDetalle} días ({paqueteDetalle.circuito.dias} de trekking +{" "}
-                                                        {paqueteDetalle.nochesAlojamiento.previas +
-                                                            paqueteDetalle.nochesAlojamiento.posteriores}{" "}
-                                                        noches hotel)
-                                                    </p>
-                                                </div>
-                                                {paqueteDetalle.diasDisponibles ? (
-                                                    <div className="rounded-xl border border-borde/80 bg-fondo/50 p-3.5">
-                                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-texto-suave">
-                                                            Salidas habituales
-                                                        </p>
-                                                        <p className="mt-1 font-bold text-navegacion">
-                                                            {formatearDiasLegibles(
-                                                                paqueteDetalle.diasDisponibles,
-                                                            )}
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Duración y salidas programadas
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 text-texto">
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Duración total</p>
+                                                        <p className="font-bold text-navegacion">
+                                                            {diasTotalesDetalle} días ({paqueteDetalle.circuito.dias} de trekking + {paqueteDetalle.nochesAlojamiento.previas + paqueteDetalle.nochesAlojamiento.posteriores} noches hotel)
                                                         </p>
                                                     </div>
-                                                ) : null}
+                                                    {paqueteDetalle.diasDisponibles ? (
+                                                        <div className="rounded border border-borde bg-white p-2.5">
+                                                            <p className="text-texto-suave">Salidas habituales</p>
+                                                            <p className="font-bold text-navegacion">
+                                                                {formatearDiasLegibles(paqueteDetalle.diasDisponibles)}
+                                                            </p>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
                                             </div>
 
-                                            {/* ITINERARIO CON LÍNEA DE TIEMPO */}
                                             {etapas.length > 0 ? (
-                                                <div className="space-y-3 rounded-2xl border border-borde/80 bg-fondo/40 p-4">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-navegacion">
-                                                        Itinerario día a día ({etapas.length} etapas)
+                                                <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
+                                                        Itinerario por etapas (
+                                                        {etapas.length})
                                                     </p>
-                                                    <ol className="relative ml-3 space-y-3 border-l-2 border-marca/25 pl-5">
+                                                    <div className="space-y-2">
                                                         {etapas.map((etapa) => (
-                                                            <li
-                                                                key={etapa.numeroOrden}
-                                                                className="relative rounded-xl border border-borde/80 bg-white p-3 text-xs shadow-2xs"
+                                                            <div
+                                                                key={
+                                                                    etapa.numeroOrden
+                                                                }
+                                                                className="rounded border border-borde bg-white p-2.5 text-xs"
                                                             >
-                                                                <span
-                                                                    aria-hidden="true"
-                                                                    className="absolute -left-[31px] top-3 grid size-5 place-items-center rounded-full bg-navegacion text-[10px] font-bold text-white ring-4 ring-fondo"
-                                                                >
-                                                                    {etapa.numeroOrden}
-                                                                </span>
                                                                 <p className="font-bold text-navegacion">
-                                                                    {etapa.puntoInicio} → {etapa.puntoFin}
+                                                                    Etapa #
+                                                                    {
+                                                                        etapa.numeroOrden
+                                                                    }
+                                                                    :{" "}
+                                                                    {
+                                                                        etapa.puntoInicio
+                                                                    }{" "}
+                                                                    →{" "}
+                                                                    {
+                                                                        etapa.puntoFin
+                                                                    }
                                                                 </p>
                                                                 {etapa.campamentoPrevisto ? (
-                                                                    <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-fondo px-2 py-0.5 text-[11px] font-medium text-texto-suave">
-                                                                        Campamento: {etapa.campamentoPrevisto}
+                                                                    <p className="mt-0.5 text-texto-suave">
+                                                                        ⛺
+                                                                        Campamento:{" "}
+                                                                        {
+                                                                            etapa.campamentoPrevisto
+                                                                        }
                                                                     </p>
                                                                 ) : null}
-                                                            </li>
+                                                            </div>
                                                         ))}
-                                                    </ol>
+                                                    </div>
                                                 </div>
                                             ) : null}
                                         </div>
 
                                         <div className="space-y-4 max-lg:order-first">
                                             {/* SALIDAS DISPONIBLES */}
-                                            <div className="space-y-3 rounded-2xl border border-borde/80 bg-fondo/40 p-4">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-navegacion">
+                                            <div className="space-y-2 rounded-control border border-borde bg-fondo/40 p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-navegacion">
                                                         Próximas salidas disponibles
                                                     </p>
                                                     {comprables.length > 0 ? (
-                                                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-exito ring-1 ring-inset ring-emerald-600/15">
-                                                            {comprables.length}{" "}
-                                                            {comprables.length === 1
-                                                                ? "abierta"
-                                                                : "abiertas"}
+                                                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-exito">
+                                                            {comprables.length} {comprables.length === 1 ? "salida abierta" : "salidas abiertas"}
                                                         </span>
                                                     ) : null}
                                                 </div>
                                                 {salidas.length === 0 ? (
                                                     <p className="text-xs text-texto-suave">
-                                                        Actualmente no hay salidas abiertas para este paquete.
+                                                        Actualmente no hay
+                                                        salidas abiertas para
+                                                        este paquete.
                                                     </p>
                                                 ) : (
                                                     <div className="space-y-2">
-                                                        {salidas.map((s) => {
-                                                            const abierta = esVentaAbierta(s);
-                                                            const disponible =
-                                                                abierta &&
-                                                                s.stockLocal > 0 &&
-                                                                s.precioPersona != null;
-                                                            return (
-                                                                <div
-                                                                    key={s.idsalida}
-                                                                    className="flex items-center justify-between gap-3 rounded-xl border border-borde/80 bg-white p-3 text-xs transition hover:border-marca/40"
-                                                                >
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-sm font-bold text-navegacion">
-                                                                            {formatearFechaUtcCorta(
-                                                                                s.fechaInicio,
-                                                                            )}
+                                                        {salidas.map((s) => (
+                                                            <div
+                                                                key={s.idsalida}
+                                                                className="flex items-center justify-between rounded border border-borde bg-white p-3 text-xs"
+                                                            >
+                                                                <div>
+                                                                    <p className="font-bold text-navegacion">
+                                                                        {formatearFechaUtcCorta(
+                                                                            s.fechaInicio,
+                                                                        )}
+                                                                    </p>
+                                                                    <p className="text-texto-suave">
+                                                                        {!esVentaAbierta(s) ? (
+                                                                            <span className="font-semibold text-slate-600">
+                                                                                Venta cerrada
+                                                                            </span>
+                                                                        ) : s.stockLocal <= 0 ? (
+                                                                            <span className="font-semibold text-peligro">
+                                                                                Agotada
+                                                                            </span>
+                                                                        ) : (
+                                                                            <>
+                                                                                {s.stockLocal} cupos disponibles
+                                                                            </>
+                                                                        )}{" "}
+                                                                        ·{" "}
+                                                                        {s.precioPersona ==
+                                                                        null
+                                                                            ? "Sin tarifa para esta fecha"
+                                                                            : formatearMonto(s.precioPersona, s.moneda)}
+                                                                    </p>
+                                                                    {salidaSinReintegro(s) ? (
+                                                                        <p className="mt-0.5 text-xs font-semibold text-amber-800">
+                                                                            Esta fecha ya no tiene reintegro si cancelás
                                                                         </p>
-                                                                        <p className="mt-0.5 text-texto-suave">
-                                                                            {!abierta ? (
-                                                                                <span className="font-semibold text-slate-600">
-                                                                                    Venta cerrada
-                                                                                </span>
-                                                                            ) : s.stockLocal <= 0 ? (
-                                                                                <span className="font-semibold text-peligro">
-                                                                                    Agotada
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="font-medium text-exito">
-                                                                                    {s.stockLocal} cupos disponibles
-                                                                                </span>
-                                                                            )}{" "}
-                                                                            ·{" "}
-                                                                            <strong className="font-semibold text-navegacion">
-                                                                                {s.precioPersona == null
-                                                                                    ? "Sin tarifa"
-                                                                                    : formatearMonto(
-                                                                                          s.precioPersona,
-                                                                                          s.moneda,
-                                                                                      )}
-                                                                            </strong>
+                                                                    ) : null}
+                                                                    {s.garantia &&
+                                                                    s.garantia !==
+                                                                        paqueteDetalle
+                                                                            .nochesAlojamiento
+                                                                            .garantia ? (
+                                                                        // CAT-29: la salida conserva la garantía con la que se publicó
+                                                                        <p className="font-semibold text-advertencia">
+                                                                            Alojamiento de esta salida:{" "}
+                                                                            {s.garantia}
                                                                         </p>
-                                                                        {salidaSinReintegro(s) ? (
-                                                                            <p className="mt-1 text-[11px] font-semibold text-amber-800">
-                                                                                Esta fecha ya no tiene reintegro si cancelás
-                                                                            </p>
-                                                                        ) : null}
-                                                                        {s.garantia &&
-                                                                        s.garantia !==
-                                                                            paqueteDetalle
-                                                                                .nochesAlojamiento
-                                                                                .garantia ? (
-                                                                            // CAT-29: la salida conserva la garantía con la que se publicó
-                                                                            <p className="mt-0.5 font-semibold text-advertencia">
-                                                                                Alojamiento de esta salida:{" "}
-                                                                                {s.garantia}
-                                                                            </p>
-                                                                        ) : null}
-                                                                        {s.nochesPrevias !== undefined &&
-                                                                        s.nochesPosteriores !== undefined &&
-                                                                        (s.nochesPrevias !==
-                                                                            paqueteDetalle
-                                                                                .nochesAlojamiento
-                                                                                .previas ||
-                                                                            s.nochesPosteriores !==
-                                                                                paqueteDetalle
-                                                                                    .nochesAlojamiento
-                                                                                    .posteriores) ? (
-                                                                            // CAT-05: la salida conserva las noches con las que se publicó
-                                                                            <p className="mt-0.5 font-semibold text-advertencia">
-                                                                                Noches de hotel de esta salida:{" "}
-                                                                                {s.nochesPrevias} previas ·{" "}
-                                                                                {s.nochesPosteriores} posteriores
-                                                                            </p>
-                                                                        ) : null}
-                                                                    </div>
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={!disponible}
-                                                                        onClick={() =>
-                                                                            iniciarCompraPaquete(
-                                                                                paqueteDetalle,
-                                                                                s.idsalida,
-                                                                            )
-                                                                        }
-                                                                        className="shrink-0 cursor-pointer rounded-xl bg-gradient-to-r from-navegacion to-marca-oscura px-3.5 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-texto-suave"
-                                                                    >
-                                                                        {!abierta
-                                                                            ? "Venta cerrada"
-                                                                            : s.stockLocal <= 0
-                                                                              ? "Agotada"
-                                                                              : "Elegir →"}
-                                                                    </button>
+                                                                    ) : null}
+                                                                    {s.nochesPrevias !== undefined &&
+                                                                    s.nochesPosteriores !== undefined &&
+                                                                    (s.nochesPrevias !== paqueteDetalle.nochesAlojamiento.previas ||
+                                                                        s.nochesPosteriores !== paqueteDetalle.nochesAlojamiento.posteriores) ? (
+                                                                        // CAT-05: la salida conserva las noches con las que se publicó
+                                                                        <p className="font-semibold text-advertencia">
+                                                                            Noches de hotel de esta salida: {s.nochesPrevias} previas · {s.nochesPosteriores} posteriores
+                                                                        </p>
+                                                                    ) : null}
                                                                 </div>
-                                                            );
-                                                        })}
+                                                                <Boton
+                                                                    className="px-3 py-1.5 text-xs"
+                                                                    disabled={
+                                                                        !esVentaAbierta(s) ||
+                                                                        s.stockLocal <=
+                                                                            0 ||
+                                                                        s.precioPersona ==
+                                                                            null
+                                                                    }
+                                                                    onClick={() =>
+                                                                        iniciarCompraPaquete(
+                                                                            paqueteDetalle,
+                                                                            s.idsalida,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {!esVentaAbierta(s)
+                                                                        ? "Venta cerrada"
+                                                                        : s.stockLocal <= 0
+                                                                          ? "Agotada"
+                                                                          : "Elegir y comprar"}
+                                                                </Boton>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* SERVICIOS INCLUIDOS */}
-                                            <div className="space-y-2.5 rounded-2xl border border-borde/80 bg-fondo/40 p-4 text-xs">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-navegacion">
-                                                    Qué incluye este paquete
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Servicios incluidos
                                                 </p>
                                                 {paqueteDetalle.serviciosAdicionales &&
                                                 paqueteDetalle.serviciosAdicionales.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1.5">
-                                                        {paqueteDetalle.serviciosAdicionales.map(
-                                                            (serv) => (
-                                                                <span
-                                                                    key={serv}
-                                                                    className="inline-flex items-center gap-1 rounded-lg border border-borde/80 bg-white px-2.5 py-1 text-xs font-medium text-texto"
-                                                                >
-                                                                    <span className="shrink-0 text-exito">
-                                                                        <IconoCheck />
-                                                                    </span>
-                                                                    {serv}
-                                                                </span>
-                                                            ),
-                                                        )}
+                                                        {paqueteDetalle.serviciosAdicionales.map((serv) => (
+                                                            <span
+                                                                key={serv}
+                                                                className="rounded-full border border-borde bg-white px-2.5 py-1 text-xs font-medium text-texto"
+                                                            >
+                                                                ✓ {serv}
+                                                            </span>
+                                                        ))}
                                                     </div>
                                                 ) : (
                                                     <p className="text-texto-suave">
                                                         Servicios base de trekking guiado incluidos.
                                                     </p>
                                                 )}
+                                                {paqueteDetalle.equipaje ? (
+                                                    <p className="text-texto">
+                                                        {textoEquipaje(paqueteDetalle.equipaje)}
+                                                    </p>
+                                                ) : null}
                                             </div>
 
                                             {/* ALOJAMIENTO Y CONDICIONES */}
-                                            <div className="space-y-3 rounded-2xl border border-borde/80 bg-fondo/40 p-4 text-xs">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-navegacion">
-                                                    Alojamiento y políticas
+                                            <div className="rounded-control border border-borde bg-fondo/40 p-4 text-xs space-y-2">
+                                                <p className="font-bold uppercase tracking-wide text-navegacion">
+                                                    Alojamiento y condiciones
                                                 </p>
-                                                <div className="grid grid-cols-2 gap-2.5 text-texto">
-                                                    <div className="rounded-xl border border-borde/80 bg-white p-3">
-                                                        <p className="text-[11px] text-texto-suave">
-                                                            Garantía hotelera
-                                                        </p>
-                                                        <p className="mt-0.5 font-semibold text-navegacion">
+                                                <div className="grid grid-cols-2 gap-2 text-texto">
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Garantía hotelera</p>
+                                                        <p className="font-semibold text-texto">
                                                             {paqueteDetalle.nochesAlojamiento.garantia}
                                                         </p>
                                                     </div>
-                                                    <div className="rounded-xl border border-borde/80 bg-white p-3">
-                                                        <p className="text-[11px] text-texto-suave">
-                                                            Estadía
-                                                        </p>
-                                                        <p className="mt-0.5 font-semibold text-navegacion">
-                                                            {textoNoches(
-                                                                paqueteDetalle.nochesAlojamiento.previas,
-                                                                paqueteDetalle.nochesAlojamiento.posteriores,
-                                                            )}
+                                                    <div className="rounded border border-borde bg-white p-2.5">
+                                                        <p className="text-texto-suave">Estadía</p>
+                                                        <p className="font-semibold text-texto">
+                                                            {textoNoches(paqueteDetalle.nochesAlojamiento.previas, paqueteDetalle.nochesAlojamiento.posteriores)}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 {paqueteDetalle.condiciones ? (
-                                                    <p className="leading-relaxed text-texto-suave">
-                                                        <strong className="text-texto">
-                                                            Políticas y condiciones:
-                                                        </strong>{" "}
-                                                        {paqueteDetalle.condiciones}
+                                                    <p className="pt-1 text-texto-suave">
+                                                        <strong className="text-texto">Políticas y condiciones:</strong> {paqueteDetalle.condiciones}
                                                     </p>
                                                 ) : null}
                                             </div>
+
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-3 border-t border-borde/80 bg-fondo/40 px-6 py-4">
-                                        <button
-                                            type="button"
+                                    <div className="flex justify-end gap-3 border-t border-borde bg-fondo/40 px-6 py-4">
+                                        <Boton
+                                            variante="fantasma"
                                             onClick={() =>
                                                 setPaqueteDetalle(null)
                                             }
-                                            className="cursor-pointer rounded-xl border border-borde bg-white px-4 py-2 text-sm font-semibold text-navegacion transition hover:bg-fondo"
                                         >
                                             Cerrar
-                                        </button>
-                                        <button
-                                            type="button"
+                                        </Boton>
+                                        <Boton
                                             disabled={comprables.length === 0}
                                             onClick={() =>
                                                 iniciarCompraPaquete(
                                                     paqueteDetalle,
                                                 )
                                             }
-                                            className="cursor-pointer rounded-xl bg-gradient-to-r from-navegacion to-marca-oscura px-5 py-2 text-sm font-semibold text-white shadow-xs transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
                                         >
-                                            Continuar a la reserva →
-                                        </button>
+                                            Continuar a la compra →
+                                        </Boton>
                                     </div>
                                 </>
                             );

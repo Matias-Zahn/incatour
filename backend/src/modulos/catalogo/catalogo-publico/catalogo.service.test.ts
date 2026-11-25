@@ -118,14 +118,14 @@ describe("CatalogoService (CU-26)", () => {
           servicio("Carpas", { equipamiento: {} }),
           servicio("Expedition", { tren: { horarioSalida: "06:10", horarioLlegada: "07:45" } }),
           servicio("Hotel viejo", { alojamiento: {} }), // los paquetes viejos podían tener el hotel como servicio
-          servicio("Bus", { transporte: { capacidadVehiculo: 20 } }),
+          servicio("Bus", { transporte: { capacidadVehiculo: 20, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2.5 } }),
         ],
       }),
     ]);
 
     const [paquete] = await new CatalogoService().consultarCatalogo();
 
-    expect(paquete).toMatchObject({ saleDesde: "Cusco", serviciosIncluidos: ["Bus", "Expedition (sale 06:10, llega 07:45)", "Carpas"] });
+    expect(paquete).toMatchObject({ saleDesde: "Cusco", serviciosIncluidos: ["Bus", "Expedition (sale 06:10, llega 07:45)", "Carpas"], equipaje: { kgIncluidos: 15, costoPorKgExcedente: 2.5 } });
     expect(paquete!.salidasDisponibles[0]).toMatchObject({ ventaAbierta: true, ultimoDiaVenta: "2030-01-12", fechaLimiteReintegro: "2029-12-31" });
   });
 

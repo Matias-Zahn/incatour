@@ -38,6 +38,8 @@ const CAMPOS_COMPARABLES: (keyof ServicioModificar)[] = [
     "capacidadDisponible",
     "modalidadConfirmacion",
     "capacidadVehiculo",
+    "pesoEquipajeIncluido",
+    "costoPorKgExcedente",
     "horarioSalida",
     "horarioLlegada",
     "diasOperacion",
@@ -61,7 +63,9 @@ function describirDisponibilidad(servicio: Servicio): string {
             return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${plazas}`;
         }
         case "TRANSPORTE":
-            return `${servicio.capacidadVehiculo ?? 0} asientos`;
+            return servicio.pesoEquipajeIncluido != null
+                ? `${servicio.capacidadVehiculo ?? 0} asientos · ${servicio.pesoEquipajeIncluido} kg incl.${servicio.costoPorKgExcedente != null ? ` (+USD ${servicio.costoPorKgExcedente}/kg)` : ""}`
+                : `${servicio.capacidadVehiculo ?? 0} asientos`;
         case "TREN":
             return `${servicio.horarioSalida ?? "--:--"} a ${servicio.horarioLlegada ?? "--:--"} (${servicio.diasOperacion ?? "-"})`;
         default:
@@ -436,7 +440,7 @@ function ServiciosPage() {
                                             Editar
                                         </Boton>
                                         <Boton
-                                            variante="peligroSuave"
+                                            variante="peligro"
                                             className="px-3 py-1.5 text-xs"
                                             aria-label={`Dar de baja servicio ${servicio.nombreServicio}`}
                                             onClick={() => {

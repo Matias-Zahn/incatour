@@ -93,15 +93,13 @@ describe("CU-19: CrearServicioDto", () => {
     expect(e2).toContain("no puede superar el máximo de 10000");
   });
 
-  it("transporte: acepta costoBase de 10.000.000 e ignora los campos de equipaje si llegan (B6)", () => {
+  it("transporte: acepta costoBase de 10.000.000 y el equipaje es opcional", () => {
     const [error, dto] = CrearServicioDto.create({
       tipo: "TRANSPORTE",
       nombreServicio: "Bus Premium",
       costoBase: 10_000_000,
       localidad: "Cusco",
       capacidadVehiculo: 20,
-      pesoEquipajeIncluido: 99,
-      costoPorKgExcedente: -5,
     });
 
     expect(error).toBeUndefined();
@@ -109,10 +107,17 @@ describe("CU-19: CrearServicioDto", () => {
     expect(dto?.especifico).toEqual({ capacidadVehiculo: 20 });
   });
 
-  it("modificar transporte: ignora los campos de equipaje si llegan (B6)", () => {
-    const [error, dto] = ModificarServicioDto.create({ capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2 });
+  it("transporte: valida el equipaje informativo", () => {
+    const base = { tipo: "TRANSPORTE", nombreServicio: "Bus", costoBase: 100, localidad: "Cusco", capacidadVehiculo: 20 };
+    expect(CrearServicioDto.create({ ...base, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2.5 })[1]?.especifico)
+      .toEqual({ capacidadVehiculo: 20, pesoEquipajeIncluido: 15, costoPorKgExcedente: 2.5 });
+    expect(CrearServicioDto.create({ ...base, costoPorKgExcedente: -5 })[0]).toMatch(/costoPorKgExcedente/);
+  });
+
+  it("modificar transporte: el equipaje se cambia o se borra con null", () => {
+    const [error, dto] = ModificarServicioDto.create({ capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: null });
 
     expect(error).toBeUndefined();
-    expect(dto?.especifico).toEqual({ capacidadVehiculo: 30 });
+    expect(dto?.especifico).toEqual({ capacidadVehiculo: 30, pesoEquipajeIncluido: 15, costoPorKgExcedente: null });
   });
 });

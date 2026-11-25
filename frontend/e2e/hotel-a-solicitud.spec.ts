@@ -25,7 +25,7 @@ test("B8: crear un hotel a solicitud sin plazas funciona y no envía capacidadDi
 
     // 2. Ir a los servicios de un proveedor de ALOJAMIENTO
     await page.goto("/gestion/proveedores");
-    const filaAlojamiento = page.locator("article", { hasText: /ALOJAMIENTO/i }).first();
+    const filaAlojamiento = page.locator("tbody tr", { hasText: /ALOJAMIENTO/i }).first();
     await expect(filaAlojamiento).toBeVisible({ timeout: 10_000 });
     await filaAlojamiento.getByRole("link", { name: /Servicios/i }).click();
     await page.waitForURL(/\/gestion\/proveedores\/\d+\/servicios/);

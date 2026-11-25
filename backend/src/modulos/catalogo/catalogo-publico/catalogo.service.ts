@@ -53,6 +53,12 @@ export class CatalogoService {
       // Extraemos información limpia de los servicios activos (CAT-09: filtrar solo servicios activos)
       const serviciosActivos = paquete.servicios.filter((s) => s.servicio.estado === "ACTIVO");
       const serviciosIncluidos = textosIncluye(serviciosActivos.map((s) => s.servicio));
+      // Solo informativo: la franquicia del transporte del paquete; el excedente se paga en persona
+      const transporte = serviciosActivos.find((s) => s.servicio.transporte)?.servicio.transporte;
+      const equipaje =
+        transporte?.pesoEquipajeIncluido != null
+          ? { kgIncluidos: transporte.pesoEquipajeIncluido, costoPorKgExcedente: transporte.costoPorKgExcedente ?? null }
+          : null;
 
       // CAT-29: la garantía del paquete (rige para las salidas nuevas); cada salida informa la suya, congelada (CAT-05)
       const garantía = textoGarantia(armarDefinicionPaquete(paquete));
@@ -141,6 +147,7 @@ export class CatalogoService {
         },
         serviciosAdicionales: serviciosIncluidos,
         serviciosIncluidos,
+        equipaje,
         condiciones: paquete.condiciones,
         diasDisponibles: paquete.diasDisponibles,
         precios: tarifasVigentes,

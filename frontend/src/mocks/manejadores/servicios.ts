@@ -27,7 +27,7 @@ const CAMPOS_BASE_EDITABLES = ["nombreServicio", "descripcion", "costoBase", "lo
 
 const CAMPOS_MODIFICAR_POR_TIPO: Record<TipoServicio, string[]> = {
     ALOJAMIENTO: ["categoria", "tipoHabitacion", "capacidadDisponible", "modalidadConfirmacion"],
-    TRANSPORTE: ["capacidadVehiculo"],
+    TRANSPORTE: ["capacidadVehiculo", "pesoEquipajeIncluido", "costoPorKgExcedente"],
     TREN: ["horarioSalida", "horarioLlegada", "diasOperacion"],
     EQUIPAMIENTO: ["tipoEquipamiento", "inventarioTotal"],
 };
@@ -74,6 +74,8 @@ function respuestaServicio(servicio: Servicio, incluirEdicion = false) {
         capacidadDisponible: tipo === "ALOJAMIENTO" ? plazasAlojamiento : undefined,
         modalidadConfirmacion: servicio.modalidadConfirmacion,
         capacidadVehiculo: servicio.capacidadVehiculo,
+        pesoEquipajeIncluido: servicio.pesoEquipajeIncluido ?? null,
+        costoPorKgExcedente: servicio.costoPorKgExcedente ?? null,
         horarioSalida: servicio.horarioSalida,
         horarioLlegada: servicio.horarioLlegada,
         diasOperacion: servicio.diasOperacion,
@@ -196,9 +198,6 @@ export const manejadoresServicios = [
             }
 
             const cuerpo = { ...((await request.json()) as Record<string, unknown>) };
-            // B6: si llegan campos de equipaje en transporte, se ignoran
-            delete cuerpo.pesoEquipajeIncluido;
-            delete cuerpo.costoPorKgExcedente;
 
             // B8: validaciones de capacidadDisponible según modalidad de alojamiento (contratos-viernes §2)
             if (cuerpo.tipo === "ALOJAMIENTO") {
@@ -298,9 +297,6 @@ export const manejadoresServicios = [
         }
 
         const resto = { ...((await request.json()) as Record<string, unknown>) };
-        // B6: si llegan campos de equipaje en transporte, se ignoran
-        delete resto.pesoEquipajeIncluido;
-        delete resto.costoPorKgExcedente;
         const datos = resto as ServicioModificar;
         if (!datos || Object.keys(datos).length === 0) {
             return respuestaInvalida("Debe enviar al menos un campo para modificar.");
