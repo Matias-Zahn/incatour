@@ -214,6 +214,8 @@ function armarCalendario(hoy: string) {
   // Venta terminada con la mitad vendida y hotel a solicitud: antes de confirmar hay que resolver los alojamientos
   // pendientes, y al confirmar sobran porteadores y el admin elige cuáles libera
   planes.push({ virtual: sumarDias(hoy, 2), paquete: PAQUETES[2], etapa: "pendiente", vender: 0.5, dejarSolicitudes: true });
+  // Venta terminada, sin pendientes de alojamiento, pero le falta equipo (stockParaMostrar): confirmar la frena
+  planes.push({ virtual: sumarDias(hoy, 2), paquete: PAQUETES[1], etapa: "pendiente", vender: 0.8 });
   // Vendida a la mitad y hoy es su último día de venta: la fecha mínima (hoy + corte + 1)
   planes.push({ virtual: sumarDias(hoy, 3), paquete: PAQUETES[3], etapa: "publicada", vender: 0.5 });
   const historicas = planes.filter((p) => p.etapa === "historica");
@@ -422,7 +424,20 @@ async function main() {
       // CU-36 (B3): guía, porteadores y transporte se eligen al crear, con la dotación del máximo (1 porteador cada 2)
       const zona = ZONAS[paquete.zona]!;
       // B10: con bloqueo, los hoteles de la zona en orden (el primero que no alcanza le pasa el resto al siguiente); a solicitud, uno (corte de 5 días)
-      const alojamientos = zona.modalidad === "BLOQUEO_PLAZAS" ? hoteles[paquete.zona]!.map((h) => h.idservicio) : [elegir(hoteles[paquete.zona]!).idservicio];
+      // Solo los que aportan plazas esas noches: el alta rechaza un hotel que no hace falta
+      // (el azar se consume igual que antes: así la historia generada no cambia)
+      let alojamientos: number[] = [];
+      if (zona.modalidad !== "BLOQUEO_PLAZAS") alojamientos = [elegir(hoteles[paquete.zona]!).idservicio];
+      else {
+        const op = await api("GET", `/salidas/opciones?idpaquete=${paquetes.get(paquete.nombre)}&fechaInicio=${real}&tamanoMaximo=${paquete.cupo}`);
+        let faltan = paquete.cupo;
+        alojamientos = hoteles[paquete.zona]!.flatMap(({ idservicio }) => {
+          const libre = op.alojamientos.find((a: any) => a.idservicio === idservicio)?.capacidadDisponible ?? 0;
+          if (faltan <= 0 || libre <= 0) return [];
+          faltan -= libre;
+          return [idservicio];
+        });
+      }
       const equipoGuias = plan.carlos ? [guias[0]!] : libres(guias.slice(1), real, realFin, 1);
       const equipoPorteadores = libres(porteadores, real, realFin, Math.ceil(paquete.cupo / 2));
       // 12.4: el vehículo lleva a los pasajeros y al personal
@@ -788,16 +803,25 @@ async function stockParaMostrar(db: PrismaClient, hoy: string, api: (m: string, 
   const justa = await db.salida.findFirstOrThrow({ where: { fechaInicio: new Date(sumarDias(hoy, 3)), estado: "PUBLICADA", paquete: { nombrePaquete: PAQUETES[3].nombre } } });
   await ajustarStock(db, EQUIPOS[0]![0], justa.idsalida, 0);
 
-  const conFalta = await db.salida.findFirstOrThrow({ where: { fechaInicio: { gt: new Date(sumarDias(hoy, 6)) }, estado: "PUBLICADA" }, orderBy: { fechaInicio: "asc" }, include: { ocupaciones: true } });
-  const nombreServicio = "Equipo de oxígeno portátil";
-  const s = await api("POST", `/proveedores/${alquiler}/servicios`, { tipo: "EQUIPAMIENTO", nombreServicio, localidad: "Cusco", costoBase: 30, tipoEquipamiento: "Oxígeno", cantidadDisponible: 1 });
-  const idservicio = idDe(s, "idservicio")!;
-  const equipo = conFalta.ocupaciones.find((o) => o.tipo === "EQUIPAMIENTO")!;
-  const definicion = conFalta.definicionPaquete as any;
-  definicion.servicios.push({ tipo: "EQUIPAMIENTO", tren: null, cantidad: 2, idservicio, cadaPasajeros: null, nombreServicio });
-  await db.salida.update({ where: { idsalida: conFalta.idsalida }, data: { definicionPaquete: definicion } });
-  await db.ocupacion.create({ data: { idservicio, idsalida: conFalta.idsalida, tipo: "EQUIPAMIENTO", desde: equipo.desde, hasta: equipo.hasta, cantidad: 2 } });
+  const conFalta = await db.salida.findFirstOrThrow({ where: { fechaInicio: { gt: new Date(sumarDias(hoy, 6)) }, estado: "PUBLICADA" }, orderBy: { fechaInicio: "asc" } });
+  await faltaEquipo(db, api, alquiler, conFalta.idsalida, "Equipo de oxígeno portátil", "Oxígeno");
+  // Venta terminada y le falta equipo: "Confirmar salida" no deja confirmar hasta que se suba el stock en Proveedores
+  const sinConfirmar = await db.salida.findFirstOrThrow({ where: { fechaInicio: new Date(sumarDias(hoy, 2)), estado: "PUBLICADA", paquete: { nombrePaquete: PAQUETES[1].nombre } } });
+  await faltaEquipo(db, api, alquiler, sinConfirmar.idsalida, "Radio satelital", "Comunicación");
   console.log(`  Equipo justo (una compra más y faltan carpas): ${justa.nroSalida} · ya le falta oxígeno: ${conFalta.nroSalida}`);
+  console.log(`  Venta terminada y le falta una radio satelital, no deja confirmar: ${sinConfirmar.nroSalida}`);
+}
+
+/** Un equipo que usa solo esa salida: lleva 2 y el proveedor tiene 1, así que ya falta 1 (FALTA_RECURSO). */
+async function faltaEquipo(db: PrismaClient, api: (m: string, r: string, b?: unknown) => Promise<any>, alquiler: number, idsalida: number, nombreServicio: string, tipoEquipamiento: string) {
+  const salida = await db.salida.findUniqueOrThrow({ where: { idsalida }, include: { ocupaciones: true } });
+  const s = await api("POST", `/proveedores/${alquiler}/servicios`, { tipo: "EQUIPAMIENTO", nombreServicio, localidad: "Cusco", costoBase: 30, tipoEquipamiento, cantidadDisponible: 1 });
+  const idservicio = idDe(s, "idservicio")!;
+  const equipo = salida.ocupaciones.find((o) => o.tipo === "EQUIPAMIENTO")!;
+  const definicion = salida.definicionPaquete as any;
+  definicion.servicios.push({ tipo: "EQUIPAMIENTO", tren: null, cantidad: 2, idservicio, cadaPasajeros: null, nombreServicio });
+  await db.salida.update({ where: { idsalida }, data: { definicionPaquete: definicion } });
+  await db.ocupacion.create({ data: { idservicio, idsalida, tipo: "EQUIPAMIENTO", desde: equipo.desde, hasta: equipo.hasta, cantidad: 2 } });
 }
 
 /** Lo que se usa en vivo el día de la presentación (ver presentacion/datos-demo.md) */
