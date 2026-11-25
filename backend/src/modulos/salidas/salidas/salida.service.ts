@@ -117,7 +117,9 @@ export class SalidaService {
     // B3 y 12.4: el vehículo lleva a los pasajeros y al personal
     const totalLugares = dto.tamanoMaximo + dto.personalIds.length;
     const transporte = p.transportes.find((t) => t.idservicio === dto.idtransporte);
-    if (!transporte) throw CustomError.badRequest("El transporte elegido no existe o no está activo");
+    if (!transporte) {
+      throw CustomError.badRequest("El transporte elegido no está disponible: tiene que estar activo y no costar más que el del paquete");
+    }
     if (transporte.capacidadVehiculo < totalLugares) {
       throw CustomError.badRequest(
         `El transporte elegido tiene ${transporte.capacidadVehiculo} asientos y la salida necesita ${totalLugares} lugares ` +
@@ -241,12 +243,18 @@ export class SalidaService {
     const rangosAlojamiento = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, fechas, paquete);
     const definicion = armarDefinicionPaquete(paquete, tarifa);
     const salidaNueva = { ...fechas, estado: ESTADO_SALIDA.PUBLICADA, tamanoMaximo: dto.tamanoMaximo, definicionPaquete: definicion };
-    const [alojamientos, transportes, libres, datosEquipo] = await Promise.all([
+    const [alojamientos, todosLosTransportes, libres, datosEquipo] = await Promise.all([
       this.repository.buscarAlojamientos(paquete, rangosAlojamiento),
       this.repository.buscarTransportes(fechas),
       this.repository.buscarPersonalLibre(fechas),
       this.repository.cargarEquipoDe([salidaNueva]),
     ]);
+    // El precio se fijó con el transporte del paquete: la salida solo lo reemplaza por otro que no cueste más
+    // (como el hotel, que el simulador toma por el más caro de la categoría)
+    const delPaquete = todosLosTransportes.find((t) => paquete.servicios.some((s) => s.idservicio === t.idservicio));
+    const transportes = delPaquete
+      ? todosLosTransportes.filter((t) => t === delPaquete || t.costoBase <= delPaquete.costoBase)
+      : todosLosTransportes;
     // A2b: cada equipo con regla, contra la demanda proyectada de las otras salidas
     const equipo = reglasEquipo(definicion).map((r) => ({
       ...controlEquipo(r, datosEquipo.totales.get(r.idservicio) ?? 0, datosEquipo.filas, salidaNueva, 0),

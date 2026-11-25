@@ -11,10 +11,17 @@ export class ReglaLogisticaViolada extends Error {}
 
 type Cliente = Prisma.TransactionClient;
 
+/**
+ * Lo que fijó el paquete (su copia en la salida): el equipo con regla y el costo del transporte con que se calculó el precio.
+ * null = sin límite (salidas anteriores a la copia del paquete).
+ */
+export type LimitesPaquete = { equipos: number[] | null; costoMaxTransporte: number | null };
+
 interface SalidaFechas {
   idsalida: number;
   fechaInicio: Date;
   fechaFin: Date;
+  limites: LimitesPaquete;
 }
 
 export class LogisticaRepository {
@@ -22,7 +29,7 @@ export class LogisticaRepository {
     return db.salida.findUnique({
       where: { idsalida },
       select: {
-        idsalida: true, nroSalida: true, estado: true, fechaInicio: true, fechaFin: true, tamanoMaximo: true,
+        idsalida: true, nroSalida: true, estado: true, fechaInicio: true, fechaFin: true, tamanoMaximo: true, definicionPaquete: true,
         _count: { select: { personalAsignado: true } },
       },
     });
@@ -70,9 +77,16 @@ export class LogisticaRepository {
 
   // DCD consultarProveedoresDisponibles. A1: lo disponible en las fechas de la salida, descontando también
   // lo que ella ya tiene (es lo que se le puede sumar). Los que dan 0 no se listan
+  async costoDe(idservicio: number) {
+    return (await db.servicioBase.findUnique({ where: { idservicio }, select: { costoBase: true } }))?.costoBase ?? null;
+  }
+
   async disponiblesEquipamiento(salida: SalidaFechas) {
     const equipos = await db.servicioBase.findMany({
-      where: { estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, equipamiento: { isNot: null } },
+      where: {
+        estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, equipamiento: { isNot: null },
+        ...(salida.limites.equipos && { idservicio: { in: salida.limites.equipos } }),
+      },
       include: { proveedor: { select: { idproveedor: true, razonSocial: true } }, equipamiento: true },
       orderBy: { nombreServicio: "asc" },
     });
@@ -87,6 +101,7 @@ export class LogisticaRepository {
         estado: ESTADO.ACTIVO,
         proveedor: { estado: ESTADO.ACTIVO },
         transporte: { is: { capacidadVehiculo: { gte: lugares } } },
+        ...(salida.limites.costoMaxTransporte !== null && { costoBase: { lte: salida.limites.costoMaxTransporte } }),
       },
       include: { proveedor: { select: { idproveedor: true, razonSocial: true } }, transporte: true },
       orderBy: { nombreServicio: "asc" },
@@ -169,6 +184,9 @@ export class LogisticaRepository {
     if (!servicio || !servicio.equipamiento) {
       throw new ReglaLogisticaViolada(`El servicio ${item.idservicio} no existe o no es de equipamiento.`);
     }
+    if (salida.limites.equipos && !salida.limites.equipos.includes(item.idservicio)) {
+      throw new ReglaLogisticaViolada(`"${servicio.nombreServicio}" no es parte del equipo del paquete.`);
+    }
     if (servicio.estado !== ESTADO.ACTIVO || servicio.proveedor.estado !== ESTADO.ACTIVO) {
       throw new ReglaLogisticaViolada(`"${servicio.nombreServicio}" o su proveedor están inactivos.`);
     }
@@ -221,6 +239,9 @@ export class LogisticaRepository {
     if (!servicio || !servicio.transporte) return `El servicio ${idservicio} no existe o no es de transporte.`;
     if (servicio.estado !== ESTADO.ACTIVO || servicio.proveedor.estado !== ESTADO.ACTIVO) {
       return `"${servicio.nombreServicio}" o su proveedor están inactivos.`;
+    }
+    if (salida.limites.costoMaxTransporte !== null && servicio.costoBase > salida.limites.costoMaxTransporte) {
+      return `"${servicio.nombreServicio}" cuesta más que el transporte del paquete: el precio se fijó con ese costo.`;
     }
     if (servicio.transporte.capacidadVehiculo < lugares) {
       return `"${servicio.nombreServicio}" no tiene capacidad: admite ${servicio.transporte.capacidadVehiculo} y la salida necesita ${lugares} lugares (pasajeros y personal).`;

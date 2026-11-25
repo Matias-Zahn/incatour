@@ -1,9 +1,11 @@
 import { hoyUTC } from "../../../shared/fechas";
 import { CustomError } from "../../../error/CustomError";
 import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { DefinicionPaquete } from "../../../shared/definicionPaquete";
+import { reglasEquipo } from "../../../shared/equipo";
 import { UsuarioAutenticado } from "../../reservas/gestion-reservas/gestion-reserva.service";
 import { ModificarLogisticaDto, TipoRecursoDto } from "./logistica.dto";
-import { LogisticaRepository } from "./logistica.repository";
+import { LimitesPaquete, LogisticaRepository } from "./logistica.repository";
 
 type Panel = NonNullable<Awaited<ReturnType<LogisticaRepository["obtenerPanel"]>>>;
 
@@ -90,7 +92,15 @@ export class LogisticaService {
         "La logística solo puede modificarse en salidas que no hayan comenzado y no estén canceladas ni finalizadas."
       );
     }
-    return salida;
+    const { definicionPaquete, ...resto } = salida;
+    const def = definicionPaquete as DefinicionPaquete | null;
+    const idtransporte = idTransporteDelPaquete(def);
+    const limites: LimitesPaquete = {
+      // ponytail: un paquete sin equipo deja agregar cualquiera (no entra en el precio); si eso molesta, pasar a [] también
+      equipos: def && reglasEquipo(def).length ? reglasEquipo(def).map((r) => r.idservicio) : null,
+      costoMaxTransporte: idtransporte ? await this.repository.costoDe(idtransporte) : null,
+    };
+    return { ...resto, limites };
   }
 
   private formatearPanel(panel: Panel) {
@@ -121,6 +131,10 @@ export class LogisticaService {
     };
   }
 }
+
+/** El transporte con que el paquete calculó el precio (en su copia de la salida), o null en las fotos anteriores a B2. */
+export const idTransporteDelPaquete = (d: Pick<DefinicionPaquete, "servicios"> | null) =>
+  d?.servicios.find((s) => s.tipo === TIPO_SERVICIO.TRANSPORTE)?.idservicio ?? null;
 
 /** 12.4: el vehículo lleva al personal además de los pasajeros: el máximo mientras se vende, los vendidos después. */
 const lugaresVehiculo = (s: { estado: string; tamanoMaximo: number; _count: { personalAsignado: number } }, pasajeros: number) =>

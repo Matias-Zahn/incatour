@@ -156,7 +156,7 @@ export class SalidaRepository {
   async buscarTransportes(fechas: { fechaInicio: Date; fechaFin: Date }) {
     const transportes = await db.servicioBase.findMany({
       where: { estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, transporte: { isNot: null } },
-      select: { idservicio: true, nombreServicio: true, transporte: { select: { capacidadVehiculo: true } } },
+      select: { idservicio: true, nombreServicio: true, costoBase: true, transporte: { select: { capacidadVehiculo: true } } },
       orderBy: { nombreServicio: "asc" },
     });
     const libres = await disponibles(db, transportes, rangosDe(TIPO_SERVICIO.TRANSPORTE, fechas));
