@@ -9,6 +9,8 @@ export type EstadoServicio = "ACTIVO" | "INACTIVO";
 export const modalidadesConfirmacion = ["BLOQUEO_PLAZAS", "A_SOLICITUD"] as const;
 // Mismo texto que la garantía por categoría del paquete: la búsqueda de hoteles compara la categoría tal cual
 export const categoriasAlojamiento = ["1 Estrella", "2 Estrellas", "3 Estrellas", "4 Estrellas", "5 Estrellas"] as const;
+/** La misma lista que la garantía del paquete: la búsqueda de hoteles al crear la salida compara por este texto */
+export const tiposHabitacion = ["Simple", "Doble", "Triple", "Matrimonial", "Suite"] as const;
 export type ModalidadConfirmacion = (typeof modalidadesConfirmacion)[number];
 
 const REGEX_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;

@@ -346,7 +346,7 @@ export function FormularioAsignarRecursos({
             {porteadoresSobrantes > 0 ? (
                 <Alerta tipo="informacion" titulo="Porteadores sobrantes para la venta final">
                     Tenés {porteadoresSobrantes}{" "}
-                    {porteadoresSobrantes === 1 ? "porteador" : "porteadores"} por encima del mínimo requerido para {pasajerosConfirmados} pasajeros. Podés confirmar igual o ajustarlo desde reemplazos.
+                    {porteadoresSobrantes === 1 ? "porteador" : "porteadores"} por encima del mínimo requerido para {pasajerosConfirmados} pasajeros. Al confirmar se {porteadoresSobrantes === 1 ? "desasigna" : "desasignan"}: no se emite su permiso y quedan libres para otras salidas.
                 </Alerta>
             ) : null}
 

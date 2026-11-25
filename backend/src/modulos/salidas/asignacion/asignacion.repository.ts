@@ -102,6 +102,7 @@ export class AsignacionRepository {
     rechazados: PermisoRechazado[];
     reservaDePasajero: Map<number, number>;
     lugaresPorLiberar: number;
+    porteadoresQuitados?: number[];
   }) {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
@@ -116,6 +117,11 @@ export class AsignacionRepository {
         personal.every((a) => p.salida.personalAsignado.some((b) => b.idpersonal === a.idpersonal));
       if (fila?.estado !== ESTADO_SALIDA.PUBLICADA || confirmados !== vendidos || !mismoPersonal) {
         throw CustomError.conflict("La salida cambió mientras se confirmaba. Volvé a cargar el panel");
+      }
+
+      // Decisión 5: los porteadores que sobran para lo vendido quedan libres para otras salidas
+      if (p.porteadoresQuitados?.length) {
+        await tx.asignacionPersonal.deleteMany({ where: { idsalida, idpersonal: { in: p.porteadoresQuitados } } });
       }
 
       for (const permiso of p.permisos) {

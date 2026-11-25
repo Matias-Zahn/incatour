@@ -35,7 +35,7 @@ export class AsignacionService {
       pasajerosConfirmados: vendidos,
       dotacionRequerida: dotacion,
       personal: recursos.personal.map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol, apto: !p.motivo, motivo: p.motivo })),
-      porteadoresSobrantes: Math.max(0, recursos.personal.filter((p) => p.rol === ROL_PORTEADOR).length - dotacion.porteadores), // decisión 5: solo avisa
+      porteadoresSobrantes: porteadoresDeMas(salida, dotacion.porteadores).length, // se desasignan al confirmar
       // 12.2: los pasajeros que la compra mandó a cada hotel
       hoteles: ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
         idservicio: o.idservicio,
@@ -65,7 +65,7 @@ export class AsignacionService {
   // CU-40 pasos 4 a 15: confirmar (body vacío, decisión 15). personalIds: solo para una salida sin personal (anterior a la etapa 3)
   async confirmarAsignacion(idsalida: number, personalIds?: number[]) {
     if (personalIds) await this.asignarPersonalFaltante(idsalida, personalIds);
-    const { salida, sobrantes, motivoNoConfirmable, bloqueaPorRecursos, pendientes, faltantes } = await this.prepararConfirmacion(idsalida);
+    const { salida, sobrantes, dotacion, motivoNoConfirmable, bloqueaPorRecursos, pendientes, faltantes } = await this.prepararConfirmacion(idsalida);
     if (motivoNoConfirmable) {
       // Los alojamientos pendientes y los faltantes son 409, con el detalle para el panel
       throw bloqueaPorRecursos ? CustomError.conflict(motivoNoConfirmable, { reservasSinAlojamiento: pendientes, faltantes }) : CustomError.badRequest(motivoNoConfirmable);
@@ -73,7 +73,10 @@ export class AsignacionService {
 
     // SAL-21 (RF-47): el pasajero vencido no va a la autoridad; queda rechazado y el resto sigue.
     // El personal vencido ya frenó la confirmación como no apto (12.3)
-    const nominaCompleta = armarNomina(salida, salida.personalAsignado.map((a) => a.personal));
+    // Los porteadores se asignaron por el máximo (decisión 5): los que sobran para los vendidos se desasignan,
+    // no llevan permiso y su lugar se libera con los sobrantes
+    const quitados = porteadoresDeMas(salida, dotacion.porteadores);
+    const nominaCompleta = armarNomina(salida, salida.personalAsignado.filter((a) => !quitados.includes(a.idpersonal)).map((a) => a.personal));
     const vencidos = nominaCompleta.filter((t) => t.fechaVencimientoPasaporte <= salida.fechaFin);
     const nomina = nominaCompleta.filter((t) => !vencidos.includes(t));
 
@@ -100,7 +103,7 @@ export class AsignacionService {
 
     // RF-47: los rechazados no ocupan lugar. Se liberan los de pasajeros junto con los sobrantes; los del personal
     // quedan reservados para su reemplazo (CU-38), que pide ahí un permiso nuevo
-    const lugaresALiberar = sobrantes + rechazados.filter((r) => r.titular.tipo === "PASAJERO").length;
+    const lugaresALiberar = sobrantes + quitados.length + rechazados.filter((r) => r.titular.tipo === "PASAJERO").length;
     let salidaActualizada;
     try {
       salidaActualizada = await this.repository.confirmar({
@@ -108,6 +111,7 @@ export class AsignacionService {
         permisos,
         rechazados,
         lugaresPorLiberar: lugaresALiberar,
+        porteadoresQuitados: quitados,
         reservaDePasajero: new Map(
           salida.reservas.flatMap((r) => r.pasajeros.map((rp) => [rp.idpasajero, r.idreserva] as [number, number]))
         ),
@@ -124,6 +128,7 @@ export class AsignacionService {
     return {
       salida: salidaActualizada,
       permisosEmitidos: permisos.length,
+      porteadoresLiberados: quitados.length,
       rechazados: rechazados.map((r) => ({
         tipo: r.titular.tipo,
         id: r.titular.id,
@@ -229,6 +234,14 @@ export class AsignacionService {
     return { salida, venta, vendidos, dotacion, recursos, faltantes, pendientes, motivoNoConfirmable, bloqueaPorRecursos, bloqueoInicial, sobrantes };
   }
 }
+
+/** Los porteadores que sobran para lo vendido. ponytail: se quitan los de id más alto; sin orden de asignación guardado */
+const porteadoresDeMas = (salida: SalidaParaAsignar, necesarios: number) =>
+  salida.personalAsignado
+    .filter((a) => a.personal.rol === ROL_PORTEADOR)
+    .map((a) => a.idpersonal)
+    .sort((a, b) => b - a)
+    .slice(0, Math.max(0, salida.personalAsignado.filter((a) => a.personal.rol === ROL_PORTEADOR).length - necesarios));
 
 // Nómina completa (paso 14): pasajeros de las reservas confirmadas y personal asignado
 const MOTIVO_PASAPORTE_VENCIDO = "Pasaporte vence antes de finalizar el recorrido";

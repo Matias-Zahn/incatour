@@ -38,7 +38,7 @@ test("B8: crear un hotel a solicitud sin plazas funciona y no envía capacidadDi
     await page.getByLabel("Localidad").fill("Cusco");
     await page.getByLabel("Costo por noche y por persona (USD)").fill("95");
     await page.getByLabel("Categoría").selectOption("3 Estrellas");
-    await page.getByLabel("Tipo de habitación").fill("Doble");
+    await page.getByLabel("Tipo de habitación").selectOption("Doble");
 
     // Verificar que primero aparece el campo de plazas (BLOQUEO_PLAZAS) y luego desaparece al pasar a A_SOLICITUD
     await expect(page.getByLabel("Capacidad disponible (plazas)")).toBeVisible();

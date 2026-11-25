@@ -128,6 +128,17 @@ describe("AsignacionService.confirmarAsignacion (CU-40)", () => {
     expect((await autoridad.solicitarBloqueoCupo(INICIO, 493)).aprobado).toBe(true);
   });
 
+  it("decisión 5: con 1 vendido sobra un porteador: se desasigna, no lleva permiso y su lugar se libera", async () => {
+    repo.buscarSalida.mockResolvedValue(salida(idBloqueo, [pasajero(1)]));
+    repo.confirmar.mockResolvedValue({ idsalida: 2 });
+
+    const r = await new AsignacionService().confirmarAsignacion(2);
+
+    expect(r.porteadoresLiberados).toBe(1);
+    expect(r.permisosEmitidos).toBe(4); // 1 pasajero + 2 guías + 1 porteador
+    expect(repo.confirmar).toHaveBeenCalledWith(expect.objectContaining({ porteadoresQuitados: [4], lugaresPorLiberar: 8 }));
+  });
+
   it("SAL-09: si la autoridad no libera los sobrantes, quedan pendientes y se reintentan", async () => {
     repo.confirmar.mockResolvedValue({ idsalida: 2 });
     vi.spyOn(autoridad, "liberarLugaresSobrantes").mockRejectedValueOnce(new Error("caída"));

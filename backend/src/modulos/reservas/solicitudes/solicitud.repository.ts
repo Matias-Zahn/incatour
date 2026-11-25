@@ -60,8 +60,9 @@ export class SolicitudRepository {
           notIn: serviciosRechazadosIds
         },
         alojamiento: {
-          tipoHabitacion: tipoHabitacion,
-          categoria: categoria
+          // Sin distinguir mayúsculas, igual que la búsqueda de hoteles al crear la salida
+          tipoHabitacion: { equals: tipoHabitacion, mode: "insensitive" },
+          categoria: { equals: categoria, mode: "insensitive" }
         }
       },
       include: {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { tiposHabitacion } from "../services/servicioService";
 import { Link } from "react-router-dom";
 import Alerta from "./Alerta";
 import AsistentePasos from "./AsistentePasos";
@@ -65,13 +66,7 @@ const CATEGORIAS_SUGERIDAS = [
     "5 Estrellas",
 ];
 
-const HABITACIONES_SUGERIDAS = [
-    "Simple",
-    "Doble",
-    "Triple",
-    "Matrimonial",
-    "Suite",
-];
+const HABITACIONES_SUGERIDAS = tiposHabitacion;
 
 const LOCALIDADES_BASE = ["Cusco", "Aguas Calientes", "Ollantaytambo", "Urubamba"];
 
