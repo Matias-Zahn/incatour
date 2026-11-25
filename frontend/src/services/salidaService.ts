@@ -253,6 +253,8 @@ export type DatosCrearSalida = {
     idtransporte: number;
     personalIds: number[];
     diasCierreVenta?: number;
+    /** Precio por pasajero ajustado en la revisión; sin él se congela la tarifa de la temporada */
+    precioPorPasajero?: number;
 };
 
 type RespuestaOpcionesSalidaApi = {
@@ -836,6 +838,9 @@ export async function crearSalida(
     };
     if (datos.diasCierreVenta !== undefined) {
         cuerpo.diasCierreVenta = datos.diasCierreVenta;
+    }
+    if (datos.precioPorPasajero !== undefined) {
+        cuerpo.precioPorPasajero = datos.precioPorPasajero;
     }
 
     const respuesta = await solicitarApi<RespuestaCrearSalidaApi>("/salidas", {

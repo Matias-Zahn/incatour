@@ -82,6 +82,14 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     );
   });
 
+  it("el precio ajustado en la revisión reemplaza la tarifa que se congela; sin él rige la de la temporada", async () => {
+    await new SalidaService().crearSalida(dto({ precioPorPasajero: 850 }));
+    expect(repo.crearSalida.mock.calls[0]![0].definicionPaquete.tarifa).toMatchObject({ monto: 850 });
+    repo.crearSalida.mockClear();
+    await new SalidaService().crearSalida(dto());
+    expect(repo.crearSalida.mock.calls[0]![0].definicionPaquete.tarifa.monto).not.toBe(850);
+  });
+
   it("B3: se aceptan extras; el cupo se pide por el máximo más todo el personal (decisión 5)", async () => {
     repo.buscarPersonalLibre.mockResolvedValue([...PERSONAL, persona(11)]);
     repo.buscarPersonal.mockResolvedValue([...PERSONAL, persona(11)]);

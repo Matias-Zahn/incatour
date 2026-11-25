@@ -191,7 +191,10 @@ export class SalidaService {
         equipos: p.equipo.map((e) => e.idservicio),
         diasCierreVenta,
         rangosAlojamiento,
-        definicionPaquete: p.definicion,
+        // 12.5: se congela la tarifa de la temporada, o el precio que el admin ajustó en la revisión
+        definicionPaquete: dto.precioPorPasajero && p.definicion.tarifa
+          ? { ...p.definicion, tarifa: { ...p.definicion.tarifa, monto: dto.precioPorPasajero } }
+          : p.definicion,
       });
       const [resumen] = await this.listar([salida]);
       return { salida: resumen!, dotacion, totalLugares, advertencias };

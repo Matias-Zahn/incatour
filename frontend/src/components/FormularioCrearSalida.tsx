@@ -124,6 +124,8 @@ function FormularioCrearSalida({
     const idForm = useId();
     const [pasoActual, setPasoActual] = useState(0);
     const [opciones, setOpciones] = useState<OpcionesSalidaDto | null>(null);
+    // Precio por pasajero de la salida: vacío = la tarifa del paquete para esa temporada
+    const [precioAjustado, setPrecioAjustado] = useState("");
     const [cargandoOpciones, setCargandoOpciones] = useState(false);
     const [errorPaso, setErrorPaso] = useState("");
 
@@ -366,6 +368,7 @@ function FormularioCrearSalida({
                     tamanoMaximo: Number(valores.tamanoMaximo),
                 });
                 setOpciones(resp);
+                setPrecioAjustado(""); // otra fecha u otro paquete: vuelve a la tarifa
                 inicializarSeleccionesDesdeOpciones(resp);
                 setPasoActual(1);
             } catch (err) {
@@ -482,10 +485,17 @@ function FormularioCrearSalida({
             idtransporte: idtransporteSeleccionado,
             personalIds: personalSeleccionadoIds,
             diasCierreVenta,
+            ...(precioAjustado.trim() !== "" && precioFinal !== opciones.tarifa?.monto && { precioPorPasajero: precioFinal }),
         });
     }
 
+    // Lo que la logística elegida cuesta de más por pasajero respecto de la referencia del paquete
+    const extraLogistica = transporteElegido?.encarecePorPasajero ?? 0;
+    const precioFinal = precioAjustado.trim() === "" ? (opciones?.tarifa?.monto ?? 0) : Number(precioAjustado);
+    const precioValido = precioFinal > 0;
+
     const puedeConfirmarFinal =
+        precioValido &&
         Boolean(opciones) &&
         !cupoAutoridadInsuficiente &&
         equipoBloqueante.length === 0 &&
@@ -877,13 +887,15 @@ function FormularioCrearSalida({
                                                         <span className="ml-2 font-semibold text-peligro">
                                                             · Insuficiente para {opciones.totalLugares} lugares
                                                         </span>
+                                                    ) : trans.encarecePorPasajero ? (
+                                                        <span
+                                                            className="ml-2 text-amber-800"
+                                                            title="Cuesta más que el transporte del paquete: la diferencia por pasajero sale del margen"
+                                                        >
+                                                            · +{formatearMonto(trans.encarecePorPasajero)} por pasajero
+                                                        </span>
                                                     ) : null}
                                                 </p>
-                                                {trans.encarecePorPasajero ? (
-                                                    <p className="mt-1 font-semibold text-amber-800">
-                                                        Encarece {formatearMonto(trans.encarecePorPasajero)} por pasajero respecto del transporte del paquete: el margen baja.
-                                                    </p>
-                                                ) : null}
                                             </div>
                                         </label>
                                     );
@@ -1073,15 +1085,44 @@ function FormularioCrearSalida({
                                 </p>
                             </div>
                             <div>
-                                <span className="text-texto-suave">Tarifa congelada</span>
-                                <p className="font-semibold text-texto">
-                                    USD {opciones.tarifa.monto} / pasajero ({opciones.tarifa.temporada})
-                                </p>
+                                <label className="text-texto-suave" htmlFor="precio-salida">
+                                    Precio por pasajero (se congela al guardar)
+                                </label>
+                                <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="font-semibold text-texto">USD</span>
+                                    <input
+                                        id="precio-salida"
+                                        type="number"
+                                        min={1}
+                                        step="0.01"
+                                        value={precioAjustado === "" ? opciones.tarifa.monto : precioAjustado}
+                                        onChange={(e) => setPrecioAjustado(e.target.value)}
+                                        className="w-28 rounded-control border border-borde bg-white px-2 py-1 text-sm font-semibold text-texto outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                                    />
+                                </div>
                                 <p className="text-xs text-texto-suave">
-                                    Si se llena: {opciones.tamanoMaximo} × USD {opciones.tarifa.monto} ={" "}
-                                    <strong className="text-texto">
-                                        USD {(opciones.tamanoMaximo * opciones.tarifa.monto).toLocaleString("es-AR")}
-                                    </strong>
+                                    Tarifa del paquete: USD {opciones.tarifa.monto} ({opciones.tarifa.temporada})
+                                </p>
+                                {extraLogistica > 0 ? (
+                                    <p className="mt-1 text-xs text-amber-800">
+                                        La logística elegida cuesta {formatearMonto(extraLogistica)} más por pasajero que la referencia del paquete.{" "}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setPrecioAjustado(String(Math.round((opciones.tarifa!.monto + extraLogistica) * 100) / 100))
+                                            }
+                                            className="font-semibold text-marca underline hover:text-marca-oscura"
+                                        >
+                                            Sumar al precio
+                                        </button>
+                                    </p>
+                                ) : null}
+                                {!precioValido ? (
+                                    <p className="text-xs font-semibold text-peligro">El precio tiene que ser mayor a 0.</p>
+                                ) : null}
+                                <p className="text-xs text-texto-suave">
+                                    Si se llena: {opciones.tamanoMaximo} × {formatearMonto(precioFinal)} ={" "}
+                                    <strong className="text-texto">{formatearMonto(opciones.tamanoMaximo * precioFinal)}</strong>
                                 </p>
                             </div>
                             <div>

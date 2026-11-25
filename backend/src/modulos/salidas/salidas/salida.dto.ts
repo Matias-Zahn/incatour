@@ -64,6 +64,7 @@ export class CrearSalidaDto {
     public diasCierreVenta: number | undefined,
     public idtransporte: number = 0, // solo en el alta
     public personalIds: number[] = [],
+    public precioPorPasajero?: number, // si la logística elegida cuesta más, el admin ajusta el precio antes de vender
   ) {}
 
   public static create(obj: { [key: string]: any }, alta = false): [string | undefined, CrearSalidaDto?] {
@@ -103,7 +104,12 @@ export class CrearSalidaDto {
     }
     if (new Set(personalIds).size !== personalIds.length) return ["personalIds tiene ids repetidos"];
 
-    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta, idtransporte, personalIds)];
+    const { precioPorPasajero } = obj;
+    if (precioPorPasajero != null && (typeof precioPorPasajero !== "number" || !(precioPorPasajero > 0) || precioPorPasajero > TOPES.montoTarifa)) {
+      return [`precioPorPasajero debe ser mayor a 0 y no superar ${TOPES.montoTarifa}`];
+    }
+
+    return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta, idtransporte, personalIds, precioPorPasajero ?? undefined)];
   }
 }
 
