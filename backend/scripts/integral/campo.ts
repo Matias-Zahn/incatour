@@ -255,7 +255,8 @@ export async function campo(ctx: Ctx) {
     const a = await armar(ctx);
     await empezar(ctx, a);
     const url = `/guia/salidas/${a.idsalida}/incidentes`;
-    const datos = incidente({ pasajerosAfectados: [a.pasajeros[0]] });
+    // el portal manda la misma claveCliente en cada reintento del mismo incidente
+    const datos = { ...incidente({ pasajerosAfectados: [a.pasajeros[0]] }), claveCliente: `integral-${a.idsalida}-1` };
     const primero = await ctx.esperar("Incidente original → 201", "POST", url, datos, a.guia.token, 201);
     const reenvio = await ctx.esperar("Reenvío idéntico → 201", "POST", url, datos, a.guia.token, 201);
     ctx.controlar("Reenvío: devuelve el mismo incidente", !!primero && primero.idincidente === reenvio?.idincidente, `${primero?.idincidente} / ${reenvio?.idincidente}`);
