@@ -155,8 +155,8 @@ export default function PortalGuiaPage() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col bg-fondo">
-            {/* Barra superior / navegación */}
+        <div className="flex min-h-screen flex-col bg-[#f4f7f8] md:flex-row">
+            {/* Barra lateral / navegación */}
             <BarraLateralGuia
                 seccionActiva={seccionActiva}
                 onCambiarSeccion={manejarCambioSeccion}
@@ -165,8 +165,8 @@ export default function PortalGuiaPage() {
             />
 
             {/* Área de contenido */}
-            <main className="mx-auto w-full max-w-6xl flex-1 overflow-x-hidden px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 md:pb-8">
-                <div><LimiteDeError>
+            <main className="flex-1 overflow-x-hidden p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8">
+                <div className="mx-auto max-w-6xl"><LimiteDeError>
                     {/* Barra Superior / Contexto Global de Salida Operativa */}
                     <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-tarjeta border border-borde bg-white p-4 shadow-tarjeta">
                         <div className="flex min-w-0 items-center gap-3">

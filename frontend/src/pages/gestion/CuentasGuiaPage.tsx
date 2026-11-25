@@ -370,7 +370,7 @@ function CuentasGuiaPage() {
                                 titulo: "Acciones",
                                 renderizar: (cuenta) => (
                                     <Boton
-                                        variante="peligroSuave"
+                                        variante="peligro"
                                         className="px-3 py-1.5 text-xs"
                                         aria-label={`Dar de baja la cuenta de ${cuenta.guia.nombreCompleto}`}
                                         onClick={() => {

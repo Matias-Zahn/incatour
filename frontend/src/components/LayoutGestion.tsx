@@ -1,5 +1,6 @@
 import { Suspense, useEffect, type ReactNode } from "react";
 import EstadoListado from "./EstadoListado";
+import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
 import LimiteDeError from "./LimiteDeError";
 
@@ -14,15 +15,12 @@ function LayoutGestion({ seccion, children }: LayoutGestionProps) {
     }, [seccion]);
 
     return (
-        <div className="flex min-h-screen flex-col bg-fondo">
-            <BarraSuperior seccion={seccion} />
-            <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
-                <LimiteDeError>
-                    <Suspense fallback={<EstadoListado estado="cargando" />}>
-                        {children}
-                    </Suspense>
-                </LimiteDeError>
-            </main>
+        <div className="flex min-h-screen flex-col bg-fondo md:flex-row">
+            <BarraLateral seccionActiva={seccion} />
+            <div className="flex min-w-0 flex-1 flex-col">
+                <BarraSuperior seccion={seccion} />
+                <main className="p-8"><LimiteDeError><Suspense fallback={<EstadoListado estado="cargando" />}>{children}</Suspense></LimiteDeError></main>
+            </div>
         </div>
     );
 }
