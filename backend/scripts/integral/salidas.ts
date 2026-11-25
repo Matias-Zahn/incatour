@@ -239,6 +239,35 @@ export async function salidas(ctx: Ctx) {
     ok("B4 la salida muestra FALTA_RECURSO con el faltante", lista?.[0]?.alertas?.includes("FALTA_RECURSO") && lista[0].avisos.some((a: any) => a.alerta === "FALTA_RECURSO" && /^Faltan 1 de /.test(a.mensaje)), JSON.stringify(lista?.[0]?.avisos));
   });
 
+  await ctx.escenario("CU-39 el equipo del paquete solo se reemplaza por otro del mismo tipo", async () => {
+    const carpas = await f.equipamiento("Loc E", 10);
+    const otras = await f.equipamiento("Loc E", 10);
+    const localidad = `Loc ${ctx.unico()}`;
+    const temporadas = await db.temporada.findMany({ where: { estado: "ACTIVO" } });
+    const pq = await ctx.preparar("Paquete con equipo", "POST", "/paquetes", {
+      idcircuito: await f.circuito(), nombrePaquete: `Int ${ctx.unico()}`, tipoGarantia: "POR_CATEGORIA", localidadGarantizada: localidad,
+      categoriaGarantizada: "3 Estrellas", tipoHabitacionGarantizada: "Doble", nochesPrevias: 0, nochesPosteriores: 0,
+      idtransporte: (await f.transporte(localidad)).idservicio, equipo: [{ idservicio: carpas.idservicio, cantidad: 1, cadaPasajeros: 2 }],
+      matrizPrecios: temporadas.map((t) => ({ idtemporada: t.idtemporada, monto: 500, moneda: "USD" })),
+    });
+    const idsalida = await f.salida(ctx.idDe(pq, "idpaquete")!, proximoInicio(), 6);
+    const url = `/salidas/${idsalida}/logistica`;
+    const cantidadDe = async (id: number) => (await db.ocupacion.findFirst({ where: { idsalida, idservicio: id } }))?.cantidad;
+    for (let i = 0; i < 3; i++) await f.comprar((await f.cliente()).token, idsalida);
+
+    await ctx.esperar("CU-39 cambiar a mano la cantidad del equipo del paquete → 400", "PUT", url, { itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: carpas.idservicio, cantidad: 5 }] }, admin, 400);
+    await ctx.esperar("CU-39 quitar el equipo del paquete sin reemplazo → 400", "PUT", url, { itemsDesasignar: [{ tipo: "EQUIPAMIENTO", idservicio: carpas.idservicio }] }, admin, 400);
+    ok("CU-39 los rechazos dejaron las 2 carpas de la regla", (await cantidadDe(carpas.idservicio)) === 2);
+
+    await ctx.esperar("CU-39 reemplazar las carpas por otras del mismo tipo → 200", "PUT", url, {
+      itemsDesasignar: [{ tipo: "EQUIPAMIENTO", idservicio: carpas.idservicio }],
+      itemsNuevos: [{ tipo: "EQUIPAMIENTO", idservicio: otras.idservicio, cantidad: 1 }],
+    }, admin, 200);
+    ok("CU-39 el reemplazo toma la cantidad de la regla (3 vendidos → 2), no la del pedido", (await cantidadDe(otras.idservicio)) === 2 && (await cantidadDe(carpas.idservicio)) === undefined);
+    await f.comprar((await f.cliente()).token, idsalida, { n: 2 });
+    ok("CU-39 la compra siguiente recalcula el artículo nuevo (5 vendidos → 3)", (await cantidadDe(otras.idservicio)) === 3, `carpas ${await cantidadDe(otras.idservicio)}`);
+  });
+
   await ctx.escenario("CU-36 datos inválidos", async () => {
     const pq = await f.paquete();
     const base = await f.cuerpoSalida(pq.idpaquete, proximoInicio(), 6);
@@ -427,18 +456,21 @@ export async function salidas(ctx: Ctx) {
       panel?.puedeConfirmar === true && panel.pasajerosConfirmados === 3 && panel.dotacionRequerida?.guias === 1 && panel.dotacionRequerida?.porteadores === 2 &&
         panel.porteadoresSobrantes === 1 && panel.lugaresSobrantes === 3 && panel.bloqueoInicial === 10 && panel.transporte?.alcanza === true && panel.personal?.length === 4,
       JSON.stringify(panel));
-    const r = await ctx.esperar("CU-40 confirmar → 200", "POST", `/salidas/${m.idsalida}/asignacion`, {}, admin, 200);
+    // Decisión 5: el porteador que sobra lo elige el admin; se desasigna, no lleva permiso y su lugar se libera
+    const liberado = m.alta.porteadores[0]!;
+    await ctx.esperar("CU-40 elegir un porteador que no es de la salida → 400", "POST", `/salidas/${m.idsalida}/asignacion`, { porteadoresALiberar: [m.alta.guias[0]] }, admin, 400);
+    const r = await ctx.esperar("CU-40 confirmar liberando el porteador elegido → 200", "POST", `/salidas/${m.idsalida}/asignacion`, { porteadoresALiberar: [liberado] }, admin, 200);
     const s = await salidaDb(m.idsalida);
     ok("CU-40 salida CERRADA con stocks en 0 y nada por liberar", s.estado === "CERRADA" && s.stockLocal === 0 && s.stockLocalAlojamiento === 0 && s.lugaresPorLiberar === 0, JSON.stringify(s));
-    ok("CU-40 sobrantes liberados: lugares del bloqueo = pasajeros + personal (7)", (await lugares(m.idsalida)) === 7 && r?.lugaresLiberados === 3, `lugares ${await lugares(m.idsalida)}, informados ${r?.lugaresLiberados}`);
-    ok("CU-40 el cupo del día bajó los 3 sobrantes", ocupadosAntes - (await ocupados(m.inicio)) === 3);
+    ok("CU-40 sobrantes liberados: lugares del bloqueo = pasajeros + personal que va (6)", (await lugares(m.idsalida)) === 6 && r?.lugaresLiberados === 4 && r?.porteadoresLiberados === 1, `lugares ${await lugares(m.idsalida)}, informados ${r?.lugaresLiberados}`);
+    ok("CU-40 el cupo del día bajó los 3 pasajeros sin vender y el porteador liberado", ocupadosAntes - (await ocupados(m.inicio)) === 4);
     ok("CU-40 las plazas sobrantes vuelven al hotel (44 → 47)", (await capacidad(m.hotel!.idservicio)) === 47, `capacidad ${await capacidad(m.hotel!.idservicio)}`);
     const pp = await permisosPas(m.idsalida);
     const per = await permisosPer(m.idsalida);
     ok("CU-40 3 permisos de pasajero Emitido con número", pp.length === 3 && pp.every((x) => x.estadoTramite === "Emitido" && !!x.nroPermiso));
-    ok("CU-40 4 permisos de personal Emitido con número", per.length === 4 && per.every((x) => x.estadoTramite === "Emitido" && !!x.nroPermiso));
-    ok("CU-40 permisos vigentes ante la autoridad = lugares", (await vigentes(m.idsalida)) === 7);
-    ok("CU-40 no asigna nada: el personal y el transporte son los del alta", (await asignados(m.idsalida)).join() === [...m.alta.guias, ...m.alta.porteadores].sort((a, b) => a - b).join() && (await db.ocupacion.count({ where: { idsalida: m.idsalida, tipo: "TRANSPORTE" } })) === 1);
+    ok("CU-40 3 permisos de personal Emitido con número (sin el liberado)", per.length === 3 && per.every((x) => x.estadoTramite === "Emitido" && !!x.nroPermiso && x.idpersonal !== liberado));
+    ok("CU-40 permisos vigentes ante la autoridad = lugares", (await vigentes(m.idsalida)) === 6);
+    ok("CU-40 no asigna a nadie nuevo: queda el personal del alta menos el porteador liberado", (await asignados(m.idsalida)).join() === [...m.alta.guias, ...m.alta.porteadores].filter((id) => id !== liberado).sort((a, b) => a - b).join() && (await db.ocupacion.count({ where: { idsalida: m.idsalida, tipo: "TRANSPORTE" } })) === 1);
     const compra = f.compra(m.idsalida);
     await ctx.esperar("CU-30 comprar en una salida ya CERRADA → 400", "POST", "/reservas", compra, m.cliente.token, 400);
   });

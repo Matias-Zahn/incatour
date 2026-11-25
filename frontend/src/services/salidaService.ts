@@ -509,6 +509,8 @@ export type EquipamientoLogisticaItem = {
     tipoEquipamiento: string | null;
     cantidad: number;
     proveedor: ProveedorLogistica;
+    /** Equipo del paquete: la cantidad la calcula la regla con los vendidos; solo se reemplaza por otro del mismo tipo */
+    segunRegla?: boolean;
 };
 
 export type TransporteLogisticaItem = {
@@ -527,6 +529,8 @@ export type PanelLogistica = {
     equipamiento: EquipamientoLogisticaItem[];
     transporte: TransporteLogisticaItem | null;
     requerimientosSinAsignar: string[];
+    /** El paquete fija el equipo: no se agregan artículos sueltos */
+    equipoDelPaquete?: boolean;
 };
 
 type RespuestaPanelLogisticaApi = {

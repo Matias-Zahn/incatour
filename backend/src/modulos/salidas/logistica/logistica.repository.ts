@@ -4,6 +4,8 @@ import { hoyUTC } from "../../../shared/fechas";
 import { ESTADO, ESTADO_RESERVA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { rangosDe } from "../../../shared/ocupacion";
 import { bloquearServicio, disponible, disponibles, liberar, ocupacionesDe, ocupar } from "../../../shared/ocupacion.repository";
+import { necesidad, ReglaEquipo } from "../../../shared/equipo";
+import { DefinicionPaquete } from "../../../shared/definicionPaquete";
 import { ItemDesasignar, ItemNuevo } from "./logistica.dto";
 
 /** Regla de negocio violada dentro de la transacción: provoca el rollback y se informa como 400. */
@@ -22,6 +24,9 @@ interface SalidaFechas {
   fechaInicio: Date;
   fechaFin: Date;
   limites: LimitesPaquete;
+  /** El equipo con regla de la copia del paquete: su cantidad la calcula la venta, acá solo se reemplaza por otro del mismo tipo */
+  reglas: ReglaEquipo[];
+  definicion: DefinicionPaquete | null;
 }
 
 export class LogisticaRepository {
@@ -45,6 +50,7 @@ export class LogisticaRepository {
         estado: true,
         fechaInicio: true,
         fechaFin: true,
+        definicionPaquete: true,
         ocupaciones: {
           where: { tipo: { in: [TIPO_SERVICIO.EQUIPAMIENTO, TIPO_SERVICIO.TRANSPORTE] } },
           select: {
@@ -85,13 +91,19 @@ export class LogisticaRepository {
     const equipos = await db.servicioBase.findMany({
       where: {
         estado: ESTADO.ACTIVO, proveedor: { estado: ESTADO.ACTIVO }, equipamiento: { isNot: null },
-        ...(salida.limites.equipos && { idservicio: { in: salida.limites.equipos } }),
+        // Con equipo del paquete se ofrecen los del mismo tipo, para reemplazarlo
+        ...(salida.limites.equipos && { equipamiento: { is: { tipoEquipamiento: { in: await this.tiposDe(salida.limites.equipos) } } } }),
       },
       include: { proveedor: { select: { idproveedor: true, razonSocial: true } }, equipamiento: true },
       orderBy: { nombreServicio: "asc" },
     });
     const libres = await disponibles(db, equipos, rangosDe(TIPO_SERVICIO.EQUIPAMIENTO, salida));
     return equipos.map((e) => ({ ...e, disponible: libres.get(e.idservicio)! })).filter((e) => e.disponible > 0);
+  }
+
+  private async tiposDe(ids: number[]) {
+    const filas = await db.servicioEquipamiento.findMany({ where: { idservicio: { in: ids } }, select: { tipoEquipamiento: true } });
+    return [...new Set(filas.map((f) => f.tipoEquipamiento))];
   }
 
   // 12.4: lugares son los pasajeros más el personal
@@ -136,6 +148,7 @@ export class LogisticaRepository {
           }
 
           const antes = await this.instantanea(tx, idsalida);
+          const reemplazos = await this.reemplazosDeEquipo(tx, p.salida, p.itemsDesasignar, p.itemsNuevos);
 
           // 1. Desasignar: A1, borrar la ocupación alcanza; lo liberado vuelve solo por fecha
           for (const item of p.itemsDesasignar) {
@@ -148,10 +161,21 @@ export class LogisticaRepository {
           // 2. Asignar, en orden de id: dos modificaciones con los mismos servicios los bloquean en el mismo orden
           for (const item of [...p.itemsNuevos].sort((a, b) => a.idservicio - b.idservicio)) {
             if (item.tipo === TIPO_SERVICIO.EQUIPAMIENTO) {
-              await this.asignarEquipamiento(tx, p.salida, item);
+              const regla = reemplazos.get(item.idservicio);
+              // El reemplazo hereda la regla: su cantidad es la que piden los vendidos, como la recalcula cada compra
+              await this.asignarEquipamiento(tx, p.salida, regla ? { ...item, cantidad: necesidad(reemplazos.vendidos, regla) } : item, !!regla);
             } else {
               await this.asignarTransporte(tx, p.salida, p.lugares, item);
             }
+          }
+
+          // La copia del paquete pasa a apuntar al artículo nuevo, así la compra y la confirmación siguen su regla
+          if (reemplazos.size && p.salida.definicion) {
+            const servicios = p.salida.definicion.servicios.map((s) => {
+              const nuevo = [...reemplazos.entries()].find(([, r]) => r.idservicio === s.idservicio);
+              return nuevo && s.tipo === TIPO_SERVICIO.EQUIPAMIENTO ? { ...s, idservicio: nuevo[0], nombreServicio: reemplazos.nombres.get(nuevo[0])! } : s;
+            });
+            await tx.salida.update({ where: { idsalida }, data: { definicionPaquete: { ...p.salida.definicion, servicios } } });
           }
 
           // 3. Auditoría: antes y después, con el motivo opcional
@@ -175,7 +199,44 @@ export class LogisticaRepository {
   }
 
   // ---------- internos (dentro de la transacción) ----------
-  private async asignarEquipamiento(tx: Cliente, salida: SalidaFechas, item: ItemNuevo) {
+  /**
+   * Con equipo del paquete, CU-39 solo lo reemplaza por otro del mismo tipo (quitar uno y poner otro en la misma operación).
+   * No se quita sin reemplazo ni se le cambia la cantidad a mano: la cantidad sale de la regla y la recalcula cada compra.
+   * Devuelve, por cada artículo nuevo, la regla que hereda.
+   */
+  private async reemplazosDeEquipo(tx: Cliente, salida: SalidaFechas, desasignar: ItemDesasignar[], nuevos: ItemNuevo[]) {
+    const reemplazos = Object.assign(new Map<number, ReglaEquipo>(), { vendidos: 0, nombres: new Map<number, string>() });
+    if (!salida.reglas.length) return reemplazos;
+    const esEquipo = (i: { tipo: string }) => i.tipo === TIPO_SERVICIO.EQUIPAMIENTO;
+    const regla = (id: number) => salida.reglas.find((r) => r.idservicio === id);
+    const ids = [...desasignar.filter(esEquipo), ...nuevos.filter(esEquipo)].map((i) => i.idservicio);
+    const tipos = new Map(
+      (await tx.servicioBase.findMany({ where: { idservicio: { in: ids } }, select: { idservicio: true, nombreServicio: true, equipamiento: { select: { tipoEquipamiento: true } } } }))
+        .map((s) => [s.idservicio, s])
+    );
+    for (const n of nuevos.filter(esEquipo)) {
+      const r = regla(n.idservicio);
+      if (r) throw new ReglaLogisticaViolada(`La cantidad de "${r.nombreServicio}" la calcula la regla del paquete según los vendidos: no se cambia a mano.`);
+    }
+    const sinPareja = [...nuevos.filter(esEquipo)];
+    for (const d of desasignar.filter(esEquipo)) {
+      const r = regla(d.idservicio);
+      if (!r) continue;
+      const tipo = tipos.get(d.idservicio)?.equipamiento?.tipoEquipamiento;
+      const i = sinPareja.findIndex((n) => tipos.get(n.idservicio)?.equipamiento?.tipoEquipamiento === tipo);
+      if (i < 0) throw new ReglaLogisticaViolada(`"${r.nombreServicio}" lo exige el paquete: se puede reemplazar por otro del mismo tipo, no quitar.`);
+      const [nuevo] = sinPareja.splice(i, 1);
+      reemplazos.set(nuevo!.idservicio, r);
+      reemplazos.nombres.set(nuevo!.idservicio, tipos.get(nuevo!.idservicio)!.nombreServicio);
+    }
+    if (sinPareja.length) {
+      throw new ReglaLogisticaViolada("El equipo de esta salida lo fija el paquete: solo se puede reemplazar un artículo por otro del mismo tipo.");
+    }
+    reemplazos.vendidos = await tx.reservaPasajero.count({ where: { reserva: { idsalida: salida.idsalida, estado: ESTADO_RESERVA.CONFIRMADA } } });
+    return reemplazos;
+  }
+
+  private async asignarEquipamiento(tx: Cliente, salida: SalidaFechas, item: ItemNuevo, esReemplazo = false) {
     const cantidad = item.cantidad as number;
     const servicio = await tx.servicioBase.findUnique({
       where: { idservicio: item.idservicio },
@@ -184,7 +245,7 @@ export class LogisticaRepository {
     if (!servicio || !servicio.equipamiento) {
       throw new ReglaLogisticaViolada(`El servicio ${item.idservicio} no existe o no es de equipamiento.`);
     }
-    if (salida.limites.equipos && !salida.limites.equipos.includes(item.idservicio)) {
+    if (!esReemplazo && salida.limites.equipos && !salida.limites.equipos.includes(item.idservicio)) {
       throw new ReglaLogisticaViolada(`"${servicio.nombreServicio}" no es parte del equipo del paquete.`);
     }
     if (servicio.estado !== ESTADO.ACTIVO || servicio.proveedor.estado !== ESTADO.ACTIVO) {

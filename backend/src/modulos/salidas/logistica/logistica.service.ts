@@ -100,11 +100,12 @@ export class LogisticaService {
       equipos: def && reglasEquipo(def).length ? reglasEquipo(def).map((r) => r.idservicio) : null,
       costoMaxTransporte: idtransporte ? await this.repository.costoDe(idtransporte) : null,
     };
-    return { ...resto, limites };
+    return { ...resto, limites, reglas: def ? reglasEquipo(def) : [], definicion: def };
   }
 
   private formatearPanel(panel: Panel) {
     const transporte = panel.ocupaciones.find((o) => o.tipo === TIPO_SERVICIO.TRANSPORTE) ?? null;
+    const reglas = reglasEquipo(panel.definicionPaquete as DefinicionPaquete | null);
     return {
       idsalida: panel.idsalida,
       nroSalida: panel.nroSalida,
@@ -117,7 +118,10 @@ export class LogisticaService {
         tipoEquipamiento: e.servicio.equipamiento?.tipoEquipamiento ?? null,
         cantidad: e.cantidad,
         proveedor: e.servicio.proveedor,
+        // Con regla del paquete: la cantidad la calcula la venta; solo se reemplaza por otro del mismo tipo
+        segunRegla: reglas.some((r) => r.idservicio === e.servicio.idservicio),
       })),
+      equipoDelPaquete: reglas.length > 0,
       transporte: transporte
         ? {
             idservicio: transporte.servicio.idservicio,
