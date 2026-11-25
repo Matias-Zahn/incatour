@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: inicio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Muestra de identidad aplicada al inicio del cliente en escritorio. No es el wireframe final. */
+  :root {
+    --algodon:#FFFFFF; --indigo:#232850; --indigo-2:#4B5170; --cochinilla:#A3123A; --qolle:#E8A817; --chilca:#2F6B2C;
+    --piedra:#E9E6DF; --piedra-2:#B9B2A4; --linea:#E1E2EC; --espera:#8A5F00;
+    --f-titulo:"Alegreya", serif; --f-texto:"Alegreya Sans", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--algodon); color: var(--indigo); font: 18px/1.55 var(--f-texto); }
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+  .solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.1; margin: 0; }
+  .cifra, .fecha, .desde b, .lugares { font-variant-numeric: lining-nums tabular-nums; }
+  .ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+  @media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 26px; border-radius: 6px; border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+  .btn:hover { background: #870E30; }
+  .btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; padding: 0 18px; font-weight: 700; font-size: 16px; }
+  .btn-sec:hover { background: #F2F2F7; }
+  .estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+  .estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+  .listo { color: var(--chilca); } .espera { color: var(--espera); }
+
+  /* Portada a todo color: cada circuito trae su tinte de fondo (índigo, cochinilla, chilca) */
+  .hero { position: relative; overflow: hidden; padding-top: 80px; color: #fff; background: var(--tono, var(--indigo)); transition: background-color .5s ease; }
+  .cab, .control, .diapo > div { position: relative; z-index: 2; }
+  /* El tinte vive en <body data-tono="...">, para que lo compartan el encabezado y la portada */
+  [data-tono="indigo"] { --tono: #232850; }
+  [data-tono="cochinilla"] { --tono: #8C1032; }
+  [data-tono="chilca"] { --tono: #27592A; }
+  .hero a:focus-visible, .hero button:focus-visible, .sitio a:focus-visible, .sitio button:focus-visible { outline-color: var(--qolle); }
+
+  /* Salto al contenido: aparece solo al recibir el foco */
+  .saltar { position: absolute; left: 16px; top: -80px; z-index: 10; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+  .saltar:focus { top: 12px; }
+
+  /* El encabezado queda fuera de <main> y se apoya sobre la portada */
+  .sitio { position: absolute; top: 0; left: 0; right: 0; z-index: 3; color: #fff; }
+
+  .cab { display: flex; justify-content: space-between; align-items: center; min-height: 80px; }
+  .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 28px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+  .nav { display: flex; gap: 8px; align-items: center; }
+  .enlaces { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .menu-btn { display: none; font: inherit; font-weight: 700; color: #fff; background: none; border: 2px solid rgba(255,255,255,.6); border-radius: 6px; min-height: 44px; padding: 0 14px; cursor: pointer; }
+  .nav a { text-decoration: none; font-weight: 500; padding: 10px 14px; border-radius: 6px; min-height: 44px; display: inline-flex; align-items: center; }
+  .nav a:hover { background: rgba(255,255,255,.12); }
+  .nav .ingresar { border: 2px solid #fff; font-weight: 700; }
+  /* En celular (y con zoom al 200 %) los enlaces pasan a un menú desplegable: no se pierden */
+  @media (max-width: 700px) {
+    .cab { min-height: 72px; }
+    .hero { padding-top: 72px; }
+    .menu-btn { display: inline-flex; align-items: center; }
+    .enlaces { display: none; position: absolute; top: 64px; left: 20px; right: 20px; flex-direction: column; gap: 0; background: var(--tono); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .enlaces.abierta { display: flex; }
+    .enlaces a { width: 100%; }
+  }
+
+  /* Carrusel: se pasa con las flechas o con los nombres; no avanza solo */
+  /* Los nombres y las flechas van arriba, para que se vean sin bajar */
+  /* Solo margen vertical: el lateral lo pone .ancho */
+  .carrusel { padding-top: 8px; padding-bottom: 48px; }
+  .carrusel .control { margin: 0 0 28px; }
+  .nombres { order: 0; } .flecha { order: 2; }
+  .diapo { display: grid; grid-template-columns: minmax(0, 560px); align-content: end; }
+  .diapo[hidden] { display: none; }
+  /* Se anima el texto con desplazamiento y la foto solo con opacidad */
+  .diapo.entra > div { animation: entra .45s ease both; }
+  @keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes entra { from { opacity: 0; transform: translateX(var(--desde, 24px)); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .diapo.entra > div { animation: none; } .hero { transition: none; } }
+  .diapo h2 { font-size: clamp(40px, 4.4vw, 58px); font-weight: 800; letter-spacing: -0.01em; }
+  .datos { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 22px 0 0; padding: 0; list-style: none; }
+  .datos li { font-size: 15px; color: #fff; }
+  .datos li b { display: block; font-size: 30px; font-weight: 800; line-height: 1.1; color: #fff; }
+  .diapo .estado { margin-top: 20px; color: #fff; }
+  /* Fecha sin confirmar: se informa solo la fecha, sin estado */
+  .proxima { margin: 20px 0 0; font-weight: 700; font-size: 16px; }
+  .circuito .proxima { margin-top: 10px; font-size: 15px; color: var(--indigo-2); font-weight: 500; }
+  .diapo .estado.listo::before { background: #9BD49A; }
+  .diapo .estado.espera::before { background: var(--qolle); }
+  .acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 18px; }
+  .acciones .btn { background: #fff; color: var(--indigo); }
+  .precio-hero { margin: 0; font-size: 15px; color: #fff; }
+  .cancela { margin: 16px 0 0; font-size: 15px; font-weight: 700; color: #fff; }
+  .precio-hero b { display: block; font-size: 28px; font-weight: 800; color: #fff; line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; }
+  .acciones .btn:hover { background: #F2F2F7; }
+  .control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid rgba(255,255,255,.2); padding-bottom: 12px; }
+  /* Relleno sólido con el tinte: se ven igual sobre nieve, cielo o selva */
+  .flecha { width: 52px; height: 52px; border-radius: 50%; border: 2px solid #fff; background: var(--tono); box-shadow: 0 2px 10px rgba(0,0,0,.35); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .flecha:hover { background: #fff; color: var(--tono); }
+  .flecha[data-paso="-1"] { margin-left: auto; }
+  .flecha svg { width: 22px; height: 22px; }
+  .nombres { display: flex; gap: 4px; flex-wrap: wrap; }
+  .nombres button { font: inherit; font-size: 16px; font-weight: 700; color: rgba(255,255,255,.75); background: none; border: 0; border-bottom: 3px solid transparent; min-height: 44px; padding: 0 10px; cursor: pointer; }
+  .nombres button[aria-current="true"] { color: #fff; border-bottom-color: var(--qolle); }
+
+  /* En celular: los nombres en una línea y, debajo, las flechas */
+  @media (max-width: 700px) {
+    .nombres { flex-basis: 100%; }
+  }
+
+
+  /* ===== Versión B: foto a sangre y el nombre del circuito detrás de la montaña ===== */
+  /* Fondo neutro y oscuro: si una foto tarda, no aparece un bloque de color pleno */
+  .hero-b { padding-top: 0; min-height: max(660px, min(100svh, 920px)); display: flex; flex-direction: column; justify-content: flex-end; background: #14172A; transition: none; isolation: isolate; }
+  /* La diapositiva que sale deja su foto debajo de la nueva, sin texto */
+  .hero-b .diapo.saliendo { display: block; }
+  .hero-b .diapo.saliendo > .escena { z-index: -1; animation: none; }
+  .hero-b .diapo.saliendo > .texto { display: none; }
+  /* Ancho completo de .ancho: si no, el carrusel se achica a su contenido y se corre entre diapositivas */
+  .hero-b .carrusel { width: 100%; padding-top: 160px; padding-bottom: 28px; }
+  .hero-b .carrusel .control { margin: 28px 0 0; border-bottom: 0; border-top: 1px solid rgba(255,255,255,.25); padding: 14px 0 0; }
+  .hero-b .diapo { display: block; }
+  .hero-b .diapo[hidden] { display: none; }
+  .hero-b .diapo > .escena { position: absolute; inset: 0; z-index: 0; }
+  .escena svg { display: block; width: 100%; height: 100%; }
+  /* Sombra neutra en la franja del texto y un halo suave, sin bordes, solo detrás del bloque de texto, con un toque del tinte del circuito: la foto manda */
+  .escena::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to top, rgba(10,12,22,.78) 0%, rgba(10,12,22,.55) 24%, rgba(10,12,22,.18) 46%, transparent 62%),
+                linear-gradient(to top, color-mix(in srgb, var(--tono) 40%, transparent) 0%, transparent 28%),
+                linear-gradient(to bottom, rgba(0,0,0,.35) 0%, transparent 16%),
+                radial-gradient(ellipse 48% 40% at 24% 74%, rgba(10,12,22,.45) 0%, rgba(10,12,22,.2) 55%, transparent 100%); }
+  .hero-b .texto, .hero-b .control { text-shadow: 0 1px 14px rgba(0,0,0,.5); }
+  /* Columnas fijas: el precio y el botón quedan en el mismo lugar en las tres diapositivas */
+  .hero-b .texto { position: relative; z-index: 2; max-width: 1000px; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 56px; align-items: end; }
+  .hero-b .texto h2 { grid-column: 1 / -1; }
+  .hero-b .texto .acciones { grid-column: 2; grid-row: 2; margin-top: 0; flex-wrap: nowrap; }
+  .hero-b .texto .estado, .hero-b .texto .proxima { grid-column: 1; grid-row: 3; margin-bottom: 0; }
+  .hero-b .texto .cancela { grid-column: 2; grid-row: 3; }
+  @media (max-width: 900px) { .hero-b .texto { display: block; } .hero-b .texto .acciones { margin-top: 18px; } }
+  /* text-4xl del 04. Tres líneas reservadas: el bloque no cambia de alto entre diapositivas y los nombres no saltan */
+  .hero-b .diapo h2 { font-size: 38px; line-height: 1.1; max-width: 26ch; min-height: 3.3em; text-wrap: balance; }
+  .hero-b .diapo.entra > .escena { animation: aparece .7s ease both; }
+  .hero-b .diapo.entra > .texto { animation: entra .45s ease both; }
+  /* El nombre gigante: vive dentro del SVG, así queda pegado a la foto en cualquier tamaño */
+  .nombre-gigante { font-family: "Alegreya", serif; font-weight: 800; fill: #fff; letter-spacing: .02em; }
+  /* Tamaño y altura medidos para que la montaña tape como mucho un cuarto de cada letra */
+  .ng-mp { font-size: 430px; } .ng-hu { font-size: 202px; } .ng-la { font-size: 202px; }
+  /* CAMINO INCA es largo: va centrado y se achica por tramos para no cortarse contra el borde */
+  /* El centro va corrido a la izquierda: a la derecha está el Huayna Picchu, que taparía la última A */
+  .ng-mp { text-anchor: middle; font-size: 360px; transform: translateX(1420px); }
+  @media (max-width: 1399px) { .ng-mp { font-size: 320px; transform: translateX(1520px); } }
+  @media (max-width: 1199px) { .ng-mp { font-size: 280px; transform: translateX(1670px); } }
+  @media (max-width: 900px) { .ng-mp { font-size: 270px; transform: translateX(1870px); } .ng-hu { font-size: 170px; } .ng-la { transform: translateX(-300px); } }
+  /* En celular la foto va arriba, a sangre y con alto fijo, con el nombre detrás de la cresta.
+     El encabezado va sobre el tinte, no sobre la foto, para que el nombre tenga cielo libre.
+     Debajo, sobre el tinte del circuito, van los nombres y el texto: se leen sin depender de la foto.
+     Sin flechas: los nombres ya son los botones y se puede deslizar.
+     Medidas del nombre calculadas para que la cresta tape entre un 7 y un 21 % de la letra, como mucho la mitad. Cada diapositiva se abre (display: contents)
+     para que la foto, los controles y el texto entren en una misma grilla. */
+  @media (max-width: 700px) {
+    .hero-b { min-height: 0; padding-top: 72px; background: var(--tono); }
+    .hero-b .carrusel { display: grid; padding-top: 0; padding-bottom: 32px; }
+    .hero-b .diapo { display: contents; }
+    .hero-b .diapo[hidden] { display: none; }
+    .hero-b .diapo.saliendo { display: contents; }
+    .hero-b .diapo > .escena { position: relative; grid-row: 1; grid-column: 1; height: 360px; margin: 0 -20px; z-index: 1; }
+    .hero-b .diapo.saliendo > .escena { z-index: 0; }
+    .hero-b .carrusel .control { grid-row: 2; margin: 0 0 20px; }
+    .hero-b .flecha { display: none; }
+    .hero-b .diapo > .texto { grid-row: 3; }
+    .hero-b .texto, .hero-b .control { text-shadow: none; }
+    .escena::after { background: linear-gradient(to top, var(--tono) 0%, transparent 30%), linear-gradient(to bottom, rgba(0,0,0,.45) 0%, transparent 28%); }
+    .hero-b .diapo h2 { font-size: 30px; min-height: 0; }
+    .hero-b .datos { gap: 8px 20px; }
+    .hero-b .datos li b { font-size: 26px; }
+    .ng-mp, .ng-hu, .ng-la { text-anchor: middle; }
+    .ng-mp { font-size: 310px; transform: translate(1870px, 170px); }
+    .ng-hu { font-size: 170px; transform: translate(0, 20px); }
+    .ng-la { font-size: 380px; transform: translate(-520px, 80px); }
+  }
+  @media (max-width: 360px) { .ng-mp { font-size: 275px; } .ng-hu { font-size: 150px; } .ng-la { font-size: 340px; } }
+  /* Si la foto todavía no llegó, el nombre no se dibuja sobre el fondo vacío */
+  .js .escena .nombre-gigante { transition: opacity .4s ease; }
+  .js .escena:not(.lista) .nombre-gigante { opacity: 0; }
+
+  /* La faja tejida cierra la portada como el borde de un aguayo. Va solo acá. */
+  .faja { display: block; width: 100%; height: 26px; }
+
+  /* Circuitos: una fila por circuito, con sus andenes como dato */
+  .seccion { padding: 72px 0; }
+  /* Las secciones alternan fondo: algodón, un índigo muy claro y el índigo pleno para las reseñas */
+  .seccion.tinte { background: #ECEDF5; }
+  .seccion.tinte .salida { border-color: #D3D5E6; }
+  /* Las reseñas son una tarjeta índigo que flota sobre el fondo claro: se separan del pie */
+  .tarjeta-resenas { background: var(--indigo); color: #fff; border-radius: 16px; padding: 56px; overflow: hidden; box-shadow: 0 18px 40px rgba(35,40,80,.18); }
+  @media (max-width: 700px) { .tarjeta-resenas { padding: 32px 24px; border-radius: 12px; } }
+  /* Trama de piedra encajada: juntas de mampostería poligonal en línea fina, módulo de 800 px con cada piedra distinta.
+     Solo en las reseñas: se apaga de abajo hacia arriba hasta la mitad del bloque. */
+  .tarjeta-resenas { position: relative; isolation: isolate; }
+  .tarjeta-resenas::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='800' fill='none' stroke='white' stroke-opacity='.1' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M65 17 L51 20 M51 20 L22 58 M65 17 L97 13 M97 13 L119 -8 M119 -8 L190 59 M190 59 L177 57 M97 13 L104 90 M104 90 L39 84 M39 84 L51 20 M190 59 L145 109 M145 109 L104 90 M191 147 L151 162 M151 162 L145 109 M39 84 L-7 112 M104 90 L105 179 M105 179 L35 158 M35 158 L-7 112 M35 158 L53 215 M105 179 L153 200 M105 179 L151 162 M53 215 L64 214 M64 214 L7 239 M53 215 L108 239 M108 239 L153 200 M153 200 L177 252 M177 252 L183 248 M108 239 L96 309 M96 309 L53 297 M53 297 L64 214 M177 252 L165 300 M165 300 L96 309 M217 327 L158 326 M158 326 L165 300 M53 297 L3 337 M96 309 L123 352 M123 352 L41 345 M41 345 L3 337 M41 345 L48 399 M123 352 L143 392 M123 352 L158 326 M48 399 L56 428 M56 428 L-1 477 M48 399 L87 426 M87 426 L143 392 M143 392 L151 455 M151 455 L177 453 M87 426 L78 478 M78 478 L25 500 M25 500 L56 428 M151 455 L170 512 M170 512 L78 478 M209 535 L188 534 M188 534 L170 512 M25 500 L5 540 M78 478 L98 565 M98 565 L78 573 M78 573 L5 540 M78 573 L60 600 M98 565 L164 576 M98 565 L188 534 M60 600 L51 640 M51 640 L13 675 M60 600 L125 611 M125 611 L164 576 M164 576 L158 639 M158 639 L216 649 M125 611 L110 713 M110 713 L7 683 M7 683 L51 640 M158 639 L184 667 M184 667 L110 713 M188 754 L182 726 M182 726 L184 667 M7 683 L-12 728 M110 713 L101 743 M101 743 L45 736 M45 736 L-12 728 M45 736 L65 817 M101 743 L119 792 M101 743 L182 726 M268 -16 L228 58 M228 58 L177 57 M268 -16 L312 10 M312 10 L330 20 M330 20 L383 35 M383 35 L414 60 M312 10 L304 78 M304 78 L232 86 M232 86 L228 58 M383 35 L344 95 M344 95 L304 78 M408 153 L392 164 M392 164 L344 95 M232 86 L191 147 M304 78 L311 164 M311 164 L278 149 M278 149 L191 147 M278 149 L276 187 M311 164 L345 184 M311 164 L392 164 M276 187 L258 230 M258 230 L183 248 M276 187 L282 217 M282 217 L345 184 M345 184 L351 237 M351 237 L389 273 M282 217 L305 307 M305 307 L226 275 M226 275 L258 230 M351 237 L362 284 M362 284 L305 307 M411 344 L387 346 M387 346 L362 284 M226 275 L217 327 M305 307 L334 373 M334 373 L247 345 M247 345 L217 327 M247 345 L269 403 M334 373 L338 390 M334 373 L387 346 M269 403 L244 411 M244 411 L177 453 M269 403 L327 435 M327 435 L338 390 M338 390 L379 421 M379 421 L379 446 M327 435 L277 488 M277 488 L229 478 M229 478 L244 411 M379 421 L364 481 M364 481 L277 488 M402 537 L393 531 M393 531 L364 481 M229 478 L209 535 M277 488 L337 579 M337 579 L250 575 M250 575 L209 535 M250 575 L273 594 M337 579 L358 624 M337 579 L393 531 M273 594 L237 642 M237 642 L216 649 M273 594 L290 630 M290 630 L358 624 M358 624 L394 652 M394 652 L385 644 M290 630 L297 682 M297 682 L223 697 M223 697 L237 642 M394 652 L337 683 M337 683 L297 682 M386 736 L391 744 M391 744 L337 683 M223 697 L188 754 M297 682 L319 760 M319 760 L235 778 M235 778 L188 754 M235 778 L268 784 M319 760 L330 820 M319 760 L391 744 M478 3 L420 19 M420 19 L414 60 M478 3 L515 15 M515 15 L556 15 M556 15 L546 54 M546 54 L613 59 M515 15 L516 115 M516 115 L430 111 M430 111 L420 19 M546 54 L540 92 M540 92 L516 115 M610 136 L591 172 M591 172 L540 92 M430 111 L408 153 M516 115 L527 143 M527 143 L458 146 M458 146 L408 153 M458 146 L457 209 M527 143 L544 191 M527 143 L591 172 M457 209 L428 248 M428 248 L389 273 M457 209 L488 240 M488 240 L544 191 M544 191 L577 223 M577 223 L607 238 M488 240 L487 277 M487 277 L448 302 M448 302 L428 248 M577 223 L548 301 M548 301 L487 277 M597 347 L562 343 M562 343 L548 301 M448 302 L411 344 M487 277 L500 361 M500 361 L479 383 M479 383 L411 344 M479 383 L476 403 M500 361 L521 409 M500 361 L562 343 M476 403 L446 453 M446 453 L379 446 M476 403 L515 424 M515 424 L521 409 M521 409 L566 438 M566 438 L624 440 M515 424 L501 496 M501 496 L421 501 M421 501 L446 453 M566 438 L573 501 M573 501 L501 496 M578 548 L588 559 M588 559 L573 501 M421 501 L402 537 M501 496 L530 556 M530 556 L453 582 M453 582 L402 537 M453 582 L476 580 M530 556 L531 589 M530 556 L588 559 M476 580 L446 652 M446 652 L385 644 M476 580 L502 632 M502 632 L531 589 M531 589 L588 616 M588 616 L578 645 M502 632 L511 701 M511 701 L422 692 M422 692 L446 652 M588 616 L537 666 M537 666 L511 701 M585 729 L582 739 M582 739 L537 666 M422 692 L386 736 M511 701 L516 757 M516 757 L459 783 M459 783 L386 736 M459 783 L478 803 M516 757 L556 815 M516 757 L582 739 M680 4 L659 48 M659 48 L613 59 M680 4 L685 49 M685 49 L718 -21 M718 -21 L759 57 M759 57 L822 58 M685 49 L697 93 M697 93 L643 99 M643 99 L659 48 M759 57 L746 75 M746 75 L697 93 M793 112 L754 169 M754 169 L746 75 M643 99 L610 136 M697 93 L737 153 M737 153 L647 142 M647 142 L610 136 M647 142 L650 180 M737 153 L747 199 M737 153 L754 169 M650 180 L662 215 M662 215 L607 238 M650 180 L708 231 M708 231 L747 199 M747 199 L749 258 M749 258 L807 239 M708 231 L699 279 M699 279 L621 272 M621 272 L662 215 M749 258 L748 271 M748 271 L699 279 M803 337 L762 346 M762 346 L748 271 M621 272 L597 347 M699 279 L717 347 M717 347 L653 337 M653 337 L597 347 M653 337 L664 409 M717 347 L730 378 M717 347 L762 346 M664 409 L617 416 M617 416 L624 440 M664 409 L694 437 M694 437 L730 378 M730 378 L780 421 M780 421 L799 477 M694 437 L713 521 M713 521 L646 516 M646 516 L617 416 M780 421 L780 511 M780 511 L713 521 M805 540 L766 547 M766 547 L780 511 M646 516 L578 548 M713 521 L741 579 M741 579 L636 537 M636 537 L578 548 M636 537 L668 622 M741 579 L744 594 M741 579 L766 547 M668 622 L645 621 M645 621 L578 645 M668 622 L698 624 M698 624 L744 594 M744 594 L787 662 M787 662 L813 675 M698 624 L697 720 M697 720 L628 709 M628 709 L645 621 M787 662 L765 670 M765 670 L697 720 M788 728 L767 748 M767 748 L765 670 M628 709 L585 729 M697 720 L722 785 M722 785 L669 744 M669 744 L585 729 M669 744 L680 804 M722 785 L718 779 M722 785 L767 748 M97 813 L119 792 M119 792 L190 859 M839 84 L793 112 M835 158 L793 112 M856 428 L799 477 M807 683 L788 728 M845 736 L788 728 M45 -64 L65 17 M268 784 L228 858 M268 784 L312 810 M319 -40 L330 20 M459 -17 L478 3 M516 -43 L556 15 M685 849 L718 779 M718 779 L759 857 M-41 57 L22 58 M-51 258 L7 239 M3 337 L-38 346 M5 540 L-34 547 M-13 662 L13 675 M669 -56 L680 4'/%3E%3C/svg%3E"); background-size: 560px 560px; background-position: left bottom; }
+  .tarjeta-resenas::before { -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 55%); mask-image: linear-gradient(to top, #000 0%, transparent 55%); }
+  .tarjeta-resenas .resena footer { color: #D5D8EE; }
+  .tarjeta-resenas .estrellas { color: var(--qolle); }
+  .tarjeta-resenas a:focus-visible { outline-color: var(--qolle); }
+  .seccion > .ancho > h2, .tarjeta-resenas > h2 { font-size: 38px; font-weight: 800; }
+  h2.solo { margin-bottom: 32px; }
+  .seccion > .ancho > p.bajada { margin: 8px 0 32px; color: var(--indigo-2); max-width: 60ch; text-wrap: pretty; }
+  .circuito { display: grid; grid-template-columns: 200px 1fr 260px 180px; gap: 32px; align-items: center; padding: 28px 0; border-top: 1px solid var(--linea); }
+  .circuito:last-child { border-bottom: 1px solid var(--linea); }
+  .circuito img.mini { display: block; width: 100%; height: 140px; object-fit: cover; border-radius: 6px; background: var(--piedra); }
+  .circuito h3 { font-size: 34px; font-weight: 800; }
+  .circuito h3 a { text-decoration: none; }
+  .circuito h3 a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .circuito p { margin: 6px 0 0; color: var(--indigo-2); font-size: 17px; }
+  .circuito .estado { margin-top: 10px; font-size: 15px; color: var(--chilca); }
+  .circuito .calif { margin-top: 10px; font-size: 15px; }
+  .circuito .calif b { color: var(--indigo); }
+  .andenes { display: grid; align-items: end; gap: 3px; height: 92px; }
+  .anden { background: var(--piedra); border-top: 3px solid #8E8676; border-radius: 2px 2px 0 0; }
+  .anden.alto { background: var(--indigo); border-top-color: var(--qolle); }
+  .andenes-pie { display: flex; justify-content: space-between; font-size: 14px; color: var(--indigo-2); margin-top: 6px; }
+  .andenes-pie b { color: var(--indigo); }
+  .desde { margin: 0 0 12px; font-size: 15px; color: var(--indigo-2); }
+  .desde b { display: block; font-size: 28px; color: var(--indigo); line-height: 1.1; }
+  @media (max-width: 1000px) {
+    .circuito { grid-template-columns: 140px 1fr; gap: 16px 24px; }
+    .circuito .col-andenes, .circuito .col-precio { grid-column: 2; }
+  }
+  @media (max-width: 560px) {
+    .circuito { grid-template-columns: 1fr; }
+    .circuito .col-andenes, .circuito .col-precio { grid-column: 1; }
+    .circuito img.mini { height: 180px; }
+  }
+
+  /* Próximas salidas: para quien ya tiene fecha */
+  .salidas { list-style: none; margin: 0; padding: 0; }
+  .salida { display: grid; grid-template-columns: 110px 1fr 220px 140px auto; gap: 24px; align-items: center; padding: 18px 0; border-top: 1px solid var(--linea); }
+  .salida:last-child { border-bottom: 1px solid var(--linea); }
+  .fecha { font-family: var(--f-titulo); font-weight: 800; font-size: 30px; line-height: 1; }
+  .fecha small { display: block; font-family: var(--f-texto); font-weight: 500; font-size: 15px; color: var(--indigo-2); margin-top: 4px; }
+  .salida .nombre { font-weight: 700; font-size: 20px; }
+  .salida .nombre span { display: block; font-weight: 400; font-size: 15px; color: var(--indigo-2); }
+  .lugares { font-size: 16px; color: var(--indigo-2); }
+  .salida .precio { font-weight: 800; font-size: 20px; font-variant-numeric: lining-nums tabular-nums; }
+  @media (max-width: 900px) {
+    .salida { grid-template-columns: 90px 1fr; gap: 6px 20px; }
+    .salida > :nth-child(n+3) { grid-column: 2; }
+    .salida > span:empty { display: none; }
+  }
+
+  /* Mi viaje: lo que pasa después de pagar. Usa el componente Estado del 04, con texto */
+  .mi-viaje { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 56px; align-items: center; }
+  .mi-viaje h2 { font-size: 38px; font-weight: 800; }
+  .mi-viaje p { margin: 12px 0 0; color: var(--indigo-2); max-width: 52ch; text-wrap: pretty; }
+  .panel-viaje { border: 1px solid var(--linea); border-radius: 10px; padding: 24px 28px; }
+  .panel-viaje h3 { font-size: 26px; font-weight: 700; }
+  .panel-viaje .cuando { margin: 4px 0 16px; color: var(--indigo-2); font-size: 15px; }
+  .panel-viaje ul { list-style: none; margin: 0; padding: 0; }
+  .panel-viaje li { padding: 12px 0; border-top: 1px solid var(--linea); }
+  .panel-viaje li.plazo { font-size: 15px; color: var(--indigo); font-weight: 500; }
+  @media (max-width: 900px) { .mi-viaje { grid-template-columns: 1fr; gap: 32px; } }
+
+  /* Confianza */
+  .confianza { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; }
+  .resena { margin: 0; }
+  .resena p { margin: 0; font-family: var(--f-titulo); font-size: 22px; line-height: 1.35; font-weight: 500; }
+  .resena footer { margin-top: 12px; font-size: 15px; color: var(--indigo-2); }
+  .estrellas { color: var(--cochinilla); letter-spacing: 2px; font-size: 18px; margin-bottom: 8px; }
+  .garantia { background: var(--qolle); color: var(--indigo); border-radius: 8px; padding: 28px; }
+  .garantia h3 { font-size: 26px; }
+  .garantia p { margin: 10px 0 0; font-size: 17px; }
+  @media (max-width: 900px) { .confianza { grid-template-columns: 1fr; } }
+
+  /* Pie compacto: una fila con la marca, los enlaces y el teléfono de emergencias; abajo, la letra chica */
+  .pie { background: #1C2044; color: #D5D8EE; font-size: 15px; }
+  .pie-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 32px; padding-top: 16px; padding-bottom: 8px; }
+  .pie-logo { font-family: var(--f-titulo); font-weight: 800; font-size: 24px; color: #fff; }
+  .pie ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 20px; }
+  .pie a { color: #D5D8EE; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+  .pie a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+  .pie a:focus-visible { outline-color: var(--qolle); }
+  .pie-fila p { margin: 0; }
+  .pie-legal { border-top: 1px solid rgba(255,255,255,.12); padding-top: 12px; padding-bottom: 18px; font-size: 13px; color: #A9ADCB; }
+  .pie-legal p { margin: 0 0 4px; }
+  /* Los nombres de los destacados van arriba del texto, grandes, para que se vea de entrada cuántos caminos hay.
+     Tope de 3: el sistema elige los 3 con la próxima salida confirmada más cercana. Con 1 solo, el hero queda fijo, sin nombres ni flechas.
+     Si hay más de 3 circuitos a la venta, después de los nombres va un enlace "Ver los N circuitos" a #circuitos. */
+  .hero-b .carrusel { touch-action: pan-y; }
+  .hero-b .carrusel .control { margin: 0 0 28px; border-top: 0; border-bottom: 1px solid rgba(255,255,255,.25); padding: 0; }
+  .hero-b .nombres { gap: 8px 24px; }
+  .hero-b .nombres button { font-family: "Alegreya", serif; font-size: 26px; font-weight: 800; min-height: 52px; padding: 0; color: rgba(255,255,255,.78); }
+  .hero-b .nombres button:hover { color: #fff; }
+  @media (max-width: 700px) { .hero-b .nombres { gap: 4px 18px; } .hero-b .nombres button { font-size: 22px; } }
+</style>
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-tono="indigo">
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="pallay" width="22" height="22" patternUnits="userSpaceOnUse">
+      <rect width="22" height="22" fill="#232850"/>
+      <rect width="22" height="2.5" fill="#2F6B2C"/><rect y="19.5" width="22" height="2.5" fill="#2F6B2C"/>
+      <polygon points="11,4 18,11 11,18 4,11" fill="#A3123A"/>
+      <polygon points="11,8 14,11 11,14 8,11" fill="#E8A817"/>
+      <polygon points="0,7 4,11 0,15" fill="#fff"/><polygon points="22,7 18,11 22,15" fill="#fff"/>
+    </pattern>
+
+  </defs>
+</svg>
+
+<header class="sitio">
+  <div class="ancho cab">
+    <a class="logo" href="#">IncaTour</a>
+    <nav class="nav" aria-label="Principal">
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="enlaces">Menú</button>
+      <ul class="enlaces" id="enlaces">
+        <li><a href="#circuitos">Circuitos</a></li>
+        <li><a href="#salidas">Próximas salidas</a></li>
+      </ul>
+      <!-- Con sesión iniciada, "Ingresar" pasa a ser "Mi viaje" -->
+      <a class="ingresar" href="#">Ingresar</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenido" tabindex="-1">
+<div class="hero hero-b">
+
+  <h1 class="solo-lector">IncaTour: trekkings por el Camino Inca, Salkantay y Lares hasta Machu Picchu</h1>
+  <section class="ancho carrusel" aria-roledescription="carrusel" aria-label="Circuitos destacados">
+
+    <div class="control">
+      <div class="nombres">
+        <button type="button" data-ir="0" aria-current="true">Camino Inca</button>
+        <button type="button" data-ir="1">Salkantay</button>
+        <button type="button" data-ir="2">Lares</button>
+      </div>
+      <span class="solo-lector" aria-live="polite" id="anuncio"></span>
+      <button class="flecha" type="button" data-paso="-1" aria-label="Circuito anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="flecha" type="button" data-paso="1" aria-label="Circuito siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+
+    <article class="diapo" data-tono="indigo" aria-roledescription="diapositiva" aria-label="1 de 3: Camino Inca">
+      <div class="escena" aria-hidden="true">
+          <svg viewBox="0 0 4200 2412" preserveAspectRatio="xMidYMin slice">
+            <defs><image id="foto-mp" href="fotos/machu-picchu.jpg" width="6000" height="3445"/><clipPath id="frente-ng-mp"><polygon points="0,675 50,675 100,675 150,675 200,688 250,688 300,688 350,675 400,675 450,675 500,675 550,675 600,700 650,700 700,712 750,988 800,988 850,988 900,988 950,1050 1000,1075 1050,1150 1100,1188 1150,1250 1200,1250 1250,1250 1300,1238 1350,1088 1400,1025 1450,975 1500,912 1550,875 1600,838 1650,812 1700,812 1750,812 1800,875 1850,888 1900,1000 1950,1050 2000,1112 2050,1175 2100,1212 2150,1212 2200,1212 2250,1162 2300,1162 2350,1150 2400,1125 2450,1125 2500,1125 2550,1088 2600,1062 2650,1062 2700,1062 2750,1075 2800,1075 2850,1100 2900,1100 2950,1100 3000,1012 3050,938 3100,850 3150,738 3200,688 3250,562 3300,500 3350,388 3400,325 3450,250 3500,150 3550,0 3600,0 3650,0 3700,0 3750,0 3800,0 3850,0 3900,0 3950,0 4000,0 4050,188 4100,250 4150,262 4200,350 4250,462 4300,462 4350,550 4400,575 4450,575 4500,625 4550,700 4600,800 4650,850 4700,850 4750,850 4800,875 4850,875 4900,900 4950,875 5188,388 5312,262 5500,300 5750,362 6000,388 6000,3445 0,3445"/></clipPath></defs>
+            <use href="#foto-mp"/>
+            <text class="nombre-gigante ng-mp" x="230" y="720">CAMINO INCA</text>
+            <use href="#foto-mp" clip-path="url(#frente-ng-mp)"/>
+          </svg>
+        </div>
+      <div class="texto">
+        <h2>Llegá a Machu Picchu caminando, por la Puerta del Sol.</h2>
+        <!-- Con menos de 3 reseñas, el tercer dato dice "Todavía pocas reseñas", sin promedio -->
+        <ul class="datos" aria-label="El Camino Inca en datos">
+          <li><b class="cifra">4 días</b>de Ollantaytambo a Machu Picchu</li>
+          <li><b class="cifra">4.215 m</b>en el paso de Warmiwañusca</li>
+          <li><b class="cifra">4,8 de 5</b>en 52 reseñas</li>
+        </ul>
+        <p class="estado listo">Próxima salida confirmada: 10 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 750</b>por persona</p><a class="btn" href="#">Conocé el Camino Inca</a></div>
+        <p class="cancela">Cancelá sin costo hasta 15 días antes</p>
+      </div>
+    </article>
+
+    <article class="diapo" data-tono="cochinilla" aria-roledescription="diapositiva" aria-label="2 de 3: Salkantay" hidden>
+      <div class="escena" aria-hidden="true">
+          <svg viewBox="0 0 1920 1280" preserveAspectRatio="xMidYMin slice">
+            <defs><clipPath id="frente-ng-hu"><polygon points="0,244 120,288 268,356 388,432 444,432 576,376 668,332 776,304 912,276 956,284 1044,276 1132,268 1224,276 1312,320 1424,392 1512,444 1532,468 1680,380 1800,312 1920,244 1920,1280 0,1280"/></clipPath></defs>
+            <image href="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Humantay%2C_2023_%2803%29.jpg/1920px-Humantay%2C_2023_%2803%29.jpg" x="0" y="0" width="1920" height="1280"/>
+            <text class="nombre-gigante ng-hu" x="960" y="300" text-anchor="middle">SALKANTAY</text>
+            <image href="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Humantay%2C_2023_%2803%29.jpg/1920px-Humantay%2C_2023_%2803%29.jpg" x="0" y="0" width="1920" height="1280" clip-path="url(#frente-ng-hu)"/>
+          </svg>
+        </div>
+      <div class="texto">
+        <h2>Cruzá al pie del nevado sagrado y bajá a la selva de nubes.</h2>
+        <ul class="datos" aria-label="El Salkantay en datos">
+          <li><b class="cifra">5 días</b>de Mollepata a Machu Picchu</li>
+          <li><b class="cifra">4.630 m</b>en el paso del Salkantay</li>
+          <li><b class="cifra">4,6 de 5</b>en 31 reseñas</li>
+        </ul>
+        <p class="proxima">Próxima salida: 14 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 690</b>por persona</p><a class="btn" href="#">Conocé el Salkantay</a></div>
+        <p class="cancela">Cancelá sin costo hasta 15 días antes</p>
+      </div>
+    </article>
+
+    <article class="diapo" data-tono="chilca" aria-roledescription="diapositiva" aria-label="3 de 3: Lares" hidden>
+      <div class="escena" aria-hidden="true">
+          <svg viewBox="0 0 1920 1480" preserveAspectRatio="xMidYMin slice">
+            <defs><clipPath id="frente-ng-la"><polygon points="0,796 16,800 32,800 48,804 64,804 80,804 96,796 112,792 128,792 144,784 160,784 176,784 192,780 208,768 224,756 240,752 256,748 272,748 288,748 304,744 320,744 336,748 352,744 368,744 384,708 400,700 416,692 432,692 448,684 464,684 480,680 496,680 512,652 528,624 544,624 560,612 576,608 592,580 608,564 624,492 640,472 656,444 672,428 688,428 704,412 720,404 736,388 752,372 768,364 784,352 800,348 816,348 832,340 848,304 864,296 880,284 896,284 912,280 928,280 944,280 960,276 976,276 992,280 1008,280 1024,284 1040,284 1056,284 1072,280 1088,280 1104,272 1120,260 1136,260 1152,252 1168,252 1184,252 1200,264 1216,288 1232,292 1248,300 1264,328 1280,336 1296,340 1312,340 1328,356 1344,356 1360,356 1376,364 1392,364 1408,348 1424,348 1440,380 1456,388 1472,388 1488,388 1504,388 1520,388 1536,380 1552,376 1568,372 1584,360 1600,360 1616,360 1632,360 1648,384 1664,400 1680,400 1696,388 1712,388 1728,392 1744,388 1760,388 1776,392 1792,388 1808,388 1824,368 1840,368 1856,336 1872,336 1888,336 1904,324 1920,324 1920,1480 0,1480"/></clipPath><linearGradient id="cielo-lares" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#03498C"/><stop offset="1" stop-color="#0566BE"/></linearGradient><linearGradient id="borde-lares" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000"/><stop offset=".08" stop-color="#fff"/></linearGradient><mask id="funde-lares"><rect y="200" width="1920" height="1280" fill="url(#borde-lares)"/></mask></defs>
+            <rect width="1920" height="420" fill="url(#cielo-lares)"/><image href="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg/1920px-Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg" x="0" y="200" width="1920" height="1280" mask="url(#funde-lares)"/>
+            <text class="nombre-gigante ng-la" x="1480" y="290" text-anchor="middle">LARES</text>
+            <image href="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg/1920px-Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg" x="0" y="200" width="1920" height="1280" clip-path="url(#frente-ng-la)"/>
+          </svg>
+        </div>
+      <div class="texto">
+        <h2>Caminá entre las comunidades que todavía tejen como hace siglos.</h2>
+        <ul class="datos" aria-label="Lares en datos">
+          <li><b class="cifra">4 días</b>de Lares a Machu Picchu</li>
+          <li><b class="cifra">4.450 m</b>en el paso de Ipsaycocha</li>
+          <li><b class="cifra">4,7 de 5</b>en 24 reseñas</li>
+        </ul>
+        <p class="estado listo">Próxima salida confirmada: 18 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 620</b>por persona</p><a class="btn" href="#">Conocé Lares</a></div>
+        <p class="cancela">Cancelá sin costo hasta 15 días antes</p>
+      </div>
+    </article>
+
+  </section>
+</div>
+<svg class="faja" aria-hidden="true"><rect width="100%" height="26" fill="url(#pallay)"/></svg>
+
+
+  <section class="seccion" id="circuitos" aria-labelledby="t-circuitos">
+    <div class="ancho">
+      <h2 id="t-circuitos">Elegí tu camino</h2>
+      <p class="bajada">Los tres terminan en Machu Picchu. Cambian los días, la altura y lo que ves en el camino.</p>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg/1920px-Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg" alt="Machu Picchu visto desde Intipunku, la Puerta del Sol">
+        <div>
+          <h3><a href="#">Camino Inca</a></h3>
+          <p>El camino original, de piedra, con ciudadelas en cada día. Entrás a Machu Picchu por Intipunku.</p>
+          <p class="calif"><b class="cifra">4,8 de 5</b> en 52 reseñas</p>
+          <p class="estado listo">Próxima salida confirmada: 10 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(4,1fr)" role="img" aria-label="Altura máxima por día: 3.000, 4.215, 3.950 y 2.720 metros">
+            <div class="anden" style="height:38%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:89%"></div><div class="anden" style="height:32%"></div>
+          </div>
+          <div class="andenes-pie"><span>4 días</span><span>hasta <b class="cifra">4.215 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 750</b>por persona</p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> del Camino Inca</span></a>
+        </div>
+      </article>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Humantay%2C_2023_%2803%29.jpg/1920px-Humantay%2C_2023_%2803%29.jpg" alt="La laguna Humantay, en el camino al Salkantay">
+        <div>
+          <h3><a href="#">Salkantay</a></h3>
+          <p>La ruta alternativa: cruza al pie del nevado sagrado y baja a la selva de nubes antes de Machu Picchu.</p>
+          <p class="calif"><b class="cifra">4,6 de 5</b> en 31 reseñas</p>
+          <p class="proxima">Próxima salida: 14 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(5,1fr)" role="img" aria-label="Altura máxima por día: 3.900, 4.630, 2.900, 2.700 y 2.430 metros">
+            <div class="anden" style="height:72%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:34%"></div><div class="anden" style="height:27%"></div><div class="anden" style="height:16%"></div>
+          </div>
+          <div class="andenes-pie"><span>5 días</span><span>hasta <b class="cifra">4.630 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 690</b>por persona</p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> del Salkantay</span></a>
+        </div>
+      </article>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg/1920px-Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg" alt="Valles abiertos del trekking de Lares">
+        <div>
+          <h3><a href="#">Lares</a></h3>
+          <p>Por las comunidades tejedoras de los Andes, con aguas termales el primer día. Termina en tren a Machu Picchu.</p>
+          <p class="calif"><b class="cifra">4,7 de 5</b> en 24 reseñas</p>
+          <p class="estado listo">Próxima salida confirmada: 18 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(4,1fr)" role="img" aria-label="Altura máxima por día: 3.800, 4.450, 2.800 y 2.430 metros">
+            <div class="anden" style="height:68%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:30%"></div><div class="anden" style="height:16%"></div>
+          </div>
+          <div class="andenes-pie"><span>4 días</span><span>hasta <b class="cifra">4.450 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 620</b>por persona</p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> de Lares</span></a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="seccion tinte" id="salidas" aria-labelledby="t-salidas">
+    <div class="ancho">
+      <h2 id="t-salidas" class="solo">¿Ya tenés fecha?</h2>
+      <ul class="salidas">
+        <li class="salida"><span class="fecha">10 dic<small>al 13 dic</small></span><span class="nombre">Camino Inca<span>4 días</span></span><span class="estado listo">Confirmada</span><span class="lugares">Quedan 3 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Camino Inca, 10 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">14 dic<small>al 18 dic</small></span><span class="nombre">Salkantay<span>5 días</span></span><span></span><span class="lugares">Quedan 8 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Salkantay, 14 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">18 dic<small>al 21 dic</small></span><span class="nombre">Lares<span>4 días</span></span><span class="estado listo">Confirmada</span><span class="lugares">Quedan 5 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Lares, 18 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">22 dic<small>al 25 dic</small></span><span class="nombre">Camino Inca<span>4 días</span></span><span></span><span class="lugares">Quedan 10 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Camino Inca, 22 de diciembre</span></a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="t-mi-viaje">
+    <div class="ancho mi-viaje">
+      <div>
+        <h2 id="t-mi-viaje">Después de pagar, sabés en qué está tu viaje</h2>
+        <p>En Mi viaje ves si la salida, el hotel y los permisos están listos, qué te falta hacer y hasta cuándo podés cancelar sin costo. Todo en un solo lugar, desde el celular.</p>
+      </div>
+      <div class="panel-viaje" role="img" aria-label="Ejemplo de Mi viaje: Camino Inca del 10 al 13 de diciembre. Salida confirmada, hotel confirmado, tramitando permisos. Podés cancelar sin costo hasta el 25 de noviembre.">
+        <h3>Camino Inca</h3>
+        <p class="cuando">Del 10 al 13 de diciembre</p>
+        <ul>
+          <li><span class="estado listo">Salida confirmada</span></li>
+          <li><span class="estado listo">Hotel confirmado</span></li>
+          <li><span class="estado espera">Tramitando permisos</span></li>
+          <li class="plazo">Podés cancelar sin costo hasta el 25 de noviembre</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="t-confianza">
+    <div class="ancho">
+      <div class="tarjeta-resenas">
+      <h2 id="t-confianza" class="solo">Lo que cuentan quienes ya caminaron</h2>
+      <div class="confianza">
+        <blockquote class="resena">
+          <div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div>
+          <p>Llegar a Intipunku con la niebla abriéndose sobre Machu Picchu no se olvida. Los porteadores fueron lo mejor del viaje.</p>
+          <footer>Lucía, Camino Inca, octubre</footer>
+        </blockquote>
+        <blockquote class="resena">
+          <div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div>
+          <p>Nos avisaron con tiempo que la salida estaba confirmada y todo lo que había que llevar. Cero sorpresas.</p>
+          <footer>Martín, Salkantay, septiembre</footer>
+        </blockquote>
+        <div class="garantia">
+          <h3>Cancelá sin costo hasta 15 días antes</h3>
+          <p>Si cambian tus planes, <b>te devolvemos todo lo que pagaste</b>.</p>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="ancho pie-fila">
+    <span class="pie-logo">IncaTour</span>
+    <nav aria-label="Enlaces del pie"><ul><li><a href="#">Camino Inca</a></li><li><a href="#">Salkantay</a></li><li><a href="#">Lares</a></li><li><a href="#">Mi viaje</a></li><li><a href="#">Cancelaciones y reintegros</a></li><li><a href="#">Escribinos</a></li></ul></nav>
+    <p>Emergencias en ruta: <a href="tel:+5184000000">+51 84 000 000</a></p>
+  </div>
+  <div class="ancho pie-legal">
+    <p>IncaTour, Cusco, Perú. Machu Picchu: foto de referencia sin licencia confirmada. Fotos de Wikimedia Commons: Intipunku, Christoph Strässler (CC BY-SA 2.0); Humantay, Draceane (CC BY-SA 4.0); Patacancha, Yupanasimi (CC BY-SA 4.0); valles de Lares, McKay Savage (CC BY 2.0).</p>
+    <p>Muestra de identidad, versión B, no el wireframe final. Las fotos sirven para mostrar el estilo: para publicar hacen falta fotos propias o con licencia comercial. Fechas, precios y reseñas son de ejemplo.</p>
+  </div>
+</footer>
+
+<script>
+  // El nombre gigante se muestra recién cuando la foto de su escena cargó
+  document.querySelectorAll('.escena').forEach(esc => {
+    const img = esc.querySelector('image');
+    if (!img) { esc.classList.add('lista'); return; }
+    const pre = new Image();
+    pre.onload = () => esc.classList.add('lista');
+    pre.src = img.getAttribute('href');
+  });
+
+  // Carrusel: flechas, nombres y teclado. No avanza solo.
+  const anuncio = document.getElementById('anuncio');
+  const nombresCirc = ['Camino Inca', 'Salkantay', 'Lares'];
+  const diapos = [...document.querySelectorAll('.diapo')];
+  const nombres = [...document.querySelectorAll('.nombres button')];
+  let actual = 0;
+  function ir(n, dir) {
+    n = (n + diapos.length) % diapos.length;
+    if (n === actual) return;
+    // Fundido cruzado: la foto anterior queda debajo hasta que la nueva termina de aparecer,
+    // así nunca se ve el fondo de la portada entre una y otra
+    const previa = diapos[actual];
+    previa.classList.add('saliendo');
+    previa.setAttribute('aria-hidden', 'true');
+    clearTimeout(previa._t);
+    const espera = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 750;
+    previa._t = setTimeout(() => { previa.classList.remove('saliendo'); previa.removeAttribute('aria-hidden'); if (previa !== diapos[actual]) previa.hidden = true; }, espera);
+    const d = diapos[n];
+    clearTimeout(d._t); d.classList.remove('saliendo'); d.removeAttribute('aria-hidden');
+    d.hidden = false;
+    d.style.setProperty('--desde', (dir < 0 ? -24 : 24) + 'px');
+    d.classList.remove('entra'); void d.offsetWidth; d.classList.add('entra');
+    document.body.dataset.tono = d.dataset.tono;
+    nombres.forEach((b, i) => b.setAttribute('aria-current', i === n ? 'true' : 'false'));
+    anuncio.textContent = nombresCirc[n] + ', ' + (n + 1) + ' de ' + diapos.length;
+    actual = n;
+  }
+  document.querySelectorAll('.flecha').forEach(b => b.addEventListener('click', () => ir(actual + +b.dataset.paso, +b.dataset.paso)));
+  nombres.forEach(b => b.addEventListener('click', () => ir(+b.dataset.ir, +b.dataset.ir - actual)));
+  document.querySelector('.carrusel').addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') ir(actual + 1, 1);
+    if (e.key === 'ArrowLeft') ir(actual - 1, -1);
+  });
+  // En celular se pasa deslizando con el dedo
+  let x0 = null;
+  const car = document.querySelector('.carrusel');
+  car.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') x0 = e.clientX; });
+  car.addEventListener('pointerup', e => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50) ir(actual + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+  });
+  car.addEventListener('pointercancel', () => { x0 = null; });
+
+  // Menú en celular: se abre con el botón y se cierra con Escape
+  const menuBtn = document.querySelector('.menu-btn');
+  const enlaces = document.getElementById('enlaces');
+  function menu(abrir) { enlaces.classList.toggle('abierta', abrir); menuBtn.setAttribute('aria-expanded', abrir); }
+  menuBtn.addEventListener('click', () => menu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+  enlaces.addEventListener('click', e => { if (e.target.closest('a')) menu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuBtn.getAttribute('aria-expanded') === 'true') { menu(false); menuBtn.focus(); } });
+</script>
+</body>
+</html>

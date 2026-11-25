@@ -11,22 +11,35 @@ Con Docker levantado, desde `backend`:
 npm run demo
 ```
 
-Tarda unos minutos y al final imprime lo que se usa en vivo, por ejemplo:
+Tarda unos minutos y al final imprime lo que se usa en vivo. Generada para el viernes 27/11:
 
 ```
-Para la presentación (2026-11-13):
-  Carlos inicia en vivo: SAL-2026-038 (CERRADA)
-  En curso al día: SAL-2026-037 · atrasada (Desfasada): SAL-2026-036
-  Solicitudes de alojamiento pendientes: 8
-  Juan: ... en SAL-2026-036 (FINALIZADA, CONFIRMADA)   ← la puede reseñar
-  Juan: ... en SAL-2026-043 (PUBLICADA, CONFIRMADA)    ← la puede cancelar con 100% de reintegro
+Para la presentación (2026-11-27):
+  Carlos inicia en vivo: SAL-2026-041 (CERRADA)
+  En curso al día: SAL-2026-040 · atrasada (Desfasada): SAL-2026-039
+  Vendida completa y con la venta terminada, para confirmar en vivo (CU-40): SAL-2026-042
+  Venta terminada con la mitad vendida, al confirmar sobran porteadores: SAL-2026-043 (1 alojamientos pendientes)
+  Vendida a la mitad, hoy es su último día de venta: SAL-2026-044
+  Equipo justo (una compra más y faltan carpas): SAL-2026-044 · ya le falta oxígeno: SAL-2026-046
+  Juan: ... en SAL-2026-038 (FINALIZADA, CONFIRMADA)   ← la puede reseñar
+  Juan: ... en SAL-2026-048 (PUBLICADA, CONFIRMADA)    ← la puede cancelar con 100% de reintegro
 ```
 
-Los números de salida cambian según el día: anotar los que imprima.
+El script usa una semilla fija, así que corrido el mismo día los números se repiten; igual, anotar los que imprima.
 
-En Salidas, las dos en curso muestran el control sobre el guía: la que va al día ("Al día") y la que empezó
-hace dos días y solo informó la etapa 1 ("Desfasada", en amarillo), con el punto al que llegó y el tramo que
-le toca hoy.
+| Salida | Qué tiene | Para qué |
+| --- | --- | --- |
+| SAL-2026-039 | En curso, solo informó la etapa 1 ("Desfasada") | Control sobre el guía |
+| SAL-2026-040 | En curso, al día | Control sobre el guía |
+| SAL-2026-041 | Confirmada, empieza hoy, guía Carlos | Carlos la inicia en vivo |
+| SAL-2026-042 | Clásico, 16 de 16 vendidos, venta terminada | Confirmar una salida completa |
+| SAL-2026-043 | Express (hotel a solicitud), 6 de 12, venta terminada, 1 solicitud pendiente | Resolver la solicitud (si se rechaza, aparecen los otros 2 hoteles) y confirmar liberando 3 porteadores |
+| SAL-2026-044 | Salkantay, 7 de 14, hoy es su último día de venta, carpas justas | Una compra de Juan hace aparecer "Faltan … de Carpa doble" |
+| SAL-2026-046 | Clásico, a la venta | Ya muestra "Faltan 1 de Equipo de oxígeno portátil" |
+
+Para el alta en vivo: Clásico, 16 pasajeros, a más de un mes. En el paso 2, Cusco 3★ doble tiene 4 hoteles
+(Inti Wasi USD 40, Wayra 48, Tikari 62 y Plaza Regocijo 78 por noche): con el Plaza Regocijo la revisión
+avisa +USD 76 por pasajero y "Sumar al precio" lo aplica.
 
 Después, levantar el back contra esa base (`DATABASE_URL` apuntando a `incatour_demo`) y el front.
 
@@ -47,12 +60,13 @@ Mailpit: http://localhost:8025
 
 | Parte | Quién | Qué usar |
 | --- | --- | --- |
-| Armar la oferta | Zahn | Crea un circuito nuevo; el resto ya está cargado |
+| Armar la oferta | Zahn | Crea un circuito y un paquete: el costo por pasajero sale del hotel más económico de la categoría (precio "desde") y se carga el equipaje del porteador |
 | Proveedores y personal | Alexis | Crea un proveedor, un empleado y su cuenta de guía |
-| Crear y preparar la salida | Daniel | Nueva salida a más de un mes (hay personal libre). Solicitudes pendientes para confirmar en vivo |
-| El cliente compra | Sepúlveda | Juan compra en una salida Publicada y cancela la que ya tiene en estado Publicada (100% de reintegro) |
-| La salida en el campo | Martín | Carlos inicia la salida de hoy, registra un avance, prueba sin señal y notifica un incidente crítico |
-| Resultados | Alexis | Reportes con dos años de historia. Juan reseña su última salida finalizada |
+| La salida | Martín | Alta en vivo (ver arriba), alertas de equipo de la 044 y la 046, confirmar la 042 y la 043 (antes resuelve su solicitud pendiente) |
+| Alojamiento y alertas | Daniel | Otra de las solicitudes pendientes: rechazarla (aparecen los otros hoteles de la zona) y aceptar otro; alertas y contadores de Salidas |
+| El cliente compra | Sepúlveda | Juan compra en la 044 (aparece la falta de carpas), ve el equipaje en el catálogo y cancela su reserva de la 048 (100% de reintegro) |
+| La salida en el campo | Daniel | Carlos inicia la 041, registra un avance, prueba sin señal y notifica un incidente crítico |
+| Resultados | Alexis | Reportes con dos años de historia. Juan reseña la 038 |
 
 ## Simular que el guía se queda sin señal
 
@@ -107,49 +121,38 @@ Contraseñas: administradora `AdminIncaTour123`, guías `guia12345`, clientes `c
 | Guía | Hernán Apaza | hernan.guia@incatour.com |
 | Guía | Pilar Yupanqui | pilar.guia@incatour.com |
 | Cliente | Juan Pérez | juan@test.com |
-| Cliente | Vicente Morales | vicente.morales1@gmail.com |
-| Cliente | Valentina Benítez | valentina.benitez@yahoo.com.ar |
-| Cliente | Pablo Jiménez | pablojimenez91@gmail.com |
-| Cliente | Beatriz Souza | beatriz.souza@hotmail.com |
-| Cliente | José Vargas | jvargas@gmail.com |
-| Cliente | Joaquín Sosa | joaquin.sosa@gmail.com |
-| Cliente | Lucía Martínez | lucia.martinez3@gmail.com |
-| Cliente | Regina Navarro | regina.navarro2@gmail.com |
-| Cliente | Martín Medina | martin.medina@gmail.com |
-| Cliente | Martín Fernández | mfernandez@yahoo.com.ar |
-| Cliente | Beatriz Oliveira | beatriz.oliveira6@uol.com.br |
-| Cliente | Thiago Silva | thiago.silva@gmail.com |
-| Cliente | Lucía Benítez | lucia.benitez4@gmail.com |
-| Cliente | Thiago Pereira | tpereira@hotmail.com |
-| Cliente | Nicolás Fernández | nicolas.fernandez@gmail.com |
-| Cliente | Beatriz Ribeiro | beatriz.ribeiro@uol.com.br |
-| Cliente | Agustina Benítez | agustina.benitez2@hotmail.com |
-| Cliente | Rosa Mendoza | rosa.mendoza@hotmail.com |
-| Cliente | Gonzalo Herrera | gherrera@hotmail.com |
-| Cliente | Florencia Sosa | florencia.sosa@gmail.com |
-| Cliente | Lucía Techera | ltechera@adinet.com.uy |
-| Cliente | Agustina Herrera | aherrera@hotmail.com |
-| Cliente | Ana Silva | anasilva89@gmail.com |
-| Cliente | Julieta Herrera | jherrera@gmail.com |
-| Cliente | Milagros Mendoza | milagros.mendoza@hotmail.com |
-| Cliente | Beatriz Oliveira | beatriz.oliveira1@uol.com.br |
-| Cliente | Emiliano Navarro | emiliano.navarro1@gmail.com |
-| Cliente | Cristóbal Fuentes | cristobal.fuentes7@gmail.com |
-| Cliente | Vicente Morales | vicentemorales84@gmail.com |
-| Cliente | Javier Serrano | javier.serrano@gmail.com |
-| Cliente | Julieta Romero | julietaromero70@gmail.com |
-| Cliente | Catalina Fuentes | cfuentes@hotmail.com |
-| Cliente | Lucía Navarro | lnavarro@gmail.com |
-| Cliente | Carmen Martín | carmen.martin@hotmail.es |
-| Cliente | Andrés Vargas | avargas@gmail.com |
-| Cliente | Vicente Díaz | vicente.diaz4@hotmail.com |
-| Cliente | Ana Ribeiro | ana.ribeiro@hotmail.com |
-| Cliente | Camila Díaz | camila.diaz3@hotmail.com |
-| Cliente | Matías Contreras | matias.contreras@hotmail.com |
-| Cliente | Florencia Romero | fromero@hotmail.com |
-| Cliente | Milagros Huamán | milagros.huaman@gmail.com |
-| Cliente | Pablo Ruiz | pruiz@hotmail.es |
-| Cliente | Lucía Navarro | lucia.navarro7@hotmail.es |
+| Cliente | Lucía Navarro | lucia.navarro@hotmail.es |
+| Cliente | Javiera Soto | jsoto@gmail.com |
+| Cliente | Julieta Martínez | jmartinez@gmail.com |
+| Cliente | Fernanda Navarro | fernandanavarro71@gmail.com |
+| Cliente | Mariana Costa | mariana.costa@gmail.com |
+| Cliente | Tomás Benítez | tomas.benitez@yahoo.com.ar |
+| Cliente | Beatriz Santos | beatrizsantos87@uol.com.br |
+| Cliente | Facundo Sosa | facundo.sosa@hotmail.com |
+| Cliente | Milagros Chávez | milagros.chavez@gmail.com |
+| Cliente | Benjamín Rojas | benjaminrojas93@hotmail.com |
+| Cliente | Lucía Acosta | lucia.acosta@gmail.com |
+| Cliente | Agustina Álvarez | aalvarez@gmail.com |
+| Cliente | Gabriel Almeida | gabrielalmeida94@gmail.com |
+| Cliente | Florencia Herrera | florencia.herrera5@gmail.com |
+| Cliente | Fernanda Navarro | fernandanavarro82@gmail.com |
+| Cliente | Lucía Herrera | lucia.herrera@gmail.com |
+| Cliente | Beatriz Ribeiro | beatrizribeiro76@uol.com.br |
+| Cliente | Valeria Mejía | valeria.mejia5@hotmail.com |
+| Cliente | Lucía Martínez | lmartinez@gmail.com |
+| Cliente | Milagros Flores | milagros.flores1@gmail.com |
+| Cliente | Carmen Molina | cmolina@gmail.com |
+| Cliente | Fernanda Navarro | fnavarro@gmail.com |
+| Cliente | Julieta Martínez | julieta.martinez@gmail.com |
+| Cliente | Sofía Romero | sofia.romero@yahoo.com.ar |
+| Cliente | Hugo García | hugo.garcia@gmail.com |
+| Cliente | Florencia Herrera | florencia.herrera@hotmail.com |
+| Cliente | Beatriz Costa | beatrizcosta93@gmail.com |
+| Cliente | Facundo González | facundo.gonzalez3@gmail.com |
+| Cliente | Andrés Mejía | amejia@hotmail.com |
+| Cliente | Sofía González | sofiagonzalez95@hotmail.com |
+| Cliente | Elena García | egarcia@hotmail.es |
+| Cliente | José Quispe | jose.quispe7@hotmail.com |
 | Cliente | Sebastián Restrepo | sebastianrestrepo78@hotmail.com |
 | Cliente | Julieta Medina | julieta.medina4@gmail.com |
 | Cliente | Tomás Herrera | therrera@yahoo.com.ar |
@@ -166,3 +169,14 @@ Contraseñas: administradora `AdminIncaTour123`, guías `guia12345`, clientes `c
 | Cliente | Diego Torres | diegotorres89@gmail.com |
 | Cliente | Thiago Pereira | thiago.pereira@hotmail.com |
 | Cliente | Pedro Silva | pedro.silva@uol.com.br |
+| Cliente | Julieta Álvarez | julieta.alvarez5@yahoo.com.ar |
+| Cliente | Florencia Méndez | fmendez@adinet.com.uy |
+| Cliente | Fernanda Torres | fernandatorres82@outlook.com |
+| Cliente | Paula Méndez | paulamendez94@adinet.com.uy |
+| Cliente | Fernanda Navarro | fernanda.navarro@gmail.com |
+| Cliente | Alejandro Ruiz | alejandro.ruiz9@hotmail.es |
+| Cliente | Pablo Ruiz | pabloruiz74@gmail.com |
+| Cliente | Javiera Díaz | jdiaz@gmail.com |
+| Cliente | Catalina Díaz | cdiaz@gmail.com |
+| Cliente | Mariana Santos | mariana.santos8@gmail.com |
+| Cliente | Facundo González | facundo.gonzalez@hotmail.com |

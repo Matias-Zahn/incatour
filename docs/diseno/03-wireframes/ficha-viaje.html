@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: ficha del viaje</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/*BASE*/
+/* Base común de los wireframes de IncaTour. Fuente única: se incrusta en cada HTML con armar.py
+   (el panel de vista previa no carga hojas de estilo por ruta relativa). Semilla de los tokens de 04-sistema. */
+:root {
+  --algodon: #FFFFFF; --indigo: #232850; --indigo-2: #4B5170; --indigo-claro: #ECEDF5;
+  --cochinilla: #A3123A; --qolle: #E8A817; --chilca: #2F6B2C; --piedra: #E9E6DF; --piedra-borde: #8E8676;
+  --linea: #E1E2EC; --espera: #8A5F00; --riesgo: #9C4A00; --critico: #A3123A;
+  --f-titulo: "Alegreya", serif; --f-texto: "Alegreya Sans", sans-serif;
+  --radio: 6px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--algodon); color: var(--indigo); font: 17px/1.55 var(--f-texto); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.15; margin: 0; }
+.cifra { font-variant-numeric: lining-nums tabular-nums; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* El salto al contenido aparece al recibir el foco */
+a.solo-lector:focus { position: fixed; top: 12px; left: 16px; width: auto; height: auto; clip: auto; z-index: 20; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+.ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+/* Encabezado de las páginas interiores: índigo liso, sin foto */
+.barra { background: var(--indigo); color: #fff; }
+.barra .ancho { display: flex; justify-content: space-between; align-items: center; min-height: 72px; gap: 16px; }
+.barra .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 26px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.barra nav { display: flex; gap: 8px; }
+.barra nav a { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--radio); }
+.barra nav a:hover { background: rgba(255,255,255,.12); }
+.barra nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--qolle); }
+.barra a:focus-visible { outline-color: var(--qolle); }
+@media (max-width: 480px) { .barra .ancho { gap: 8px; } .barra .logo { font-size: 22px; } .barra nav { gap: 0; } .barra nav a { padding: 0 8px; white-space: nowrap; font-size: 15px; } }
+
+/* Botones */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--radio); border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.btn:hover { background: #870E30; }
+.btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; font-weight: 700; }
+.btn-sec:hover { background: #F2F2F7; }
+.btn-texto { background: none; border: 0; color: var(--indigo); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.btn-peligro { color: var(--critico); }
+.btn[disabled] { background: #C9CBD8; color: #4B5170; cursor: not-allowed; }
+
+/* Estados: siempre con texto */
+.estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.listo { color: var(--chilca); } .espera { color: var(--espera); } .riesgo { color: var(--riesgo); } .critico { color: var(--critico); }
+
+/* Campos */
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 15px; }
+.campo .ayuda { font-size: 14px; color: var(--indigo-2); }
+.campo input, .campo select { font: inherit; min-height: 48px; padding: 0 14px; border: 2px solid #9EA2BC; border-radius: var(--radio); background: #fff; color: var(--indigo); }
+.campo input:hover { border-color: var(--indigo-2); }
+.campo.con-error input { border-color: var(--critico); }
+.campo .error { font-size: 14px; font-weight: 700; color: var(--critico); }
+
+/* Bloques */
+.tarjeta { border: 1px solid var(--linea); border-radius: 10px; background: #fff; }
+.aviso { border-radius: 10px; padding: 14px 16px; font-size: 16px; }
+.aviso.info { background: var(--indigo-claro); }
+.aviso.error { background: #FBEAEE; color: #7A0E2B; border-left: 4px solid var(--critico); }
+
+/* Andenes: el recorrido por día */
+.andenes { display: grid; align-items: end; gap: 4px; height: 120px; }
+.anden { background: var(--piedra); border-top: 3px solid var(--piedra-borde); border-radius: 2px 2px 0 0; padding: 4px 6px 0; font-size: 13px; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+.anden b { display: block; }
+.anden.alto { background: var(--indigo); color: #fff; border-top-color: var(--qolle); }
+
+/* Pie con muro: versión corta para las páginas interiores */
+.pie-corto { background: var(--indigo); color: #D5D8EE; font-size: 15px; }
+.pie-corto .ancho { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
+.pie-corto svg { display: block; width: 100%; height: 90px; }
+
+/* Notas de diseño: van fuera de la pantalla, no son parte de la interfaz */
+.wf-notas { background: #FFFBEA; border-top: 4px solid var(--qolle); margin-top: 64px; }
+.wf-notas .ancho { padding-top: 32px; padding-bottom: 48px; }
+.wf-notas h2 { font-size: 26px; }
+.wf-notas ol, .wf-notas ul { padding-left: 22px; max-width: 80ch; }
+.wf-notas li { margin-bottom: 8px; }
+.wf-notas h3 { font-family: var(--f-texto); font-size: 18px; margin-top: 28px; }
+.wf-estados { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.wf-estado { background: #fff; border: 1px dashed #C8B98A; border-radius: 8px; padding: 16px; }
+.wf-estado > b { display: block; font-size: 14px; color: #6B5A1E; margin-bottom: 8px; }
+.wf-marca { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--qolle); color: var(--indigo); font-size: 13px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
+
+/* ===== Admin: estructura común. Calmo y denso: sin motivos, algodón e índigo ===== */
+.adm { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+.adm-lateral { background: var(--indigo); color: #fff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.adm-lateral .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 24px; padding: 4px 10px 18px; text-decoration: none; }
+.adm-lateral a { color: #D5D8EE; text-decoration: none; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: var(--radio); font-weight: 500; }
+.adm-lateral a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.adm-lateral a[aria-current="page"] { background: rgba(255,255,255,.12); color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--qolle); }
+.adm-lateral a:focus-visible { outline-color: var(--qolle); }
+.adm-lateral .cuenta { font-weight: 700; color: var(--indigo); background: var(--qolle); border-radius: 999px; padding: 0 8px; font-size: 14px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.adm-lateral .separador { height: 1px; background: rgba(255,255,255,.15); margin: 12px 10px; }
+.adm-lateral .secundario a { font-size: 15px; min-height: 40px; }
+.adm-principal { padding: 28px 40px 64px; min-width: 0; }
+.adm-principal > header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.adm-principal h1 { font-size: 38px; }
+.adm-principal .bajada { margin: 4px 0 0; color: var(--indigo-2); }
+@media (max-width: 900px) { .adm { grid-template-columns: 1fr; } .adm-lateral { flex-direction: row; flex-wrap: wrap; } .adm-lateral .separador, .adm-lateral .secundario { display: none; } .adm-principal { padding: 20px; } }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 700; background: var(--indigo-claro); color: var(--indigo); }
+.progreso { height: 8px; border-radius: 999px; background: var(--indigo-claro); overflow: hidden; }
+.progreso > span { display: block; height: 100%; background: var(--indigo); border-radius: 999px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tabla th { text-align: left; font-size: 13px; color: var(--indigo-2); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--linea); }
+.tabla td { padding: 10px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+/*FIN-BASE*/
+
+/* Portada corta de la ficha: foto a sangre con el nombre */
+.portada { position: relative; min-height: 380px; color: #fff; display: flex; align-items: flex-end; overflow: hidden; }
+.portada img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.portada::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,12,22,.75) 0%, rgba(10,12,22,.25) 55%, transparent 80%); }
+.portada .ancho { position: relative; z-index: 1; width: 100%; padding-bottom: 28px; }
+.migas { font-size: 15px; margin: 0 0 8px; }
+.migas a { color: #fff; }
+.portada h1 { font-size: clamp(48px, 7vw, 88px); font-weight: 800; letter-spacing: .01em; }
+.resumen { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 17px; }
+.resumen b { font-variant-numeric: lining-nums tabular-nums; }
+
+/* Dos columnas: el contenido y la columna de compra, que se queda fija al bajar */
+.cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 56px; padding-top: 40px; align-items: start; }
+.compra { position: sticky; top: 16px; }
+.seccion-ficha { padding-bottom: 40px; margin-bottom: 40px; border-bottom: 1px solid var(--linea); }
+.seccion-ficha:last-child { border-bottom: 0; }
+.seccion-ficha > h2 { font-size: 30px; margin-bottom: 14px; }
+.seccion-ficha > p { max-width: 62ch; margin: 0; }
+
+/* Recorrido */
+.dias { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 20px; }
+.dia { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start; }
+.dia h3 { font-size: 21px; }
+.dia p { margin: 4px 0 0; color: var(--indigo-2); }
+.dia .datos-dia { font-weight: 700; color: var(--indigo); font-variant-numeric: lining-nums tabular-nums; }
+.mapa { width: 100%; height: 120px; border-radius: 8px; background: #E6EBE3; display: block; }
+@media (max-width: 560px) { .dia { grid-template-columns: 1fr; } }
+
+.incluye { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 32px; padding-left: 20px; margin: 0; }
+.no-incluye { margin-top: 16px; color: var(--indigo-2); }
+
+/* Reseñas */
+.promedio { display: flex; align-items: baseline; gap: 12px; }
+.promedio b { font-family: var(--f-titulo); font-size: 44px; font-variant-numeric: lining-nums; }
+.resenas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-top: 20px; }
+.resena { margin: 0; }
+.resena .estrellas { color: var(--cochinilla); letter-spacing: 2px; }
+.resena p { margin: 6px 0 0; font-family: var(--f-titulo); font-size: 19px; line-height: 1.4; }
+.resena footer { margin-top: 8px; font-size: 15px; color: var(--indigo-2); }
+
+/* Columna de compra */
+.compra .tarjeta { padding: 24px; }
+.compra h2 { font-size: 26px; }
+.mes { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px; }
+.mes b { font-size: 18px; }
+.mes button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--linea); background: #fff; font-size: 20px; cursor: pointer; color: var(--indigo); }
+.calendario { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.calendario th { font-size: 13px; font-weight: 700; color: var(--indigo-2); padding: 4px 0; }
+.calendario td { text-align: center; padding: 2px; height: 48px; font-variant-numeric: lining-nums tabular-nums; color: #9EA2BC; }
+.calendario td button { width: 100%; height: 48px; border-radius: 8px; border: 2px solid transparent; font: inherit; font-weight: 800; cursor: pointer; position: relative; color: var(--indigo); background: var(--indigo-claro); }
+.calendario td button::after { content: ""; position: absolute; left: 50%; bottom: 6px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; }
+.calendario td button.confirmada::after { background: var(--chilca); }
+.calendario td button.agotada { background: none; color: #9EA2BC; text-decoration: line-through; cursor: not-allowed; }
+.calendario td button[aria-pressed="true"] { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+.calendario td button:hover:not(.agotada) { border-color: var(--indigo); }
+.leyenda { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.leyenda .estado { font-size: 14px; font-weight: 500; }
+
+.elegida { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--linea); display: grid; gap: 10px; }
+.elegida .fechas { font-weight: 800; font-size: 19px; }
+.fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.contador { display: inline-flex; align-items: center; gap: 4px; }
+.contador button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--indigo); background: #fff; color: var(--indigo); font-size: 22px; font-weight: 700; cursor: pointer; }
+.contador button[disabled] { border-color: #C9CBD8; color: #9EA2BC; cursor: not-allowed; }
+.contador output { min-width: 32px; text-align: center; font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; }
+.total { font-size: 15px; color: var(--indigo-2); }
+.total b { display: block; font-size: 30px; color: var(--indigo); font-variant-numeric: lining-nums tabular-nums; }
+.compra .btn { width: 100%; margin-top: 4px; }
+.letra-chica { font-size: 14px; color: var(--indigo-2); margin: 0; }
+.elegida .lugares { font-weight: 700; font-size: 15px; }
+
+/* Celular: la compra baja y aparece una barra fija con el precio */
+.barra-movil { display: none; }
+@media (max-width: 960px) {
+  .cuerpo { grid-template-columns: 1fr; gap: 32px; }
+  .compra { position: static; order: -1; }
+  .barra-movil { display: flex; position: sticky; bottom: 0; z-index: 5; background: #fff; border-top: 1px solid var(--linea); box-shadow: 0 -4px 16px rgba(35,40,80,.12); padding: 10px 20px; justify-content: space-between; align-items: center; gap: 12px; }
+  .barra-movil p { margin: 0; font-size: 14px; color: var(--indigo-2); }
+  .barra-movil b { display: block; font-size: 20px; color: var(--indigo); }
+  .incluye { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<a class="solo-lector" href="#contenido">Saltar al contenido</a>
+<header class="barra">
+  <div class="ancho">
+    <a class="logo" href="#">IncaTour</a>
+    <nav aria-label="Principal"><a href="#">Circuitos</a><a href="#">Ingresar</a></nav>
+  </div>
+</header>
+
+<main id="contenido">
+  <section class="portada" aria-labelledby="t-viaje">
+    <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/Winay_Wayna_Inca_site%2C_Inca_Trail%2C_Peru.jpg/1920px-Winay_Wayna_Inca_site%2C_Inca_Trail%2C_Peru.jpg" alt="">
+    <div class="ancho">
+      <p class="migas"><a href="#">Circuitos</a> / Camino Inca</p>
+      <h1 id="t-viaje">Camino Inca</h1>
+      <ul class="resumen">
+        <li><b>4 días</b> de Km 82 a Machu Picchu</li>
+        <li>Hasta <b>4.215 m</b></li>
+        <li>Dificultad <b>alta</b></li>
+        <li><b>4,8 de 5</b> en 52 reseñas</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="ancho cuerpo">
+    <div>
+      <section class="seccion-ficha" aria-labelledby="t-vivir">
+        <h2 id="t-vivir">Qué vas a vivir</h2>
+        <p>Cuatro días por el camino de piedra que hicieron los incas, entre andenes, abras y ciudadelas que solo se ven a pie. El último día entrás a Machu Picchu caminando, por la Puerta del Sol, antes de que lleguen los buses.</p>
+      </section>
+
+      <section class="seccion-ficha" aria-labelledby="t-recorrido">
+        <h2 id="t-recorrido">El recorrido, día por día <span class="wf-marca" aria-hidden="true">1</span></h2>
+        <div class="andenes" style="grid-template-columns: repeat(4, 1fr)" role="img" aria-label="Altura máxima por día: 3.000, 4.215, 3.950 y 2.720 metros">
+          <div class="anden" style="height:52%"><b>Día 1</b>3.000 m</div>
+          <div class="anden alto" style="height:100%"><b>Día 2</b>4.215 m</div>
+          <div class="anden" style="height:90%"><b>Día 3</b>3.950 m</div>
+          <div class="anden" style="height:45%"><b>Día 4</b>2.720 m</div>
+        </div>
+        <ol class="dias">
+          <li class="dia">
+            <svg class="mapa" viewBox="0 0 200 120" role="img" aria-label="Mapa del tramo de Km 82 a Wayllabamba"><path d="M14 98 C50 90 70 60 104 62 S160 40 186 26" fill="none" stroke="#232850" stroke-width="3" stroke-dasharray="6 5"/><circle cx="14" cy="98" r="6" fill="#2F6B2C"/><circle cx="186" cy="26" r="6" fill="#A3123A"/></svg>
+            <div><h3>Día 1. De Km 82 a Wayllabamba</h3><p class="datos-dia">12 km, hasta 3.000 m</p><p>Un día de calentamiento junto al río, con los primeros sitios incas. Noche en campamento.</p></div>
+          </li>
+          <li class="dia">
+            <svg class="mapa" viewBox="0 0 200 120" role="img" aria-label="Mapa del tramo de Wayllabamba a Pacaymayo, por Warmiwañusca"><path d="M14 104 C40 80 70 30 100 18 S150 70 186 84" fill="none" stroke="#232850" stroke-width="3" stroke-dasharray="6 5"/><circle cx="14" cy="104" r="6" fill="#2F6B2C"/><circle cx="186" cy="84" r="6" fill="#A3123A"/></svg>
+            <div><h3>Día 2. Abra de Warmiwañusca</h3><p class="datos-dia">12 km, hasta 4.215 m, el punto más alto</p><p>La subida más dura del camino. Desde el abra se baja a Pacaymayo para dormir.</p></div>
+          </li>
+          <li class="dia">
+            <svg class="mapa" viewBox="0 0 200 120" role="img" aria-label="Mapa del tramo de Pacaymayo a Wiñay Wayna"><path d="M14 70 C40 30 80 40 110 60 S160 100 186 96" fill="none" stroke="#232850" stroke-width="3" stroke-dasharray="6 5"/><circle cx="14" cy="70" r="6" fill="#2F6B2C"/><circle cx="186" cy="96" r="6" fill="#A3123A"/></svg>
+            <div><h3>Día 3. Runkurakay y Wiñay Wayna</h3><p class="datos-dia">16 km, hasta 3.950 m</p><p>El día más largo y el más lindo: tres ciudadelas y la selva de nubes. Noche junto a Wiñay Wayna.</p></div>
+          </li>
+          <li class="dia">
+            <svg class="mapa" viewBox="0 0 200 120" role="img" aria-label="Mapa del tramo de Wiñay Wayna a Machu Picchu, por Intipunku"><path d="M14 90 C60 80 100 40 140 46 S176 60 186 70" fill="none" stroke="#232850" stroke-width="3" stroke-dasharray="6 5"/><circle cx="14" cy="90" r="6" fill="#2F6B2C"/><circle cx="186" cy="70" r="6" fill="#A3123A"/></svg>
+            <div><h3>Día 4. Intipunku, la Puerta del Sol</h3><p class="datos-dia">6 km, hasta 2.720 m</p><p>Salida antes del amanecer para ver Machu Picchu desde arriba. Visita guiada y tren de regreso a Cusco.</p></div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="seccion-ficha" aria-labelledby="t-incluye">
+        <h2 id="t-incluye">Qué incluye <span class="wf-marca" aria-hidden="true">2</span></h2>
+        <ul class="incluye">
+          <li>Guía en español</li>
+          <li>Porteadores para el equipo común</li>
+          <li>Carpas y bolsas de dormir</li>
+          <li>Todas las comidas del trekking</li>
+          <li>Permiso del Camino Inca y entrada a Machu Picchu</li>
+          <li>Tren de regreso a Cusco</li>
+          <li>Una noche de hotel en Cusco antes de salir</li>
+          <li>Equipaje de hasta 7 kg por persona, que llevan los porteadores</li>
+        </ul>
+        <p class="no-incluye">No incluye: vuelos, propinas ni el equipaje extra, que se abona en el punto de encuentro.</p>
+      </section>
+
+      <section class="seccion-ficha" aria-labelledby="t-resenas">
+        <h2 id="t-resenas">Lo que cuentan quienes ya caminaron <span class="wf-marca" aria-hidden="true">3</span></h2>
+        <div class="promedio"><b>4,8</b><span>de 5, en 52 reseñas</span></div>
+        <div class="resenas">
+          <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Llegar a Intipunku con la niebla abriéndose no se olvida. Los porteadores fueron lo mejor del viaje.</p><footer>Lucía, octubre</footer></blockquote>
+          <blockquote class="resena"><div class="estrellas" role="img" aria-label="4 de 5 estrellas">★★★★☆</div><p>El segundo día es durísimo, pero el guía nos fue esperando. Llevá bastones.</p><footer>Tomás, septiembre</footer></blockquote>
+          <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Todo confirmado con tiempo y cero sorpresas en el pago.</p><footer>Ana, agosto</footer></blockquote>
+        </div>
+      </section>
+    </div>
+
+    <aside class="compra" id="fechas" aria-labelledby="t-fecha">
+      <div class="tarjeta">
+        <h2 id="t-fecha">Elegí la fecha <span class="wf-marca" aria-hidden="true">4</span></h2>
+        <div class="mes"><button type="button" aria-label="Mes anterior">‹</button><b>Diciembre 2026</b><button type="button" aria-label="Mes siguiente">›</button></div>
+        <table class="calendario" aria-label="Diciembre 2026">
+          <thead><tr><th scope="col" abbr="lunes">lu</th><th scope="col" abbr="martes">ma</th><th scope="col" abbr="miércoles">mi</th><th scope="col" abbr="jueves">ju</th><th scope="col" abbr="viernes">vi</th><th scope="col" abbr="sábado">sá</th><th scope="col" abbr="domingo">do</th></tr></thead>
+          <tbody id="dias-mes"></tbody>
+        </table>
+        <ul class="leyenda">
+          <li><span class="estado listo">Confirmada</span></li>
+          <li>Tachada: sin lugares</li>
+        </ul>
+
+        <div class="elegida" aria-live="polite">
+          <span class="fechas" id="e-fechas">Del 10 al 13 de diciembre</span>
+          <span class="estado listo" id="e-estado">Salida confirmada. Quedan 3 lugares</span>
+          <div class="fila">
+            <span>Pasajeros</span>
+            <span class="contador">
+              <button type="button" id="menos" aria-label="Un pasajero menos">−</button>
+              <output id="cant" aria-live="polite">2</output>
+              <button type="button" id="mas" aria-label="Un pasajero más">+</button>
+            </span>
+          </div>
+          <div class="fila">
+            <p class="total">Total para <span id="e-pax">2 personas</span><b id="e-total">USD 1.500</b></p>
+            <span class="letra-chica" id="e-unit">USD 750 por persona</span>
+          </div>
+          <a class="btn" href="pagar.html">Continuar</a>
+          <p class="letra-chica" id="e-cancela">Podés cancelar sin costo hasta el 25 de noviembre.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="barra-movil">
+  <p>Desde<b>USD 750</b></p>
+  <a class="btn" href="#fechas">Elegir fecha</a>
+</div>
+
+<footer class="pie-corto">
+  <div class="ancho"><span>IncaTour. Cusco, Perú.</span><span>Foto: Wiñay Wayna, Christoph Strässler (CC BY-SA 2.0)</span></div>
+</footer>
+
+<section class="wf-notas" aria-labelledby="t-notas">
+  <div class="ancho">
+    <h2 id="t-notas">Notas de diseño: ficha del viaje</h2>
+    <p>Es la decisión de compra. Responde, en este orden: qué voy a vivir, cuánto sube cada día, qué incluye, qué opinan otros y qué fecha me sirve. La compra queda siempre a la vista: fija a la derecha en escritorio y como barra abajo en celular.</p>
+    <ol>
+      <li><b>Recorrido.</b> Los andenes resumen la altura de cada día y, debajo, cada día tiene su mapa, la distancia y la altura máxima. Depende del pedido al back 4 (día, altura, distancia y coordenadas por etapa). Sin coordenadas, el día se muestra sin mapa.</li>
+      <li><b>Qué incluye.</b> Texto escrito para el cliente (pedido 2), no los nombres internos de los servicios. El equipaje se informa acá y no se cobra en la compra.</li>
+      <li><b>Reseñas.</b> Promedio y cantidad (pedido 12). Con menos de 3 reseñas no se muestra el promedio: "Todavía pocas reseñas".</li>
+      <li><b>Calendario.</b> Solo los días con salida son botones. Cada uno dice su estado con texto en el nombre accesible ("10 de diciembre, salida confirmada, quedan 3 lugares, USD 750"); el punto de color es un refuerzo. El precio puede cambiar según la temporada, por eso se muestra al elegir la fecha. Componente: react-day-picker.</li>
+    </ol>
+    <h3>Estados</h3>
+    <div class="wf-estados">
+      <div class="wf-estado"><b>Fecha que todavía no llegó al mínimo</b><span>Quedan 8 lugares</span><p class="letra-chica" style="margin-top:8px">Sin estado ni aviso: solo las fechas confirmadas llevan la marca "Salida confirmada".</p></div>
+      <div class="wf-estado"><b>Últimos lugares</b><span class="estado listo">Salida confirmada. Queda 1 lugar</span><p class="letra-chica" style="margin-top:8px">El contador de pasajeros no deja pasar de 1.</p></div>
+      <div class="wf-estado"><b>Sin fechas este mes</b><p style="margin:0">No hay salidas en diciembre.</p><button class="btn-texto" type="button">Ver enero</button></div>
+      <div class="wf-estado"><b>Ninguna fecha elegida (al entrar)</b><p style="margin:0">Elegí una fecha para ver el precio y los lugares.</p><button class="btn" type="button" disabled style="width:100%;margin-top:10px">Continuar</button></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Salidas de ejemplo: el estado y el precio vienen del catálogo (pedido 1)
+  const salidas = {
+    4:  { hasta: 7,  estado: 'agotada' },
+    10: { hasta: 13, estado: 'confirmada', lugares: 3, precio: 750, cancela: '25 de noviembre' },
+    18: { hasta: 21, estado: 'falta', faltan: 2, lugares: 8, precio: 750, cancela: '3 de diciembre' },
+    22: { hasta: 25, estado: 'falta', faltan: 1, lugares: 10, precio: 790, cancela: '7 de diciembre' },
+    28: { hasta: 31, estado: 'confirmada', lugares: 6, precio: 790, cancela: '13 de diciembre' },
+  };
+  const usd = n => 'USD ' + n.toLocaleString('es-AR');
+  let elegido = 10, cant = 2;
+  const cuerpo = document.getElementById('dias-mes');
+  // Diciembre 2026 empieza un martes
+  let html = '<tr><td></td>', col = 1;
+  for (let d = 1; d <= 31; d++) {
+    const s = salidas[d];
+    if (s) {
+      const desc = s.estado === 'agotada' ? 'sin lugares' : s.estado === 'confirmada' ? `salida confirmada, quedan ${s.lugares} lugares, ${usd(s.precio)}` : `quedan ${s.lugares} lugares, ${usd(s.precio)}`;
+      html += `<td><button type="button" class="${s.estado}" data-dia="${d}" aria-pressed="${d === elegido}" aria-label="${d} de diciembre, ${desc}" ${s.estado === 'agotada' ? 'aria-disabled="true"' : ''}>${d}</button></td>`;
+    } else html += `<td>${d}</td>`;
+    if (++col === 7 && d < 31) { html += '</tr><tr>'; col = 0; }
+  }
+  cuerpo.innerHTML = html + '</tr>';
+  function pintar() {
+    const s = salidas[elegido];
+    cant = Math.min(cant, s.lugares);
+    document.getElementById('e-fechas').textContent = `Del ${elegido} al ${s.hasta} de diciembre`;
+    const est = document.getElementById('e-estado');
+    est.className = s.estado === 'confirmada' ? 'estado listo' : 'lugares';
+    est.textContent = s.estado === 'confirmada' ? `Salida confirmada. Quedan ${s.lugares} lugares` : `Quedan ${s.lugares} lugares`;
+    document.getElementById('cant').textContent = cant;
+    document.getElementById('e-pax').textContent = cant === 1 ? '1 persona' : cant + ' personas';
+    document.getElementById('e-total').textContent = usd(s.precio * cant);
+    document.getElementById('e-unit').textContent = usd(s.precio) + ' por persona';
+    document.getElementById('e-cancela').textContent = `Podés cancelar sin costo hasta el ${s.cancela}.`;
+    document.getElementById('menos').disabled = cant <= 1;
+    document.getElementById('mas').disabled = cant >= s.lugares;
+    cuerpo.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.dia === elegido));
+  }
+  cuerpo.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.classList.contains('agotada')) return; elegido = +b.dataset.dia; pintar(); });
+  document.getElementById('menos').onclick = () => { cant--; pintar(); };
+  document.getElementById('mas').onclick = () => { cant++; pintar(); };
+  pintar();
+</script>
+</body>
+</html>

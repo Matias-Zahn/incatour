@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: inicio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Muestra de identidad aplicada al inicio del cliente en escritorio. No es el wireframe final. */
+  :root {
+    --algodon:#FFFFFF; --indigo:#232850; --indigo-2:#4B5170; --cochinilla:#A3123A; --qolle:#E8A817; --chilca:#2F6B2C;
+    --piedra:#E9E6DF; --piedra-2:#B9B2A4; --linea:#E1E2EC; --espera:#8A5F00;
+    --f-titulo:"Alegreya", serif; --f-texto:"Alegreya Sans", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--algodon); color: var(--indigo); font: 18px/1.55 var(--f-texto); }
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+  .solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.1; margin: 0; }
+  .cifra, .fecha, .desde b, .lugares { font-variant-numeric: lining-nums tabular-nums; }
+  .ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+  @media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 26px; border-radius: 6px; border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+  .btn:hover { background: #870E30; }
+  .btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; padding: 0 18px; font-weight: 700; font-size: 16px; }
+  .btn-sec:hover { background: #F2F2F7; }
+  .estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+  .estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+  .listo { color: var(--chilca); } .espera { color: var(--espera); }
+
+  /* Portada a todo color: cada circuito trae su tinte de fondo (índigo, cochinilla, chilca) */
+  .hero { position: relative; overflow: hidden; padding-top: 80px; color: #fff; background: var(--tono, var(--indigo)); transition: background-color .5s ease; }
+  /* Textura de tejido: el ligamento de la tela fino y, encima, la retícula de rombos del pallay.
+     Se desvanece hacia la foto para no ensuciarla. */
+  .hero::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' fill='none' stroke='white' stroke-opacity='.11' stroke-width='2'%3E%3Cpath d='M48 8 L88 48 L48 88 L8 48Z'/%3E%3Cpath d='M48 24 L72 48 L48 72 L24 48Z'/%3E%3Cpath d='M48 38 L58 48 L48 58 L38 48Z' fill='white' fill-opacity='.12'/%3E%3Cpath d='M0 8 L8 0 M88 0 L96 8 M0 88 L8 96 M88 96 L96 88'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='3' height='3' fill='white' fill-opacity='.05'/%3E%3Crect x='3' y='3' width='3' height='3' fill='white' fill-opacity='.05'/%3E%3Crect y='2.5' width='6' height='.6' fill='black' fill-opacity='.12'/%3E%3Crect x='2.5' width='.6' height='6' fill='black' fill-opacity='.07'/%3E%3C/svg%3E"); background-size: 96px 96px, 6px 6px;
+    -webkit-mask-image: linear-gradient(to right, #000 38%, transparent 72%); mask-image: linear-gradient(to right, #000 38%, transparent 72%); }
+  .cab, .control, .diapo > div { position: relative; z-index: 2; }
+  /* El tinte vive en <body data-tono="indigo">
+<a class="saltar" href="#contenido">Saltar al contenido</a> para que lo compartan el encabezado y la portada */
+  [data-tono="indigo"] { --tono: #232850; }
+  [data-tono="cochinilla"] { --tono: #8C1032; }
+  [data-tono="chilca"] { --tono: #27592A; }
+  .hero a:focus-visible, .hero button:focus-visible, .sitio a:focus-visible, .sitio button:focus-visible { outline-color: var(--qolle); }
+
+  /* Salto al contenido: aparece solo al recibir el foco */
+  .saltar { position: absolute; left: 16px; top: -80px; z-index: 10; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+  .saltar:focus { top: 12px; }
+
+  /* El encabezado queda fuera de <main> y se apoya sobre la portada */
+  .sitio { position: absolute; top: 0; left: 0; right: 0; z-index: 3; color: #fff; }
+
+  .cab { display: flex; justify-content: space-between; align-items: center; min-height: 80px; }
+  .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 28px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+  .nav { display: flex; gap: 8px; align-items: center; }
+  .enlaces { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .menu-btn { display: none; font: inherit; font-weight: 700; color: #fff; background: none; border: 2px solid rgba(255,255,255,.6); border-radius: 6px; min-height: 44px; padding: 0 14px; cursor: pointer; }
+  .nav a { text-decoration: none; font-weight: 500; padding: 10px 14px; border-radius: 6px; min-height: 44px; display: inline-flex; align-items: center; }
+  .nav a:hover { background: rgba(255,255,255,.12); }
+  .nav .ingresar { border: 2px solid #fff; font-weight: 700; }
+  /* En celular (y con zoom al 200 %) los enlaces pasan a un menú desplegable: no se pierden */
+  @media (max-width: 700px) {
+    .cab { min-height: 72px; }
+    .hero { padding-top: 72px; }
+    .menu-btn { display: inline-flex; align-items: center; }
+    .enlaces { display: none; position: absolute; top: 64px; left: 20px; right: 20px; flex-direction: column; gap: 0; background: var(--tono); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .enlaces.abierta { display: flex; }
+    .enlaces a { width: 100%; }
+  }
+
+  /* Carrusel: se pasa con las flechas o con los nombres; no avanza solo */
+  /* Los nombres y las flechas van arriba, para que se vean sin bajar */
+  /* Solo margen vertical: el lateral lo pone .ancho */
+  .carrusel { padding-top: 8px; padding-bottom: 48px; }
+  .carrusel .control { margin: 0 0 28px; }
+  .nombres { order: 0; } .contador { order: 1; } .flecha { order: 2; }
+  .diapo { display: grid; grid-template-columns: minmax(0, 560px); align-content: end; }
+  .diapo[hidden] { display: none; }
+  /* Se anima el texto con desplazamiento y la foto solo con opacidad */
+  .diapo.entra > div { animation: entra .45s ease both; }
+  .diapo.entra figure { animation: aparece .6s ease both; }
+  @keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes entra { from { opacity: 0; transform: translateX(var(--desde, 24px)); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .diapo.entra > div, .diapo.entra figure { animation: none; } .hero { transition: none; } }
+  .diapo h2 { font-size: clamp(40px, 4.4vw, 58px); font-weight: 800; letter-spacing: -0.01em; }
+  .diapo .baj { font-size: 20px; margin: 16px 0 0; max-width: 34ch; color: rgba(255,255,255,.86); }
+  .datos { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 22px 0 0; padding: 0; list-style: none; }
+  .datos li { font-size: 15px; color: rgba(255,255,255,.8); }
+  .datos li b { display: block; font-size: 30px; font-weight: 800; line-height: 1.1; color: #fff; }
+  .diapo .estado { margin-top: 20px; color: #fff; }
+  .diapo .estado.listo::before { background: #9BD49A; }
+  .diapo .estado.espera::before { background: var(--qolle); }
+  .acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 18px; }
+  .acciones .btn { background: #fff; color: var(--indigo); }
+  .precio-hero { margin: 0; font-size: 15px; color: rgba(255,255,255,.8); }
+  .precio-hero b { display: block; font-size: 28px; font-weight: 800; color: #fff; line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; }
+  .acciones .btn:hover { background: #F2F2F7; }
+  .acciones a.otro { font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; }
+  /* La foto ocupa la mitad derecha de la portada y se funde con el tinte de fondo, sin bordes */
+  .diapo figure { position: absolute; top: 0; right: 0; bottom: 0; width: 60%; margin: 0; z-index: 0; }
+  .diapo figure img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .diapo figure::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to right, var(--tono) 0%, transparent 48%),
+                linear-gradient(to top, var(--tono) 0%, transparent 22%),
+                linear-gradient(to bottom, rgba(0,0,0,.45) 0%, transparent 20%); }
+  .diapo figcaption { position: absolute; right: 24px; bottom: 14px; z-index: 2; font-size: 13px; color: rgba(255,255,255,.85); text-shadow: 0 1px 3px rgba(0,0,0,.6); max-width: 46ch; text-align: right; }
+
+  .control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid rgba(255,255,255,.2); padding-bottom: 12px; }
+  /* Relleno sólido con el tinte: se ven igual sobre nieve, cielo o selva */
+  .flecha { width: 52px; height: 52px; border-radius: 50%; border: 2px solid #fff; background: var(--tono); box-shadow: 0 2px 10px rgba(0,0,0,.35); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .flecha:hover { background: #fff; color: var(--tono); }
+  .flecha[data-paso="-1"] { margin-left: auto; }
+  .flecha svg { width: 22px; height: 22px; }
+  .nombres { display: flex; gap: 4px; flex-wrap: wrap; }
+  .nombres button { font: inherit; font-size: 16px; font-weight: 700; color: rgba(255,255,255,.75); background: none; border: 0; border-bottom: 3px solid transparent; min-height: 44px; padding: 0 10px; cursor: pointer; }
+  .nombres button[aria-current="true"] { color: #fff; border-bottom-color: var(--qolle); }
+  .contador { margin-left: 8px; font-size: 15px; color: rgba(255,255,255,.8); font-variant-numeric: lining-nums tabular-nums; }
+
+  @media (max-width: 900px) {
+    .diapo { grid-template-columns: 1fr; min-height: 0; gap: 20px; }
+    .diapo figure { position: relative; z-index: 1; order: -1; width: auto; height: 300px; margin: 0 -32px; }
+    .diapo figure::after { background: linear-gradient(to top, var(--tono) 0%, transparent 45%); }
+    .diapo figcaption { bottom: auto; top: 10px; }
+    .hero::before { -webkit-mask-image: none; mask-image: none; }
+  }
+  /* En celular: los nombres en una línea y, debajo, el contador y las flechas */
+  @media (max-width: 700px) {
+    .nombres { flex-basis: 100%; }
+    .diapo figure { margin: 0 -20px; }
+    .contador { margin-left: 0; }
+  }
+
+  /* La faja tejida cierra la portada como el borde de un aguayo. Va solo acá. */
+  .faja { display: block; width: 100%; height: 26px; }
+
+  /* Circuitos: una fila por circuito, con sus andenes como dato */
+  .seccion { padding: 72px 0; }
+  /* Las secciones alternan fondo: algodón, un índigo muy claro y el índigo pleno para las reseñas */
+  .seccion.tinte { background: #ECEDF5; }
+  .seccion.tinte .salida { border-color: #D3D5E6; }
+  .seccion.oscura { background: var(--indigo); color: #fff; }
+  .seccion.oscura .resena footer { color: #D5D8EE; }
+  .seccion.oscura .estrellas { color: var(--qolle); }
+  .seccion.oscura a:focus-visible { outline-color: var(--qolle); }
+  .seccion > .ancho > h2 { font-size: 40px; font-weight: 800; }
+  .seccion > .ancho > p.bajada { margin: 8px 0 32px; color: var(--indigo-2); max-width: 60ch; }
+  .circuito { display: grid; grid-template-columns: 200px 1fr 260px 180px; gap: 32px; align-items: center; padding: 28px 0; border-top: 1px solid var(--linea); }
+  .circuito:last-child { border-bottom: 1px solid var(--linea); }
+  .circuito img.mini { display: block; width: 100%; height: 140px; object-fit: cover; border-radius: 6px; background: var(--piedra); }
+  .circuito h3 { font-size: 34px; font-weight: 800; }
+  .circuito h3 a { text-decoration: none; }
+  .circuito h3 a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .circuito p { margin: 6px 0 0; color: var(--indigo-2); font-size: 17px; }
+  .circuito .estado { margin-top: 10px; font-size: 15px; }
+  .andenes { display: grid; align-items: end; gap: 3px; height: 92px; }
+  .anden { background: var(--piedra); border-top: 3px solid #8E8676; border-radius: 2px 2px 0 0; }
+  .anden.alto { background: var(--indigo); border-top-color: var(--qolle); }
+  .andenes-pie { display: flex; justify-content: space-between; font-size: 14px; color: var(--indigo-2); margin-top: 6px; }
+  .andenes-pie b { color: var(--indigo); }
+  .desde { margin: 0 0 12px; font-size: 15px; color: var(--indigo-2); }
+  .desde b { display: block; font-size: 28px; color: var(--indigo); line-height: 1.1; }
+  @media (max-width: 1000px) {
+    .circuito { grid-template-columns: 140px 1fr; gap: 16px 24px; }
+    .circuito .col-andenes, .circuito .col-precio { grid-column: 2; }
+  }
+  @media (max-width: 560px) {
+    .circuito { grid-template-columns: 1fr; }
+    .circuito .col-andenes, .circuito .col-precio { grid-column: 1; }
+    .circuito img.mini { height: 180px; }
+  }
+
+  /* Próximas salidas: para quien ya tiene fecha */
+  .salidas { list-style: none; margin: 0; padding: 0; }
+  .salida { display: grid; grid-template-columns: 110px 1fr 220px 140px auto; gap: 24px; align-items: center; padding: 18px 0; border-top: 1px solid var(--linea); }
+  .salida:last-child { border-bottom: 1px solid var(--linea); }
+  .fecha { font-family: var(--f-titulo); font-weight: 800; font-size: 30px; line-height: 1; }
+  .fecha small { display: block; font-family: var(--f-texto); font-weight: 500; font-size: 15px; color: var(--indigo-2); margin-top: 4px; }
+  .salida .nombre { font-weight: 700; font-size: 20px; }
+  .salida .nombre span { display: block; font-weight: 400; font-size: 15px; color: var(--indigo-2); }
+  .lugares { font-size: 16px; color: var(--indigo-2); }
+  .salida .precio { font-weight: 800; font-size: 20px; font-variant-numeric: lining-nums tabular-nums; }
+  @media (max-width: 900px) {
+    .salida { grid-template-columns: 90px 1fr; gap: 6px 20px; }
+    .salida > :nth-child(n+3) { grid-column: 2; }
+  }
+
+  /* Confianza */
+  .confianza { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; }
+  .resena p { margin: 0; font-family: var(--f-titulo); font-size: 22px; line-height: 1.35; font-weight: 500; }
+  .resena footer { margin-top: 12px; font-size: 15px; color: var(--indigo-2); }
+  .estrellas { color: var(--cochinilla); letter-spacing: 2px; font-size: 18px; margin-bottom: 8px; }
+  .garantia { background: var(--qolle); color: var(--indigo); border-radius: 8px; padding: 28px; }
+  .garantia h3 { font-size: 26px; }
+  .garantia p { margin: 10px 0 0; font-size: 17px; }
+  @media (max-width: 900px) { .confianza { grid-template-columns: 1fr; } }
+
+  /* Pie: contenido sobre índigo y, al final, el muro inca como cimiento de la página */
+  .pie { background: var(--indigo); color: #D5D8EE; font-size: 16px; }
+  .pie-cuerpo { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 32px; padding-top: 56px; padding-bottom: 40px; }
+  .pie h2 { font-family: var(--f-texto); font-size: 16px; font-weight: 700; color: #fff; margin: 0 0 6px; }
+  .pie ul { list-style: none; margin: 0; padding: 0; }
+  .pie li { padding: 0; }
+  /* 44 px de alto como mínimo: regla del proyecto para objetivos táctiles */
+  .pie a { color: #D5D8EE; text-decoration: none; display: inline-block; padding: 10px 0; min-height: 44px; }
+  .pie a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+  .pie a:focus-visible { outline-color: var(--qolle); }
+  .pie-marca b { font-family: var(--f-titulo); font-weight: 800; font-size: 30px; color: #fff; }
+  .pie-marca p { margin: 6px 0 0; max-width: 30ch; }
+  .pie .creditos { grid-column: 1 / -1; margin: 0; font-size: 14px; border-top: 1px solid rgba(255,255,255,.15); padding-top: 16px; }
+  .muro { display: block; width: 100%; height: 200px; }
+  @media (max-width: 900px) { .pie-cuerpo { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .pie-cuerpo { grid-template-columns: 1fr; } .muro { height: 140px; } }
+  .nota { background: #fff; font-size: 14px; color: var(--indigo-2); padding-top: 16px; padding-bottom: 32px; }
+</style>
+</head>
+<body data-tono="indigo">
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="pallay" width="22" height="22" patternUnits="userSpaceOnUse">
+      <rect width="22" height="22" fill="#232850"/>
+      <rect width="22" height="2.5" fill="#2F6B2C"/><rect y="19.5" width="22" height="2.5" fill="#2F6B2C"/>
+      <polygon points="11,4 18,11 11,18 4,11" fill="#A3123A"/>
+      <polygon points="11,8 14,11 11,14 8,11" fill="#E8A817"/>
+      <polygon points="0,7 4,11 0,15" fill="#fff"/><polygon points="22,7 18,11 22,15" fill="#fff"/>
+    </pattern>
+
+    <!-- Muro inca: piedras poligonales encajadas. El módulo de 640 px se repite espejado para que las juntas coincidan -->
+    <g id="piedras" stroke="#4F4A40" stroke-width="4" stroke-linejoin="round">
+        <polygon points="0,0 120,0 135,44 110,94 0,86" fill="#A8A08F"/>
+        <polygon points="120,0 260,0 250,61 200,78 135,44" fill="#857E6F"/>
+        <polygon points="260,0 400,0 410,50 350,83 250,61" fill="#B2AB9A"/>
+        <polygon points="400,0 520,0 540,67 470,89 410,50" fill="#7A7364"/>
+        <polygon points="520,0 640,0 640,78 540,67" fill="#9B9483"/>
+        <polygon points="0,86 110,94 140,144 95,200 0,200" fill="#8E8778"/>
+        <polygon points="110,94 135,44 200,78 230,139 140,144" fill="#A39C8B"/>
+        <polygon points="200,78 250,61 350,83 330,150 230,139" fill="#A8A08F"/>
+        <polygon points="350,83 410,50 470,89 455,156 330,150" fill="#857E6F"/>
+        <polygon points="470,89 540,67 640,78 640,167 455,156" fill="#B2AB9A"/>
+        <polygon points="140,144 230,139 255,200 95,200" fill="#7A7364"/>
+        <polygon points="230,139 330,150 360,200 255,200" fill="#9B9483"/>
+        <polygon points="330,150 455,156 470,200 360,200" fill="#8E8778"/>
+        <polygon points="455,156 640,167 640,200 470,200" fill="#A39C8B"/>
+        <polygon points="288,72 342,72 356,178 274,178" fill="#2A2721"/>
+        <polygon points="280,60 350,60 344,72 286,72" fill="#B3AC9C"/>
+    </g>
+    <pattern id="muro" width="1280" height="200" patternUnits="userSpaceOnUse">
+      <use href="#piedras"/>
+      <use href="#piedras" transform="translate(1280 0) scale(-1 1)"/>
+    </pattern>
+    <linearGradient id="luz-muro" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient>
+  </defs>
+</svg>
+
+<header class="sitio">
+  <div class="ancho cab">
+    <a class="logo" href="#">IncaTour</a>
+    <nav class="nav" aria-label="Principal">
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="enlaces">Menú</button>
+      <ul class="enlaces" id="enlaces">
+        <li><a href="#circuitos">Circuitos</a></li>
+        <li><a href="#salidas">Próximas salidas</a></li>
+      </ul>
+      <!-- Con sesión iniciada, "Ingresar" pasa a ser "Mi viaje" -->
+      <a class="ingresar" href="#">Ingresar</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenido" tabindex="-1">
+<div class="hero">
+
+  <h1 class="solo-lector">IncaTour: trekkings por el Camino Inca, Salkantay y Lares hasta Machu Picchu</h1>
+  <section class="ancho carrusel" aria-roledescription="carrusel" aria-label="Circuitos destacados">
+    <div class="control">
+      <div class="nombres">
+        <button type="button" data-ir="0" aria-current="true">Camino Inca</button>
+        <button type="button" data-ir="1">Salkantay</button>
+        <button type="button" data-ir="2">Lares</button>
+      </div>
+      <span class="contador" aria-hidden="true">1 de 3</span>
+      <span class="solo-lector" aria-live="polite" id="anuncio"></span>
+      <button class="flecha" type="button" data-paso="-1" aria-label="Circuito anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="flecha" type="button" data-paso="1" aria-label="Circuito siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+
+    <article class="diapo" data-tono="indigo" aria-roledescription="diapositiva" aria-label="1 de 3: Camino Inca">
+      <div>
+        <h2>Llegá a Machu Picchu caminando, por la Puerta del Sol.</h2>
+        <p class="baj">Cuatro días por el camino de piedra que hicieron los incas, entre andenes, abras y ciudadelas que solo se ven a pie.</p>
+        <ul class="datos" aria-label="El Camino Inca en datos">
+          <li><b class="cifra">4 días</b>de Km 82 a Machu Picchu</li>
+          <li><b class="cifra">4.215 m</b>en Warmiwañusca</li>
+          <li><b class="cifra">4,8 de 5</b>en 52 reseñas</li>
+        </ul>
+        <p class="estado listo">Próxima salida confirmada: 10 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 750</b></p><a class="btn" href="#">Ver fechas del Camino Inca</a></div>
+      </div>
+      <figure>
+        <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/Winay_Wayna_Inca_site%2C_Inca_Trail%2C_Peru.jpg/1920px-Winay_Wayna_Inca_site%2C_Inca_Trail%2C_Peru.jpg" alt="Los andenes y muros de piedra de Wiñay Wayna sobre el valle del Urubamba">
+      </figure>
+    </article>
+
+    <article class="diapo" data-tono="cochinilla" aria-roledescription="diapositiva" aria-label="2 de 3: Salkantay" hidden>
+      <div>
+        <h2>Cruzá al pie del nevado sagrado y bajá a la selva de nubes.</h2>
+        <p class="baj">Cinco días por la ruta alternativa, de los glaciares a los cafetales, con llegada a Machu Picchu.</p>
+        <ul class="datos" aria-label="El Salkantay en datos">
+          <li><b class="cifra">5 días</b>de Mollepata a Machu Picchu</li>
+          <li><b class="cifra">4.630 m</b>en el abra Salkantay</li>
+          <li><b class="cifra">4,6 de 5</b>en 31 reseñas</li>
+        </ul>
+        <p class="estado espera">Faltan 2 personas para confirmar la salida del 14 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 690</b></p><a class="btn" href="#">Ver fechas del Salkantay</a></div>
+      </div>
+      <figure>
+        <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Salcantay%E2%80%94Inca_Chiriaska_lagoon.jpg/1920px-Salcantay%E2%80%94Inca_Chiriaska_lagoon.jpg" alt="El nevado Salkantay sobre una laguna de altura">
+      </figure>
+    </article>
+
+    <article class="diapo" data-tono="chilca" aria-roledescription="diapositiva" aria-label="3 de 3: Lares" hidden>
+      <div>
+        <h2>Caminá entre las comunidades que todavía tejen como hace siglos.</h2>
+        <p class="baj">Cuatro días por los pueblos tejedores de los Andes, con aguas termales al empezar y tren a Machu Picchu al final.</p>
+        <ul class="datos" aria-label="Lares en datos">
+          <li><b class="cifra">4 días</b>de Lares a Machu Picchu</li>
+          <li><b class="cifra">4.450 m</b>en el abra Ipsaycocha</li>
+          <li><b class="cifra">4,7 de 5</b>en 24 reseñas</li>
+        </ul>
+        <p class="estado listo">Próxima salida confirmada: 18 de diciembre</p>
+        <div class="acciones"><p class="precio-hero">Desde<b>USD 620</b></p><a class="btn" href="#">Ver fechas de Lares</a></div>
+      </div>
+      <figure>
+        <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/Comunidad_de_Patacancha.jpg/1920px-Comunidad_de_Patacancha.jpg" alt="Casas de la comunidad de Patacancha entre cerros andinos">
+      </figure>
+    </article>
+
+  </section>
+</div>
+<svg class="faja" aria-hidden="true"><rect width="100%" height="26" fill="url(#pallay)"/></svg>
+
+
+  <section class="seccion" id="circuitos" aria-labelledby="t-circuitos">
+    <div class="ancho">
+      <h2 id="t-circuitos">Elegí tu camino</h2>
+      <p class="bajada">Los tres terminan en Machu Picchu. Cambian los días, la altura y lo que ves en el camino. Solo mostramos los que tienen fechas a la venta.</p>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg/1920px-Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg" alt="Machu Picchu visto desde Intipunku, la Puerta del Sol">
+        <div>
+          <h3><a href="#">Camino Inca</a></h3>
+          <p>El camino original, de piedra, con ciudadelas en cada día. Entrás a Machu Picchu por Intipunku.</p>
+          <p class="estado listo">Próxima salida confirmada: 10 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(4,1fr)" role="img" aria-label="Altura máxima por día: 3.000, 4.215, 3.950 y 2.720 metros">
+            <div class="anden" style="height:38%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:89%"></div><div class="anden" style="height:32%"></div>
+          </div>
+          <div class="andenes-pie"><span>4 días</span><span>hasta <b class="cifra">4.215 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 750</b></p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> del Camino Inca</span></a>
+        </div>
+      </article>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/Salcantay_Peak_shrouded_in_clouds.jpg/1920px-Salcantay_Peak_shrouded_in_clouds.jpg" alt="El nevado Salkantay entre nubes">
+        <div>
+          <h3><a href="#">Salkantay</a></h3>
+          <p>La ruta alternativa: cruza al pie del nevado sagrado y baja a la selva de nubes antes de Machu Picchu.</p>
+          <p class="estado espera">Faltan 2 personas para confirmar la salida del 14 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(5,1fr)" role="img" aria-label="Altura máxima por día: 3.900, 4.630, 2.900, 2.700 y 2.430 metros">
+            <div class="anden" style="height:72%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:34%"></div><div class="anden" style="height:27%"></div><div class="anden" style="height:16%"></div>
+          </div>
+          <div class="andenes-pie"><span>5 días</span><span>hasta <b class="cifra">4.630 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 690</b></p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> del Salkantay</span></a>
+        </div>
+      </article>
+
+      <article class="circuito">
+        <img class="mini" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg/1920px-Peru_-_Lares_Trek_007_-_wide%2C_apline_valleys_%287584211332%29.jpg" alt="Valles abiertos del trekking de Lares">
+        <div>
+          <h3><a href="#">Lares</a></h3>
+          <p>Por las comunidades tejedoras de los Andes, con aguas termales el primer día. Termina en tren a Machu Picchu.</p>
+          <p class="estado listo">Próxima salida confirmada: 18 de diciembre</p>
+        </div>
+        <div class="col-andenes">
+          <div class="andenes" style="grid-template-columns:repeat(4,1fr)" role="img" aria-label="Altura máxima por día: 3.800, 4.450, 2.800 y 2.430 metros">
+            <div class="anden" style="height:68%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:30%"></div><div class="anden" style="height:16%"></div>
+          </div>
+          <div class="andenes-pie"><span>4 días</span><span>hasta <b class="cifra">4.450 m</b></span></div>
+        </div>
+        <div class="col-precio">
+          <p class="desde">Desde<b>USD 620</b></p>
+          <a class="btn btn-sec" href="#">Ver fechas<span class="solo-lector"> de Lares</span></a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="seccion tinte" id="salidas" aria-labelledby="t-salidas">
+    <div class="ancho">
+      <h2 id="t-salidas">¿Ya tenés fecha?</h2>
+      <p class="bajada">Las próximas salidas de todos los circuitos, con los lugares que quedan.</p>
+      <ul class="salidas">
+        <li class="salida"><span class="fecha">10 dic<small>al 13 dic</small></span><span class="nombre">Camino Inca<span>4 días</span></span><span class="estado listo">Confirmada</span><span class="lugares">Quedan 3 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Camino Inca, 10 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">14 dic<small>al 18 dic</small></span><span class="nombre">Salkantay<span>5 días</span></span><span class="estado espera">Faltan 2 personas</span><span class="lugares">Quedan 8 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Salkantay, 14 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">18 dic<small>al 21 dic</small></span><span class="nombre">Lares<span>4 días</span></span><span class="estado listo">Confirmada</span><span class="lugares">Quedan 5 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Lares, 18 de diciembre</span></a></li>
+        <li class="salida"><span class="fecha">22 dic<small>al 25 dic</small></span><span class="nombre">Camino Inca<span>4 días</span></span><span class="estado espera">Falta 1 persona</span><span class="lugares">Quedan 10 lugares</span><a class="btn btn-sec" href="#">Elegir esta fecha<span class="solo-lector">: Camino Inca, 22 de diciembre</span></a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="seccion oscura" aria-labelledby="t-confianza">
+    <div class="ancho">
+      <h2 id="t-confianza" style="margin-bottom:32px">Lo que cuentan quienes ya caminaron</h2>
+      <div class="confianza">
+        <blockquote class="resena" style="margin:0">
+          <div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div>
+          <p>Llegar a Intipunku con la niebla abriéndose sobre Machu Picchu no se olvida. Los porteadores fueron lo mejor del viaje.</p>
+          <footer>Lucía, Camino Inca, octubre</footer>
+        </blockquote>
+        <blockquote class="resena" style="margin:0">
+          <div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div>
+          <p>Nos avisaron con tiempo que la salida estaba confirmada y todo lo que había que llevar. Cero sorpresas.</p>
+          <footer>Martín, Salkantay, septiembre</footer>
+        </blockquote>
+        <div class="garantia">
+          <h3>Si la salida no se confirma, te devolvemos el 100 %</h3>
+          <p>Cada salida necesita un mínimo de personas. Si no se llega, <b>te devolvemos todo lo que pagaste</b>, sin trámites.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="ancho pie-cuerpo">
+    <div class="pie-marca"><b>IncaTour</b><p>Trekkings por el Camino Inca, el Salkantay y Lares. Cusco, Perú.</p></div>
+    <nav aria-labelledby="pie-circuitos"><h2 id="pie-circuitos">Circuitos</h2><ul><li><a href="#">Camino Inca</a></li><li><a href="#">Salkantay</a></li><li><a href="#">Lares</a></li></ul></nav>
+    <nav aria-labelledby="pie-viaje"><h2 id="pie-viaje">Tu viaje</h2><ul><li><a href="#">Mi viaje</a></li><li><a href="#">Cancelaciones y reintegros</a></li><li><a href="#">Qué llevar</a></li></ul></nav>
+    <div><h2>Contacto</h2><ul><li>Cusco, Perú</li><li><a href="#">Escribinos</a></li><li>Emergencias en ruta: <a href="tel:+5184000000">+51 84 000 000</a></li></ul></div>
+    <p class="creditos">Fotos de Wikimedia Commons: Wiñay Wayna e Intipunku, Christoph Strässler (CC BY-SA 2.0); Salkantay, Sashimi-b (CC BY-SA 4.0 y CC BY 4.0); Patacancha, Yupanasimi (CC BY-SA 4.0); valles de Lares, McKay Savage (CC BY 2.0).</p>
+  </div>
+  <svg class="muro" aria-hidden="true"><rect width="100%" height="200" fill="url(#muro)"/><rect width="100%" height="200" fill="url(#luz-muro)"/></svg>
+  <div class="nota"><p class="ancho" style="margin:0">Muestra de identidad, no el wireframe final. Las fotos tienen licencia libre y sirven para mostrar el estilo: para publicar hacen falta fotos propias o con licencia comercial. Fechas, precios y reseñas son de ejemplo.</p></div>
+</footer>
+
+<script>
+  // Carrusel: flechas, nombres y teclado. No avanza solo.
+  const anuncio = document.getElementById('anuncio');
+  const nombresCirc = ['Camino Inca', 'Salkantay', 'Lares'];
+  const diapos = [...document.querySelectorAll('.diapo')];
+  const nombres = [...document.querySelectorAll('.nombres button')];
+  const contador = document.querySelector('.contador');
+  let actual = 0;
+  function ir(n, dir) {
+    n = (n + diapos.length) % diapos.length;
+    if (n === actual) return;
+    diapos[actual].hidden = true;
+    const d = diapos[n];
+    d.hidden = false;
+    d.style.setProperty('--desde', (dir < 0 ? -24 : 24) + 'px');
+    d.classList.remove('entra'); void d.offsetWidth; d.classList.add('entra');
+    document.body.dataset.tono = d.dataset.tono;
+    nombres.forEach((b, i) => b.setAttribute('aria-current', i === n ? 'true' : 'false'));
+    contador.textContent = (n + 1) + ' de ' + diapos.length;
+    anuncio.textContent = nombresCirc[n] + ', ' + (n + 1) + ' de ' + diapos.length;
+    actual = n;
+  }
+  document.querySelectorAll('.flecha').forEach(b => b.addEventListener('click', () => ir(actual + +b.dataset.paso, +b.dataset.paso)));
+  nombres.forEach(b => b.addEventListener('click', () => ir(+b.dataset.ir, +b.dataset.ir - actual)));
+  document.querySelector('.carrusel').addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') ir(actual + 1, 1);
+    if (e.key === 'ArrowLeft') ir(actual - 1, -1);
+  });
+
+  // Menú en celular: se abre con el botón y se cierra con Escape
+  const menuBtn = document.querySelector('.menu-btn');
+  const enlaces = document.getElementById('enlaces');
+  function menu(abrir) { enlaces.classList.toggle('abierta', abrir); menuBtn.setAttribute('aria-expanded', abrir); }
+  menuBtn.addEventListener('click', () => menu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+  enlaces.addEventListener('click', e => { if (e.target.closest('a')) menu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuBtn.getAttribute('aria-expanded') === 'true') { menu(false); menuBtn.focus(); } });
+</script>
+</body>
+</html>

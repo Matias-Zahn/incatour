@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: mi viaje</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/*BASE*/
+/* Base común de los wireframes de IncaTour. Fuente única: se incrusta en cada HTML con armar.py
+   (el panel de vista previa no carga hojas de estilo por ruta relativa). Semilla de los tokens de 04-sistema. */
+:root {
+  --algodon: #FFFFFF; --indigo: #232850; --indigo-2: #4B5170; --indigo-claro: #ECEDF5;
+  --cochinilla: #A3123A; --qolle: #E8A817; --chilca: #2F6B2C; --piedra: #E9E6DF; --piedra-borde: #8E8676;
+  --linea: #E1E2EC; --espera: #8A5F00; --riesgo: #9C4A00; --critico: #A3123A;
+  --f-titulo: "Alegreya", serif; --f-texto: "Alegreya Sans", sans-serif;
+  --radio: 6px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--algodon); color: var(--indigo); font: 17px/1.55 var(--f-texto); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.15; margin: 0; }
+.cifra { font-variant-numeric: lining-nums tabular-nums; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* El salto al contenido aparece al recibir el foco */
+a.solo-lector:focus { position: fixed; top: 12px; left: 16px; width: auto; height: auto; clip: auto; z-index: 20; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+.ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+/* Encabezado de las páginas interiores: índigo liso, sin foto */
+.barra { background: var(--indigo); color: #fff; }
+.barra .ancho { display: flex; justify-content: space-between; align-items: center; min-height: 72px; gap: 16px; }
+.barra .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 26px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.barra nav { display: flex; gap: 8px; }
+.barra nav a { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--radio); }
+.barra nav a:hover { background: rgba(255,255,255,.12); }
+.barra nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--qolle); }
+.barra a:focus-visible { outline-color: var(--qolle); }
+@media (max-width: 480px) { .barra .ancho { gap: 8px; } .barra .logo { font-size: 22px; } .barra nav { gap: 0; } .barra nav a { padding: 0 8px; white-space: nowrap; font-size: 15px; } }
+
+/* Botones */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--radio); border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.btn:hover { background: #870E30; }
+.btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; font-weight: 700; }
+.btn-sec:hover { background: #F2F2F7; }
+.btn-texto { background: none; border: 0; color: var(--indigo); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.btn-peligro { color: var(--critico); }
+.btn[disabled] { background: #C9CBD8; color: #4B5170; cursor: not-allowed; }
+
+/* Estados: siempre con texto */
+.estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.listo { color: var(--chilca); } .espera { color: var(--espera); } .riesgo { color: var(--riesgo); } .critico { color: var(--critico); }
+
+/* Campos */
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 15px; }
+.campo .ayuda { font-size: 14px; color: var(--indigo-2); }
+.campo input, .campo select { font: inherit; min-height: 48px; padding: 0 14px; border: 2px solid #9EA2BC; border-radius: var(--radio); background: #fff; color: var(--indigo); }
+.campo input:hover { border-color: var(--indigo-2); }
+.campo.con-error input { border-color: var(--critico); }
+.campo .error { font-size: 14px; font-weight: 700; color: var(--critico); }
+
+/* Bloques */
+.tarjeta { border: 1px solid var(--linea); border-radius: 10px; background: #fff; }
+.aviso { border-radius: 10px; padding: 14px 16px; font-size: 16px; }
+.aviso.info { background: var(--indigo-claro); }
+.aviso.error { background: #FBEAEE; color: #7A0E2B; border-left: 4px solid var(--critico); }
+
+/* Andenes: el recorrido por día */
+.andenes { display: grid; align-items: end; gap: 4px; height: 120px; }
+.anden { background: var(--piedra); border-top: 3px solid var(--piedra-borde); border-radius: 2px 2px 0 0; padding: 4px 6px 0; font-size: 13px; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+.anden b { display: block; }
+.anden.alto { background: var(--indigo); color: #fff; border-top-color: var(--qolle); }
+
+/* Pie con muro: versión corta para las páginas interiores */
+.pie-corto { background: var(--indigo); color: #D5D8EE; font-size: 15px; }
+.pie-corto .ancho { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
+.pie-corto svg { display: block; width: 100%; height: 90px; }
+
+/* Notas de diseño: van fuera de la pantalla, no son parte de la interfaz */
+.wf-notas { background: #FFFBEA; border-top: 4px solid var(--qolle); margin-top: 64px; }
+.wf-notas .ancho { padding-top: 32px; padding-bottom: 48px; }
+.wf-notas h2 { font-size: 26px; }
+.wf-notas ol, .wf-notas ul { padding-left: 22px; max-width: 80ch; }
+.wf-notas li { margin-bottom: 8px; }
+.wf-notas h3 { font-family: var(--f-texto); font-size: 18px; margin-top: 28px; }
+.wf-estados { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.wf-estado { background: #fff; border: 1px dashed #C8B98A; border-radius: 8px; padding: 16px; }
+.wf-estado > b { display: block; font-size: 14px; color: #6B5A1E; margin-bottom: 8px; }
+.wf-marca { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--qolle); color: var(--indigo); font-size: 13px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
+
+/* ===== Admin: estructura común. Calmo y denso: sin motivos, algodón e índigo ===== */
+.adm { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+.adm-lateral { background: var(--indigo); color: #fff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.adm-lateral .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 24px; padding: 4px 10px 18px; text-decoration: none; }
+.adm-lateral a { color: #D5D8EE; text-decoration: none; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: var(--radio); font-weight: 500; }
+.adm-lateral a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.adm-lateral a[aria-current="page"] { background: rgba(255,255,255,.12); color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--qolle); }
+.adm-lateral a:focus-visible { outline-color: var(--qolle); }
+.adm-lateral .cuenta { font-weight: 700; color: var(--indigo); background: var(--qolle); border-radius: 999px; padding: 0 8px; font-size: 14px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.adm-lateral .separador { height: 1px; background: rgba(255,255,255,.15); margin: 12px 10px; }
+.adm-lateral .secundario a { font-size: 15px; min-height: 40px; }
+.adm-principal { padding: 28px 40px 64px; min-width: 0; }
+.adm-principal > header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.adm-principal h1 { font-size: 38px; }
+.adm-principal .bajada { margin: 4px 0 0; color: var(--indigo-2); }
+@media (max-width: 900px) { .adm { grid-template-columns: 1fr; } .adm-lateral { flex-direction: row; flex-wrap: wrap; } .adm-lateral .separador, .adm-lateral .secundario { display: none; } .adm-principal { padding: 20px; } }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 700; background: var(--indigo-claro); color: var(--indigo); }
+.progreso { height: 8px; border-radius: 999px; background: var(--indigo-claro); overflow: hidden; }
+.progreso > span { display: block; height: 100%; background: var(--indigo); border-radius: 999px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tabla th { text-align: left; font-size: 13px; color: var(--indigo-2); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--linea); }
+.tabla td { padding: 10px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+/*FIN-BASE*/
+
+.pagina { padding-top: 40px; padding-bottom: 64px; }
+h1 { font-size: 38px; }
+
+/* El próximo viaje: foto, cuenta regresiva y lo que está listo */
+.proximo { display: grid; grid-template-columns: 1.1fr 1fr; margin-top: 20px; overflow: hidden; }
+.proximo img { width: 100%; height: 100%; min-height: 320px; object-fit: cover; display: block; }
+.proximo .info { padding: 28px; display: grid; gap: 16px; align-content: start; }
+.proximo h2 { font-size: 34px; }
+.cuando { margin: 0; font-size: 18px; }
+.cuando b { font-variant-numeric: lining-nums; }
+.faltan { display: inline-block; background: var(--indigo); color: #fff; border-radius: 999px; padding: 4px 14px; font-weight: 800; font-size: 15px; font-variant-numeric: lining-nums; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.checklist li { display: grid; gap: 2px; }
+.checklist .detalle { font-size: 15px; color: var(--indigo-2); padding-left: 17px; }
+.encuentro { background: var(--indigo-claro); border-radius: 8px; padding: 14px 16px; }
+.encuentro b { display: block; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.plazo { font-size: 15px; color: var(--indigo-2); margin: 0; }
+@media (max-width: 860px) { .proximo { grid-template-columns: 1fr; } .proximo img { min-height: 200px; max-height: 240px; } }
+
+/* Mis viajes: el historial, con la reseña pendiente a la vista */
+.historial { margin-top: 56px; }
+.historial h2 { font-size: 28px; }
+.viajes { list-style: none; margin: 16px 0 0; padding: 0; }
+.viaje { display: grid; grid-template-columns: 1fr auto; gap: 8px 24px; align-items: center; padding: 18px 0; border-top: 1px solid var(--linea); }
+.viaje:last-child { border-bottom: 1px solid var(--linea); }
+.viaje h3 { font-size: 22px; }
+.viaje p { margin: 2px 0 0; color: var(--indigo-2); font-variant-numeric: lining-nums; }
+.viaje .estrellas { color: var(--cochinilla); letter-spacing: 2px; }
+@media (max-width: 560px) { .viaje { grid-template-columns: 1fr; } }
+
+/* Diálogo de cancelación (Radix Dialog en la implementación) */
+.dialogo { max-width: 520px; padding: 28px; box-shadow: 0 16px 48px rgba(35,40,80,.25); }
+.dialogo h2 { font-size: 26px; }
+.reintegro { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 16px 0; font-variant-numeric: lining-nums tabular-nums; }
+.reintegro .total { font-weight: 800; font-size: 22px; border-top: 2px solid var(--indigo); padding-top: 8px; }
+.dialogo .botones { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+.btn-cancelar { background: var(--critico); }
+
+/* El recorrido: el mapa es un extra; la lista de etapas funciona sin señal */
+.recorrido { margin-top: 40px; }
+.recorrido h2 { font-size: 28px; }
+.mapa { margin-top: 12px; height: 180px; border-radius: 8px; background: repeating-linear-gradient(135deg, var(--piedra) 0 12px, #F3F1EC 12px 24px); display: grid; place-items: center; color: var(--indigo-2); font-size: 15px; }
+.etapas { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.etapas li { display: grid; grid-template-columns: 64px 1fr auto; gap: 4px 16px; align-items: baseline; padding: 12px 16px; border-radius: 8px; background: #fff; border: 1px solid var(--linea); font-variant-numeric: lining-nums tabular-nums; }
+.etapas .dia { font-weight: 800; color: var(--indigo-2); }
+.etapas .num { color: var(--indigo-2); font-size: 15px; }
+.etapas [aria-current="step"] { border: 2px solid var(--indigo); background: var(--indigo-claro); }
+@media (max-width: 560px) { .etapas li { grid-template-columns: 56px 1fr; } .etapas .num { grid-column: 2; } }
+</style>
+</head>
+<body>
+<a class="solo-lector" href="#contenido">Saltar al contenido</a>
+<header class="barra">
+  <div class="ancho">
+    <a class="logo" href="#">IncaTour</a>
+    <nav aria-label="Principal"><a href="#">Circuitos</a><a href="#" aria-current="page">Mi viaje</a><a href="mi-cuenta.html">Mi cuenta</a></nav>
+  </div>
+</header>
+
+<main id="contenido" class="ancho pagina">
+  <h1>Mi viaje</h1>
+
+  <article class="tarjeta proximo" aria-labelledby="t-prox">
+    <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg/1920px-Machu_Picchu_seen_from_Intipunku_%28the_Gate_of_the_Sun%29%2C_Peru.jpg" alt="">
+    <div class="info">
+      <div>
+        <span class="faltan">Faltan 23 días</span>
+        <h2 id="t-prox" style="margin-top:10px">Camino Inca</h2>
+        <p class="cuando">Del <b>10 al 13 de diciembre</b>, 2 pasajeros</p>
+      </div>
+      <ul class="checklist" aria-label="Qué está listo">
+        <li><span class="estado listo">Salida confirmada</span></li>
+        <li><span class="estado listo">Hotel confirmado</span><span class="detalle">Hotel Andenes, Cusco, la noche del 9 de diciembre</span></li>
+        <li><span class="estado espera">Tramitando los permisos</span><span class="detalle">Los gestiona la agencia. Te avisamos cuando estén.</span></li>
+      </ul>
+      <div class="encuentro"><b>Punto de encuentro</b>Plaza de Armas de Cusco, 10 de diciembre a las 4:30</div>
+      <div class="acciones">
+        <a class="btn-sec btn" href="#">Ver comprobante</a>
+        <button class="btn-texto btn-peligro" type="button">Cancelar el viaje</button>
+      </div>
+      <p class="plazo">Podés cancelar sin costo hasta el 25 de noviembre. Cuando los permisos estén emitidos, ya no hay reintegro.</p>
+    </div>
+  </article>
+
+  <section class="recorrido" aria-labelledby="t-rec">
+    <h2 id="t-rec">El recorrido <span class="wf-marca" aria-hidden="true">5</span></h2>
+    <div class="mapa" aria-hidden="true">Mapa, solo con conexión</div>
+    <ol class="etapas">
+      <li><span class="dia">Día 1</span><b>Wayllabamba</b><span class="num">3.000 m · 12 km · campamento</span></li>
+      <li><span class="dia">Día 2</span><b>Abra de Warmiwañusca</b><span class="num">4.215 m · 11 km · acampan en Pacaymayo</span></li>
+      <li><span class="dia">Día 3</span><b>Wiñay Wayna</b><span class="num">2.650 m · 16 km · campamento</span></li>
+      <li><span class="dia">Día 4</span><b>Machu Picchu</b><span class="num">2.430 m · 6 km</span></li>
+    </ol>
+  </section>
+
+  <section class="historial" aria-labelledby="t-hist">
+    <h2 id="t-hist">Mis viajes</h2>
+    <ul class="viajes">
+      <li class="viaje">
+        <div><h3>Salkantay</h3><p>Del 3 al 7 de septiembre de 2026</p></div>
+        <a class="btn" href="#">Contanos cómo te fue<span class="solo-lector"> en el Salkantay</span></a>
+      </li>
+      <li class="viaje">
+        <div><h3>Lares</h3><p>Del 12 al 15 de mayo de 2026</p></div>
+        <p><span class="estrellas" role="img" aria-label="Tu reseña: 5 de 5 estrellas">★★★★★</span> Ya dejaste tu reseña</p>
+      </li>
+    </ul>
+  </section>
+</main>
+
+<footer class="pie-corto"><div class="ancho"><span>IncaTour. Cusco, Perú.</span><span>Foto: Intipunku, Christoph Strässler (CC BY-SA 2.0)</span></div></footer>
+
+<section class="wf-notas" aria-labelledby="t-notas">
+  <div class="ancho">
+    <h2 id="t-notas">Notas de diseño: Mi viaje y Mis viajes</h2>
+    <p>"Mi viaje" responde una sola pregunta: ¿está todo en orden y qué sigue? Arriba, solo el próximo viaje. Abajo, el historial, donde se dejan las reseñas.</p>
+    <ol>
+      <li><b>Lo que está listo y lo que falta</b>, con estados escritos para el cliente. Hotel: <code>estadoAlojamiento</code>. Permisos: pedido al back 5.</li>
+      <li><b>Punto y hora de encuentro</b> (pedido 3). Es el dato que el cliente más busca la semana del viaje.</li>
+      <li><b>El plazo de cancelación se dice antes de que lo necesite</b>, incluido que con permisos emitidos no hay reintegro. Cancelar es un enlace discreto, no un botón principal.</li>
+      <li><b>Las reseñas se dejan desde el historial.</b> El viaje sin reseña lleva el botón principal; el que ya tiene, muestra las estrellas.</li>
+      <li><b>El recorrido funciona sin mapa.</b> En la montaña no hay señal: la lista de etapas (día, punto de llegada, altura, distancia y campamento) se guarda en el celular y es lo que siempre se ve. Con conexión, el mapa aparece arriba. Durante el viaje, la etapa en curso se resalta (borde índigo) con lo que informa el guía.</li>
+    </ol>
+    <h3>Estados</h3>
+    <div class="wf-estados">
+      <div class="wf-estado"><b>Sin viajes</b><p style="margin:0 0 10px">Todavía no tenés viajes. Elegí tu camino.</p><a class="btn" href="#">Ver circuitos</a></div>
+      <div class="wf-estado"><b>Salida todavía no confirmada</b><p style="margin:0;font-size:15px">La lista arranca con el hotel y los permisos; la línea "Salida confirmada" aparece recién cuando se confirma. No se anuncia que podría no salir.</p></div>
+      <div class="wf-estado"><b>Hotel todavía sin confirmar</b><span class="estado espera">Hotel a confirmar</span><p style="margin:8px 0 0;font-size:15px">La noche del 9 de diciembre en Cusco. Te avisamos por mail cuando esté confirmado.</p><p style="margin:8px 0 0;font-size:14px;color:var(--indigo-2)">Es el mismo estado si un hotel rechazó y se pidió a otro: el back no los distingue y al cliente no le suma saberlo.</p></div>
+      <div class="wf-estado"><b>Salida cancelada por la agencia</b><span class="estado critico">La agencia canceló esta salida</span><p style="margin:8px 0 0;font-size:15px">Te devolvimos USD 1.500 a la tarjeta terminada en 4821. Puede tardar hasta 10 días hábiles en verse.</p></div>
+    </div>
+
+    <h3>Diálogo: cancelar el viaje</h3>
+    <div class="tarjeta dialogo" role="dialog" aria-labelledby="t-dlg" aria-modal="false">
+      <h2 id="t-dlg">¿Cancelar tu viaje al Camino Inca?</h2>
+      <p style="margin:8px 0 0">Faltan más de 15 días, así que te devolvemos todo lo que pagaste.</p>
+      <div class="reintegro">
+        <span>Pagaste</span><span>USD 1.500</span>
+        <span>Reintegro (100 %)</span><span>USD 1.500</span>
+        <span class="total">Te devolvemos</span><span class="total">USD 1.500</span>
+      </div>
+      <p class="plazo">Vuelve a la tarjeta terminada en 4821. Cancelar no se puede deshacer y los lugares vuelven a la venta.</p>
+      <div class="botones">
+        <button class="btn-sec btn" type="button">Mantener mi viaje</button>
+        <button class="btn btn-cancelar" type="button">Cancelar y recibir USD 1.500</button>
+      </div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

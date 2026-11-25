@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: estilos de trama</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --indigo:#232850; --indigo-2:#4B5170; --qolle:#E8A817; --f-titulo:"Alegreya", serif; --f-texto:"Alegreya Sans", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; color: var(--indigo); font: 17px/1.55 var(--f-texto); }
+  h1, h2, h3, h4 { font-family: var(--f-titulo); line-height: 1.15; margin: 0; }
+  a { color: inherit; }
+  a:focus-visible { outline: 3px solid var(--qolle); outline-offset: 3px; }
+  .ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+  @media (max-width: 700px) { .ancho { padding: 0 20px; } }
+  .intro { padding-top: 40px; }
+  .intro h1 { font-size: 40px; }
+  .intro p { max-width: 70ch; color: var(--indigo-2); }
+  .indice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .indice a { border: 1px solid #E1E2EC; border-radius: 999px; padding: 0 16px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+  .variante { margin-top: 64px; }
+  .variante > .ancho > h2 { font-size: 32px; }
+  .variante > .ancho > p { max-width: 70ch; color: var(--indigo-2); margin: 6px 0 20px; }
+
+  /* Variante 1: la trama se apaga de abajo hacia arriba. En reseñas ocupa el tercio inferior; en el pie, toda la altura */
+  .con-trama { position: relative; background: var(--indigo); color: #fff; }
+  .con-trama::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-position: left bottom; }
+  .resenas::before { -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 40%); mask-image: linear-gradient(to top, #000 0%, transparent 40%); }
+  .pie::before { -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%); mask-image: linear-gradient(to top, #000 0%, transparent 100%); }
+  .t-a::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' fill='none' stroke='white' stroke-opacity='.1' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M40 8 H56 V16 H64 V24 H72 V32 H80 V40 H88 V56 H80 V64 H72 V72 H64 V80 H56 V88 H40 V80 H32 V72 H24 V64 H16 V56 H8 V40 H16 V32 H24 V24 H32 V16 H40 Z'/%3E%3Cpath d='M44 28 H52 V36 H60 V44 H68 V52 H60 V60 H52 V68 H44 V60 H36 V52 H28 V44 H36 V36 H44 Z'/%3E%3Cpath d='M46 46 H50 V50 H46 Z'/%3E%3C/svg%3E"); background-size: 96px 96px; }
+  .t-b::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='none' stroke='white' stroke-opacity='.1' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M70 0 L40 35'/%3E%3Cpath d='M40 35 L0 60'/%3E%3Cpath d='M70 0 L105 30'/%3E%3Cpath d='M105 30 L140 0'/%3E%3Cpath d='M140 0 L170 40'/%3E%3Cpath d='M170 40 L200 60'/%3E%3Cpath d='M105 30 L95 100'/%3E%3Cpath d='M95 100 L30 95'/%3E%3Cpath d='M30 95 L40 35'/%3E%3Cpath d='M170 40 L160 90'/%3E%3Cpath d='M160 90 L95 100'/%3E%3Cpath d='M200 130 L175 150'/%3E%3Cpath d='M175 150 L160 90'/%3E%3Cpath d='M30 95 L0 130'/%3E%3Cpath d='M95 100 L120 165'/%3E%3Cpath d='M120 165 L55 160'/%3E%3Cpath d='M55 160 L0 130'/%3E%3Cpath d='M55 160 L70 200'/%3E%3Cpath d='M120 165 L140 200'/%3E%3Cpath d='M120 165 L175 150'/%3E%3C/svg%3E"); background-size: 200px 200px; }
+  .t-c::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' fill='none' stroke='white' stroke-opacity='.1' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M12 12 H66 M94 12 H148 V66 M148 94 V148 H94 M66 148 H12 V94 M12 66 V12'/%3E%3Cpath d='M54 54 H70 M90 54 H106 V106 H54 V54'/%3E%3Cpath d='M34 12 V54 M126 12 V54 M34 106 V148 M126 106 V148 M12 54 H34 M126 54 H148 M12 106 H34 M126 106 H148'/%3E%3Cpath d='M70 54 L72 60 H88 L90 54'/%3E%3C/svg%3E"); background-size: 160px 160px; }
+  .con-trama > .ancho { position: relative; }
+
+  .resenas .ancho { padding-top: 64px; padding-bottom: 72px; }
+  .resenas h3 { font-size: 34px; margin-bottom: 28px; }
+  .confianza { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; }
+  .resena { margin: 0; }
+  .resena .estrellas { color: var(--qolle); letter-spacing: 2px; }
+  .resena p { margin: 8px 0 0; font-family: var(--f-titulo); font-size: 21px; line-height: 1.35; }
+  .resena footer { margin-top: 10px; font-size: 15px; color: #D5D8EE; }
+  .garantia { background: var(--qolle); color: var(--indigo); border-radius: 8px; padding: 26px; }
+  .garantia h4 { font-size: 24px; }
+  .garantia p { margin: 10px 0 0; font-size: 16px; }
+  @media (max-width: 900px) { .confianza { grid-template-columns: 1fr; } }
+
+  .pie { color: #D5D8EE; font-size: 16px; }
+  .pie-cuerpo { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 32px; padding-top: 48px; padding-bottom: 150px; }
+  .pie h4 { font-family: var(--f-texto); font-size: 16px; font-weight: 700; color: #fff; margin: 0 0 6px; }
+  .pie ul { list-style: none; margin: 0; padding: 0; }
+  .pie a { text-decoration: none; display: inline-block; padding: 10px 0; min-height: 44px; }
+  .pie a:hover { color: #fff; text-decoration: underline; }
+  .logo b { font-family: var(--f-titulo); font-weight: 800; font-size: 30px; color: #fff; }
+  .logo p { margin: 6px 0 0; max-width: 30ch; }
+  @media (max-width: 900px) { .pie-cuerpo { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .pie-cuerpo { grid-template-columns: 1fr; } }
+  .separa { height: 40px; background: #fff; }
+</style>
+</head>
+<body>
+<div class="ancho intro">
+  <h1>Trama: tres estilos de dibujo</h1>
+  <p>Los tres usan la variante 1: una retícula regular que se apaga de abajo hacia arriba, sin afectar la lectura. Cambia el dibujo: en vez de motivos sueltos que parecen íconos, son trazos continuos y abstractos, más cerca de un tejido o de un plano.</p>
+  <nav class="indice" aria-label="Estilos"><a href="#a">A. Rombo escalonado</a><a href="#b">B. Piedra encajada</a><a href="#c">C. Plano de kancha</a></nav>
+</div>
+<section class="variante" id="a" aria-labelledby="t-a">
+  <div class="ancho"><h2 id="t-a">A. Rombo escalonado</h2><p>El dibujo base de los tejidos andinos, hecho solo con líneas rectas. Es el más textil de los tres y el más abstracto: no representa ningún objeto.</p></div>
+  <section class="con-trama resenas t-a">
+    <div class="ancho">
+      <h3>Lo que cuentan quienes ya caminaron</h3>
+      <div class="confianza">
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Llegar a Intipunku con la niebla abriéndose sobre Machu Picchu no se olvida.</p><footer>Lucía, Camino Inca, octubre</footer></blockquote>
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Nos avisaron con tiempo que la salida estaba confirmada. Cero sorpresas.</p><footer>Martín, Salkantay, septiembre</footer></blockquote>
+        <div class="garantia"><h4>Si la salida no se confirma, te devolvemos el 100 %</h4><p>Cada salida necesita un mínimo de personas. Si no se llega, te devolvemos todo lo que pagaste.</p></div>
+      </div>
+    </div>
+  </section>
+  <div class="separa"></div>
+  <footer class="con-trama pie t-a">
+    <div class="ancho pie-cuerpo">
+      <div class="logo"><b>IncaTour</b><p>Trekkings por el Camino Inca, el Salkantay y Lares. Cusco, Perú.</p></div>
+      <div><h4>Circuitos</h4><ul><li><a href="#">Camino Inca</a></li><li><a href="#">Salkantay</a></li><li><a href="#">Lares</a></li></ul></div>
+      <div><h4>Tu viaje</h4><ul><li><a href="#">Mi viaje</a></li><li><a href="#">Cancelaciones y reintegros</a></li><li><a href="#">Qué llevar</a></li></ul></div>
+      <div><h4>Contacto</h4><ul><li style="padding:10px 0">Cusco, Perú</li><li><a href="#">Escribinos</a></li><li><a href="#">+51 84 000 000</a></li></ul></div>
+    </div>
+  </footer>
+</section>
+<section class="variante" id="b" aria-labelledby="t-b">
+  <div class="ancho"><h2 id="t-b">B. Piedra encajada</h2><p>Las juntas de un muro de mampostería poligonal, como las de Sacsayhuamán, en una red continua. No se ven cuadros que se repiten: se lee como una superficie de piedra.</p></div>
+  <section class="con-trama resenas t-b">
+    <div class="ancho">
+      <h3>Lo que cuentan quienes ya caminaron</h3>
+      <div class="confianza">
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Llegar a Intipunku con la niebla abriéndose sobre Machu Picchu no se olvida.</p><footer>Lucía, Camino Inca, octubre</footer></blockquote>
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Nos avisaron con tiempo que la salida estaba confirmada. Cero sorpresas.</p><footer>Martín, Salkantay, septiembre</footer></blockquote>
+        <div class="garantia"><h4>Si la salida no se confirma, te devolvemos el 100 %</h4><p>Cada salida necesita un mínimo de personas. Si no se llega, te devolvemos todo lo que pagaste.</p></div>
+      </div>
+    </div>
+  </section>
+  <div class="separa"></div>
+  <footer class="con-trama pie t-b">
+    <div class="ancho pie-cuerpo">
+      <div class="logo"><b>IncaTour</b><p>Trekkings por el Camino Inca, el Salkantay y Lares. Cusco, Perú.</p></div>
+      <div><h4>Circuitos</h4><ul><li><a href="#">Camino Inca</a></li><li><a href="#">Salkantay</a></li><li><a href="#">Lares</a></li></ul></div>
+      <div><h4>Tu viaje</h4><ul><li><a href="#">Mi viaje</a></li><li><a href="#">Cancelaciones y reintegros</a></li><li><a href="#">Qué llevar</a></li></ul></div>
+      <div><h4>Contacto</h4><ul><li style="padding:10px 0">Cusco, Perú</li><li><a href="#">Escribinos</a></li><li><a href="#">+51 84 000 000</a></li></ul></div>
+    </div>
+  </footer>
+</section>
+<section class="variante" id="c" aria-labelledby="t-c">
+  <div class="ancho"><h2 id="t-c">C. Plano de kancha</h2><p>El recinto inca visto desde arriba, como un plano de arquitecto: muro, cuartos, patio y vanos trapezoidales. Es el más arquitectónico.</p></div>
+  <section class="con-trama resenas t-c">
+    <div class="ancho">
+      <h3>Lo que cuentan quienes ya caminaron</h3>
+      <div class="confianza">
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Llegar a Intipunku con la niebla abriéndose sobre Machu Picchu no se olvida.</p><footer>Lucía, Camino Inca, octubre</footer></blockquote>
+        <blockquote class="resena"><div class="estrellas" role="img" aria-label="5 de 5 estrellas">★★★★★</div><p>Nos avisaron con tiempo que la salida estaba confirmada. Cero sorpresas.</p><footer>Martín, Salkantay, septiembre</footer></blockquote>
+        <div class="garantia"><h4>Si la salida no se confirma, te devolvemos el 100 %</h4><p>Cada salida necesita un mínimo de personas. Si no se llega, te devolvemos todo lo que pagaste.</p></div>
+      </div>
+    </div>
+  </section>
+  <div class="separa"></div>
+  <footer class="con-trama pie t-c">
+    <div class="ancho pie-cuerpo">
+      <div class="logo"><b>IncaTour</b><p>Trekkings por el Camino Inca, el Salkantay y Lares. Cusco, Perú.</p></div>
+      <div><h4>Circuitos</h4><ul><li><a href="#">Camino Inca</a></li><li><a href="#">Salkantay</a></li><li><a href="#">Lares</a></li></ul></div>
+      <div><h4>Tu viaje</h4><ul><li><a href="#">Mi viaje</a></li><li><a href="#">Cancelaciones y reintegros</a></li><li><a href="#">Qué llevar</a></li></ul></div>
+      <div><h4>Contacto</h4><ul><li style="padding:10px 0">Cusco, Perú</li><li><a href="#">Escribinos</a></li><li><a href="#">+51 84 000 000</a></li></ul></div>
+    </div>
+  </footer>
+</section>
+<div style="height:64px"></div>
+</body>
+</html>

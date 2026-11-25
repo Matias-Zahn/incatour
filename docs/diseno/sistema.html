@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: sistema de diseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens: los mismos que 04-sistema.md, 2.7 ===== */
+:root {
+  --color-algodon: #FFFFFF;
+  --color-indigo-950: #1C2044; --color-indigo-900: #232850; --color-indigo-700: #4B5170;
+  --color-indigo-500: #7B809F; --color-indigo-300: #C9CBD8;
+  --color-indigo-200: #D5D8EE; --color-indigo-150: #E1E2EC; --color-indigo-100: #ECEDF5; --color-indigo-50: #F7F7FB;
+  --color-cochinilla-800: #7A0E2B; --color-cochinilla-700: #870E30; --color-cochinilla-600: #A3123A; --color-cochinilla-50: #FBEAEE;
+  --color-qolle-500: #E8A817;
+  --color-chilca-700: #2F6B2C; --color-chilca-300: #9BD49A;
+  --color-piedra-200: #E9E6DF; --color-piedra-500: #8E8676;
+  --color-tierra-700: #9C4A00; --color-tierra-800: #8A5F00;
+
+  --color-fondo: var(--color-algodon);
+  --color-fondo-suave: var(--color-indigo-50);
+  --color-fondo-seccion: var(--color-indigo-100);
+  --color-texto: var(--color-indigo-900);
+  --color-texto-suave: var(--color-indigo-700);
+  --color-borde: var(--color-indigo-150);
+  --color-borde-campo: var(--color-indigo-500);
+  --color-accion: var(--color-cochinilla-600);
+  --color-accion-hover: var(--color-cochinilla-700);
+  --color-texto-accion: var(--color-algodon);
+  --color-foco: var(--color-cochinilla-600);
+  --color-listo: var(--color-chilca-700);
+  --color-espera: var(--color-tierra-800);
+  --color-riesgo: var(--color-tierra-700);
+  --color-critico: var(--color-cochinilla-600);
+  --color-destacado: var(--color-qolle-500);
+
+  --font-titulo: "Alegreya", serif;
+  --font-texto: "Alegreya Sans", sans-serif;
+  --radius-anden: 2px; --radius-control: 6px; --radius-bloque: 10px;
+  --shadow-flota: 0 16px 48px rgb(35 40 80 / .22);
+  --shadow-sutil: 0 2px 8px rgb(35 40 80 / .12);
+}
+.superficie-indigo {
+  --color-fondo: var(--color-indigo-900);
+  --color-fondo-suave: rgb(255 255 255 / .08);
+  --color-texto: var(--color-algodon);
+  --color-texto-suave: var(--color-indigo-200);
+  --color-borde: rgb(255 255 255 / .15);
+  --color-borde-campo: rgb(255 255 255 / .4);
+  --color-accion: var(--color-qolle-500);
+  --color-accion-hover: #F0B83A;
+  --color-texto-accion: var(--color-indigo-900);
+  --color-foco: var(--color-qolle-500);
+  --color-listo: var(--color-chilca-300);
+  --color-espera: var(--color-qolle-500);
+  --color-riesgo: var(--color-qolle-500);
+  background: var(--color-fondo); color: var(--color-texto);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 400 17px/1.55 var(--font-texto); color: var(--color-texto); background: var(--color-fondo); }
+h1, h2, h3 { font-family: var(--font-titulo); line-height: 1.15; margin: 0; }
+:focus-visible { outline: 3px solid var(--color-foco); outline-offset: 3px; }
+.cifra { font-variant-numeric: lining-nums tabular-nums; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+a.solo-lector:focus { position: fixed; top: 12px; left: 16px; width: auto; height: auto; clip: auto; z-index: 20; background: #fff; padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ===== Componentes ===== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--radius-control); border: 2px solid transparent; background: var(--color-accion); color: var(--color-texto-accion); font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; transition: background-color 150ms; }
+.btn:hover { background: var(--color-accion-hover); }
+.btn-sec { background: transparent; color: var(--color-texto); border-color: currentColor; min-height: 44px; font-weight: 700; }
+.btn-sec:hover { background: var(--color-fondo-suave); }
+.btn-texto { background: none; border: 0; color: var(--color-texto); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.btn-peligro { color: var(--color-critico); }
+.superficie-indigo .btn-peligro { color: #fff; }
+.btn-confirmar-peligro { background: var(--color-cochinilla-600); color: #fff; }
+.btn-confirmar-peligro:hover { background: var(--color-cochinilla-700); }
+.btn[disabled] { background: var(--color-indigo-300); color: var(--color-indigo-700); cursor: not-allowed; }
+.btn-grande { min-height: 64px; font-size: 21px; border-radius: var(--radius-bloque); width: 100%; }
+.btn[aria-busy="true"] { cursor: progress; opacity: .85; }
+
+.estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.listo { color: var(--color-listo); } .espera { color: var(--color-espera); } .riesgo { color: var(--color-riesgo); } .critico { color: var(--color-critico); }
+.superficie-indigo .critico { color: #fff; background: var(--color-cochinilla-600); padding: 0 8px; border-radius: 999px; }
+.chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 700; background: var(--color-fondo-seccion, var(--color-indigo-100)); color: var(--color-indigo-900); }
+.superficie-indigo .chip { background: rgb(255 255 255 / .14); color: #fff; }
+
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 15px; }
+.campo .ayuda { font-size: 14px; color: var(--color-texto-suave); }
+.campo input, .campo select, .campo textarea { font: inherit; min-height: 48px; padding: 0 14px; border: 2px solid var(--color-borde-campo); border-radius: var(--radius-control); background: transparent; color: var(--color-texto); }
+.campo textarea { padding: 10px 14px; min-height: 96px; }
+.campo select option { color: var(--color-indigo-900); }
+.campo.con-error input { border-color: var(--color-critico); }
+.superficie-indigo .campo.con-error input { border-color: #fff; border-style: dashed; }
+.campo .error { font-size: 14px; font-weight: 700; color: var(--color-critico); }
+.superficie-indigo .campo .error { color: #fff; }
+.superficie-indigo .campo .error::before { content: "⚠ "; color: var(--color-qolle-500); }
+
+.casilla { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--color-borde); cursor: pointer; }
+.casilla input { width: 24px; height: 24px; accent-color: var(--color-accion); margin: 0; }
+
+.opciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.opcion { font: inherit; font-weight: 700; min-height: 56px; border-radius: var(--radius-bloque); border: 2px solid var(--color-borde-campo); background: transparent; color: var(--color-texto); cursor: pointer; }
+.opcion[aria-pressed="true"] { background: var(--color-texto); color: var(--color-fondo); border-color: var(--color-texto); }
+
+.buscar input { width: 100%; }
+.lista { max-height: 264px; overflow-y: auto; border: 1px solid var(--color-borde); border-radius: var(--radius-control); padding: 0 12px; margin-top: 8px; }
+.lista .casilla:last-child { border-bottom: 0; }
+.lista .casilla small { color: var(--color-texto-suave); margin-left: auto; font-size: 14px; }
+.sin-resultados { padding: 14px 0; color: var(--color-texto-suave); margin: 0; }
+
+.pestanas { display: flex; gap: 4px; border-bottom: 2px solid var(--color-borde); }
+.pestanas button { font: inherit; font-weight: 700; min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--color-texto-suave); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.pestanas button[aria-selected="true"] { color: var(--color-texto); border-bottom-color: var(--color-accion); }
+.panel { padding-top: 14px; }
+.panel[hidden] { display: none; }
+.segmentos { display: grid; grid-template-columns: 1fr 1fr; background: var(--color-fondo-suave); border-radius: var(--radius-bloque); padding: 4px; gap: 4px; }
+.segmentos button { font: inherit; font-weight: 800; min-height: 48px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-texto); cursor: pointer; }
+.segmentos button[aria-selected="true"] { background: var(--color-texto); color: var(--color-fondo); }
+
+.pasos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; font-weight: 700; color: var(--color-texto-suave); counter-reset: paso; }
+.pasos li { counter-increment: paso; display: flex; align-items: center; gap: 8px; }
+.pasos li::before { content: counter(paso); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 2px solid currentColor; font-size: 14px; }
+.pasos .hecho::before { content: "✓"; background: var(--color-listo); border-color: var(--color-listo); color: #fff; }
+.pasos [aria-current="step"] { color: var(--color-texto); }
+.pasos [aria-current="step"]::before { background: var(--color-texto); color: var(--color-fondo); border-color: var(--color-texto); }
+
+.tarjeta { border: 1px solid var(--color-borde); border-radius: var(--radius-bloque); background: var(--color-fondo); padding: 24px; }
+.tarjeta.flota { border: 0; box-shadow: var(--shadow-flota); }
+.tarea { border: 1px solid var(--color-borde); border-radius: var(--radius-bloque); background: var(--color-algodon); padding: 14px 16px; display: grid; gap: 4px; }
+.tarea.urgente .arriba > span:first-child { color: var(--color-riesgo); }
+.tarea.pendiente .arriba > span:first-child { color: var(--color-espera); }
+.tarea.urgente .arriba > span:first-child, .tarea.pendiente .arriba > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.tarea.urgente .arriba > span:first-child::before, .tarea.pendiente .arriba > span:first-child::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.tarea .arriba { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 700; }
+.tarea .plazo { color: var(--color-texto-suave); }
+.tarea p { margin: 0; }
+.tarea .salida { font-weight: 700; }
+.tarea .que { font-size: 15px; color: var(--color-texto-suave); }
+.tarea .btn { justify-self: start; margin-top: 6px; }
+
+.aviso { border-radius: var(--radius-bloque); padding: 14px 16px; font-size: 16px; }
+.aviso b { display: block; }
+.aviso.info { background: var(--color-indigo-100); color: var(--color-indigo-900); }
+.aviso.error { background: var(--color-cochinilla-50); color: var(--color-cochinilla-800); border-left: 4px solid var(--color-critico); }
+.aviso.grave { background: var(--color-algodon); color: var(--color-indigo-900); border-left: 4px solid var(--color-cochinilla-600); box-shadow: inset 0 0 0 1px var(--color-indigo-150); }
+.aviso.grave b { color: var(--color-cochinilla-600); }
+
+.tabla-caja { overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tabla th { text-align: left; font-size: 14px; color: var(--color-texto-suave); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--color-borde); }
+.tabla td { padding: 10px; border-bottom: 1px solid var(--color-borde); }
+
+.cifras { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 16px 40px; }
+.cifras span { display: block; font-size: 15px; color: var(--color-texto-suave); }
+.cifras b { font-family: var(--font-titulo); font-size: 30px; font-weight: 800; font-variant-numeric: lining-nums tabular-nums; }
+.cifras small { font-size: 15px; color: var(--color-texto-suave); }
+
+dialog { border: 0; border-radius: var(--radius-bloque); box-shadow: var(--shadow-flota); padding: 28px; max-width: 520px; width: calc(100% - 32px); color: var(--color-indigo-900); }
+dialog::backdrop { background: rgb(28 32 68 / .55); }
+dialog h2 { font-size: 26px; }
+dialog .botones { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+
+.envio { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; }
+.envio::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--color-listo); }
+.envio.pendiente::before { background: var(--color-espera); }
+
+.andenes { display: grid; grid-template-columns: repeat(4, 1fr); align-items: end; gap: 4px; height: 110px; }
+.anden { background: var(--color-piedra-200); border-top: 3px solid var(--color-piedra-500); border-radius: var(--radius-anden) var(--radius-anden) 0 0; padding: 4px 6px 0; font-size: 14px; line-height: 1.2; color: var(--color-indigo-900); font-variant-numeric: lining-nums tabular-nums; }
+.anden b { display: block; }
+.anden.alto { background: var(--color-indigo-900); color: #fff; border-top-color: var(--color-qolle-500); }
+.superficie-indigo .anden { background: var(--color-indigo-700); color: #fff; border-top-color: var(--color-indigo-200); }
+.superficie-indigo .anden.hecho { background: var(--color-chilca-300); color: var(--color-indigo-900); border-top-color: var(--color-chilca-300); }
+.superficie-indigo .anden.alto { background: var(--color-qolle-500); color: var(--color-indigo-900); }
+
+.etapas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 16px; }
+.etapas li { display: grid; grid-template-columns: 56px 1fr; gap: 2px 10px; padding: 10px 14px; border-radius: var(--radius-bloque); border: 1px solid var(--color-borde); background: var(--color-fondo); }
+.etapas .dia { grid-row: span 2; font-weight: 800; color: var(--color-texto-suave); }
+.etapas .num { color: var(--color-texto-suave); font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.etapas .hecho b::after { content: " ✓" / ", hecha"; color: var(--color-listo); }
+.etapas [aria-current="step"] { border: 2px solid var(--color-texto); background: var(--color-fondo-suave); }
+.superficie-indigo .etapas li { background: rgb(255 255 255 / .06); }
+.superficie-indigo .etapas [aria-current="step"] { background: var(--color-qolle-500); border-color: var(--color-qolle-500); color: var(--color-indigo-900); }
+.superficie-indigo .etapas [aria-current="step"] .dia, .superficie-indigo .etapas [aria-current="step"] .num { color: var(--color-indigo-900); }
+
+/* ===== La página de muestra ===== */
+.pagina { display: grid; grid-template-columns: 220px minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+.indice { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; padding: 32px 16px 32px 24px; border-right: 1px solid var(--color-borde); }
+.indice .marca { font-family: var(--font-titulo); font-weight: 800; font-size: 24px; margin: 0 0 4px; }
+.indice p { margin: 0 0 18px; font-size: 14px; color: var(--color-texto-suave); }
+.indice ul { list-style: none; margin: 0 0 16px; padding: 0; }
+.indice a { display: flex; align-items: center; min-height: 44px; text-decoration: none; font-weight: 500; font-size: 15px; padding: 0 8px; border-radius: var(--radius-control); }
+.indice a:hover { background: var(--color-fondo-suave); }
+.indice .grupo { font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--color-texto-suave); margin: 0 0 4px 8px; }
+main { padding: 40px 40px 80px; min-width: 0; }
+main > header h1 { font-size: 38px; }
+main > header p { max-width: 70ch; color: var(--color-texto-suave); }
+section.bloque { padding-top: 48px; scroll-margin-top: 8px; }
+section.bloque > h2 { font-size: 30px; padding-bottom: 8px; border-bottom: 2px solid var(--color-indigo-900); margin-bottom: 8px; }
+section.bloque > p.bajada { margin: 0 0 20px; color: var(--color-texto-suave); max-width: 72ch; }
+h3.sub { font-family: var(--font-texto); font-size: 19px; font-weight: 800; margin: 28px 0 10px; }
+.par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.par > div { border-radius: var(--radius-bloque); padding: 20px; display: grid; gap: 14px; align-content: start; }
+.par > div:not(.superficie-indigo) { border: 1px solid var(--color-borde); }
+.par .rotulo { font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--color-texto-suave); margin: 0; }
+.fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.nota { font-size: 15px; color: var(--color-texto-suave); margin: 8px 0 0; max-width: 72ch; }
+.nota code, td code, p code { font-size: 14px; background: var(--color-indigo-50); padding: 1px 5px; border-radius: 4px; }
+
+.muestras { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.muestra { border: 1px solid var(--color-borde); border-radius: var(--radius-bloque); overflow: hidden; font-size: 14px; }
+.muestra i { display: block; height: 64px; }
+.muestra div { padding: 8px 10px; }
+.muestra b { display: block; font-size: 14px; }
+.muestra code { font-size: 14px; color: var(--color-texto-suave); }
+
+.tabla-tokens td:first-child code { white-space: nowrap; }
+.contraste { font-weight: 800; }
+.punto-color { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1px solid rgb(0 0 0 / .15); }
+
+.escala { display: grid; gap: 10px; }
+.escala div { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: baseline; border-bottom: 1px solid var(--color-borde); padding-bottom: 10px; }
+.escala code { font-size: 14px; color: var(--color-texto-suave); }
+
+.espacios { display: grid; gap: 6px; }
+.espacios div { display: grid; grid-template-columns: 60px 1fr; align-items: center; gap: 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.espacios i { display: block; height: 14px; background: var(--color-qolle-500); border-radius: 2px; }
+
+.formas { display: flex; flex-wrap: wrap; gap: 20px; }
+.formas div { width: 140px; height: 96px; background: var(--color-indigo-100); display: grid; place-items: center; text-align: center; font-size: 14px; }
+
+.caras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.caras > div { border-radius: var(--radius-bloque); padding: 20px; }
+.caras > div:not(.superficie-indigo) { border: 1px solid var(--color-borde); }
+.caras h3 { font-size: 24px; margin-bottom: 8px; }
+.caras ul { margin: 0; padding-left: 20px; font-size: 15px; }
+
+@media (max-width: 1024px) {
+  .pagina { grid-template-columns: 1fr; }
+  .indice { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--color-borde); padding: 20px; }
+  .indice ul { display: flex; flex-wrap: wrap; gap: 0 4px; }
+}
+@media (max-width: 768px) {
+  main { padding: 24px 16px 64px; }
+  .par, .caras { grid-template-columns: 1fr; }
+  .escala div { grid-template-columns: 1fr; gap: 2px; }
+}
+</style>
+</head>
+<body>
+<a class="solo-lector" href="#contenido">Saltar al contenido</a>
+<div class="pagina">
+  <nav class="indice" aria-label="Secciones del sistema">
+    <p class="marca">IncaTour</p>
+    <p>Sistema de diseño. El detalle y las reglas están en 04-sistema.md.</p>
+    <p class="grupo">Tokens</p>
+    <ul>
+      <li><a href="#color">Color</a></li>
+      <li><a href="#tipografia">Tipografía</a></li>
+      <li><a href="#espaciado">Espaciado y formas</a></li>
+    </ul>
+    <p class="grupo">Componentes</p>
+    <ul>
+      <li><a href="#basicos">Básicos</a></li>
+      <li><a href="#formularios">Formularios</a></li>
+      <li><a href="#navegacion">Navegación</a></li>
+      <li><a href="#contenido-c">Contenido</a></li>
+      <li><a href="#recorrido">Recorrido</a></li>
+    </ul>
+    <p class="grupo">Uso</p>
+    <ul>
+      <li><a href="#caras">Las tres caras</a></li>
+    </ul>
+  </nav>
+
+  <main id="contenido">
+    <header>
+      <h1>Sistema de diseño</h1>
+      <p>Los tokens y los componentes de IncaTour, funcionando. Cada componente se muestra sobre las dos superficies, algodón e índigo, con los mismos tokens: lo único que cambia es la clase <code>superficie-indigo</code> del contenedor. Probá todo con el teclado.</p>
+    </header>
+
+    <!-- ===== Color ===== -->
+    <section class="bloque" id="color" aria-labelledby="h-color">
+      <h2 id="h-color">Color</h2>
+      <p class="bajada">Los tintes del tejido. Arriba, la paleta de referencia; abajo, lo que significa cada color. Los componentes usan solo los de uso.</p>
+      <h3 class="sub">Referencia</h3>
+      <div class="muestras" id="muestras"></div>
+
+      <h3 class="sub">Uso, con el contraste medido</h3>
+      <div class="tabla-caja">
+        <table class="tabla tabla-tokens">
+          <thead><tr><th scope="col">Token</th><th scope="col">Sobre algodón</th><th scope="col">Sobre índigo</th><th scope="col">Para qué</th></tr></thead>
+          <tbody id="tokens-uso"></tbody>
+        </table>
+      </div>
+      <p class="nota">El q'olle no es texto sobre fondo claro: da 2,1:1. Los estados siempre llevan texto; el color nunca es la única señal. El borde de los campos pasó de <code>#9EA2BC</code> (2,5:1) a <code>#7B809F</code> (3,9:1).</p>
+    </section>
+
+    <!-- ===== Tipografía ===== -->
+    <section class="bloque" id="tipografia" aria-labelledby="h-tipo">
+      <h2 id="h-tipo">Tipografía</h2>
+      <p class="bajada">Alegreya para títulos y cifras; Alegreya Sans para todo lo demás. Ocho tamaños y uno solo para la portada. El mínimo es 14 px.</p>
+      <div class="escala">
+        <div><code>portada · 40–58</code><span style="font-family:var(--font-titulo);font-weight:800;font-size:clamp(40px,4.4vw,58px);line-height:1.05">Camino Inca</span></div>
+        <div><code>4xl · 38</code><span style="font-family:var(--font-titulo);font-weight:700;font-size:38px;line-height:1.1">Mi viaje</span></div>
+        <div><code>3xl · 30</code><span class="cifra" style="font-family:var(--font-titulo);font-weight:800;font-size:30px">USD 1.500 · 4.215 m</span></div>
+        <div><code>2xl · 26</code><span style="font-family:var(--font-titulo);font-weight:700;font-size:26px">Próximas salidas</span></div>
+        <div><code>xl · 22</code><span style="font-weight:700;font-size:22px">Salkantay, 5 días</span></div>
+        <div><code>lg · 19</code><span style="font-size:19px">Base de la app del guía: llegué al abra.</span></div>
+        <div><code>base · 17</code><span>Texto. Cancelá sin costo hasta 15 días antes de la salida.</span></div>
+        <div><code>sm · 15</code><span style="font-size:15px">Detalles y ayudas: los gestiona la agencia.</span></div>
+        <div><code>xs · 14</code><span style="font-size:14px;font-weight:700">Encabezados de tabla y errores</span></div>
+      </div>
+      <p class="nota">Números: <span>4.215 m, USD 1.500</span> en párrafos; <span class="cifra">4.215 m, USD 1.500</span> con la clase <code>cifra</code>, obligatoria en precios, alturas, tablas y contadores.</p>
+    </section>
+
+    <!-- ===== Espaciado y formas ===== -->
+    <section class="bloque" id="espaciado" aria-labelledby="h-esp">
+      <h2 id="h-esp">Espaciado y formas</h2>
+      <p class="bajada">Base de 4 px. Diez pasos permitidos, cuatro radios, dos sombras.</p>
+      <div class="par">
+        <div>
+          <p class="rotulo">Espaciado</p>
+          <div class="espacios" id="espacios"></div>
+        </div>
+        <div>
+          <p class="rotulo">Radios y sombras</p>
+          <div class="formas">
+            <div style="border-radius:2px">anden · 2</div>
+            <div style="border-radius:6px">control · 6</div>
+            <div style="border-radius:10px">bloque · 10</div>
+            <div style="border-radius:999px">full</div>
+            <div style="border-radius:10px;background:#fff;box-shadow:var(--shadow-flota)">flota</div>
+            <div style="border-radius:10px;background:#fff;box-shadow:var(--shadow-sutil)">sutil</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Básicos ===== -->
+    <section class="bloque" id="basicos" aria-labelledby="h-bas">
+      <h2 id="h-bas">Básicos</h2>
+      <p class="bajada">Botón, estado y chip. Una sola acción principal por pantalla.</p>
+      <h3 class="sub">Botón</h3>
+      <div class="par">
+        <div>
+          <p class="rotulo">Algodón</p>
+          <div class="fila"><button class="btn" type="button">Pagar USD 1.500</button><button class="btn btn-sec" type="button">Ver comprobante</button><button class="btn-texto" type="button">Volver</button><button class="btn-texto btn-peligro" type="button">Cancelar el viaje</button></div>
+          <div class="fila"><button class="btn" type="button" disabled>Pagar USD 1.500</button><button class="btn cargando" type="button">Pagar USD 1.500</button><button class="btn btn-confirmar-peligro" type="button">Cancelar y recibir USD 1.200</button></div>
+          <p class="solo-lector" role="status" id="aviso-pago"></p>
+        </div>
+        <div class="superficie-indigo">
+          <p class="rotulo">Índigo (guía)</p>
+          <button class="btn btn-grande" type="button">Llegué al abra</button>
+          <button class="btn btn-sec btn-grande" type="button" style="font-size:19px;min-height:56px">Llegamos con demora</button>
+          <div class="fila"><button class="btn-texto" type="button">Volver</button><button class="btn-texto btn-peligro" type="button">Finalizar salida antes de tiempo</button></div>
+        </div>
+      </div>
+      <p class="nota">Probá el segundo "Pagar": muestra el estado cargando. Deshabilitado se usa poco: es mejor dejar el botón activo y explicar qué falta.</p>
+
+      <h3 class="sub">Estado y chip</h3>
+      <div class="par">
+        <div>
+          <div class="fila"><span class="estado listo">Salida confirmada</span><span class="estado espera">Tramitando los permisos</span></div>
+          <div class="fila"><span class="estado riesgo">Bajo el mínimo</span><span class="estado critico">Incidente crítico</span></div>
+          <div class="fila"><span class="chip">3 en curso</span><span class="chip">Día 2</span></div>
+        </div>
+        <div class="superficie-indigo">
+          <div class="fila"><span class="estado listo">Descargada para usar sin señal</span><span class="estado espera">2 por enviar</span></div>
+          <div class="fila"><span class="estado critico">Crítica</span><span class="chip">Día 2 de 4</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Formularios ===== -->
+    <section class="bloque" id="formularios" aria-labelledby="h-form">
+      <h2 id="h-form">Formularios</h2>
+      <p class="bajada">Etiqueta siempre visible, error en el campo y controles nativos mientras alcancen.</p>
+      <h3 class="sub">Campo</h3>
+      <div class="par">
+        <div>
+          <div class="campo"><label for="c1">Mail</label><input id="c1" type="email" autocomplete="email" value="lucia.fernandez@ejemplo.com" aria-describedby="c1-a"><span class="ayuda" id="c1-a">Con este mail ingresás y te avisamos todo sobre tu viaje.</span></div>
+          <div class="campo con-error"><label for="c2">Pasaporte</label><input id="c2" value="AAB12" aria-invalid="true" aria-describedby="c2-e"><span class="error" id="c2-e">El pasaporte tiene que tener al menos 6 caracteres. Revisalo en tu documento.</span></div>
+          <div class="campo"><label for="c3">País</label><select id="c3"><option>Argentina</option><option>Chile</option><option>Perú</option></select></div>
+        </div>
+        <div class="superficie-indigo">
+          <div class="campo"><label for="c4">Contá qué pasó</label><textarea id="c4">Mareo y dolor de cabeza en la subida al abra.</textarea></div>
+          <div class="campo con-error"><label for="c5">Motivo</label><input id="c5" value="" aria-invalid="true" aria-describedby="c5-e"><span class="error" id="c5-e">Escribí el motivo para poder finalizar.</span></div>
+          <div class="campo"><label for="c6">¿A qué hora pasó?</label><input id="c6" type="time" value="09:40"></div>
+        </div>
+      </div>
+
+      <h3 class="sub">Casilla y opción de un toque</h3>
+      <div class="par">
+        <div>
+          <fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:800">Servicios incluidos</legend>
+            <label class="casilla"><input type="checkbox" checked> Traslado desde el hotel</label>
+            <label class="casilla"><input type="checkbox"> Tren de regreso a Cusco</label>
+          </fieldset>
+        </div>
+        <div class="superficie-indigo">
+          <fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:800;margin-bottom:8px">¿Qué tan grave?</legend>
+            <div class="opciones" data-unico><button class="opcion" type="button" aria-pressed="false">Leve</button><button class="opcion" type="button" aria-pressed="true">Media</button><button class="opcion" type="button" aria-pressed="false">Crítica</button></div>
+          </fieldset>
+        </div>
+      </div>
+
+      <h3 class="sub">Lista con búsqueda</h3>
+      <div class="par">
+        <div>
+          <div class="campo buscar"><label for="b1">Hoteles para la noche del 9</label><input id="b1" type="search" placeholder="Buscá por nombre o zona" aria-controls="l1" aria-describedby="b1-n"></div>
+          <p class="ayuda" id="b1-n" style="margin:0;font-size:14px;color:var(--color-texto-suave)" aria-live="polite">1 elegido</p>
+          <div class="lista" id="l1">
+            <label class="casilla"><input type="checkbox" checked> Hotel Andenes <small>Centro · 7 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Casa Qorikancha <small>San Blas · 4 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Hostal Saphi <small>Centro · 10 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Tambo Andino <small>Santa Ana · 6 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Wayra Inn <small>San Blas · 3 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Inti Wasi <small>Centro · 8 lugares</small></label>
+            <label class="casilla"><input type="checkbox"> Andes Cusco <small>San Cristóbal · 12 lugares</small></label>
+            <p class="sin-resultados" hidden>No hay hoteles con ese nombre.</p>
+          </div>
+        </div>
+        <div>
+          <p class="nota" style="margin:0">Para elegir uno o varios entre muchos: hoteles, transportes, equipo, guías. Filtra mientras se escribe, cuenta los elegidos y dice cuándo no hay resultados. Con 7 opciones o menos, alcanza con casillas o un <code>select</code>.</p>
+          <p class="nota">El calendario de fechas usa <code>react-day-picker</code>: solo se eligen las fechas a la venta y la salida confirmada lleva un punto verde con su nombre accesible. Está en <code>03-wireframes/ficha-viaje.html</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Navegación ===== -->
+    <section class="bloque" id="navegacion" aria-labelledby="h-nav">
+      <h2 id="h-nav">Navegación y organización</h2>
+      <p class="bajada">Pestañas (Radix Tabs): flechas para moverse entre pestañas, Tab para entrar al panel.</p>
+      <div class="par">
+        <div>
+          <p class="rotulo">Subrayada · admin</p>
+          <div class="pestanas" role="tablist" aria-label="Ficha de la salida">
+            <button role="tab" id="p1" aria-selected="true" aria-controls="pp1">Cierre</button>
+            <button role="tab" id="p2" aria-selected="false" aria-controls="pp2" tabindex="-1">Pasajeros</button>
+            <button role="tab" id="p3" aria-selected="false" aria-controls="pp3" tabindex="-1">Recursos</button>
+          </div>
+          <div class="panel" id="pp1" role="tabpanel" aria-labelledby="p1" tabindex="0">Llegó al mínimo. La propuesta de cierre está armada.</div>
+          <div class="panel" id="pp2" role="tabpanel" aria-labelledby="p2" tabindex="0" hidden>7 pasajeros. 1 no vino.</div>
+          <div class="panel" id="pp3" role="tabpanel" aria-labelledby="p3" tabindex="0" hidden>Hotel, transporte y equipo asignados.</div>
+        </div>
+        <div class="superficie-indigo">
+          <p class="rotulo">Segmentos · guía y celular</p>
+          <div class="segmentos" role="tablist" aria-label="Mis salidas">
+            <button role="tab" id="s1" aria-selected="true" aria-controls="ps1">Próximas</button>
+            <button role="tab" id="s2" aria-selected="false" aria-controls="ps2" tabindex="-1">Anteriores</button>
+          </div>
+          <div class="panel" id="ps1" role="tabpanel" aria-labelledby="s1" tabindex="0">Camino Inca, 10 al 13 de diciembre.</div>
+          <div class="panel" id="ps2" role="tabpanel" aria-labelledby="s2" tabindex="0" hidden>Salkantay, 14 al 18 de noviembre.</div>
+        </div>
+      </div>
+
+      <h3 class="sub">Asistente</h3>
+      <div class="tarjeta">
+        <ol class="pasos" aria-label="Crear paquete">
+          <li class="hecho">Circuito</li><li class="hecho">Servicios</li><li aria-current="step">Precios</li><li>Fotos</li><li>Temporadas</li><li>Revisar</li>
+        </ol>
+        <div class="fila" style="justify-content:space-between;margin-top:24px"><button class="btn-texto" type="button">Volver</button><button class="btn" type="button">Seguir</button></div>
+      </div>
+    </section>
+
+    <!-- ===== Contenido ===== -->
+    <section class="bloque" id="contenido-c" aria-labelledby="h-cont">
+      <h2 id="h-cont">Contenido</h2>
+      <p class="bajada">Tarjeta, tarea, aviso, tabla, cifra, diálogo e indicador de envío.</p>
+      <div class="par">
+        <div style="border:0;padding:0">
+          <div class="tarjeta"><h3 style="font-size:22px">Tarjeta</h3><p style="margin:6px 0 0">Borde, sin sombra. Agrupa lo que va junto.</p></div>
+          <div class="tarjeta flota"><h3 style="font-size:22px">Tarjeta flotante</h3><p style="margin:6px 0 0">Sin borde y con sombra. Solo reseñas y diálogos.</p></div>
+        </div>
+        <div style="border:0;padding:0">
+          <div class="tarea urgente"><div class="arriba"><span>Bajo el mínimo</span><span class="plazo">Decidís en 6 días</span></div><p class="salida">Camino Inca, 2 de diciembre</p><p class="que">3 de 6 pasajeros.</p><a class="btn btn-sec" href="#contenido-c">Ver opciones</a></div>
+          <div class="tarea pendiente"><div class="arriba"><span>Hotel por confirmar</span><span class="plazo">Sale en 24 días</span></div><p class="salida">Camino Inca, 10 de diciembre</p><p class="que">2 reservas esperan hotel.</p><a class="btn btn-sec" href="#contenido-c">Elegir hotel</a></div>
+        </div>
+      </div>
+
+      <h3 class="sub">Aviso</h3>
+      <div class="par">
+        <div style="border:0;padding:0;gap:10px">
+          <div class="aviso info"><b>El costo es parcial</b>Faltan guías y permisos: el margen real va a ser menor.</div>
+          <div class="aviso error"><b>La tarjeta fue rechazada</b>Probá con otra o revisá los datos.</div>
+        </div>
+        <div class="superficie-indigo">
+          <div class="aviso grave"><b>2 etapas quedan sin informar</b>Wiñay Wayna y Machu Picchu. No se pueden informar después.</div>
+        </div>
+      </div>
+
+      <h3 class="sub">Tabla y cifras</h3>
+      <ul class="cifras" aria-label="La salida en cifras" style="margin-bottom:20px">
+        <li><span>Pasajeros</span><b>7</b> <small>de 12</small></li>
+        <li><span>Cobrado</span><b>USD 5.250</b></li>
+        <li><span>Ganancia actual</span><b>USD 4.006</b></li>
+      </ul>
+      <div class="tabla-caja">
+        <table class="tabla">
+          <thead><tr><th scope="col">Pasajero</th><th scope="col">Hotel</th><th scope="col">Permiso</th><th scope="col">Reserva</th></tr></thead>
+          <tbody>
+            <tr><td>Lucía Fernández</td><td><span class="estado listo">Confirmado</span></td><td><span class="estado espera">En trámite</span></td><td><a href="#contenido-c">Comprobante<span class="solo-lector"> de Lucía Fernández</span></a></td></tr>
+            <tr><td>Emma Laurent</td><td colspan="2"><span class="estado riesgo">No vino</span></td><td><a href="#contenido-c">Comprobante<span class="solo-lector"> de Emma Laurent</span></a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Diálogo e indicador de envío</h3>
+      <div class="par">
+        <div>
+          <div class="fila"><button class="btn-texto btn-peligro" type="button" id="abrir-dialogo">Cancelar el viaje</button></div>
+          <p class="nota" style="margin:0">Abrilo: el foco va al diálogo, Esc lo cierra y vuelve al botón.</p>
+        </div>
+        <div class="superficie-indigo">
+          <div class="fila" style="justify-content:space-between"><b>Día 2 de 4</b><span class="envio pendiente" id="envio" aria-live="polite">2 por enviar</span></div>
+          <button class="btn-texto" type="button" id="enviar">Simular que vuelve la señal</button>
+        </div>
+      </div>
+      <dialog id="dialogo" aria-labelledby="d-t">
+        <h2 id="d-t">¿Cancelar tu viaje al Camino Inca?</h2>
+        <p>Te devolvemos USD 1.200 a la tarjeta terminada en 4821. Puede tardar hasta 10 días hábiles. No se puede deshacer.</p>
+        <div class="botones"><button class="btn btn-sec" type="button" autofocus id="cerrar-dialogo">Volver</button><button class="btn btn-confirmar-peligro" type="button">Cancelar y recibir USD 1.200</button></div>
+      </dialog>
+    </section>
+
+    <!-- ===== Recorrido ===== -->
+    <section class="bloque" id="recorrido" aria-labelledby="h-rec">
+      <h2 id="h-rec">Recorrido</h2>
+      <p class="bajada">Andenes para ver cuánto se sube cada día; lista de etapas para seguir el viaje sin señal.</p>
+      <div class="par">
+        <div>
+          <p class="rotulo">Andenes · ficha del viaje</p>
+          <div class="andenes" role="img" aria-label="4 días. Día 1: 3.000 m. Día 2: 4.215 m, el más alto. Día 3: 3.950 m. Día 4: 2.430 m.">
+            <div class="anden" style="height:55%"><b>Día 1</b>3.000 m</div>
+            <div class="anden alto" style="height:100%"><b>Día 2</b>4.215 m</div>
+            <div class="anden" style="height:88%"><b>Día 3</b>3.950 m</div>
+            <div class="anden" style="height:40%"><b>Día 4</b>2.430 m</div>
+          </div>
+          <p class="rotulo" style="margin-top:8px">Lista de etapas · Mi viaje</p>
+          <ol class="etapas">
+            <li class="hecho"><span class="dia">Día 1</span><b>Wayllabamba</b><span class="num">3.000 m · 12 km · campamento</span></li>
+            <li aria-current="step"><span class="dia">Día 2</span><b>Abra de Warmiwañusca</b><span class="num">4.215 m · 11 km · acampan en Pacaymayo</span></li>
+            <li><span class="dia">Día 3</span><b>Wiñay Wayna</b><span class="num">2.650 m · 16 km · campamento</span></li>
+          </ol>
+        </div>
+        <div class="superficie-indigo">
+          <p class="rotulo">Andenes · avance del guía</p>
+          <div class="andenes" role="img" aria-label="Día 1 hecho, día 2 en curso, de 4" style="height:64px">
+            <div class="anden hecho" style="height:55%"></div><div class="anden alto" style="height:100%"></div><div class="anden" style="height:88%"></div><div class="anden" style="height:40%"></div>
+          </div>
+          <p class="rotulo" style="margin-top:8px">Lista de etapas · En curso</p>
+          <ol class="etapas">
+            <li class="hecho"><span class="dia">Día 1</span><b>Wayllabamba</b><span class="num">3.000 m · 12 km · campamento</span></li>
+            <li aria-current="step"><span class="dia">Día 2</span><b>Abra de Warmiwañusca</b><span class="num">4.215 m · 11 km · acampan en Pacaymayo</span></li>
+            <li><span class="dia">Día 3</span><b>Wiñay Wayna</b><span class="num">2.650 m · 16 km · campamento</span></li>
+          </ol>
+        </div>
+      </div>
+      <p class="nota">Los motivos de la portada (nombre detrás de la montaña, faja, piedra encajada) se ven en <code>identidad-home-b.html</code>.</p>
+    </section>
+
+    <!-- ===== Caras ===== -->
+    <section class="bloque" id="caras" aria-labelledby="h-caras">
+      <h2 id="h-caras">Las tres caras</h2>
+      <p class="bajada">Mismos tokens y componentes; cambia cuánto se muestra y qué superficie manda.</p>
+      <div class="caras">
+        <div><h3>Cliente</h3><ul><li>Algodón; índigo en barra, reseñas y pie</li><li>Con motivos, solo donde dice 04</li><li>Texto de 17 px, aireado</li><li>Se anuncia lo asegurado</li></ul></div>
+        <div><h3>Admin</h3><ul><li>Algodón; índigo solo en el lateral</li><li>Sin motivos</li><li>Denso y ordenado: lo urgente arriba</li><li>Tablas en 15 px</li></ul></div>
+        <div class="superficie-indigo"><h3>Guía</h3><ul><li>Índigo en toda la app</li><li>Texto de 19 px, botones de 64 px</li><li>Una acción por pantalla</li><li>Todo se guarda primero en el celular</li></ul></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // Muestras de color: se arman desde los tokens, así no se desfasan
+  const css = getComputedStyle(document.documentElement);
+  const ref = [['algodon','Algodón'],['indigo-950','Índigo profundo'],['indigo-900','Índigo'],['indigo-700','Índigo suave'],['indigo-500','Borde de campo'],['indigo-300','Deshabilitado'],['indigo-200','Texto sobre índigo'],['indigo-150','Línea'],['indigo-100','Índigo claro'],['indigo-50','Índigo muy claro'],['cochinilla-800','Cochinilla oscura'],['cochinilla-700','Cochinilla hover'],['cochinilla-600','Cochinilla'],['cochinilla-50','Cochinilla clara'],['qolle-500',"Q'olle"],['chilca-700','Chilca'],['chilca-300','Chilca clara'],['piedra-200','Piedra'],['piedra-500','Borde de piedra'],['tierra-700','Tierra (riesgo)'],['tierra-800','Tierra (espera)']];
+  document.getElementById('muestras').innerHTML = ref.map(([t, n]) => {
+    const v = css.getPropertyValue('--color-' + t).trim();
+    return `<div class="muestra"><i style="background:${v}"></i><div><b>${n}</b><code>${t} · ${v}</code></div></div>`;
+  }).join('');
+
+  // Contraste WCAG calculado en vivo
+  const lum = h => { const c = [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return ((x + .05) / (y + .05)).toFixed(1).replace('.', ','); };
+  const W = '#FFFFFF', I = '#232850';
+  const uso = [
+    ['texto', '#232850', W, '#FFFFFF', I, 'Texto principal'],
+    ['texto-suave', '#4B5170', W, '#D5D8EE', I, 'Detalles, ayudas, rótulos'],
+    ['accion', '#A3123A', W, '#E8A817', I, 'Botón principal (con texto-accion encima)'],
+    ['foco', '#A3123A', W, '#E8A817', I, 'Contorno de 3 px a 3 px del borde'],
+    ['borde-campo', '#7B809F', W, '#7B7E96', I, 'Borde de campos (mínimo 3:1)'],
+    ['listo', '#2F6B2C', W, '#9BD49A', I, 'Confirmado, enviado'],
+    ['espera', '#8A5F00', W, '#E8A817', I, 'En trámite, por confirmar'],
+    ['riesgo', '#9C4A00', W, '#E8A817', I, 'Requiere atención'],
+    ['critico', '#A3123A', W, '#FFFFFF', '#A3123A', 'Incidente, falta un recurso'],
+  ];
+  document.getElementById('tokens-uso').innerHTML = uso.map(([t, a, fa, b, fb, u]) =>
+    `<tr><td><code>${t}</code></td><td><span class="punto-color" style="background:${a}"></span><span class="contraste">${ratio(a, fa)}:1</span></td><td><span class="punto-color" style="background:${b}"></span><span class="contraste">${ratio(b, fb)}:1</span></td><td>${u}</td></tr>`).join('');
+
+  // Espaciado
+  document.getElementById('espacios').innerHTML = [4,8,12,16,20,24,32,40,48,64].map(n => `<div><span>${n} px</span><i style="width:${n * 3}px"></i></div>`).join('');
+
+  // Opción de un toque
+  document.querySelectorAll('[data-unico]').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  // Botón cargando
+  document.querySelector('.btn.cargando').addEventListener('click', e => {
+    const b = e.currentTarget; if (b.getAttribute('aria-busy') === 'true') return;
+    const w = b.offsetWidth, aviso = document.getElementById('aviso-pago'); b.style.width = w + 'px'; b.setAttribute('aria-busy', 'true'); b.textContent = 'Pagando…'; aviso.textContent = 'Procesando el pago.';
+    setTimeout(() => { b.removeAttribute('aria-busy'); b.textContent = 'Pagar USD 1.500'; b.style.width = ''; aviso.textContent = ''; }, 1800);
+  });
+
+  // Lista con búsqueda
+  const busc = document.getElementById('b1'), items = [...document.querySelectorAll('#l1 .casilla')], vacio = document.querySelector('#l1 .sin-resultados'), cuenta = document.getElementById('b1-n');
+  // Una sola región viva: resultados de la búsqueda y elegidos, así el lector de pantalla oye las dos cosas
+  let ultimo = '';
+  const contar = (res = ultimo) => { ultimo = typeof res === 'string' ? res : ''; const n = items.filter(i => i.querySelector('input').checked).length; cuenta.textContent = [ultimo, n === 1 ? '1 elegido' : n + ' elegidos'].filter(Boolean).join(' · '); };
+  busc.addEventListener('input', () => {
+    const q = busc.value.trim().toLowerCase(); let n = 0;
+    items.forEach(i => { const ok = i.textContent.toLowerCase().includes(q); i.hidden = !ok; if (ok) n++; });
+    vacio.hidden = n > 0; if (!n) vacio.textContent = `No hay hoteles con «${busc.value.trim()}».`;
+    contar(q ? (n ? (n === 1 ? '1 resultado' : n + ' resultados') : 'Ningún resultado') : '');
+  });
+  items.forEach(i => i.querySelector('input').addEventListener('change', contar));
+
+  // Pestañas: clic y flechas
+  document.querySelectorAll('[role="tablist"]').forEach(lista => {
+    const tabs = [...lista.querySelectorAll('[role="tab"]')];
+    const elegir = t => tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', on); x.tabIndex = on ? 0 : -1; document.getElementById(x.getAttribute('aria-controls')).hidden = !on; if (on) x.focus(); });
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => elegir(t));
+      t.addEventListener('keydown', e => {
+        if (e.key === 'ArrowRight') elegir(tabs[(i + 1) % tabs.length]);
+        if (e.key === 'ArrowLeft') elegir(tabs[(i - 1 + tabs.length) % tabs.length]);
+        if (e.key === 'Home') elegir(tabs[0]);
+        if (e.key === 'End') elegir(tabs[tabs.length - 1]);
+      });
+    });
+  });
+
+  // Diálogo
+  const dlg = document.getElementById('dialogo'), abrir = document.getElementById('abrir-dialogo');
+  abrir.addEventListener('click', () => dlg.showModal());
+  document.getElementById('cerrar-dialogo').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('close', () => abrir.focus());
+
+  // Indicador de envío
+  document.getElementById('enviar').addEventListener('click', () => { const e = document.getElementById('envio'); e.textContent = 'Todo enviado'; e.classList.remove('pendiente'); });
+</script>
+</body>
+</html>

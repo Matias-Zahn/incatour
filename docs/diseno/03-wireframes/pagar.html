@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour: pasajeros y pago</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/*BASE*/
+/* Base común de los wireframes de IncaTour. Fuente única: se incrusta en cada HTML con armar.py
+   (el panel de vista previa no carga hojas de estilo por ruta relativa). Semilla de los tokens de 04-sistema. */
+:root {
+  --algodon: #FFFFFF; --indigo: #232850; --indigo-2: #4B5170; --indigo-claro: #ECEDF5;
+  --cochinilla: #A3123A; --qolle: #E8A817; --chilca: #2F6B2C; --piedra: #E9E6DF; --piedra-borde: #8E8676;
+  --linea: #E1E2EC; --espera: #8A5F00; --riesgo: #9C4A00; --critico: #A3123A;
+  --f-titulo: "Alegreya", serif; --f-texto: "Alegreya Sans", sans-serif;
+  --radio: 6px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--algodon); color: var(--indigo); font: 17px/1.55 var(--f-texto); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.15; margin: 0; }
+.cifra { font-variant-numeric: lining-nums tabular-nums; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* El salto al contenido aparece al recibir el foco */
+a.solo-lector:focus { position: fixed; top: 12px; left: 16px; width: auto; height: auto; clip: auto; z-index: 20; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+.ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+/* Encabezado de las páginas interiores: índigo liso, sin foto */
+.barra { background: var(--indigo); color: #fff; }
+.barra .ancho { display: flex; justify-content: space-between; align-items: center; min-height: 72px; gap: 16px; }
+.barra .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 26px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.barra nav { display: flex; gap: 8px; }
+.barra nav a { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--radio); }
+.barra nav a:hover { background: rgba(255,255,255,.12); }
+.barra nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--qolle); }
+.barra a:focus-visible { outline-color: var(--qolle); }
+@media (max-width: 480px) { .barra .ancho { gap: 8px; } .barra .logo { font-size: 22px; } .barra nav { gap: 0; } .barra nav a { padding: 0 8px; white-space: nowrap; font-size: 15px; } }
+
+/* Botones */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--radio); border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.btn:hover { background: #870E30; }
+.btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; font-weight: 700; }
+.btn-sec:hover { background: #F2F2F7; }
+.btn-texto { background: none; border: 0; color: var(--indigo); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.btn-peligro { color: var(--critico); }
+.btn[disabled] { background: #C9CBD8; color: #4B5170; cursor: not-allowed; }
+
+/* Estados: siempre con texto */
+.estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.listo { color: var(--chilca); } .espera { color: var(--espera); } .riesgo { color: var(--riesgo); } .critico { color: var(--critico); }
+
+/* Campos */
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 15px; }
+.campo .ayuda { font-size: 14px; color: var(--indigo-2); }
+.campo input, .campo select { font: inherit; min-height: 48px; padding: 0 14px; border: 2px solid #9EA2BC; border-radius: var(--radio); background: #fff; color: var(--indigo); }
+.campo input:hover { border-color: var(--indigo-2); }
+.campo.con-error input { border-color: var(--critico); }
+.campo .error { font-size: 14px; font-weight: 700; color: var(--critico); }
+
+/* Bloques */
+.tarjeta { border: 1px solid var(--linea); border-radius: 10px; background: #fff; }
+.aviso { border-radius: 10px; padding: 14px 16px; font-size: 16px; }
+.aviso.info { background: var(--indigo-claro); }
+.aviso.error { background: #FBEAEE; color: #7A0E2B; border-left: 4px solid var(--critico); }
+
+/* Andenes: el recorrido por día */
+.andenes { display: grid; align-items: end; gap: 4px; height: 120px; }
+.anden { background: var(--piedra); border-top: 3px solid var(--piedra-borde); border-radius: 2px 2px 0 0; padding: 4px 6px 0; font-size: 13px; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+.anden b { display: block; }
+.anden.alto { background: var(--indigo); color: #fff; border-top-color: var(--qolle); }
+
+/* Pie con muro: versión corta para las páginas interiores */
+.pie-corto { background: var(--indigo); color: #D5D8EE; font-size: 15px; }
+.pie-corto .ancho { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
+.pie-corto svg { display: block; width: 100%; height: 90px; }
+
+/* Notas de diseño: van fuera de la pantalla, no son parte de la interfaz */
+.wf-notas { background: #FFFBEA; border-top: 4px solid var(--qolle); margin-top: 64px; }
+.wf-notas .ancho { padding-top: 32px; padding-bottom: 48px; }
+.wf-notas h2 { font-size: 26px; }
+.wf-notas ol, .wf-notas ul { padding-left: 22px; max-width: 80ch; }
+.wf-notas li { margin-bottom: 8px; }
+.wf-notas h3 { font-family: var(--f-texto); font-size: 18px; margin-top: 28px; }
+.wf-estados { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.wf-estado { background: #fff; border: 1px dashed #C8B98A; border-radius: 8px; padding: 16px; }
+.wf-estado > b { display: block; font-size: 14px; color: #6B5A1E; margin-bottom: 8px; }
+.wf-marca { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--qolle); color: var(--indigo); font-size: 13px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
+
+/* ===== Admin: estructura común. Calmo y denso: sin motivos, algodón e índigo ===== */
+.adm { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+.adm-lateral { background: var(--indigo); color: #fff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.adm-lateral .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 24px; padding: 4px 10px 18px; text-decoration: none; }
+.adm-lateral a { color: #D5D8EE; text-decoration: none; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: var(--radio); font-weight: 500; }
+.adm-lateral a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.adm-lateral a[aria-current="page"] { background: rgba(255,255,255,.12); color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--qolle); }
+.adm-lateral a:focus-visible { outline-color: var(--qolle); }
+.adm-lateral .cuenta { font-weight: 700; color: var(--indigo); background: var(--qolle); border-radius: 999px; padding: 0 8px; font-size: 14px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.adm-lateral .separador { height: 1px; background: rgba(255,255,255,.15); margin: 12px 10px; }
+.adm-lateral .secundario a { font-size: 15px; min-height: 40px; }
+.adm-principal { padding: 28px 40px 64px; min-width: 0; }
+.adm-principal > header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.adm-principal h1 { font-size: 38px; }
+.adm-principal .bajada { margin: 4px 0 0; color: var(--indigo-2); }
+@media (max-width: 900px) { .adm { grid-template-columns: 1fr; } .adm-lateral { flex-direction: row; flex-wrap: wrap; } .adm-lateral .separador, .adm-lateral .secundario { display: none; } .adm-principal { padding: 20px; } }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 700; background: var(--indigo-claro); color: var(--indigo); }
+.progreso { height: 8px; border-radius: 999px; background: var(--indigo-claro); overflow: hidden; }
+.progreso > span { display: block; height: 100%; background: var(--indigo); border-radius: 999px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tabla th { text-align: left; font-size: 13px; color: var(--indigo-2); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--linea); }
+.tabla td { padding: 10px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+/*FIN-BASE*/
+
+/* Pasos: es una secuencia real, por eso va numerada */
+.pasos { display: flex; gap: 8px; list-style: none; margin: 32px 0 0; padding: 0; font-size: 15px; flex-wrap: wrap; }
+.pasos li { display: flex; align-items: center; gap: 8px; color: var(--indigo-2); }
+.pasos li + li::before { content: ""; width: 32px; height: 2px; background: var(--linea); }
+.pasos .n { width: 28px; height: 28px; border-radius: 50%; border: 2px solid currentColor; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-variant-numeric: lining-nums; }
+.pasos .hecho { color: var(--chilca); }
+.pasos [aria-current="step"] { color: var(--indigo); font-weight: 800; }
+.pasos [aria-current="step"] .n { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+@media (max-width: 560px) { .pasos { gap: 4px; } .pasos li + li::before { width: 12px; } }
+
+.compra { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; align-items: start; padding-top: 24px; padding-bottom: 64px; }
+h1 { font-size: 38px; }
+.subtitulo { margin: 6px 0 0; color: var(--indigo-2); }
+
+fieldset { border: 1px solid var(--linea); border-radius: 10px; padding: 20px 22px 24px; margin: 24px 0 0; }
+legend { font-family: var(--f-titulo); font-weight: 800; font-size: 22px; padding: 0 6px; }
+.grilla { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+.grilla .ancho-total { grid-column: 1 / -1; }
+.sub { grid-column: 1 / -1; margin: 8px 0 0; font-weight: 700; font-size: 16px; }
+@media (max-width: 640px) { .grilla { grid-template-columns: 1fr; } }
+
+.resumen { position: sticky; top: 16px; padding: 22px; }
+.resumen h2 { font-size: 24px; }
+.resumen dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 16px 0; font-size: 16px; }
+.resumen dt { color: var(--indigo-2); }
+.resumen dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: lining-nums tabular-nums; }
+.total-pago { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--indigo); padding-top: 12px; }
+.total-pago b { font-size: 30px; font-variant-numeric: lining-nums tabular-nums; }
+.resumen .btn { width: 100%; margin-top: 16px; min-height: 56px; font-size: 18px; }
+.condiciones { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; font-size: 15px; }
+.condiciones li { padding-left: 22px; position: relative; }
+.condiciones li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--chilca); }
+@media (max-width: 960px) { .compra { grid-template-columns: 1fr; } .resumen { position: static; } }
+</style>
+</head>
+<body>
+<a class="solo-lector" href="#contenido">Saltar al contenido</a>
+<header class="barra">
+  <div class="ancho">
+    <a class="logo" href="#">IncaTour</a>
+    <nav aria-label="Principal"><a href="#">Mi viaje</a></nav>
+  </div>
+</header>
+
+<main id="contenido" class="ancho">
+  <ol class="pasos" aria-label="Pasos de la compra">
+    <li class="hecho"><span class="n">1</span>Fecha</li>
+    <li aria-current="step"><span class="n">2</span>Pasajeros y pago</li>
+    <li><span class="n">3</span>Listo</li>
+  </ol>
+
+  <div class="compra">
+    <form id="f-pago" novalidate aria-labelledby="t-pagar">
+      <h1 id="t-pagar">Pasajeros y pago</h1>
+      <p class="subtitulo">Los datos tienen que coincidir con el pasaporte: con ellos tramitamos el permiso del Camino Inca.</p>
+
+      <fieldset>
+        <legend>Pasajero 1 <span class="wf-marca" aria-hidden="true">1</span></legend>
+        <div class="grilla">
+          <div class="campo ancho-total"><label for="p1n">Nombre y apellido, como en el pasaporte</label><input id="p1n" autocomplete="name" value="Lucía Fernández"></div>
+          <div class="campo"><label for="p1p">Número de pasaporte</label><input id="p1p" value="AAB123456"></div>
+          <div class="campo"><label for="p1c">Nacionalidad</label><select id="p1c"><option>Argentina</option></select></div>
+          <div class="campo con-error"><label for="p1v">Vencimiento del pasaporte</label><input id="p1v" inputmode="numeric" placeholder="dd/mm/aaaa" value="02/01/2027" aria-invalid="true" aria-describedby="p1v-e"><span class="error" id="p1v-e">El pasaporte tiene que estar vigente hasta 6 meses después del viaje. Este vence el 2 de enero de 2027.</span></div>
+          <p class="sub">Contacto de emergencia <span class="wf-marca" aria-hidden="true">2</span></p>
+          <div class="campo"><label for="p1en">Nombre</label><input id="p1en" value="Marta Fernández"></div>
+          <div class="campo"><label for="p1et">Teléfono, con código de país</label><input id="p1et" type="tel" autocomplete="tel" value="+54 9 11 5555 0000"><span class="ayuda">Lo usamos solo si pasa algo durante el viaje.</span></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pasajero 2</legend>
+        <div class="grilla">
+          <div class="campo ancho-total"><label for="p2n">Nombre y apellido, como en el pasaporte</label><input id="p2n"></div>
+          <div class="campo"><label for="p2p">Número de pasaporte</label><input id="p2p"></div>
+          <div class="campo"><label for="p2c">Nacionalidad</label><select id="p2c"><option value="">Elegí un país</option></select></div>
+          <div class="campo"><label for="p2v">Vencimiento del pasaporte</label><input id="p2v" inputmode="numeric" placeholder="dd/mm/aaaa"></div>
+          <p class="sub">Contacto de emergencia</p>
+          <div class="campo"><label for="p2en">Nombre</label><input id="p2en"></div>
+          <div class="campo"><label for="p2et">Teléfono, con código de país</label><input id="p2et" type="tel"><span class="ayuda">Lo usamos solo si pasa algo durante el viaje.</span></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pago con tarjeta <span class="wf-marca" aria-hidden="true">3</span></legend>
+        <div class="aviso error" role="alert" style="margin-bottom:16px">La tarjeta fue rechazada. Probá con otra o revisá los datos. No se hizo ningún cobro.</div>
+        <div class="grilla">
+          <div class="campo ancho-total"><label for="tn">Número de tarjeta</label><input id="tn" inputmode="numeric" autocomplete="cc-number"></div>
+          <div class="campo ancho-total"><label for="tt">Nombre como figura en la tarjeta</label><input id="tt" autocomplete="cc-name"></div>
+          <div class="campo"><label for="tv">Vencimiento</label><input id="tv" inputmode="numeric" placeholder="mm/aa" autocomplete="cc-exp"></div>
+          <div class="campo"><label for="tc">Código de seguridad</label><input id="tc" inputmode="numeric" autocomplete="cc-csc"><span class="ayuda">Los 3 números del dorso.</span></div>
+        </div>
+      </fieldset>
+    </form>
+
+    <aside class="tarjeta resumen" aria-labelledby="t-resumen">
+      <h2 id="t-resumen">Tu viaje <span class="wf-marca" aria-hidden="true">4</span></h2>
+      <dl>
+        <dt>Circuito</dt><dd>Camino Inca</dd>
+        <dt>Fechas</dt><dd>10 al 13 de diciembre</dd>
+        <dt>Encuentro</dt><dd>Plaza de Armas, Cusco, 4:30</dd>
+        <dt>Pasajeros</dt><dd>2 × USD 750</dd>
+      </dl>
+      <div class="total-pago"><span>Total</span><b>USD 1.500</b></div>
+      <button class="btn" type="submit" form="f-pago">Pagar USD 1.500</button>
+      <ul class="condiciones">
+        <li>Salida confirmada.</li>
+        <li>Podés cancelar sin costo hasta el 25 de noviembre. Después, el reintegro depende de los días que falten.</li>
+        <li>El equipaje extra se abona en el punto de encuentro.</li>
+      </ul>
+    </aside>
+  </div>
+</main>
+
+<footer class="pie-corto"><div class="ancho"><span>IncaTour. Cusco, Perú.</span><span>Pago seguro con tarjeta</span></div></footer>
+
+<section class="wf-notas" aria-labelledby="t-notas">
+  <div class="ancho">
+    <h2 id="t-notas">Notas de diseño: pasajeros y pago</h2>
+    <p>Es la pantalla con más campos del producto, así que va en una sola página, con el resumen siempre a la vista y nada que no sea necesario para comprar. La cuenta se crea antes de llegar acá, sin perder la fecha elegida.</p>
+    <ol>
+      <li><b>Un bloque por pasajero</b>, con los datos que pide <code>POST /reservas</code>: nombre, pasaporte, nacionalidad y vencimiento. Los errores se marcan junto al campo y dicen cómo resolverlos. El caso del pasaporte que vence antes de tiempo es una regla a confirmar con el back.</li>
+      <li><b>Contacto de emergencia</b> obligatorio por pasajero (A4b), con un renglón que explica para qué se usa.</li>
+      <li><b>Pago.</b> El rechazo aparece arriba del bloque de tarjeta, dice que no se cobró nada y qué hacer. Los datos de los pasajeros no se pierden.</li>
+      <li><b>Resumen.</b> El botón dice el monto exacto. Abajo, las tres condiciones que más preguntas generan: si la salida está confirmada, hasta cuándo se cancela sin costo y que el equipaje extra no está incluido. Si la salida todavía no está confirmada, esa línea no aparece: no se anuncia la posibilidad de que no salga. El reintegro total si la agencia cancela figura en las condiciones de compra, a las que lleva un enlace.</li>
+    </ol>
+    <h3>Estados</h3>
+    <div class="wf-estados">
+      <div class="wf-estado"><b>Pagando</b><button class="btn" type="button" disabled style="width:100%">Procesando el pago…</button><p class="letra-chica" style="margin-top:8px;font-size:14px">No cierres esta página.</p></div>
+      <div class="wf-estado"><b>Se ocuparon los lugares mientras completaba</b><div class="aviso error">Mientras completabas los datos se ocuparon los últimos lugares de esta fecha. No se hizo ningún cobro.</div><a class="btn-texto" href="ficha-viaje.html">Elegir otra fecha</a></div>
+      <div class="wf-estado"><b>Pago aprobado (paso 3)</b><span class="estado listo">Listo. Tu viaje está reservado</span><p style="margin:8px 0 0">Te mandamos el comprobante por mail.</p><a class="btn-texto" href="mi-viaje.html">Ver mi viaje</a></div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

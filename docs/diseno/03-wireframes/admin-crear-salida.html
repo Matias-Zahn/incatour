@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncaTour admin: nueva salida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/*BASE*/
+/* Base común de los wireframes de IncaTour. Fuente única: se incrusta en cada HTML con armar.py
+   (el panel de vista previa no carga hojas de estilo por ruta relativa). Semilla de los tokens de 04-sistema. */
+:root {
+  --algodon: #FFFFFF; --indigo: #232850; --indigo-2: #4B5170; --indigo-claro: #ECEDF5;
+  --cochinilla: #A3123A; --qolle: #E8A817; --chilca: #2F6B2C; --piedra: #E9E6DF; --piedra-borde: #8E8676;
+  --linea: #E1E2EC; --espera: #8A5F00; --riesgo: #9C4A00; --critico: #A3123A;
+  --f-titulo: "Alegreya", serif; --f-texto: "Alegreya Sans", sans-serif;
+  --radio: 6px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--algodon); color: var(--indigo); font: 17px/1.55 var(--f-texto); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--f-titulo); line-height: 1.15; margin: 0; }
+.cifra { font-variant-numeric: lining-nums tabular-nums; }
+.solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* El salto al contenido aparece al recibir el foco */
+a.solo-lector:focus { position: fixed; top: 12px; left: 16px; width: auto; height: auto; clip: auto; z-index: 20; background: #fff; color: var(--indigo); padding: 12px 18px; border-radius: 6px; font-weight: 700; }
+.ancho { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 700px) { .ancho { padding: 0 20px; } }
+
+/* Encabezado de las páginas interiores: índigo liso, sin foto */
+.barra { background: var(--indigo); color: #fff; }
+.barra .ancho { display: flex; justify-content: space-between; align-items: center; min-height: 72px; gap: 16px; }
+.barra .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 26px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.barra nav { display: flex; gap: 8px; }
+.barra nav a { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--radio); }
+.barra nav a:hover { background: rgba(255,255,255,.12); }
+.barra nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--qolle); }
+.barra a:focus-visible { outline-color: var(--qolle); }
+@media (max-width: 480px) { .barra .ancho { gap: 8px; } .barra .logo { font-size: 22px; } .barra nav { gap: 0; } .barra nav a { padding: 0 8px; white-space: nowrap; font-size: 15px; } }
+
+/* Botones */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--radio); border: 0; background: var(--cochinilla); color: #fff; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.btn:hover { background: #870E30; }
+.btn-sec { background: transparent; color: var(--indigo); border: 2px solid var(--indigo); min-height: 44px; font-weight: 700; }
+.btn-sec:hover { background: #F2F2F7; }
+.btn-texto { background: none; border: 0; color: var(--indigo); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.btn-peligro { color: var(--critico); }
+.btn[disabled] { background: #C9CBD8; color: #4B5170; cursor: not-allowed; }
+
+/* Estados: siempre con texto */
+.estado { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.listo { color: var(--chilca); } .espera { color: var(--espera); } .riesgo { color: var(--riesgo); } .critico { color: var(--critico); }
+
+/* Campos */
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 15px; }
+.campo .ayuda { font-size: 14px; color: var(--indigo-2); }
+.campo input, .campo select { font: inherit; min-height: 48px; padding: 0 14px; border: 2px solid #9EA2BC; border-radius: var(--radio); background: #fff; color: var(--indigo); }
+.campo input:hover { border-color: var(--indigo-2); }
+.campo.con-error input { border-color: var(--critico); }
+.campo .error { font-size: 14px; font-weight: 700; color: var(--critico); }
+
+/* Bloques */
+.tarjeta { border: 1px solid var(--linea); border-radius: 10px; background: #fff; }
+.aviso { border-radius: 10px; padding: 14px 16px; font-size: 16px; }
+.aviso.info { background: var(--indigo-claro); }
+.aviso.error { background: #FBEAEE; color: #7A0E2B; border-left: 4px solid var(--critico); }
+
+/* Andenes: el recorrido por día */
+.andenes { display: grid; align-items: end; gap: 4px; height: 120px; }
+.anden { background: var(--piedra); border-top: 3px solid var(--piedra-borde); border-radius: 2px 2px 0 0; padding: 4px 6px 0; font-size: 13px; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+.anden b { display: block; }
+.anden.alto { background: var(--indigo); color: #fff; border-top-color: var(--qolle); }
+
+/* Pie con muro: versión corta para las páginas interiores */
+.pie-corto { background: var(--indigo); color: #D5D8EE; font-size: 15px; }
+.pie-corto .ancho { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
+.pie-corto svg { display: block; width: 100%; height: 90px; }
+
+/* Notas de diseño: van fuera de la pantalla, no son parte de la interfaz */
+.wf-notas { background: #FFFBEA; border-top: 4px solid var(--qolle); margin-top: 64px; }
+.wf-notas .ancho { padding-top: 32px; padding-bottom: 48px; }
+.wf-notas h2 { font-size: 26px; }
+.wf-notas ol, .wf-notas ul { padding-left: 22px; max-width: 80ch; }
+.wf-notas li { margin-bottom: 8px; }
+.wf-notas h3 { font-family: var(--f-texto); font-size: 18px; margin-top: 28px; }
+.wf-estados { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.wf-estado { background: #fff; border: 1px dashed #C8B98A; border-radius: 8px; padding: 16px; }
+.wf-estado > b { display: block; font-size: 14px; color: #6B5A1E; margin-bottom: 8px; }
+.wf-marca { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--qolle); color: var(--indigo); font-size: 13px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
+
+/* ===== Admin: estructura común. Calmo y denso: sin motivos, algodón e índigo ===== */
+.adm { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+.adm-lateral { background: var(--indigo); color: #fff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.adm-lateral .logo { font-family: var(--f-titulo); font-weight: 800; font-size: 24px; padding: 4px 10px 18px; text-decoration: none; }
+.adm-lateral a { color: #D5D8EE; text-decoration: none; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: var(--radio); font-weight: 500; }
+.adm-lateral a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.adm-lateral a[aria-current="page"] { background: rgba(255,255,255,.12); color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--qolle); }
+.adm-lateral a:focus-visible { outline-color: var(--qolle); }
+.adm-lateral .cuenta { font-weight: 700; color: var(--indigo); background: var(--qolle); border-radius: 999px; padding: 0 8px; font-size: 14px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.adm-lateral .separador { height: 1px; background: rgba(255,255,255,.15); margin: 12px 10px; }
+.adm-lateral .secundario a { font-size: 15px; min-height: 40px; }
+.adm-principal { padding: 28px 40px 64px; min-width: 0; }
+.adm-principal > header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.adm-principal h1 { font-size: 38px; }
+.adm-principal .bajada { margin: 4px 0 0; color: var(--indigo-2); }
+@media (max-width: 900px) { .adm { grid-template-columns: 1fr; } .adm-lateral { flex-direction: row; flex-wrap: wrap; } .adm-lateral .separador, .adm-lateral .secundario { display: none; } .adm-principal { padding: 20px; } }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 700; background: var(--indigo-claro); color: var(--indigo); }
+.progreso { height: 8px; border-radius: 999px; background: var(--indigo-claro); overflow: hidden; }
+.progreso > span { display: block; height: 100%; background: var(--indigo); border-radius: 999px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tabla th { text-align: left; font-size: 13px; color: var(--indigo-2); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--linea); }
+.tabla td { padding: 10px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+/*FIN-BASE*/
+
+.asistente { max-width: 780px; }
+.migas { font-size: 15px; margin: 0 0 6px; color: var(--indigo-2); }
+
+/* Pasos del asistente: una secuencia real, numerada; se puede volver a los anteriores */
+.pasos { display: flex; list-style: none; margin: 8px 0 32px; padding: 0; gap: 8px; flex-wrap: wrap; }
+.pasos li { flex: 1; min-width: 150px; border-top: 4px solid var(--linea); padding-top: 8px; font-size: 15px; color: var(--indigo-2); }
+.pasos li b { display: block; color: var(--indigo); }
+.pasos .hecho { border-top-color: var(--chilca); }
+.pasos [aria-current="step"] { border-top-color: var(--indigo); }
+.pasos a { color: inherit; }
+
+.pregunta { font-size: 30px; }
+.pregunta + p { margin: 6px 0 24px; color: var(--indigo-2); }
+fieldset { border: 0; padding: 0; margin: 0 0 28px; }
+legend { font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+
+/* Opciones como tarjetas: radio nativo, toda la tarjeta es clickeable */
+.opciones { display: grid; gap: 10px; }
+.opcion { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: start; border: 2px solid var(--linea); border-radius: 10px; padding: 14px 16px; cursor: pointer; }
+.opcion:hover { border-color: #9EA2BC; }
+.opcion:has(input:checked) { border-color: var(--indigo); background: #F7F7FB; }
+.opcion:has(input:focus-visible) { outline: 3px solid var(--cochinilla); outline-offset: 3px; }
+.opcion input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--indigo); }
+.opcion b { display: block; }
+.opcion .detalle { font-size: 15px; color: var(--indigo-2); }
+.opcion .precio { font-weight: 700; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+.opcion.sin-lugar { opacity: .6; cursor: not-allowed; }
+
+.aviso b { display: block; margin-bottom: 2px; }
+.aviso.riesgo { background: #FFF6E5; border-left: 4px solid var(--riesgo); color: #5E3000; }
+.botones { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--linea); }
+.anterior { background: #F7F7FB; border-radius: 8px; padding: 12px 16px; font-size: 15px; display: flex; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+
+/* Selector para listas largas: buscar, ordenar y una lista que se desplaza dentro de su caja */
+.selector-barra { display: grid; grid-template-columns: 1fr 220px; gap: 10px; }
+@media (max-width: 560px) { .selector-barra { grid-template-columns: 1fr; } }
+.cuantos { margin: 8px 0; font-size: 14px; color: var(--indigo-2); }
+.lista { list-style: none; margin: 0; padding: 0; max-height: 264px; overflow-y: auto; border: 1px solid var(--linea); border-radius: 10px; scroll-snap-type: y proximity; }
+.lista li { border-top: 1px solid var(--linea); scroll-snap-align: start; }
+.lista li:first-child { border-top: 0; }
+.fila { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; min-height: 56px; cursor: pointer; }
+.fila:hover { background: #F7F7FB; }
+.fila:has(input:checked) { background: #EFF0F8; box-shadow: inset 4px 0 0 var(--indigo); }
+.fila:has(input:focus-visible) { outline: 3px solid var(--cochinilla); outline-offset: -3px; }
+.fila input { width: 20px; height: 20px; margin: 0; accent-color: var(--indigo); }
+.fila b { font-weight: 700; }
+.fila .chip { margin-left: 6px; font-size: 12px; padding: 0 8px; }
+.fila .detalle { display: block; font-size: 14px; color: var(--indigo-2); }
+.fila .precio { font-weight: 700; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+.fila.sin-lugar { opacity: .6; cursor: not-allowed; }
+.lista li[hidden] { display: none; }
+</style>
+</head>
+<body>
+<a class="solo-lector" href="#contenido">Saltar al contenido</a>
+<div class="adm">
+  <nav class="adm-lateral" aria-label="Admin">
+    <a class="logo" href="#">IncaTour</a>
+    <a href="admin-hoy.html">Hoy <span class="cuenta">8</span></a>
+    <a href="#" aria-current="page">Salidas</a>
+    <a href="#">Catálogo</a>
+    <a href="#">Recursos</a>
+    <a href="#">Personal</a>
+  </nav>
+
+  <main class="adm-principal" id="contenido">
+    <div class="asistente">
+      <p class="migas"><a href="#">Salidas</a> / Nueva salida del Camino Inca</p>
+      <ol class="pasos" aria-label="Pasos para crear la salida">
+        <li class="hecho"><a href="#">1. Fechas y tamaño</a><b>10 al 13 de dic, 12 lugares</b></li>
+        <li aria-current="step">2. Hotel y transporte<b>Elegí dónde duermen y cómo viajan</b></li>
+        <li>3. Revisar y publicar</li>
+      </ol>
+
+      <form>
+        <h1 class="pregunta">¿Dónde duermen y cómo viajan?</h1>
+        <p>Solo aparecen los que tienen lugar para 12 personas esas fechas. Dejamos elegido el que más usás para este paquete. <span class="wf-marca" aria-hidden="true">1</span></p>
+
+        <fieldset class="selector">
+          <legend>Hotel en Cusco, noche del 9 de diciembre</legend>
+          <div class="selector-barra">
+            <div class="campo buscar"><label for="b-hotel" class="solo-lector">Buscar hotel</label><input id="b-hotel" type="search" placeholder="Buscar por nombre" data-filtra="l-hotel"></div>
+            <div class="campo orden"><label for="o-hotel" class="solo-lector">Ordenar</label><select id="o-hotel"><option>El más usado primero</option><option>Más barato primero</option><option>Más lugares primero</option></select></div>
+          </div>
+          <p class="cuantos">6 hoteles con lugar para 12. 1 sin lugar, al final.</p>
+          <ul class="lista" id="l-hotel" tabindex="-1">
+            <li><label class="fila"><input type="radio" name="hotel" checked><span><b>Hotel Andenes</b> <span class="chip">El más usado</span><span class="detalle">3 estrellas, doble. 14 libres. Usado en 8 salidas.</span></span><span class="precio">USD 38 por persona</span></label></li><li><label class="fila"><input type="radio" name="hotel"><span><b>Casa Cusqueña</b><span class="detalle">3 estrellas, doble. 12 libres. Usado en 3 salidas.</span></span><span class="precio">USD 42 por persona</span></label></li><li><label class="fila"><input type="radio" name="hotel"><span><b>Inti Wasi</b><span class="detalle">3 estrellas, doble. 20 libres.</span></span><span class="precio">USD 45 por persona</span></label></li><li><label class="fila"><input type="radio" name="hotel"><span><b>Qorikancha Boutique</b><span class="detalle">4 estrellas, doble. 16 libres.</span></span><span class="precio">USD 68 por persona</span></label></li><li><label class="fila"><input type="radio" name="hotel"><span><b>Plaza Regocijo</b><span class="detalle">3 estrellas, triple. 12 libres.</span></span><span class="precio">USD 36 por persona</span></label></li><li><label class="fila"><input type="radio" name="hotel"><span><b>Sacsay Lodge</b><span class="detalle">4 estrellas, doble. 18 libres.</span></span><span class="precio">USD 72 por persona</span></label></li><li><label class="fila sin-lugar"><input type="radio" name="hotel" disabled><span><b>Hostal San Blas</b><span class="detalle">6 libres: no alcanza para 12.</span></span><span class="precio">USD 29 por persona</span></label></li>
+          </ul>
+        </fieldset>
+
+        <fieldset class="selector">
+          <legend>Transporte, 10 y 13 de diciembre</legend>
+          <div class="selector-barra">
+            <div class="campo buscar"><label for="b-transporte" class="solo-lector">Buscar transporte</label><input id="b-transporte" type="search" placeholder="Buscar por nombre" data-filtra="l-transporte"></div>
+            <div class="campo orden"><label for="o-transporte" class="solo-lector">Ordenar</label><select id="o-transporte"><option>El más usado primero</option><option>Más barato primero</option><option>Más lugares primero</option></select></div>
+          </div>
+          <p class="cuantos">3 transportes libres esas fechas. 1 que no alcanza, al final.</p>
+          <ul class="lista" id="l-transporte" tabindex="-1">
+            <li><label class="fila"><input type="radio" name="transporte" checked><span><b>Inka Express, bus de 16 plazas</b> <span class="chip">El más usado</span><span class="detalle">Libre los dos días. Usado en 8 salidas.</span></span><span class="precio">USD 320 la salida</span></label></li><li><label class="fila"><input type="radio" name="transporte"><span><b>Andes Tours, combi de 14 plazas</b><span class="detalle">Libre los dos días.</span></span><span class="precio">USD 260 la salida</span></label></li><li><label class="fila"><input type="radio" name="transporte"><span><b>Valle Sagrado Bus, 20 plazas</b><span class="detalle">Libre los dos días.</span></span><span class="precio">USD 360 la salida</span></label></li><li><label class="fila sin-lugar"><input type="radio" name="transporte" disabled><span><b>Cusco Van, 12 plazas</b><span class="detalle">Libre los dos días. Justo para 12, sin plazas para el guía.</span></span><span class="precio">USD 230 la salida</span></label></li>
+          </ul>
+        </fieldset>
+
+        <div class="aviso riesgo" role="status"><b>Si se vende completa, faltarían 3 carpas el 12 de diciembre</b>Podés crearla igual y conseguirlas antes de la salida. Te lo vamos a recordar en Hoy. <span class="wf-marca" aria-hidden="true">2</span></div>
+
+        <div class="botones">
+          <a class="btn btn-sec" href="#">Volver</a>
+          <button class="btn" type="button">Siguiente: revisar</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<section class="wf-notas" aria-labelledby="t-notas">
+  <div class="ancho">
+    <h2 id="t-notas">Notas de diseño: asistente para crear una salida</h2>
+    <p>Crear es una conversación, no un formulario: una pregunta por pantalla, lo que ya se sabe precargado y un resumen antes de publicar. Es el patrón que después usan el circuito, el paquete y el equipamiento. Para editar un dato suelto, se edita en la ficha, sin volver a recorrer los pasos.</p>
+    <ol>
+      <li><b>Listas largas.</b> Cada lista tiene buscador y orden, y se desplaza dentro de su propia caja (unas 4 filas a la vista), así la página no crece con 6 hoteles o más. El más usado va primero y marcado. Las opciones sin lugar van al final, deshabilitadas y con el motivo. Componente: radio nativo, o Radix Radio Group.</li>
+      <li><b>Solo las opciones posibles.</b> Hotel y transporte se filtran por capacidad en esas fechas, con la ocupación por fechas del back (A1). La opción sin lugar se muestra deshabilitada y dice por qué, para que no parezca que falta.</li>
+      <li><b>El control de stock (A2b) avisa sin bloquear</b> cuando lo libre cubre entre el 50 y el 100 % de lo que haría falta. La alerta sigue después en Hoy como "Riesgo de stock".</li>
+    </ol>
+    <p>Los pasos anteriores se pueden revisar con un clic sin perder lo cargado. El paso 1 (fechas y tamaño) calcula la fecha de fin a partir de los días del circuito.</p>
+    <h3>Estados</h3>
+    <div class="wf-estados">
+      <div class="wf-estado"><b>No alcanza el equipo (menos del 50 %)</b><div class="aviso error">No alcanzan las carpas: el 12 de diciembre hay 2 libres y una salida de 12 necesita 6. Con 8 lugares sí alcanza.</div><button class="btn-texto" type="button">Usar 8 lugares</button></div>
+      <div class="wf-estado"><b>Ningún hotel con lugar</b><p style="margin:0 0 8px">Ningún hotel tiene 12 lugares libres la noche del 9.</p><button class="btn-texto" type="button">Probar con menos lugares</button></div>
+      <div class="wf-estado"><b>Paso 3: revisar y publicar</b><p style="margin:0">Resumen de fechas, lugares, hotel, transporte y precio por temporada, con un botón "Publicar salida".</p></div>
+    </div>
+  </div>
+</section>
+<script>
+  // Buscar dentro de cada lista
+  document.querySelectorAll('[data-filtra]').forEach(inp => inp.addEventListener('input', () => {
+    const q = inp.value.trim().toLowerCase();
+    document.querySelectorAll('#' + inp.dataset.filtra + ' li').forEach(li => li.hidden = q && !li.textContent.toLowerCase().includes(q));
+  }));
+</script>
+</body>
+</html>
