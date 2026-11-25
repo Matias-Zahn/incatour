@@ -266,6 +266,15 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
     expect(r.fechaFin).toBe(enDias(23).toISOString().slice(0, 10));
   });
 
+  it("solo ofrece el transporte del paquete o reemplazos que no cuesten más; crear con uno más caro se rechaza", async () => {
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, servicios: [{ idservicio: 7, servicio: { transporte: {} } }] });
+    const bus = (idservicio: number, costoBase: number) => ({ idservicio, nombreServicio: `T${idservicio}`, costoBase, capacidadVehiculo: 30, libre: true });
+    repo.buscarTransportes.mockResolvedValue([bus(7, 100), bus(8, 90), bus(9, 150)]);
+    const r = await new SalidaService().consultarOpcionesSalida(dto());
+    expect(r.transportes.map((t) => t.idservicio)).toEqual([7, 8]);
+    await expect(new SalidaService().crearSalida(dto({ idtransporte: 9 }))).rejects.toThrow("no costar más que el del paquete");
+  });
+
   it("informa los lugares libres de la autoridad ese día y si alcanzan", async () => {
     await autoridad.solicitarBloqueoCupo(new Date(FECHA), 490);
 
