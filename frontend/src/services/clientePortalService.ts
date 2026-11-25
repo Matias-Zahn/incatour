@@ -695,7 +695,7 @@ export function etiquetaEstadoSalidaCliente(estado?: string | null): string {
         case "PUBLICADA":
             return "Publicada";
         case "CERRADA":
-            return "Cerrada";
+            return "Confirmada";
         case "EN_CURSO":
             return "En curso";
         case "FINALIZADA":

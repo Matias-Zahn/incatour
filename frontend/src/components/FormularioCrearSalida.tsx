@@ -415,10 +415,10 @@ function FormularioCrearSalida({
             }
             if (
                 !Number.isInteger(diasCierreVenta) ||
-                diasCierreVenta < 0 ||
+                diasCierreVenta < 1 ||
                 diasCierreVenta > 30
             ) {
-                setErrorPaso("Los días de cierre de venta deben estar entre 0 y 30.");
+                setErrorPaso("Los días de cierre de venta deben estar entre 1 y 30.");
                 return;
             }
             setPasoActual(2);
@@ -800,7 +800,7 @@ function FormularioCrearSalida({
                                     Días de cierre de venta antes del inicio
                                     <input
                                         type="number"
-                                        min={0}
+                                        min={1}
                                         max={30}
                                         value={diasCierreVenta}
                                         onChange={(e) => {

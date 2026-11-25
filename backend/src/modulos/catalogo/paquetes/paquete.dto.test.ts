@@ -69,8 +69,9 @@ describe("CrearPaqueteDto", () => {
     [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }, { idservicio: 8, cantidad: 0, cadaPasajeros: 2 }] }, "equipo[1]: cantidad y cadaPasajeros deben ser enteros entre 1 y 100."],
     [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 101 }] }, "equipo[0]: cantidad y cadaPasajeros deben ser enteros entre 1 y 100."],
     [{ equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }, { idservicio: 7, cantidad: 2, cadaPasajeros: 2 }] }, "equipo repite el servicio 7."],
-    [{ diasCierreVenta: 31 }, "diasCierreVenta debe ser un número entero entre 0 y 30."],
-    [{ diasCierreVenta: 1.5 }, "diasCierreVenta debe ser un número entero entre 0 y 30."],
+    [{ diasCierreVenta: 31 }, "diasCierreVenta debe ser un número entero entre 1 y 30."],
+    [{ diasCierreVenta: 0 }, "diasCierreVenta debe ser un número entero entre 1 y 30."],
+    [{ diasCierreVenta: 1.5 }, "diasCierreVenta debe ser un número entero entre 1 y 30."],
   ])("rechaza %o", (cambio, mensaje) => {
     expect(error(cambio)).toBe(mensaje);
   });
@@ -125,7 +126,7 @@ describe("ModificarPaqueteDto", () => {
       idservicioGarantizado: 15,
       idtren: null,
       equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }],
-      diasCierreVenta: 0,
+      diasCierreVenta: 1,
     });
 
     expect(err).toBeUndefined();
@@ -134,7 +135,7 @@ describe("ModificarPaqueteDto", () => {
       tipoGarantia: "POR_ESTABLECIMIENTO",
       idservicioGarantizado: 15,
       servicios: { idtransporte: undefined, idtren: null, equipo: [{ idservicio: 7, cantidad: 1, cadaPasajeros: 2 }] },
-      diasCierreVenta: 0,
+      diasCierreVenta: 1,
     });
   });
 

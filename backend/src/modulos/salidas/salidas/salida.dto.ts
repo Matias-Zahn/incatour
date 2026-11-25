@@ -89,9 +89,9 @@ export class CrearSalidaDto {
     if (new Set(alojamientos).size !== alojamientos.length) return ["alojamientos tiene ids repetidos"];
 
     // B4: sin él, rige el corte sugerido (el del paquete, o 5 días con un hotel a solicitud)
-    const diasCierreVenta = obj.diasCierreVenta == null ? undefined : entero(obj.diasCierreVenta, 0);
+    const diasCierreVenta = obj.diasCierreVenta == null ? undefined : entero(obj.diasCierreVenta, 1); // mínimo 1: ver errorDiasCierre del paquete
     if (diasCierreVenta === null || (diasCierreVenta ?? 0) > TOPES.diasCierreVenta) {
-      return [`diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}`];
+      return [`diasCierreVenta debe ser un número entero entre 1 y ${TOPES.diasCierreVenta}`];
     }
     if (!alta) return [undefined, new CrearSalidaDto(idpaquete, fechaInicio, tamanoMaximo, alojamientos, diasCierreVenta)];
 

@@ -138,7 +138,7 @@ function ordenarSalidas(salidas: Salida[], vista: "vigentes" | "historial") {
 
 const ESTADOS_SALIDA = [
     { valor: "PUBLICADA", etiqueta: "Publicada" },
-    { valor: "CERRADA", etiqueta: "Cerrada" },
+    { valor: "CERRADA", etiqueta: "Confirmada" },
     { valor: "EN_CURSO", etiqueta: "En curso" },
     { valor: "FINALIZADA", etiqueta: "Finalizada" },
     { valor: "CANCELADA", etiqueta: "Cancelada" },
@@ -944,8 +944,8 @@ function SalidasPage() {
                             </p>
                         ) : null}
                         <div className="flex items-center justify-between text-xs text-texto-suave">
-                            {/* Al asignar recursos la venta se cierra y el stock queda en 0: no significa que se llenó */}
-                            {fila.estado === "PUBLICADA" ? (
+                            {/* La venta termina sola en el corte (B4): después del corte ya no se muestran lugares libres */}
+                            {fila.estado === "PUBLICADA" && fila.ventaAbierta !== false ? (
                                 <>
                                     <span className="max-md:hidden">
                                         {fila.stockLocal} {fila.stockLocal === 1 ? "libre" : "libres"}

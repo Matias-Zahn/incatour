@@ -117,6 +117,12 @@ const ESTADOS_SOLICITUD_ETIQUETA: Record<string, string> = {
     RECHAZADA: "Rechazada",
 };
 
+// Estado de la reserva (CONFIRMADA, CANCELADA) y de su alojamiento (CONFIRMADO, PENDIENTE)
+const ESTADOS_RESERVA_ETIQUETA: Record<string, string> = {
+    ...ESTADOS_SOLICITUD_ETIQUETA,
+    CONFIRMADO: "Confirmado",
+};
+
 function buscarEtiqueta(mapa: Record<string, string>, valor?: string | null): string {
     if (!valor) return "—";
     return mapa[valor.toUpperCase()] ?? valor;
@@ -136,6 +142,9 @@ export const etiquetaGravedad = (nivel?: string | null) =>
 
 export const etiquetaHabilitacion = (situacion?: string | null) =>
     buscarEtiqueta(HABILITACIONES_ETIQUETA, situacion);
+
+export const etiquetaEstadoReserva = (estado?: string | null) =>
+    buscarEtiqueta(ESTADOS_RESERVA_ETIQUETA, estado);
 
 export const etiquetaEstadoSolicitud = (estado?: string | null) =>
     buscarEtiqueta(ESTADOS_SOLICITUD_ETIQUETA, estado);

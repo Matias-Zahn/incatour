@@ -50,8 +50,9 @@ function validarServicios(obj: { [key: string]: any }, alta: boolean): [string |
   return [undefined, { idtransporte, idtren: alta ? (idtren ?? null) : idtren, equipo: lista ?? (alta ? [] : undefined) }];
 }
 
+// Mínimo 1: con 0 la venta sigue hasta la víspera y el día del inicio ya no se puede confirmar la salida
 const errorDiasCierre = (v: unknown) =>
-  v !== undefined && !enRango(v, 0, TOPES.diasCierreVenta) ? `diasCierreVenta debe ser un número entero entre 0 y ${TOPES.diasCierreVenta}.` : undefined;
+  v !== undefined && !enRango(v, 1, TOPES.diasCierreVenta) ? `diasCierreVenta debe ser un número entero entre 1 y ${TOPES.diasCierreVenta}.` : undefined;
 const SALE_DESDE = "localidadGarantizada (Sale desde) es obligatoria.";
 
 export class CrearPaqueteDto {

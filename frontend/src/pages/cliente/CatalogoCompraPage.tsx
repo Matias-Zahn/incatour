@@ -29,7 +29,7 @@ import {
     type DatosCompra,
     type FormularioCompra,
 } from "./esquemaCompra";
-import { formatearFechaUtcCorta, formatearMonto } from "../../services/formato";
+import { etiquetaEstadoReserva, formatearFechaUtcCorta, formatearMonto } from "../../services/formato";
 
 // FE-48: compra en curso guardada en la pestaña (sessionStorage) mientras se vuelve a iniciar sesión
 const CLAVE_COMPRA_GUARDADA = "incatour.cliente.compra_en_curso";
@@ -689,7 +689,7 @@ function CatalogoCompraPage() {
 
                         <div className="flex flex-wrap gap-2">
                             <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-exito">
-                                Estado: {reservaConfirmada.resultado.estado}
+                                Estado: {etiquetaEstadoReserva(reservaConfirmada.resultado.estado)}
                             </span>
                             <span
                                 className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -700,7 +700,7 @@ function CatalogoCompraPage() {
                                 }`}
                             >
                                 Alojamiento:{" "}
-                                {reservaConfirmada.resultado.estadoAlojamiento}
+                                {etiquetaEstadoReserva(reservaConfirmada.resultado.estadoAlojamiento)}
                             </span>
                         </div>
                     </div>
