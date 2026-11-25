@@ -76,6 +76,10 @@ const TRANSPORTES: [string, string, number, number, string][] = [
   ["Valle Sagrado Traslados", "Sprinter 19 asientos", 19, 90, "WhatsApp"],
   ["Cusco Van", "Hiace 20 asientos", 20, 100, "Teléfono"],
   ["Qosqo Móvil", "Coaster 25 asientos", 25, 125, "WhatsApp"],
+  // Flota de reemplazo: la demo elige transportes que no encarezcan el paquete (uno más caro se permite, con aviso)
+  ["Andes Sur Turismo", "Coaster 25 asientos", 25, 110, "WhatsApp"],
+  ["Ruta Imperial", "Coaster 25 asientos", 25, 115, "Email"],
+  ["Ollanta Express", "Sprinter 19 asientos", 19, 85, "Teléfono"],
 ];
 // Equipamiento de campamento: [artículo, tipo, inventario, costo por unidad]
 const EQUIPOS: [string, string, number, number][] = [
@@ -148,7 +152,7 @@ const INCIDENTES = [
 type Persona = { nombre: string; apellido: string; pais: Pais; pasaporte: string; vence: string };
 type Cliente = Persona & { idcliente: number; idusuario: number; token: string; primeraCompra?: string };
 type Etapa = "historica" | "encurso" | "cerrada" | "publicada" | "pendiente";
-type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; carlos?: boolean; cancelada?: boolean; deHoy?: boolean; juan?: boolean };
+type Plan = { virtual: string; paquete: (typeof PAQUETES)[number]; etapa: Etapa; vender?: number; carlos?: boolean; cancelada?: boolean; deHoy?: boolean; juan?: boolean };
 
 /** Calendario de salidas: desde hace dos años hasta cinco meses adelante. En febrero el Camino Inca cierra */
 function armarCalendario(hoy: string) {
@@ -180,13 +184,15 @@ function armarCalendario(hoy: string) {
   planes.push({ virtual: hoy, paquete: clasico, etapa: "cerrada", carlos: true, deHoy: true });
   planes.push({ virtual: sumarDias(hoy, 12), paquete: clasico, etapa: "cerrada", carlos: true });
   // B4: terminó la venta y falta confirmarla, para hacerlo en vivo (se opera en el futuro y se trae a su fecha)
-  planes.push({ virtual: sumarDias(hoy, 2), paquete: clasico, etapa: "pendiente" });
+  planes.push({ virtual: sumarDias(hoy, 2), paquete: clasico, etapa: "pendiente", vender: 1 });
+  // Vendida a la mitad y hoy es su último día de venta: la fecha mínima (hoy + corte + 1)
+  planes.push({ virtual: sumarDias(hoy, 3), paquete: PAQUETES[3], etapa: "publicada", vender: 0.5 });
   const historicas = planes.filter((p) => p.etapa === "historica");
   for (const i of [7, 25, 44]) historicas[i]!.cancelada = true;
   planes.sort((a, b) => a.virtual.localeCompare(b.virtual));
   // Juan tiene una salida terminada sin reseñar y una reserva a la venta que puede cancelar con reintegro
   planes.filter((p) => p.etapa === "historica" && !p.cancelada).at(-1)!.juan = true;
-  planes.find((p) => p.etapa === "publicada")!.juan = true;
+  planes.find((p) => p.etapa === "publicada" && !p.vender)!.juan = true;
   return planes;
 }
 
@@ -246,13 +252,13 @@ async function main() {
       }
     }
 
-    const transportes: { idservicio: number; idproveedor: number; asientos: number; ocupado: [string, string][] }[] = [];
+    const transportes: { idservicio: number; idproveedor: number; asientos: number; costo: number; ocupado: [string, string][] }[] = [];
     for (const [empresa, vehiculo, asientos, costo, canal] of TRANSPORTES) {
       const contacto = canal === "Email" ? `operaciones@${correo(empresa).replace(/\./g, "")}.com.pe` : `+51 984 ${digitos(3)} ${digitos(3)}`;
       const prov = await api("POST", "/proveedores", { tipoProveedor: "TRANSPORTE", razonSocial: `${empresa} E.I.R.L.`, localidad: "Cusco", datosContacto: contacto, canalComunicacion: canal });
       const idproveedor = idDe(prov, "idproveedor")!;
       const s = await api("POST", `/proveedores/${idproveedor}/servicios`, { tipo: "TRANSPORTE", nombreServicio: `${empresa} · ${vehiculo}`, localidad: "Cusco", costoBase: costo, capacidadVehiculo: asientos, pesoEquipajeIncluido: asientos > 20 ? 20 : 15, costoPorKgExcedente: 2.5 });
-      transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, asientos, ocupado: [] });
+      transportes.push({ idservicio: idDe(s, "idservicio")!, idproveedor, asientos, costo, ocupado: [] });
     }
 
     // Tren de vuelta desde Aguas Calientes
@@ -372,7 +378,8 @@ async function main() {
       const equipoPorteadores = libres(porteadores, real, realFin, Math.ceil(paquete.cupo / 2));
       // 12.4: el vehículo lleva a los pasajeros y al personal
       const lugares = paquete.cupo + equipoGuias.length + equipoPorteadores.length;
-      const transporte = libres(transportes.filter((t) => t.asientos >= lugares), real, realFin, 1)[0]!;
+      const tope = TRANSPORTES[paquete.transporte]![3];
+      const transporte = libres(transportes.filter((t) => t.asientos >= lugares && t.costo <= tope), real, realFin, 1)[0]!;
       const creada = await api("POST", "/salidas", {
         idpaquete: paquetes.get(paquete.nombre), fechaInicio: real, tamanoMaximo: paquete.cupo, alojamientos,
         idtransporte: transporte.idservicio, personalIds: [...equipoGuias, ...equipoPorteadores].map((p) => p.idpersonal),
@@ -382,7 +389,7 @@ async function main() {
 
       // CU-30: compras de clientes distintos hasta llenar lo que pide la temporada
       const avance = etapa === "publicada" ? 0.45 : 1;
-      let porVender = Math.min(paquete.cupo, Math.round(paquete.cupo * temporadaDe(virtual).demanda * avance * (0.8 + azar() * 0.35)));
+      let porVender = plan.vender ? Math.round(paquete.cupo * plan.vender) : Math.min(paquete.cupo, Math.round(paquete.cupo * temporadaDe(virtual).demanda * avance * (0.8 + azar() * 0.35)));
       const juan = clientes[0]!;
       const compradores = plan.juan ? [juan, ...mezclar(clientes.slice(1))] : mezclar(clientes);
       const compras: { cliente: Cliente; pasajeros: ReturnType<typeof comoPasajero>[]; anticipacion: number }[] = [];
@@ -444,7 +451,7 @@ async function main() {
       // CU-32: la fecha de la salida se acerca a hoy para que cuente la anticipación que dice la historia
       const vigentes = [...vendidas];
       for (const v of mezclar(vendidas)) {
-        if (azar() > 0.12 || vigentes.length === 1 || (plan.juan && v.cliente === juan)) continue;
+        if (plan.vender || azar() > 0.12 || vigentes.length === 1 || (plan.juan && v.cliente === juan)) continue;
         const delAdmin = azar() < 0.25;
         const tarde = !delAdmin && azar() < 0.4;
         if (viaja) {
@@ -505,7 +512,8 @@ async function main() {
         }
         // CU-42
         if (azar() < 0.7) {
-          for (const p of [...equipoGuias, ...equipoPorteadores]) {
+          // Los porteadores que sobraron se liberaron al confirmar: se evalúa solo a quien viajó
+          for (const p of await db.asignacionPersonal.findMany({ where: { idsalida } })) {
             await api("POST", `/salidas/${idsalida}/evaluaciones`, { tipo: "PERSONAL", id: p.idpersonal, puntaje: elegir([5, 5, 4, 4, 3]) });
           }
           const servicios = await db.ocupacion.findMany({ where: { idsalida, tipo: { not: "EQUIPAMIENTO" } }, include: { servicio: true } });
@@ -713,13 +721,15 @@ async function mostrarPresentacion(db: PrismaClient, hoy: string) {
   const enCurso = await db.salida.findMany({ where: { estado: "EN_CURSO" }, orderBy: { fechaInicio: "desc" } });
   const juan = await db.reserva.findMany({ where: { cliente: { usuario: { email: "juan@test.com" } } }, include: { salida: true }, orderBy: { salida: { fechaInicio: "asc" } } });
   const pendientes = await db.solicitud.count({ where: { estado: "PENDIENTE" } });
-  const paraConfirmar = await db.salida.findFirst({ where: { fechaInicio: new Date(sumarDias(hoy, 2)), estado: "PUBLICADA" } });
+  const paraConfirmar = await db.salida.findFirst({ where: { fechaInicio: new Date(sumarDias(hoy, 2)), estado: "PUBLICADA", paquete: { nombrePaquete: PAQUETES[0].nombre } } });
+  const ultimoDia = await db.salida.findFirst({ where: { fechaInicio: new Date(sumarDias(hoy, 3)), estado: "PUBLICADA", paquete: { nombrePaquete: PAQUETES[3].nombre } } });
   console.log(`
 Para la presentación (${hoy}):`);
   console.log(`  Carlos inicia en vivo: ${deHoy.nroSalida} (${deHoy.estado})`);
   console.log(`  En curso al día: ${enCurso[0]?.nroSalida} · atrasada (Desfasada): ${enCurso[1]?.nroSalida}`);
   console.log(`  Solicitudes de alojamiento pendientes: ${pendientes}`);
-  console.log(`  Terminó la venta, para confirmar en vivo (CU-40): ${paraConfirmar?.nroSalida}`);
+  console.log(`  Vendida completa y con la venta terminada, para confirmar en vivo (CU-40): ${paraConfirmar?.nroSalida}`);
+  console.log(`  Vendida a la mitad, hoy es su último día de venta: ${ultimoDia?.nroSalida}`);
   for (const r of juan) console.log(`  Juan: ${r.nroReserva} en ${r.salida.nroSalida} (${r.salida.estado}, ${r.estado})`);
 }
 

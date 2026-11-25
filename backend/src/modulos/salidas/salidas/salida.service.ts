@@ -76,6 +76,7 @@ export class SalidaService {
         delPaquete: t.idservicio === idtransporte,
         libre: t.libre,
         alcanza: t.capacidadVehiculo >= totalLugares, // 12.4
+        encarecePorPasajero: t.encarecePorPasajero,
       })),
       personal: { guias: personal(ROL_GUIA), porteadores: personal(ROL_PORTEADOR) },
       equipo: p.equipo.map((e) => ({
@@ -118,7 +119,7 @@ export class SalidaService {
     const totalLugares = dto.tamanoMaximo + dto.personalIds.length;
     const transporte = p.transportes.find((t) => t.idservicio === dto.idtransporte);
     if (!transporte) {
-      throw CustomError.badRequest("El transporte elegido no está disponible: tiene que estar activo y no costar más que el del paquete");
+      throw CustomError.badRequest("El transporte elegido no está disponible: tiene que estar activo");
     }
     if (transporte.capacidadVehiculo < totalLugares) {
       throw CustomError.badRequest(
@@ -249,12 +250,13 @@ export class SalidaService {
       this.repository.buscarPersonalLibre(fechas),
       this.repository.cargarEquipoDe([salidaNueva]),
     ]);
-    // El precio se fijó con el transporte del paquete: la salida solo lo reemplaza por otro que no cueste más
-    // (como el hotel, que el simulador toma por el más caro de la categoría)
+    // El precio se fijó con el transporte del paquete: otro más caro se puede usar (p. ej. uno más grande para una
+    // salida más numerosa), pero se avisa cuánto encarece por pasajero, con el máximo de la salida
     const delPaquete = todosLosTransportes.find((t) => paquete.servicios.some((s) => s.idservicio === t.idservicio));
-    const transportes = delPaquete
-      ? todosLosTransportes.filter((t) => t === delPaquete || t.costoBase <= delPaquete.costoBase)
-      : todosLosTransportes;
+    const transportes = todosLosTransportes.map((t) => ({
+      ...t,
+      encarecePorPasajero: delPaquete ? Math.max(0, Math.round(((t.costoBase - delPaquete.costoBase) / dto.tamanoMaximo) * 100) / 100) : 0,
+    }));
     // A2b: cada equipo con regla, contra la demanda proyectada de las otras salidas
     const equipo = reglasEquipo(definicion).map((r) => ({
       ...controlEquipo(r, datosEquipo.totales.get(r.idservicio) ?? 0, datosEquipo.filas, salidaNueva, 0),

@@ -165,6 +165,8 @@ export type TransporteOpcion = {
     delPaquete: boolean;
     libre: boolean;
     alcanza: boolean;
+    /** Cuánto encarece por pasajero respecto del transporte del paquete (0 si no cuesta más) */
+    encarecePorPasajero?: number;
 };
 
 export type PersonalLibreOpcion = {

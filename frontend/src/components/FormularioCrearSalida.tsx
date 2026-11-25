@@ -7,6 +7,7 @@ import AsistentePasos, { type DefinicionPaso } from "./AsistentePasos";
 import Boton from "./Boton";
 import {
     formatearFechaUtcCorta,
+    formatearMonto,
     formatearRangoFechasUtc,
 } from "../services/formato";
 import {
@@ -878,6 +879,11 @@ function FormularioCrearSalida({
                                                         </span>
                                                     ) : null}
                                                 </p>
+                                                {trans.encarecePorPasajero ? (
+                                                    <p className="mt-1 font-semibold text-amber-800">
+                                                        Encarece {formatearMonto(trans.encarecePorPasajero)} por pasajero respecto del transporte del paquete: el margen baja.
+                                                    </p>
+                                                ) : null}
                                             </div>
                                         </label>
                                     );

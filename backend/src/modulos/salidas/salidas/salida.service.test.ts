@@ -262,17 +262,17 @@ describe("SalidaService.consultarOpcionesSalida (CU-36)", () => {
     const r = await new SalidaService().consultarOpcionesSalida(dto());
     expect(r.personal.guias.map((p) => p.nombreCompleto)).toEqual(["Zoe", "Ana"]);
     expect(r.personal.porteadores.map((p) => p.nombreCompleto)).toEqual(["Ceci"]);
-    expect(r.transportes).toEqual([{ idservicio: 7, nombreServicio: "Bus", capacidadVehiculo: 30, delPaquete: false, libre: true, alcanza: true }]);
+    expect(r.transportes).toEqual([{ idservicio: 7, nombreServicio: "Bus", capacidadVehiculo: 30, delPaquete: false, libre: true, alcanza: true, encarecePorPasajero: 0 }]);
     expect(r.fechaFin).toBe(enDias(23).toISOString().slice(0, 10));
   });
 
-  it("solo ofrece el transporte del paquete o reemplazos que no cuesten más; crear con uno más caro se rechaza", async () => {
+  it("ofrece todos los transportes y avisa cuánto encarece cada uno por pasajero; crear con uno más caro se permite", async () => {
     repo.buscarPaquete.mockResolvedValue({ ...paquete, servicios: [{ idservicio: 7, servicio: { transporte: {} } }] });
     const bus = (idservicio: number, costoBase: number) => ({ idservicio, nombreServicio: `T${idservicio}`, costoBase, capacidadVehiculo: 30, libre: true });
     repo.buscarTransportes.mockResolvedValue([bus(7, 100), bus(8, 90), bus(9, 150)]);
     const r = await new SalidaService().consultarOpcionesSalida(dto());
-    expect(r.transportes.map((t) => t.idservicio)).toEqual([7, 8]);
-    await expect(new SalidaService().crearSalida(dto({ idtransporte: 9 }))).rejects.toThrow("no costar más que el del paquete");
+    // 150 - 100 = 50 de más, repartido entre el máximo de la salida
+    expect(r.transportes.map((t) => [t.idservicio, t.encarecePorPasajero])).toEqual([[7, 0], [8, 0], [9, 3.13]]);
   });
 
   it("informa los lugares libres de la autoridad ese día y si alcanzan", async () => {
