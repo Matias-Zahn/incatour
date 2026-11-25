@@ -301,10 +301,12 @@ export function elegirHoteles(
     throw CustomError.badRequest(`Los hoteles elegidos cubren ${bloqueadas(elegidos)} de ${dto.tamanoMaximo} plazas en esas noches`);
   }
   let faltan = dto.tamanoMaximo;
-  const conBloqueo = elegidos.filter((h) => h.disponible !== null).flatMap((h) => {
+  const conBloqueo = elegidos.filter((h) => h.disponible !== null).map((h) => {
     const plazas = Math.min(h.disponible!, faltan);
+    // Un hotel que no aporta plazas no se reserva: elegirlo no tiene efecto, así que se rechaza en vez de ignorarlo
+    if (plazas <= 0) throw CustomError.badRequest(`${h.nombreServicio} no hace falta: el grupo ya está cubierto con los hoteles anteriores`);
     faltan -= plazas;
-    return plazas > 0 ? [{ idservicio: h.idservicio, nombreServicio: h.nombreServicio, plazas }] : []; // el que sobra no se ocupa
+    return { idservicio: h.idservicio, nombreServicio: h.nombreServicio, plazas };
   });
   const aSolicitud = elegidos.filter((h) => h.disponible === null).map((h) => ({ idservicio: h.idservicio, nombreServicio: h.nombreServicio, plazas: null }));
   return [...conBloqueo, ...aSolicitud];

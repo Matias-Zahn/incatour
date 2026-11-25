@@ -218,6 +218,9 @@ describe("SalidaService.crearSalida (CU-36)", () => {
       await expect(new SalidaService().crearSalida(dto({ alojamientos: [5] }))).rejects.toThrow("Los hoteles elegidos cubren 8 de 16 plazas en esas noches");
       await expect(new SalidaService().crearSalida(dto({ alojamientos: [4, 9] }))).rejects.toThrow("El hotel con ID 9 no cumple la garantía del paquete");
       await expect(new SalidaService().crearSalida(dto())).rejects.toThrow("Elegí al menos un hotel");
+      // el grupo ya está cubierto: un hotel que no aporta plazas no se ignora en silencio
+      repo.buscarAlojamientos.mockResolvedValue([{ ...sol, disponible: 20 }, luna, pedido]);
+      await expect(new SalidaService().crearSalida(dto({ alojamientos: [4, 5] }))).rejects.toThrow("Luna no hace falta: el grupo ya está cubierto");
       expect(repo.crearSalida).not.toHaveBeenCalled();
     });
 

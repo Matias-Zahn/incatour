@@ -223,6 +223,25 @@ function FormularioCrearSalida({
 
     const plazasNecesarias = opciones?.plazasNecesarias ?? 0;
 
+    // Cuántas plazas aporta cada hotel elegido, en el orden de llenado del back: los de bloqueo en el orden en que se
+    // marcaron y uno a solicitud cubre lo que falte. Un hotel que no aporta nada no se puede elegir.
+    const aportes = useMemo(() => {
+        const mapa = new Map<number, number>();
+        let faltan = plazasNecesarias;
+        for (const h of hotelesElegidosObjetos.filter((x) => x.modalidadConfirmacion === "BLOQUEO_PLAZAS")) {
+            const plazas = Math.min(h.capacidadDisponible ?? 0, faltan);
+            mapa.set(h.idservicio, plazas);
+            faltan -= plazas;
+        }
+        for (const h of hotelesElegidosObjetos.filter((x) => x.modalidadConfirmacion === "A_SOLICITUD")) {
+            mapa.set(h.idservicio, faltan);
+        }
+        return mapa;
+    }, [hotelesElegidosObjetos, plazasNecesarias]);
+    const hotelSinAporte = hotelesElegidosObjetos.find(
+        (h) => h.modalidadConfirmacion === "BLOQUEO_PLAZAS" && (aportes.get(h.idservicio) ?? 0) === 0,
+    );
+
     // §14 (FA3): si ningún hotel ni combinación de hoteles disponibles cubre plazasNecesarias,
     // el back permite crear la salida sin hotel y sube el corte sugerido a 5 días.
     const puedeCubrirConAlgunHotel = useMemo(() => {
@@ -392,6 +411,10 @@ function FormularioCrearSalida({
             }
             if (plazasNecesarias > 0 && !esSinHotelFA3 && hotelesSeleccionados.length === 0) {
                 setErrorPaso("Elegí al menos un hotel para cubrir las plazas del grupo.");
+                return;
+            }
+            if (hotelSinAporte) {
+                setErrorPaso(`${hotelSinAporte.nombreServicio} no hace falta: el grupo ya está cubierto. Desmarcalo.`);
                 return;
             }
             if (!plazasCubiertasOk) {
@@ -777,18 +800,24 @@ function FormularioCrearSalida({
                                     {opciones.alojamientos.map((hotel) => {
                                         const marcado = hotelesSeleccionados.includes(hotel.idservicio);
                                         const esSolicitud = hotel.modalidadConfirmacion === "A_SOLICITUD";
+                                        // Con el grupo cubierto, otro hotel no aportaría plazas
+                                        const cubierto = !marcado && plazasCubiertasOk && hotelesSeleccionados.length > 0;
+                                        const aporte = aportes.get(hotel.idservicio);
                                         return (
                                             <label
                                                 key={hotel.idservicio}
-                                                className={`flex items-start gap-3 rounded-control border p-3 cursor-pointer transition-colors ${
+                                                className={`flex items-start gap-3 rounded-control border p-3 transition-colors ${
                                                     marcado
-                                                        ? "border-marca bg-marca-suave/30"
-                                                        : "border-borde bg-white hover:border-marca/40"
+                                                        ? "cursor-pointer border-marca bg-marca-suave/30"
+                                                        : cubierto
+                                                          ? "cursor-not-allowed border-borde bg-slate-50 opacity-60"
+                                                          : "cursor-pointer border-borde bg-white hover:border-marca/40"
                                                 }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={marcado}
+                                                    disabled={cubierto}
                                                     onChange={() => alternarHotel(hotel.idservicio)}
                                                     className="mt-1 h-4 w-4 rounded border-borde text-marca focus:ring-marca"
                                                 />
@@ -814,6 +843,15 @@ function FormularioCrearSalida({
                                                         {hotel.categoria ? ` · ${hotel.categoria}` : ""}
                                                         {hotel.costoPorNoche != null ? ` · ${formatearMonto(hotel.costoPorNoche)} por noche` : ""}
                                                     </p>
+                                                    {marcado && aporte !== undefined ? (
+                                                        <p className={`mt-0.5 font-semibold ${aporte > 0 ? "text-marca-oscura" : "text-peligro"}`}>
+                                                            {aporte > 0
+                                                                ? `Aporta ${aporte} ${aporte === 1 ? "plaza" : "plazas"}`
+                                                                : "No aporta plazas: desmarcalo"}
+                                                        </p>
+                                                    ) : cubierto ? (
+                                                        <p className="mt-0.5 text-texto-suave">El grupo ya está cubierto</p>
+                                                    ) : null}
                                                 </div>
                                             </label>
                                         );
