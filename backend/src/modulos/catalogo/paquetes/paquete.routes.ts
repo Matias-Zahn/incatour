@@ -84,7 +84,7 @@ import { PaqueteController } from "./paquete.controller";
  *                   properties:
  *                     idservicio: { type: integer }
  *                     cantidad: { type: integer }
- *                     cadaPasajeros: { type: integer }
+ *                     cadaPasajeros: { type: integer, nullable: true, description: "null = cantidad fija por salida" }
  *     responses:
  *       201:
  *         description: Paquete creado exitosamente

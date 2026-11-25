@@ -48,9 +48,12 @@ export class AsignacionService {
         idservicio: e.idservicio,
         nombreServicio: e.nombreServicio,
         tipoEquipamiento: salida.ocupaciones.find((o) => o.idservicio === e.idservicio)?.servicio.equipamiento?.tipoEquipamiento ?? null,
+        cantidad: e.cantidad,
+        cadaPasajeros: e.cadaPasajeros, // null = fija por salida
         necesita: e.necesita,
         ocupado: e.ocupado,
         falta: e.falta,
+        fechaFalta: e.falta > 0 ? e.fechaFalta : null,
       })),
       reservasSinAlojamiento: c.pendientes,
       faltantes: c.faltantes,

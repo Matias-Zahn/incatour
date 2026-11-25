@@ -7,7 +7,7 @@ export type TipoGarantiaCosto = "POR_ESTABLECIMIENTO" | "POR_CATEGORIA";
 export type ItemEquipoCostoInput = {
   idservicio: number;
   cantidad: number;
-  cadaPasajeros: number;
+  cadaPasajeros: number | null; // null = fija por salida
 };
 
 export interface SimularCostoBody {
@@ -57,7 +57,7 @@ export type EntradaCostoPura = {
   equipo?: {
     servicio: ServicioCosto;
     cantidad: number;
-    cadaPasajeros: number;
+    cadaPasajeros: number | null;
   }[];
 };
 
@@ -72,7 +72,7 @@ const formatearNumero = (n: number): string =>
  * - Hotel: costoBase × (nochesPrevias + nochesPosteriores)
  * - Transporte: costoBase ÷ pasajeros
  * - Tren: costoBase
- * - Equipo: costoBase × cantidad ÷ cadaPasajeros
+ * - Equipo: costoBase × cantidad ÷ cadaPasajeros (fijo por salida: ÷ pasajeros, como el transporte)
  */
 export function costoPorPasajero(entrada: EntradaCostoPura): ResultadoCostoPaquete {
   const desglose: ItemDesgloseCosto[] = [];
@@ -120,13 +120,16 @@ export function costoPorPasajero(entrada: EntradaCostoPura): ResultadoCostoPaque
   }
 
   for (const item of entrada.equipo ?? []) {
-    const porPasajero = redondear2((item.servicio.costoBase * item.cantidad) / item.cadaPasajeros);
+    const divisor = item.cadaPasajeros ?? entrada.pasajeros;
+    const porPasajero = redondear2((item.servicio.costoBase * item.cantidad) / divisor);
     desglose.push({
       tipo: "EQUIPAMIENTO",
       idservicio: item.servicio.idservicio,
       nombreServicio: item.servicio.nombreServicio,
       costoBase: item.servicio.costoBase,
-      calculo: `${formatearNumero(item.servicio.costoBase)} × ${item.cantidad} ÷ ${item.cadaPasajeros}`,
+      calculo: item.cadaPasajeros
+        ? `${formatearNumero(item.servicio.costoBase)} × ${item.cantidad} ÷ ${item.cadaPasajeros}`
+        : `${formatearNumero(item.servicio.costoBase)} × ${item.cantidad} por salida ÷ ${entrada.pasajeros} ${entrada.pasajeros === 1 ? "pasajero" : "pasajeros"}`,
       porPasajero,
     });
   }
@@ -201,7 +204,7 @@ export class SimularCostoDto {
         if (!it || !esEnteroEnRango(it.idservicio, 1, Number.MAX_SAFE_INTEGER)) {
           return [`equipo[${i}]: idservicio debe ser un entero mayor a 0.`];
         }
-        if (!esEnteroEnRango(it.cantidad, 1, 100) || !esEnteroEnRango(it.cadaPasajeros, 1, 100)) {
+        if (!esEnteroEnRango(it.cantidad, 1, 100) || (it.cadaPasajeros != null && !esEnteroEnRango(it.cadaPasajeros, 1, 100))) {
           return [`equipo[${i}]: cantidad y cadaPasajeros deben ser enteros entre 1 y 100.`];
         }
         if (vistos.has(it.idservicio)) {
@@ -211,7 +214,7 @@ export class SimularCostoDto {
         equipoLimpio.push({
           idservicio: it.idservicio,
           cantidad: it.cantidad,
-          cadaPasajeros: it.cadaPasajeros,
+          cadaPasajeros: typeof it.cadaPasajeros === "number" ? it.cadaPasajeros : null,
         });
       }
     }

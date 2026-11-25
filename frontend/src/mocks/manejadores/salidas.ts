@@ -1039,9 +1039,12 @@ export const manejadoresSalidas = [
                 idservicio: 5,
                 nombreServicio: "Carpa de alta montaña 4 estaciones",
                 tipoEquipamiento: "Carpas",
+                cantidad: 1,
+                cadaPasajeros: 2,
                 necesita: necesitaCarpas,
                 ocupado: necesitaCarpas,
                 falta: 0,
+                fechaFalta: null,
             },
         ];
 

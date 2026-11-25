@@ -32,7 +32,7 @@ async function abrirFormulario(page: Page) {
     await page.getByRole("button", { name: "Ingresar" }).click();
     await page.waitForURL((url) => !url.pathname.includes("login"));
     await page.goto("/catalogo");
-    await page.locator("article", { hasText: paquete }).getByRole("button", { name: "Comprar paquete" }).click();
+    await page.locator("article", { hasText: paquete }).getByRole("button", { name: /^Reservar/ }).click();
     // El cliente no ve el código de la salida: la elige por la fecha
     const fecha = new Date(salida.fechaInicio).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
     await page.getByRole("button").filter({ hasText: `Salida: ${fecha}` }).first().click();

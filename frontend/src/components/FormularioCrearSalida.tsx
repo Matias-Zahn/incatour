@@ -162,6 +162,16 @@ function FormularioCrearSalida({
     );
 
     const calendario = detallePaquete?.calendarioSalidas;
+
+    // La misma regla que el back (tarifaVigente): la temporada activa que cubre la fecha de inicio. Es la que se congela.
+    const tarifaDeLaFecha = valorFechaInicio
+        ? detallePaquete?.tarifas?.find(
+              (t) =>
+                  t.temporada?.estado === "ACTIVO" &&
+                  t.temporada.fechaInicio.slice(0, 10) <= valorFechaInicio &&
+                  valorFechaInicio <= t.temporada.fechaFin.slice(0, 10),
+          )
+        : undefined;
     const diasHabilitados = useMemo<DiaSemanaCodigo[]>(
         () =>
             (calendario?.diasHabilitados as DiaSemanaCodigo[] | undefined) ?? [
@@ -266,6 +276,12 @@ function FormularioCrearSalida({
             null,
         [opciones?.transportes, idtransporteSeleccionado],
     );
+
+    // El transporte se elige antes que el personal: sin asiento libre no se puede sumar a nadie más
+    const sinAsientoLibre =
+        transporteElegido != null &&
+        opciones != null &&
+        opciones.tamanoMaximo + personalSeleccionadoIds.length >= transporteElegido.capacidadVehiculo;
 
     const equipoBloqueante = useMemo(
         () => (opciones?.equipo ?? []).filter((e) => e.nivel === "NO_ALCANZA"),
@@ -612,6 +628,21 @@ function FormularioCrearSalida({
                                 <span>
                                     Cierre de venta del paquete: <strong className="text-texto">{detallePaquete.diasCierreVenta ?? 2} días antes</strong>
                                 </span>
+                                {valorFechaInicio ? (
+                                    tarifaDeLaFecha ? (
+                                        <span>
+                                            Precio para esa fecha:{" "}
+                                            <strong className="text-texto">
+                                                {tarifaDeLaFecha.moneda} {tarifaDeLaFecha.monto} / pasajero
+                                            </strong>{" "}
+                                            ({tarifaDeLaFecha.temporada?.nombre})
+                                        </span>
+                                    ) : (
+                                        <span className="font-semibold text-amber-800">
+                                            El paquete no tiene tarifa para una temporada activa en esa fecha: no se va a poder vender.
+                                        </span>
+                                    )
+                                ) : null}
                                 {detallePaquete.faltaTransporte ? (
                                     <span className="font-semibold text-amber-800">
                                         Este paquete no tiene transporte preasignado (podrás elegirlo en el paso 2).
@@ -862,6 +893,25 @@ function FormularioCrearSalida({
                         <p className="text-xs text-texto-suave">
                             Se muestran solo las personas aptas y libres en esas fechas, ordenadas de menor a mayor carga en el mes.
                         </p>
+                        {transporteElegido ? (
+                            <p
+                                className={`rounded-control border px-3 py-2 text-xs ${
+                                    sinAsientoLibre
+                                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                                        : "border-borde bg-fondo/40 text-texto"
+                                }`}
+                            >
+                                Asientos de {transporteElegido.nombreServicio}:{" "}
+                                <strong>
+                                    {opciones.tamanoMaximo + personalSeleccionadoIds.length} de{" "}
+                                    {transporteElegido.capacidadVehiculo}
+                                </strong>{" "}
+                                ({opciones.tamanoMaximo} pasajeros + {personalSeleccionadoIds.length} personal).
+                                {sinAsientoLibre
+                                    ? " No quedan asientos: para sumar personal, cambiá el transporte en el paso 2."
+                                    : ""}
+                            </p>
+                        ) : null}
 
                         <div className="grid gap-4 md:grid-cols-2">
                             {/* Guías */}
@@ -906,8 +956,9 @@ function FormularioCrearSalida({
                                                             <input
                                                                 type="checkbox"
                                                                 checked={marcado}
+                                                                disabled={!marcado && sinAsientoLibre}
                                                                 onChange={() => alternarPersonal(g.idpersonal)}
-                                                                className="h-4 w-4 rounded border-borde text-marca"
+                                                                className="h-4 w-4 rounded border-borde text-marca disabled:opacity-40"
                                                             />
                                                             {g.nombreCompleto}
                                                         </span>
@@ -967,8 +1018,9 @@ function FormularioCrearSalida({
                                                             <input
                                                                 type="checkbox"
                                                                 checked={marcado}
+                                                                disabled={!marcado && sinAsientoLibre}
                                                                 onChange={() => alternarPersonal(p.idpersonal)}
-                                                                className="h-4 w-4 rounded border-borde text-marca"
+                                                                className="h-4 w-4 rounded border-borde text-marca disabled:opacity-40"
                                                             />
                                                             {p.nombreCompleto}
                                                         </span>
@@ -1079,7 +1131,7 @@ function FormularioCrearSalida({
                                                         {eq.nombreServicio}
                                                     </td>
                                                     <td className="px-3 py-2 text-texto-suave">
-                                                        {eq.cantidad} cada {eq.cadaPasajeros} pax
+                                                        {eq.cadaPasajeros ? `${eq.cantidad} cada ${eq.cadaPasajeros} pax` : `${eq.cantidad} por salida`}
                                                     </td>
                                                     <td className="px-3 py-2 text-right font-semibold">
                                                         {eq.necesitaCompleta}

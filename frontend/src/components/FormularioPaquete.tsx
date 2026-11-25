@@ -188,7 +188,7 @@ function FormularioPaquete({
         .map((s) => ({
             idservicio: s.idservicio,
             cantidad: s.cantidad ?? 1,
-            cadaPasajeros: s.cadaPasajeros ?? 1,
+            cadaPasajeros: s.cadaPasajeros ?? null,
         }));
 
     const [idtransporte, setIdtransporte] = useState<number>(transporteInicial);
@@ -211,7 +211,7 @@ function FormularioPaquete({
             .map((s) => ({
                 idservicio: s.idservicio,
                 cantidad: s.cantidad ?? 1,
-                cadaPasajeros: s.cadaPasajeros ?? 1,
+                cadaPasajeros: s.cadaPasajeros ?? null,
             }));
         if (tr) setIdtransporte(tr);
         setIdtren(tren);
@@ -279,6 +279,9 @@ function FormularioPaquete({
 
     const [pasajerosSimulacion, setPasajerosSimulacion] = useState("12");
     const [margenPorcentaje, setMargenPorcentaje] = useState("25");
+    // Lo que no sale de los proveedores: no se guarda, solo entra al costo para sugerir la tarifa
+    const [personalPorSalida, setPersonalPorSalida] = useState("");
+    const [otrosPorPasajero, setOtrosPorPasajero] = useState("");
     const [simulacion, setSimulacion] = useState<ResultadoSimularCosto | null>(null);
     const [errorSimulacion, setErrorSimulacion] = useState("");
     const simularMutation = useSimularCostoPaquete();
@@ -346,7 +349,14 @@ function FormularioPaquete({
         ejecutarSimulacion,
     ]);
 
-    const costoEstimado = simulacion?.costoPorPasajero ?? null;
+    const paxBase = Number(pasajerosSimulacion) || 1;
+    const personalPorPasajero =
+        Math.round((Math.max(0, Number(personalPorSalida) || 0) / paxBase) * 100) / 100;
+    const otrosPax = Math.max(0, Number(otrosPorPasajero) || 0);
+    const costoEstimado =
+        simulacion != null
+            ? Math.round((simulacion.costoPorPasajero + personalPorPasajero + otrosPax) * 100) / 100
+            : null;
     const margenNum = Number(margenPorcentaje);
     const tarifaSugerida =
         costoEstimado !== null && Number.isFinite(margenNum) && margenNum >= 0
@@ -371,7 +381,7 @@ function FormularioPaquete({
     function actualizarReglaEquipo(
         idservicio: number,
         campo: "cantidad" | "cadaPasajeros",
-        valor: number,
+        valor: number | null,
     ) {
         setEquipo((prev) =>
             prev.map((item) =>
@@ -445,9 +455,10 @@ function FormularioPaquete({
                     !Number.isInteger(item.cantidad) ||
                     item.cantidad < 1 ||
                     item.cantidad > 100 ||
-                    !Number.isInteger(item.cadaPasajeros) ||
-                    item.cadaPasajeros < 1 ||
-                    item.cadaPasajeros > 100
+                    (item.cadaPasajeros !== null &&
+                        (!Number.isInteger(item.cadaPasajeros) ||
+                            item.cadaPasajeros < 1 ||
+                            item.cadaPasajeros > 100))
                 ) {
                     return "Cada equipo seleccionado debe tener cantidad y cadaPasajeros enteros entre 1 y 100.";
                 }
@@ -887,24 +898,41 @@ function FormularioPaquete({
                                                                     className="w-16 rounded-control border border-borde px-2 py-1 text-center font-normal"
                                                                 />
                                                             </label>
-                                                            <label className="flex items-center gap-1.5 font-semibold text-texto">
-                                                                cada
-                                                                <input
-                                                                    type="number"
-                                                                    min={1}
-                                                                    max={100}
-                                                                    value={regla.cadaPasajeros}
-                                                                    onChange={(e) =>
-                                                                        actualizarReglaEquipo(
-                                                                            eq.idservicio,
-                                                                            "cadaPasajeros",
-                                                                            Number(e.target.value),
-                                                                        )
-                                                                    }
-                                                                    className="w-16 rounded-control border border-borde px-2 py-1 text-center font-normal"
-                                                                />
-                                                                pasajeros
-                                                            </label>
+                                                            <select
+                                                                aria-label={`Regla de ${eq.nombreServicio}`}
+                                                                value={regla.cadaPasajeros === null ? "salida" : "pasajeros"}
+                                                                onChange={(e) =>
+                                                                    actualizarReglaEquipo(
+                                                                        eq.idservicio,
+                                                                        "cadaPasajeros",
+                                                                        e.target.value === "salida" ? null : 1,
+                                                                    )
+                                                                }
+                                                                className="rounded-control border border-borde bg-white px-2 py-1 font-normal"
+                                                            >
+                                                                <option value="pasajeros">cada N pasajeros</option>
+                                                                <option value="salida">por salida (fija)</option>
+                                                            </select>
+                                                            {regla.cadaPasajeros !== null ? (
+                                                                <label className="flex items-center gap-1.5 font-semibold text-texto">
+                                                                    cada
+                                                                    <input
+                                                                        type="number"
+                                                                        min={1}
+                                                                        max={100}
+                                                                        value={regla.cadaPasajeros}
+                                                                        onChange={(e) =>
+                                                                            actualizarReglaEquipo(
+                                                                                eq.idservicio,
+                                                                                "cadaPasajeros",
+                                                                                Number(e.target.value),
+                                                                            )
+                                                                        }
+                                                                        className="w-16 rounded-control border border-borde px-2 py-1 text-center font-normal"
+                                                                    />
+                                                                    pasajeros
+                                                                </label>
+                                                            ) : null}
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -1077,10 +1105,10 @@ function FormularioPaquete({
                             <div className="flex flex-wrap items-end justify-between gap-3">
                                 <div>
                                     <h3 className="text-sm font-bold text-navegacion">
-                                        Costo estimado por pasajero
+                                        Costo por pasajero
                                     </h3>
                                     <p className="text-xs text-texto-suave">
-                                        Calculado en vivo con el hotel, transporte, tren y equipo elegidos.
+                                        Servicios elegidos más personal, permisos y otros gastos que cargues abajo.
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap items-end gap-3">
@@ -1109,6 +1137,31 @@ function FormularioPaquete({
                                         />
                                     </label>
                                 </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="grid gap-1 text-xs font-semibold text-texto">
+                                    Personal por salida (USD)
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={personalPorSalida}
+                                        onChange={(e) => setPersonalPorSalida(e.target.value)}
+                                        placeholder="Guías, cocineros, porteadores"
+                                        className="w-56 rounded-control border border-borde bg-white px-2.5 py-1.5 text-sm font-normal"
+                                    />
+                                </label>
+                                <label className="grid gap-1 text-xs font-semibold text-texto">
+                                    Permisos y otros por pasajero (USD)
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={otrosPorPasajero}
+                                        onChange={(e) => setOtrosPorPasajero(e.target.value)}
+                                        placeholder="Entradas, comidas, comisiones"
+                                        className="w-56 rounded-control border border-borde bg-white px-2.5 py-1.5 text-sm font-normal"
+                                    />
+                                </label>
                             </div>
 
                             {errorSimulacion ? (
@@ -1144,19 +1197,45 @@ function FormularioPaquete({
                                                     </span>
                                                 </li>
                                             ))}
+                                            {personalPorPasajero > 0 ? (
+                                                <li className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                                                    <div>
+                                                        <span className="font-semibold text-texto">Personal:</span>{" "}
+                                                        <span className="text-texto-suave">
+                                                            ({formatearMonto(Number(personalPorSalida))} ÷ {paxBase} pasajeros)
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold text-navegacion">
+                                                        {formatearMonto(personalPorPasajero)}
+                                                    </span>
+                                                </li>
+                                            ) : null}
+                                            {otrosPax > 0 ? (
+                                                <li className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                                                    <span className="font-semibold text-texto">Permisos y otros</span>
+                                                    <span className="font-semibold text-navegacion">
+                                                        {formatearMonto(otrosPax)}
+                                                    </span>
+                                                </li>
+                                            ) : null}
                                         </ul>
                                     ) : (
                                         <p className="text-xs text-texto-suave">
                                             Sin costos de servicios para sumar.
                                         </p>
                                     )}
+                                    {!personalPorPasajero && !otrosPax ? (
+                                        <p className="text-xs text-amber-700">
+                                            Solo servicios de proveedores: sin personal ni permisos, la tarifa sugerida queda corta.
+                                        </p>
+                                    ) : null}
 
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-borde pt-2.5">
                                         <div className="flex flex-wrap items-baseline gap-4 text-sm">
                                             <span>
                                                 Costo:{" "}
                                                 <strong className="text-navegacion">
-                                                    {formatearMonto(simulacion.costoPorPasajero)}
+                                                    {formatearMonto(costoEstimado ?? simulacion.costoPorPasajero)}
                                                 </strong>
                                             </span>
                                             {tarifaSugerida != null ? (

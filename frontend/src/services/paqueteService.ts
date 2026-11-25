@@ -11,7 +11,7 @@ export const DIAS_CIERRE_SOLICITUD = 5;
 export type ItemEquipoPaquete = {
     idservicio: number;
     cantidad: number;
-    cadaPasajeros: number;
+    cadaPasajeros: number | null; // null = cantidad fija por salida
 };
 
 export type CalendarioSalidasPaquete = {

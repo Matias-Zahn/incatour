@@ -54,7 +54,7 @@ function armarServiciosPaquete(
     idpaquete: number,
     idtransporte: number | undefined,
     idtren: number | null | undefined,
-    equipo: { idservicio: number; cantidad: number; cadaPasajeros: number }[] | undefined,
+    equipo: { idservicio: number; cantidad: number; cadaPasajeros: number | null }[] | undefined,
 ): NonNullable<Paquete["servicios"]> {
     const lista: NonNullable<Paquete["servicios"]> = [];
     if (idtransporte) {
@@ -239,8 +239,10 @@ export const manejadoresPaquetes = [
                 idservicio: eq.idservicio,
                 nombreServicio: eq.nombreServicio,
                 costoBase: eq.costoBase,
-                calculo: `${eq.costoBase} × ${item.cantidad} ÷ ${item.cadaPasajeros}`,
-                porPasajero: redondear2((eq.costoBase * item.cantidad) / item.cadaPasajeros),
+                calculo: item.cadaPasajeros
+                    ? `${eq.costoBase} × ${item.cantidad} ÷ ${item.cadaPasajeros}`
+                    : `${eq.costoBase} × ${item.cantidad} por salida ÷ ${pasajeros} pasajeros`,
+                porPasajero: redondear2((eq.costoBase * item.cantidad) / (item.cadaPasajeros ?? pasajeros)),
             });
         }
 

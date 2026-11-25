@@ -285,7 +285,7 @@ async function main() {
         idtransporte: transportes[p.transporte]!.idservicio, ...(p.tren !== null && { idtren: trenes[p.tren]! }), // B2
         // B2: el equipo con su regla; la compra lo ocupa sobre el total vendido. El Camino corto no acampa
         ...(p.circuito !== "corto" && {
-          equipo: [["Carpa", 1, 2], ["Bolsa de dormir", 1, 1], ["Colchoneta", 1, 1], ["Carpa comedor", 1, 100]].map(([tipo, cantidad, cadaPasajeros]) => ({ idservicio: equipos[tipo as string]!, cantidad, cadaPasajeros })),
+          equipo: [["Carpa", 1, 2], ["Bolsa de dormir", 1, 1], ["Colchoneta", 1, 1], ["Carpa comedor", 1, null]].map(([tipo, cantidad, cadaPasajeros]) => ({ idservicio: equipos[tipo as string]!, cantidad, cadaPasajeros })),
         }),
       });
       paquetes.set(p.nombre, idDe(pq, "idpaquete")!);

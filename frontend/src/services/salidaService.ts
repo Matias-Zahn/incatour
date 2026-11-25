@@ -176,7 +176,7 @@ export type EquipoOpcion = {
     nombreServicio: string;
     tipoEquipamiento: string;
     cantidad: number;
-    cadaPasajeros: number;
+    cadaPasajeros: number | null; // null = fija por salida
     necesitaCompleta: number;
     libre: number;
     fechaCritica: string | null;
@@ -318,9 +318,12 @@ export type EquipoConfirmacionItem = {
     idservicio: number;
     nombreServicio: string;
     tipoEquipamiento: string | null;
+    cantidad: number;
+    cadaPasajeros: number | null; // null = fija por salida
     necesita: number;
     ocupado: number;
     falta: number;
+    fechaFalta: string | null;
 };
 
 export type DetalleConflictoConfirmacion = {

@@ -8,23 +8,24 @@ import { COBERTURA_MINIMA_STOCK, ESTADO_SALIDA, TIPO_SERVICIO } from "./constant
 import { DefinicionPaquete } from "./definicionPaquete";
 import { claveDia, OcupacionDias, ocupadoPorDia, rangosDe } from "./ocupacion";
 
-export type ReglaEquipo = { idservicio: number; nombreServicio: string; cantidad: number; cadaPasajeros: number };
+/** cadaPasajeros null = cantidad fija por salida, sin importar cuántos viajen. */
+export type ReglaEquipo = { idservicio: number; nombreServicio: string; cantidad: number; cadaPasajeros: number | null };
 
 /** Los equipos con regla de la copia del paquete (las fotos anteriores a B2 no tienen). */
 export const reglasEquipo = (d: Pick<DefinicionPaquete, "servicios"> | null | undefined): ReglaEquipo[] =>
   (d?.servicios ?? []).flatMap((s) =>
-    s.tipo === TIPO_SERVICIO.EQUIPAMIENTO && s.cantidad && s.cadaPasajeros
-      ? [{ idservicio: s.idservicio, nombreServicio: s.nombreServicio, cantidad: s.cantidad, cadaPasajeros: s.cadaPasajeros }]
+    s.tipo === TIPO_SERVICIO.EQUIPAMIENTO && s.cantidad
+      ? [{ idservicio: s.idservicio, nombreServicio: s.nombreServicio, cantidad: s.cantidad, cadaPasajeros: s.cadaPasajeros ?? null }]
       : []
   );
 
-/** ceil(pasajeros / cadaPasajeros) × cantidad. */
+/** ceil(pasajeros / cadaPasajeros) × cantidad; la fija por salida, la cantidad apenas hay un pasajero. */
 export const necesidad = (pasajeros: number, r: Pick<ReglaEquipo, "cantidad" | "cadaPasajeros">) =>
-  Math.ceil(pasajeros / r.cadaPasajeros) * r.cantidad;
+  r.cadaPasajeros ? Math.ceil(pasajeros / r.cadaPasajeros) * r.cantidad : pasajeros > 0 ? r.cantidad : 0;
 
 /** El mayor tamaño con el que lo libre cubre la salida completa (para sugerirlo en el 409). */
 export const tamanoQueAlcanza = (libre: number, r: Pick<ReglaEquipo, "cantidad" | "cadaPasajeros">) =>
-  Math.max(0, Math.floor(libre / r.cantidad) * r.cadaPasajeros);
+  r.cadaPasajeros ? Math.max(0, Math.floor(libre / r.cantidad) * r.cadaPasajeros) : libre >= r.cantidad ? Infinity : 0;
 
 type FilaSalida = { idservicio: number; cantidad: number; salida: { estado: string; tamanoMaximo: number; definicionPaquete: unknown } };
 

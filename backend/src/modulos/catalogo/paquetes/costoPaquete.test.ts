@@ -62,6 +62,15 @@ describe("costoPorPasajero (B5 — función pura)", () => {
     expect(r.avisos).toEqual([]);
   });
 
+  it("el equipo fijo por salida se reparte entre los pasajeros base", () => {
+    const r = costoPorPasajero({
+      nochesPrevias: 0, nochesPosteriores: 0, pasajeros: 10, hotel: null,
+      equipo: [{ servicio: { idservicio: 9, nombreServicio: "Carpa comedor", costoBase: 25 }, cantidad: 2, cadaPasajeros: null }],
+    });
+    expect(r.costoPorPasajero).toBe(5);
+    expect(r.desglose[0]!.calculo).toBe("25 × 2 por salida ÷ 10 pasajeros");
+  });
+
   it("incluye el aviso cuando hay noches pero ningún hotel cumple", () => {
     const r = costoPorPasajero({
       nochesPrevias: 1,
