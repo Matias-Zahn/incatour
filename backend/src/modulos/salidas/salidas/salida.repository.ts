@@ -54,6 +54,8 @@ export class SalidaRepository {
           select: {
             nroPaquete: true,
             nombrePaquete: true,
+            // 12.5: las salidas anteriores a la tarifa congelada siguen con la del paquete vivo
+            tarifas: { select: { monto: true, moneda: true, temporada: true } },
             circuito: {
               select: {
                 idcircuito: true, nombreCircuito: true, duracionDias: true, horasPrimerAvance: true, _count: { select: { etapas: true } },
@@ -78,6 +80,7 @@ export class SalidaRepository {
         reservas: {
           where: { estado: ESTADO_RESERVA.CONFIRMADA },
           select: {
+            precioCongelado: true,
             _count: { select: { pasajeros: true } },
             permisos: { where: { estadoTramite: ESTADO_PERMISO.EMITIDO }, select: { idpermisopasajero: true } },
             solicitudes: { where: { estado: ESTADO_SOLICITUD.PENDIENTE }, select: { idsolicitud: true } },

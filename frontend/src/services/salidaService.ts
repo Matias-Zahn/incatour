@@ -88,6 +88,9 @@ export type SalidaApi = {
     ultimoDiaVenta?: string;
     ventaAbierta?: boolean;
     puedeConfirmar?: boolean;
+    // 12.5: el precio congelado al que se vende y lo que pagaron las reservas confirmadas
+    precioPorPasajero?: { monto: number; moneda: string; temporada: string } | null;
+    totalVendido?: number;
     // Campos de estado y alertas:
     pasajerosConfirmados: number;
     cantidadPersonal: number;

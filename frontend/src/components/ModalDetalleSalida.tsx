@@ -5,7 +5,7 @@ import {
     formatearEstadoSalida,
     formatearFechaHora,
 } from "../services/guiaService";
-import { formatearRangoFechasUtc } from "../services/formato";
+import { formatearMonto, formatearRangoFechasUtc } from "../services/formato";
 import {
     diasFinalizadaAntes,
     dotacionDeSalida,
@@ -105,6 +105,19 @@ function ModalDetalleSalida({
                             ? ` · ${salida.paquete.nroPaquete}`
                             : ""}
                     </p>
+                    {salida.precioPorPasajero ? (
+                        <p className="mt-1 text-sm text-texto">
+                            Precio congelado:{" "}
+                            <strong className="text-navegacion">
+                                {formatearMonto(salida.precioPorPasajero.monto, salida.precioPorPasajero.moneda)} / pasajero
+                            </strong>{" "}
+                            <span className="text-texto-suave">({salida.precioPorPasajero.temporada})</span>
+                            {" · "}Vendido:{" "}
+                            <strong className="text-navegacion">
+                                {formatearMonto(salida.totalVendido ?? 0, salida.precioPorPasajero.moneda)}
+                            </strong>
+                        </p>
+                    ) : null}
                 </div>
 
                 <button
