@@ -256,6 +256,8 @@ model Paquete {
   diasDisponibles           String? // Formato JSON o CSV de días habilitados
   diasMinimosReintegro      Int? // RES-06: anticipación mínima para el reintegro del 100% (null = sin plazo)
   diasCierreVenta           Int     @default(2) // B4: la venta termina estos días antes del inicio
+  kgPorteador               Float? // Solo informativo: kg que el porteador carga por pasajero en el sendero
+  costoKgExcedentePorteador Float? // Solo informativo: USD por kg de más, se cobra en el lugar
 
   circuito                 Circuito                  @relation(fields: [idcircuito], references: [idcircuito])
   garantiasEstablecimiento GarantiaEstablecimiento[]

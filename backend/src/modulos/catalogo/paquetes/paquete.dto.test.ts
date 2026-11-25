@@ -23,6 +23,14 @@ describe("CrearPaqueteDto", () => {
     expect(dto?.diasCierreVenta).toBeUndefined(); // la base pone 2
   });
 
+  it("equipaje del porteador: opcional e informativo, con topes; null lo borra al modificar", () => {
+    expect(CrearPaqueteDto.create({ ...base, kgPorteador: 7, costoKgExcedentePorteador: 10 })[1]?.porteador).toEqual({ kgPorteador: 7, costoKgExcedentePorteador: 10 });
+    expect(CrearPaqueteDto.create(base)[1]?.porteador).toEqual({});
+    expect(error({ kgPorteador: 51 })).toBe("kgPorteador debe ser un número entre 0 y 50.");
+    expect(error({ costoKgExcedentePorteador: "10" })).toBe("costoKgExcedentePorteador debe ser un número entre 0 y 1000.");
+    expect(ModificarPaqueteDto.create({ kgPorteador: null })[1]?.porteador).toEqual({ kgPorteador: null });
+  });
+
   it("la tarifa sin moneda queda en USD (RES-16)", () => {
     const [err, dto] = CrearPaqueteDto.create({ ...base, matrizPrecios: [{ idtemporada: 1, monto: 800 }] });
 

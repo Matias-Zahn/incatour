@@ -55,6 +55,20 @@ const errorDiasCierre = (v: unknown) =>
   v !== undefined && !enRango(v, 1, TOPES.diasCierreVenta) ? `diasCierreVenta debe ser un número entero entre 1 y ${TOPES.diasCierreVenta}.` : undefined;
 const SALE_DESDE = "localidadGarantizada (Sale desde) es obligatoria.";
 
+/** Solo informativo: lo que carga el porteador por pasajero y el costo del excedente (null borra el dato). */
+export type EquipajePorteador = { kgPorteador?: number | null; costoKgExcedentePorteador?: number | null };
+function validarPorteador(obj: { [key: string]: any }): [string | undefined, EquipajePorteador] {
+  const datos: EquipajePorteador = {};
+  const topes = { kgPorteador: TOPES.pesoEquipaje, costoKgExcedentePorteador: TOPES.costoPorKgExcedente } as const;
+  for (const [campo, tope] of Object.entries(topes) as [keyof EquipajePorteador, number][]) {
+    const v = obj[campo];
+    if (v === undefined) continue;
+    if (v !== null && (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > tope)) return [`${campo} debe ser un número entre 0 y ${tope}.`, {}];
+    datos[campo] = v;
+  }
+  return [undefined, datos];
+}
+
 export class CrearPaqueteDto {
   private constructor(
     public idcircuito: number,
@@ -73,6 +87,8 @@ export class CrearPaqueteDto {
     public diasMinimosReintegro?: number | null,
     public diasCierreVenta?: number,
   ) {}
+
+  public porteador: EquipajePorteador = {};
 
   public static create(obj: { [key: string]: any }): [string | undefined, CrearPaqueteDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
@@ -168,8 +184,10 @@ export class CrearPaqueteDto {
     // --- B2: servicios por tipo ---
     const [errorServicios, servicios] = validarServicios(obj, true);
     if (errorServicios) return [errorServicios];
+    const [errorPorteador, porteador] = validarPorteador(obj);
+    if (errorPorteador) return [errorPorteador];
 
-    return [undefined, new CrearPaqueteDto(
+    return [undefined, Object.assign(new CrearPaqueteDto(
       idcircuito, nombrePaquete, tipoGarantia,
       matrizPrecios as PrecioTemporada[],
       condiciones,
@@ -181,7 +199,7 @@ export class CrearPaqueteDto {
       servicios,
       diasMinimosReintegro ?? null,
       diasCierreVenta,
-    )];
+    ), { porteador })];
   }
 }
 
@@ -204,6 +222,8 @@ export class ModificarPaqueteDto {
     public diasCierreVenta?: number,
   ) {}
 
+  public porteador: EquipajePorteador = {};
+
   public static create(obj: { [key: string]: any }): [string | undefined, ModificarPaqueteDto?] {
     if (!obj || typeof obj !== "object") return ["El cuerpo de la petición es requerido."];
 
@@ -221,7 +241,8 @@ export class ModificarPaqueteDto {
       localidadGarantizada === undefined && categoriaGarantizada === undefined &&
       tipoHabitacionGarantizada === undefined && obj.serviciosIncluidos === undefined &&
       diasMinimosReintegro === undefined && diasCierreVenta === undefined &&
-      obj.idtransporte === undefined && obj.idtren === undefined && obj.equipo === undefined
+      obj.idtransporte === undefined && obj.idtren === undefined && obj.equipo === undefined &&
+      obj.kgPorteador === undefined && obj.costoKgExcedentePorteador === undefined
     ) {
       return ["Debe enviar al menos un campo para modificar."];
     }
@@ -311,15 +332,17 @@ export class ModificarPaqueteDto {
 
     const [errorServicios, servicios] = validarServicios(obj, false);
     if (errorServicios) return [errorServicios];
+    const [errorPorteador, porteador] = validarPorteador(obj);
+    if (errorPorteador) return [errorPorteador];
 
-    return [undefined, new ModificarPaqueteDto(
+    return [undefined, Object.assign(new ModificarPaqueteDto(
       nombrePaquete, condiciones, nochesPrevias, nochesPosteriores, diasDisponibles,
       matrizPrecios as PrecioTemporada[] | undefined,
       idcircuito, tipoGarantia, idservicioGarantizado,
       typeof localidadGarantizada === "string" ? localidadGarantizada.trim() : localidadGarantizada,
       categoriaGarantizada, tipoHabitacionGarantizada,
       servicios, diasMinimosReintegro, diasCierreVenta,
-    )];
+    ), { porteador })];
   }
 }
 

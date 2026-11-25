@@ -192,7 +192,6 @@ function SalidasPage() {
         isPending: cargandoAsignacion,
         isFetching: recargandoAsignacion,
         error: errorAsignacion,
-        refetch: recargarAsignacion,
     } = usePanelAsignacion(salidaParaAsignar?.idsalida ?? null);
 
     const confirmarAsignacionMutation = useConfirmarAsignacion();
@@ -992,6 +991,10 @@ function SalidasPage() {
                         >
                             {formatearEstadoSalida(fila.estado)}
                         </span>
+                        {/* B4: la venta termina sola por fecha; la salida sigue Publicada hasta que el admin la confirma */}
+                        {fila.estado === "PUBLICADA" && fila.ventaAbierta === false ? (
+                            <span className="block text-xs font-semibold text-amber-800">Venta terminada · falta confirmar</span>
+                        ) : null}
 
                         {fila.estado === "EN_CURSO" && (
                             <div className="text-xs">
@@ -1903,7 +1906,6 @@ function SalidasPage() {
                             errorConfirmacion || (errorAsignacion ? errorAsignacion.message : undefined)
                         }
                         detalleErrorConfirmacion={detalleErrorConfirmacion}
-                        onRecargarDatos={() => recargarAsignacion()}
                         onConfirmar={manejarSolicitarConfirmacionAsignacion}
                         onCancelar={cerrarAsignacion}
                         onAbrirReemplazo={() => abrirReemplazo(salidaParaAsignar)}

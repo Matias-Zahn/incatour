@@ -154,6 +154,13 @@ function textoEquipaje(e: { kgIncluidos: number; costoPorKgExcedente: number | n
     return `Equipaje incluido: ${e.kgIncluidos} kg por pasajero.${excedente}`;
 }
 
+/** Solo informativo: el porteador carga hasta estos kg por pasajero en el sendero. */
+function textoPorteador(e: { kgIncluidos: number; costoPorKgExcedente: number | null }): string {
+    const excedente =
+        e.costoPorKgExcedente != null ? ` Cada kg de más se paga en el lugar: USD ${e.costoPorKgExcedente}.` : "";
+    return `En el sendero el porteador lleva hasta ${e.kgIncluidos} kg por pasajero.${excedente}`;
+}
+
 function sumarDiasIso(iso: string, dias: number): string {
     const fecha = new Date(iso);
     if (Number.isNaN(fecha.getTime())) return iso;
@@ -1066,6 +1073,11 @@ function CatalogoCompraPage() {
                                         {paqueteEnCompra?.equipaje ? (
                                             <p className="text-xs text-texto-suave">
                                                 {textoEquipaje(paqueteEnCompra.equipaje)}
+                                            </p>
+                                        ) : null}
+                                        {paqueteEnCompra?.equipajePorteador ? (
+                                            <p className="text-xs text-texto-suave">
+                                                {textoPorteador(paqueteEnCompra.equipajePorteador)}
                                             </p>
                                         ) : null}
                                     </div>
@@ -2240,6 +2252,11 @@ function CatalogoCompraPage() {
                                                 {paqueteDetalle.equipaje ? (
                                                     <p className="text-texto">
                                                         {textoEquipaje(paqueteDetalle.equipaje)}
+                                                    </p>
+                                                ) : null}
+                                                {paqueteDetalle.equipajePorteador ? (
+                                                    <p className="text-texto">
+                                                        {textoPorteador(paqueteDetalle.equipajePorteador)}
                                                     </p>
                                                 ) : null}
                                             </div>

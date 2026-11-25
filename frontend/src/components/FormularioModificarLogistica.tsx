@@ -705,35 +705,44 @@ export function FormularioModificarLogistica({
                                                 )}
                                             </td>
                                             <td className="p-2.5 text-right">
-                                                {eq.segunRegla ? (
-                                                    <select
-                                                        aria-label={`Reemplazar ${eq.nombreServicio}`}
-                                                        value={reemplazosRegla[eq.idservicio] ?? ""}
-                                                        onChange={(e) => {
-                                                            const id = e.target.value ? Number(e.target.value) : null;
-                                                            setReemplazosRegla((prev) => {
-                                                                const resto = { ...prev };
-                                                                delete resto[eq.idservicio];
-                                                                return id ? { ...resto, [eq.idservicio]: id } : resto;
-                                                            });
-                                                        }}
-                                                        className="max-w-[220px] rounded border border-borde p-1 text-xs text-texto focus:border-marca focus:outline-none"
-                                                    >
-                                                        <option value="">Conservar</option>
-                                                        {equipamientos
-                                                            .filter(
-                                                                (o) =>
-                                                                    o.idservicio !== eq.idservicio &&
-                                                                    o.disponibilidad?.tipoEquipamiento === eq.tipoEquipamiento &&
-                                                                    !eqActual.some((a) => a.idservicio === o.idservicio),
-                                                            )
-                                                            .map((o) => (
+                                                {eq.segunRegla ? (() => {
+                                                    // Solo otro artículo del mismo tipo que no esté ya en la salida
+                                                    const alternativas = equipamientos.filter(
+                                                        (o) =>
+                                                            o.idservicio !== eq.idservicio &&
+                                                            o.disponibilidad?.tipoEquipamiento === eq.tipoEquipamiento &&
+                                                            !eqActual.some((a) => a.idservicio === o.idservicio),
+                                                    );
+                                                    if (alternativas.length === 0) {
+                                                        return (
+                                                            <span className="text-xs text-texto-suave" title="No hay otro artículo del mismo tipo cargado en Proveedores">
+                                                                Sin reemplazos del mismo tipo
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <select
+                                                            aria-label={`Reemplazar ${eq.nombreServicio}`}
+                                                            value={reemplazosRegla[eq.idservicio] ?? ""}
+                                                            onChange={(e) => {
+                                                                const id = e.target.value ? Number(e.target.value) : null;
+                                                                setReemplazosRegla((prev) => {
+                                                                    const resto = { ...prev };
+                                                                    delete resto[eq.idservicio];
+                                                                    return id ? { ...resto, [eq.idservicio]: id } : resto;
+                                                                });
+                                                            }}
+                                                            className="max-w-[220px] rounded border border-borde p-1 text-xs text-texto focus:border-marca focus:outline-none"
+                                                        >
+                                                            <option value="">Conservar</option>
+                                                            {alternativas.map((o) => (
                                                                 <option key={o.idservicio} value={o.idservicio}>
                                                                     Reemplazar por {o.nombreServicio} — {o.proveedor?.razonSocial}
                                                                 </option>
                                                             ))}
-                                                    </select>
-                                                ) : (
+                                                        </select>
+                                                    );
+                                                })() : (
                                                 <button
                                                     type="button"
                                                     onClick={() => manejarAlternarQuitarOriginal(eq.idservicio, eq.cantidad)}

@@ -106,6 +106,7 @@ export class PaqueteService {
         diasDisponibles: dto.diasDisponibles,
         diasMinimosReintegro: dto.diasMinimosReintegro ?? null,
         diasCierreVenta: dto.diasCierreVenta,
+        ...dto.porteador,
       },
       dto.matrizPrecios,
       [
@@ -200,6 +201,7 @@ export class PaqueteService {
     if (dto.diasDisponibles !== undefined) dataUpdate.diasDisponibles = dto.diasDisponibles;
     if (dto.diasMinimosReintegro !== undefined) dataUpdate.diasMinimosReintegro = dto.diasMinimosReintegro;
     if (dto.diasCierreVenta !== undefined) dataUpdate.diasCierreVenta = dto.diasCierreVenta;
+    Object.assign(dataUpdate, dto.porteador);
 
     const hasData = Object.keys(dataUpdate).length > 0;
     const hasServicios = Object.keys(reemplazos).length > 0;
