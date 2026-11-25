@@ -5,6 +5,7 @@ import Alerta from "./Alerta";
 import Boton from "./Boton";
 import {
     categoriasAlojamiento,
+    tiposHabitacion,
     esquemaServicio,
     modalidadesConfirmacion,
     tiposServicio,
@@ -403,29 +404,29 @@ function FormularioServicio({
                         );
                     }
 
-                    if (nombreCampo === "categoria") {
-                        // Una categoría cargada antes como texto libre se conserva como opción para no perderla
-                        const actual = servicioEnEdicion?.categoria;
-                        const opciones: string[] = [...categoriasAlojamiento];
+                    if (nombreCampo === "categoria" || nombreCampo === "tipoHabitacion") {
+                        // Lo cargado antes como texto libre se conserva como opción para no perderlo
+                        const actual = servicioEnEdicion?.[nombreCampo];
+                        const opciones: string[] = [...(nombreCampo === "categoria" ? categoriasAlojamiento : tiposHabitacion)];
                         if (actual && !opciones.includes(actual)) opciones.push(actual);
                         return (
                             <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
                                 {campo.etiqueta}
                                 <select
                                     disabled={deshabilitado}
-                                    {...register("categoria")}
+                                    {...register(nombreCampo)}
                                     className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
                                 >
-                                    <option value="">Elegí una categoría</option>
+                                    <option value="">{nombreCampo === "categoria" ? "Elegí una categoría" : "Elegí un tipo de habitación"}</option>
                                     {opciones.map((categoria) => (
                                         <option key={categoria} value={categoria}>
                                             {categoria}
                                         </option>
                                     ))}
                                 </select>
-                                {errors.categoria ? (
+                                {errors[nombreCampo] ? (
                                     <span className="text-xs font-normal text-peligro" role="alert">
-                                        {errors.categoria.message}
+                                        {errors[nombreCampo]?.message}
                                     </span>
                                 ) : null}
                             </label>

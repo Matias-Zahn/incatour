@@ -72,6 +72,18 @@ export class AsignacionRepository {
     return ids.filter((id) => !libres.has(id));
   }
 
+  /** Cuántas salidas no canceladas tiene cada persona que empiezan en el mes de `fecha` (el mismo criterio que CU-36). */
+  async salidasEnElMes(ids: number[], fecha: Date) {
+    const inicioMes = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1));
+    const finMes = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, 1));
+    const delMes = await db.asignacionPersonal.groupBy({
+      by: ["idpersonal"],
+      where: { idpersonal: { in: ids }, salida: { estado: { not: ESTADO_SALIDA.CANCELADA }, fechaInicio: { gte: inicioMes, lt: finMes } } },
+      _count: true,
+    });
+    return new Map(delMes.map((g) => [g.idpersonal, g._count]));
+  }
+
   async buscarPersonal(ids: number[]) {
     return db.personal.findMany({ where: { idpersonal: { in: ids } }, include: { guia: { include: { usuario: true } } } });
   }
@@ -102,6 +114,7 @@ export class AsignacionRepository {
     rechazados: PermisoRechazado[];
     reservaDePasajero: Map<number, number>;
     lugaresPorLiberar: number;
+    porteadoresQuitados?: number[];
   }) {
     const { idsalida } = p.salida;
     return db.$transaction(async (tx) => {
@@ -116,6 +129,11 @@ export class AsignacionRepository {
         personal.every((a) => p.salida.personalAsignado.some((b) => b.idpersonal === a.idpersonal));
       if (fila?.estado !== ESTADO_SALIDA.PUBLICADA || confirmados !== vendidos || !mismoPersonal) {
         throw CustomError.conflict("La salida cambió mientras se confirmaba. Volvé a cargar el panel");
+      }
+
+      // Decisión 5: los porteadores que sobran para lo vendido quedan libres para otras salidas
+      if (p.porteadoresQuitados?.length) {
+        await tx.asignacionPersonal.deleteMany({ where: { idsalida, idpersonal: { in: p.porteadoresQuitados } } });
       }
 
       for (const permiso of p.permisos) {

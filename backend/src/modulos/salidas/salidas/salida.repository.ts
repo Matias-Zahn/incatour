@@ -124,8 +124,11 @@ export class SalidaRepository {
     const where: Prisma.ServicioBaseWhereInput = {
       estado: ESTADO.ACTIVO,
       alojamiento: {
-        ...(!porEstablecimiento && paquete.categoriaGarantizada && { categoria: paquete.categoriaGarantizada }),
-        ...(!porEstablecimiento && paquete.tipoHabitacionGarantizada && { tipoHabitacion: paquete.tipoHabitacionGarantizada }),
+        // Sin distinguir mayúsculas, como el simulador de costos: un hotel cargado como "doble" cumple "Doble"
+        ...(!porEstablecimiento && paquete.categoriaGarantizada && { categoria: { equals: paquete.categoriaGarantizada, mode: "insensitive" } }),
+        ...(!porEstablecimiento && paquete.tipoHabitacionGarantizada && {
+          tipoHabitacion: { equals: paquete.tipoHabitacionGarantizada, mode: "insensitive" },
+        }),
       },
       ...(porEstablecimiento && { idservicio: { in: paquete.garantiasEstablecimiento.map((g) => g.idservicio) } }),
       ...(!porEstablecimiento && paquete.localidadGarantizada && { localidad: paquete.localidadGarantizada }),

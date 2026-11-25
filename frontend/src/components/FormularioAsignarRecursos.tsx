@@ -47,6 +47,8 @@ export function FormularioAsignarRecursos({
 }: FormularioAsignarRecursosProps) {
     const idSeccion = useId();
     const [personalElegidoIds, setPersonalElegidoIds] = useState<number[]>([]);
+    // null: se usa la sugerencia del sistema (los porteadores con más salidas en el mes)
+    const [porteadoresALiberar, setPorteadoresALiberar] = useState<number[] | null>(null);
 
     // §14: salidas creadas antes de la etapa 3 llegan sin personal asignado;
     // se puede elegir acá usando las opciones de CU-36 (5.1) y enviarlo en { personalIds }.
@@ -187,7 +189,17 @@ export function FormularioAsignarRecursos({
         faltantesSinPersonal.length === 0 &&
         cumpleDotacionLegacy;
 
-    const habilitarConfirmacion = puedeConfirmar || puedeConfirmarConPersonalLegacy;
+    const porteadoresElegidos = porteadoresALiberar ?? datos.porteadoresSugeridosALiberar ?? [];
+    const faltaElegirPorteadores = porteadoresSobrantes > 0 && porteadoresElegidos.length !== porteadoresSobrantes;
+    const habilitarConfirmacion = (puedeConfirmar || puedeConfirmarConPersonalLegacy) && !faltaElegirPorteadores;
+
+    function alternarPorteadorALiberar(idpersonal: number) {
+        setPorteadoresALiberar(
+            porteadoresElegidos.includes(idpersonal)
+                ? porteadoresElegidos.filter((id) => id !== idpersonal)
+                : [...porteadoresElegidos, idpersonal],
+        );
+    }
 
     function manejarConfirmarClick() {
         if (!habilitarConfirmacion || guardando) return;
@@ -195,7 +207,7 @@ export function FormularioAsignarRecursos({
             onConfirmar?.({ personalIds: personalElegidoIds });
             return;
         }
-        onConfirmar?.({});
+        onConfirmar?.(porteadoresSobrantes > 0 ? { porteadoresALiberar: porteadoresElegidos } : {});
     }
 
     return (
@@ -346,7 +358,30 @@ export function FormularioAsignarRecursos({
             {porteadoresSobrantes > 0 ? (
                 <Alerta tipo="informacion" titulo="Porteadores sobrantes para la venta final">
                     Tenés {porteadoresSobrantes}{" "}
-                    {porteadoresSobrantes === 1 ? "porteador" : "porteadores"} por encima del mínimo requerido para {pasajerosConfirmados} pasajeros. Podés confirmar igual o ajustarlo desde reemplazos.
+                    {porteadoresSobrantes === 1 ? "porteador" : "porteadores"} por encima del mínimo requerido para {pasajerosConfirmados} pasajeros. Elegí {porteadoresSobrantes === 1 ? "cuál se libera" : `cuáles ${porteadoresSobrantes} se liberan`}: al confirmar no se emite su permiso y quedan libres para otras salidas. Viene marcado quien tiene más salidas en el mes.
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                        {personal
+                            .filter((p) => p.rol === "Porteador")
+                            .map((p) => (
+                                <label key={p.idpersonal} className="inline-flex items-center gap-1.5 text-sm text-texto">
+                                    <input
+                                        type="checkbox"
+                                        checked={porteadoresElegidos.includes(p.idpersonal)}
+                                        onChange={() => alternarPorteadorALiberar(p.idpersonal)}
+                                        disabled={
+                                            !porteadoresElegidos.includes(p.idpersonal) &&
+                                            porteadoresElegidos.length >= porteadoresSobrantes
+                                        }
+                                    />
+                                    {p.nombreCompleto}
+                                </label>
+                            ))}
+                    </div>
+                    {faltaElegirPorteadores ? (
+                        <p className="mt-1 text-xs font-semibold text-advertencia">
+                            Marcá {porteadoresSobrantes} para poder confirmar ({porteadoresElegidos.length} elegidos).
+                        </p>
+                    ) : null}
                 </Alerta>
             ) : null}
 

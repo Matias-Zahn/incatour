@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { tiposHabitacion } from "../services/servicioService";
 import { Link } from "react-router-dom";
 import Alerta from "./Alerta";
 import AsistentePasos from "./AsistentePasos";
@@ -65,13 +66,7 @@ const CATEGORIAS_SUGERIDAS = [
     "5 Estrellas",
 ];
 
-const HABITACIONES_SUGERIDAS = [
-    "Simple",
-    "Doble",
-    "Triple",
-    "Matrimonial",
-    "Suite",
-];
+const HABITACIONES_SUGERIDAS = tiposHabitacion;
 
 const LOCALIDADES_BASE = ["Cusco", "Aguas Calientes", "Ollantaytambo", "Urubamba"];
 
@@ -466,8 +461,8 @@ function FormularioPaquete({
             if (!Number.isInteger(post) || post < 0 || post > 30) {
                 return "Las noches posteriores deben ser un entero entre 0 y 30.";
             }
-            if (!Number.isInteger(cierre) || cierre < 0 || cierre > 30) {
-                return "Los días de cierre de venta deben ser un entero entre 0 y 30.";
+            if (!Number.isInteger(cierre) || cierre < 1 || cierre > 30) {
+                return "Los días de cierre de venta deben ser un entero entre 1 y 30.";
             }
             if (diasElegidos.length === 0) {
                 return "Elegí al menos un día habilitado para las salidas.";
@@ -965,7 +960,7 @@ function FormularioPaquete({
                                 Cierre de venta (días antes)
                                 <input
                                     type="number"
-                                    min={0}
+                                    min={1}
                                     max={30}
                                     value={diasCierreVenta}
                                     onChange={(e) => setDiasCierreVenta(e.target.value)}

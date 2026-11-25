@@ -382,7 +382,9 @@ function LayoutCliente({ children }: LayoutClienteProps) {
                                     <p className="text-cyan-100">
                                         {usuario.rol === "CLIENTE"
                                             ? "Cliente registrado"
-                                            : `Perfil ${usuario.rol}`}
+                                            : usuario.rol === "ADMIN"
+                                              ? "Administrador"
+                                              : "Guía"}
                                     </p>
                                     <p className="font-bold text-white">
                                         {usuario.nombre} {usuario.apellido}

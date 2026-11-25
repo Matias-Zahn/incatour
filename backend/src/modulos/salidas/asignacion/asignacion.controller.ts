@@ -23,11 +23,14 @@ export class AsignacionController {
   // Una salida creada antes de la etapa 3, sin personal, lo recibe acá en personalIds
   confirmarAsignacion = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { personalIds } = req.body ?? {};
+      const { personalIds, porteadoresALiberar } = req.body ?? {};
       if (personalIds !== undefined && (!Array.isArray(personalIds) || !personalIds.length || !personalIds.every((id) => Number.isInteger(id) && id > 0) || new Set(personalIds).size !== personalIds.length)) {
         return res.status(400).json({ error: "personalIds debe ser una lista de ids de personal, sin repetidos" });
       }
-      const resultado = await service.confirmarAsignacion(leerId(req.params.idsalida), personalIds);
+      if (porteadoresALiberar !== undefined && (!Array.isArray(porteadoresALiberar) || !porteadoresALiberar.every((id) => Number.isInteger(id) && id > 0) || new Set(porteadoresALiberar).size !== porteadoresALiberar.length)) {
+        return res.status(400).json({ error: "porteadoresALiberar debe ser una lista de ids de personal, sin repetidos" });
+      }
+      const resultado = await service.confirmarAsignacion(leerId(req.params.idsalida), personalIds, porteadoresALiberar);
       // SAL-20: con rechazados, el mensaje lo dice. Solo el personal se reemplaza (CU-38)
       const { permisosEmitidos, rechazados } = resultado;
       const personalRechazado = rechazados.some((r) => r.tipo === "PERSONAL");

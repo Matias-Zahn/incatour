@@ -1007,6 +1007,9 @@ export const manejadoresSalidas = [
         }));
         const porteadoresAsignados = personal.filter((p) => p.rol === "Porteador").length;
         const porteadoresSobrantes = Math.max(0, porteadoresAsignados - porteadoresReq);
+        const porteadoresSugeridosALiberar = porteadoresSobrantes
+            ? personal.filter((p) => p.rol === "Porteador").slice(-porteadoresSobrantes).map((p) => p.idpersonal)
+            : [];
 
         const hoteles = salida.servicios
             .filter((s) => s.tipo === "ALOJAMIENTO")
@@ -1087,6 +1090,7 @@ export const manejadoresSalidas = [
                 dotacionRequerida: { guias: guiasReq, porteadores: porteadoresReq },
                 personal,
                 porteadoresSobrantes,
+                porteadoresSugeridosALiberar,
                 hoteles,
                 transporte,
                 equipo,

@@ -26,7 +26,7 @@ export const etiquetasEstadoSalida: Record<string, string> = {
     EN_CURSO: "En curso",
     FINALIZADA: "Finalizada",
     CANCELADA: "Cancelada",
-    CERRADA: "Cerrada",
+    CERRADA: "Confirmada", // en la base sigue CERRADA: confirmada por el admin (decisión 1)
     PROGRAMADA: "Programada",
     COMPLETADO: "Completado",
     DEMORADO: "Demorado",
@@ -38,10 +38,9 @@ export function formatearEstadoSalida(estado?: string | null): string {
     return etiquetasEstadoSalida[normalizado] ?? estado;
 }
 
-/** En el portal del guía "Cerrada" se lee como lista para salir, y "Publicada" como pendiente de confirmación */
+/** En el portal del guía "Publicada" se lee como pendiente de confirmación */
 export function formatearEstadoSalidaGuia(estado?: string | null): string {
     const norm = estado?.trim().toUpperCase();
-    if (norm === "CERRADA") return "Lista para salir";
     if (norm === "PUBLICADA") return "En venta (pendiente de confirmar)";
     return formatearEstadoSalida(estado);
 }
