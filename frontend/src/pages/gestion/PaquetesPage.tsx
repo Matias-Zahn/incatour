@@ -14,7 +14,6 @@ import { useCircuitos } from "../../services/circuitoService";
 import {
     formatearDiasLegibles,
     resolverUrlImagenPaquete,
-    useCostoPaquete,
     useDarDeBajaPaquete,
     useModificarPaquete,
     usePaqueteDetalle,
@@ -220,7 +219,6 @@ function PaquetesPage() {
     const paqueteListaPrevia =
         paquetes.find((p) => p.idpaquete === paqueteVistaPreviaId) ?? null;
     const paqueteVistaPrevia = detalleVistaPrevia ?? paqueteListaPrevia;
-    const costoVistaPrevia = useCostoPaquete(detalleVistaPrevia ?? null).data?.costoPorPasajero ?? null;
 
     function manejarCambioBusqueda(nuevoValor: string) {
         setBusqueda(nuevoValor);
@@ -1766,15 +1764,6 @@ function PaquetesPage() {
                                                 <p className="text-xs font-bold uppercase tracking-wide text-texto-suave">
                                                     Matriz de tarifas vigentes
                                                 </p>
-                                                {costoVistaPrevia !== null ? (
-                                                    <p className="mt-1 text-xs text-texto-suave">
-                                                        Costo de servicios:{" "}
-                                                        <strong className="text-texto">
-                                                            {formatearMonto(costoVistaPrevia)} / pax
-                                                        </strong>{" "}
-                                                        (base 12 pasajeros; sin personal ni permisos)
-                                                    </p>
-                                                ) : null}
                                                 {tarifasVigentes(paqueteVistaPrevia).length > 0 ? (
                                                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                                                         {tarifasVigentes(paqueteVistaPrevia).map(
@@ -1791,22 +1780,13 @@ function PaquetesPage() {
                                                                             ?.nombre ??
                                                                             `Temporada #${tarifa.idtemporada}`}
                                                                     </span>
-                                                                    <span className="text-right">
-                                                                        <span className="font-bold text-navegacion">
-                                                                            {tarifa.moneda} {tarifa.monto}
-                                                                        </span>
-                                                                        {costoVistaPrevia ? (
-                                                                            <span
-                                                                                className={`block text-[11px] font-semibold ${
-                                                                                    tarifa.monto < costoVistaPrevia
-                                                                                        ? "text-peligro"
-                                                                                        : "text-emerald-700"
-                                                                                }`}
-                                                                            >
-                                                                                {tarifa.monto < costoVistaPrevia ? "" : "+"}
-                                                                                {Math.round(((tarifa.monto - costoVistaPrevia) / costoVistaPrevia) * 100)} % sobre el costo
-                                                                            </span>
-                                                                        ) : null}
+                                                                    <span className="font-bold text-navegacion">
+                                                                        {
+                                                                            tarifa.moneda
+                                                                        }{" "}
+                                                                        {
+                                                                            tarifa.monto
+                                                                        }
                                                                     </span>
                                                                 </div>
                                                             ),

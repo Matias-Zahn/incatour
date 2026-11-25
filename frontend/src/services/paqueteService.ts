@@ -526,37 +526,6 @@ export function useServiciosDisponiblesCatalogo(habilitado: boolean) {
     });
 }
 
-/** El costo de servicios de un paquete ya guardado, con la misma base de pasajeros que el formulario. */
-export function useCostoPaquete(paquete: Paquete | null, pasajeros = 12) {
-    const servicios = paquete?.servicios ?? [];
-    const porEstablecimiento = (paquete?.tipoGarantia ?? "").toUpperCase().includes("ESTABLECIMIENTO");
-    const datos: SimularCostoPayload | null =
-        paquete && paquete.localidadGarantizada && paquete.servicios
-            ? {
-                  tipoGarantia: porEstablecimiento ? "POR_ESTABLECIMIENTO" : "POR_CATEGORIA",
-                  idservicioGarantizado: porEstablecimiento
-                      ? paquete.garantiasEstablecimiento?.[0]?.idservicio
-                      : undefined,
-                  localidadGarantizada: paquete.localidadGarantizada,
-                  categoriaGarantizada: paquete.categoriaGarantizada ?? undefined,
-                  tipoHabitacionGarantizada: paquete.tipoHabitacionGarantizada ?? undefined,
-                  nochesPrevias: paquete.nochesPrevias,
-                  nochesPosteriores: paquete.nochesPosteriores,
-                  idtransporte: servicios.find((s) => s.tipo === "TRANSPORTE")?.idservicio,
-                  idtren: servicios.find((s) => s.tipo === "TREN")?.idservicio,
-                  equipo: servicios
-                      .filter((s) => s.tipo === "EQUIPAMIENTO" && s.cantidad)
-                      .map((s) => ({ idservicio: s.idservicio, cantidad: s.cantidad!, cadaPasajeros: s.cadaPasajeros ?? null })),
-                  pasajeros,
-              }
-            : null;
-    return useQuery({
-        queryKey: [...clavesPaquetes.todos, "costo", paquete?.idpaquete, pasajeros],
-        queryFn: () => simularCostoPaquete(datos!),
-        enabled: datos !== null,
-    });
-}
-
 export function useSimularCostoPaquete() {
     return useMutation({
         mutationFn: simularCostoPaquete,
