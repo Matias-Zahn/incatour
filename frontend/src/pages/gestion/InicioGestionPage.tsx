@@ -79,6 +79,10 @@ function InicioGestionPage() {
         )
         .sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
     const enCurso = salidas.filter((s) => s.estado === "EN_CURSO").length;
+    // Lo cobrado en las salidas que todavía no terminaron (programadas y en curso)
+    const vendidoActivas = salidas
+        .filter((s) => futuras.includes(s) || s.estado === "EN_CURSO")
+        .reduce((t, s) => t + (s.totalVendido ?? 0), 0);
     const conAlertas = salidas.filter((s) => s.alertas?.length > 0).length;
     const incidentes = incidentesQ.data ?? [];
     // El resumen arranca por los que cuenta el aviso rojo del menú y sigue por lo reciente
@@ -94,6 +98,7 @@ function InicioGestionPage() {
         { etiqueta: "Salidas en curso", valor: enCurso, detalle: "En operación hoy", cargando: salidasQ.isPending },
         { etiqueta: "Solicitudes de alojamiento pendientes", valor: solicitudesQ.data?.length, detalle: "Esperan resolución", cargando: solicitudesQ.isPending },
         { etiqueta: "Salidas con alertas", valor: conAlertas, detalle: "Por salir con solicitudes o permisos pendientes", cargando: salidasQ.isPending },
+        { etiqueta: "Vendido en salidas activas", valor: `USD ${Math.round(vendidoActivas).toLocaleString("es-AR")}`, detalle: "Cobrado en las programadas y en curso", cargando: salidasQ.isPending },
     ];
 
     return (
@@ -129,14 +134,14 @@ function InicioGestionPage() {
                 <Alerta tipo="error">No se pudieron cargar algunos indicadores del resumen.</Alerta>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {metricas.map((metrica) => (
                     <article
                         className="rounded-tarjeta border border-borde bg-white p-5 shadow-tarjeta"
                         key={metrica.etiqueta}
                     >
                         <p className="text-sm font-semibold text-texto-suave">{metrica.etiqueta}</p>
-                        <p className="mt-3 text-3xl font-bold text-navegacion">
+                        <p className="mt-3 whitespace-nowrap text-3xl font-bold text-navegacion">
                             {metrica.cargando ? "…" : (metrica.valor ?? "—")}
                         </p>
                         <p className="mt-2 text-xs font-semibold text-texto-suave">{metrica.detalle}</p>

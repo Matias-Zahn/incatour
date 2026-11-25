@@ -1071,6 +1071,12 @@ function FormularioCrearSalida({
                                 <p className="font-semibold text-texto">
                                     USD {opciones.tarifa.monto} / pasajero ({opciones.tarifa.temporada})
                                 </p>
+                                <p className="text-xs text-texto-suave">
+                                    Si se llena: {opciones.tamanoMaximo} × USD {opciones.tarifa.monto} ={" "}
+                                    <strong className="text-texto">
+                                        USD {(opciones.tamanoMaximo * opciones.tarifa.monto).toLocaleString("es-AR")}
+                                    </strong>
+                                </p>
                             </div>
                             <div>
                                 <span className="text-texto-suave">Hoteles</span>
