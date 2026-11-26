@@ -8,6 +8,7 @@ const { db } = vi.hoisted(() => ({
     reserva: { updateMany: vi.fn(), count: vi.fn() },
     gestionSolicitud: { create: vi.fn() },
     ocupacion: { count: vi.fn(), createMany: vi.fn() },
+    servicioBase: { findMany: vi.fn() },
   },
 }));
 vi.mock("../../../config/postgresDatabase", () => ({ db }));
@@ -24,6 +25,14 @@ describe("SolicitudRepository", () => {
     db.gestionSolicitud.create.mockResolvedValue({});
     db.ocupacion.count.mockResolvedValue(0);
     db.ocupacion.createMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("CU-34: los hoteles alternativos son solo a solicitud (el que acepta entra sin plazas fijas)", async () => {
+    db.servicioBase.findMany.mockResolvedValue([]);
+    await repo.buscarServiciosCompatiblesExcluyendoRechazados("Doble", "3 Estrellas", "Cusco", [7]);
+    expect(db.servicioBase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ alojamiento: expect.objectContaining({ modalidadConfirmacion: { not: "BLOQUEO_PLAZAS" } }) }) })
+    );
   });
 
   describe("resolverComoAceptada (RES-01, RES-05)", () => {

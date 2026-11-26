@@ -271,6 +271,16 @@ describe("SolicitudService", () => {
       expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
     });
 
+    it("CU-34: no acepta un hotel con bloqueo de plazas (entraría a la salida sin descontar las suyas)", async () => {
+      const h = hotel(40);
+      repo.buscarServicio.mockResolvedValue({ ...h, alojamiento: { ...h.alojamiento, modalidadConfirmacion: "BLOQUEO_PLAZAS" } });
+
+      await expect(
+        new SolicitudService().procesarResolucion(5, dto({ servicioId: 40, resolucion: "ACEPTADA" }))
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("a solicitud") });
+      expect(repo.resolverComoAceptada).not.toHaveBeenCalled();
+    });
+
     it("RES-04: rechaza si el servicio no cumple con los criterios de localidad/categoría/habitación", async () => {
       repo.buscarServicio.mockResolvedValue({
         idservicio: 40,

@@ -1,7 +1,7 @@
 import { db } from "../../../config/postgresDatabase";
 import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { rangosDe } from "../../../shared/ocupacion";
 import { ocupar } from "../../../shared/ocupacion.repository";
 
@@ -62,6 +62,9 @@ export class SolicitudRepository {
           notIn: serviciosRechazadosIds
         },
         alojamiento: {
+          // Solo a solicitud: el que acepta entra a la salida sin plazas fijas (resolverComoAceptada, plazasLibres null).
+          // ponytail: para ofrecer hoteles con bloqueo habría que validar y descontar sus plazas al aceptar
+          modalidadConfirmacion: { not: MODALIDAD_BLOQUEO_PLAZAS },
           // Sin distinguir mayúsculas, igual que la búsqueda de hoteles al crear la salida
           tipoHabitacion: { equals: tipoHabitacion, mode: "insensitive" },
           categoria: { equals: categoria, mode: "insensitive" }
