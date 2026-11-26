@@ -1444,11 +1444,12 @@ function SalidasPage() {
                                 onClick={() => abrirAsignacion(fila)}
                                 className={`inline-flex cursor-pointer items-center gap-1 rounded-control border px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                     ventaCerradaConPasajeros
-                                        ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                                        ? "border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100"
                                         : "border-borde bg-slate-50 text-navegacion hover:border-navegacion/30 hover:bg-slate-100"
                                 }`}
                             >
-                                <span>Qué falta confirmar</span>
+                                {/* Venta terminada y bloqueada: es la misma acción que Confirmar, en rojo porque no se puede todavía */}
+                                <span>{ventaCerradaConPasajeros ? "Confirmar salida" : "Qué falta confirmar"}</span>
                             </button>
                         ) : puedeLiberarSobrantes ? (
                             <button
@@ -1992,6 +1993,9 @@ function SalidasPage() {
                         onConfirmar={manejarSolicitarConfirmacionAsignacion}
                         onCancelar={cerrarAsignacion}
                         onAbrirReemplazo={() => abrirReemplazo(salidaParaAsignar)}
+                        avisoEquipoJusto={
+                            salidaParaAsignar.avisos?.find((av) => av.alerta === "RIESGO_STOCK")?.mensaje
+                        }
                         onAbrirLogistica={() => abrirModificarLogistica(salidaParaAsignar)}
                     />
                 </Modal>

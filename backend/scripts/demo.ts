@@ -628,6 +628,8 @@ async function llevarALaFechaReal(
     });
     await db.pago.updateMany({ where: { idreserva: m.idreserva }, data: { fechahora: momento } });
     if (m.cancelacion) await db.reembolso.updateMany({ where: { idreserva: m.idreserva }, data: { fechaReembolso: instante(m.cancelacion, 15) } });
+    // Cancelada hoy: la fecha la pone la base con su reloj, que no sigue a HOY_OFFSET_DIAS
+    else await db.reembolso.updateMany({ where: { idreserva: m.idreserva, fechaReembolso: { lt: momento } }, data: { fechaReembolso: new Date() } });
   }
   for (const g of marcas.gestiones) {
     await db.gestionSolicitud.update({ where: { idsolicitud_idservicio: { idsolicitud: g.idsolicitud, idservicio: g.idservicio } }, data: { fechaRespuesta: instante(g.fecha, 12) } });
