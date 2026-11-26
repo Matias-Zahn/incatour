@@ -1,5 +1,6 @@
 import { BedDouble, Check, Hotel, MapPin, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Modal from "../../components/Modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -305,11 +306,11 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                   }`}
                 >
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-texto">
-                    <Check className="h-4 w-4 text-exito shrink-0" aria-hidden /> Confirmar aceptación (ACEPTADA)
+                    <Check className="h-4 w-4 text-exito shrink-0" aria-hidden /> El hotel aceptó
                   </div>
                   <p className="mt-1 text-xs text-texto-suave">
                     El hotel confirma las {solicitud.cantidadPlazas} plaza(s). La solicitud pasa a
-                    CONFIRMADA y se notifica al titular de la reserva.
+                    confirmada y se notifica al titular de la reserva.
                   </p>
                 </button>
 
@@ -326,7 +327,7 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
                   }`}
                 >
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-texto">
-                    <X className="h-4 w-4 text-peligro shrink-0" aria-hidden /> Registrar rechazo (RECHAZADA)
+                    <X className="h-4 w-4 text-peligro shrink-0" aria-hidden /> El hotel rechazó
                   </div>
                   <p className="mt-1 text-xs text-texto-suave">
                     El hotel no tiene cupo. Se excluye este hotel y se crea automáticamente una
@@ -401,7 +402,10 @@ function ModalResolucionSolicitud({ solicitud, onCerrar, onResuelta }: ModalReso
 
 export function SolicitudesPage() {
   const queryClient = useQueryClient();
-  const [busqueda, setBusqueda] = useState("");
+  // Desde Salidas se llega con ?salida=SAL-…: filtra por esa salida y, si tiene una sola, la abre.
+  const [params] = useSearchParams();
+  const salidaPedida = params.get("salida");
+  const [busqueda, setBusqueda] = useState(salidaPedida ?? "");
   const [pagina, setPagina] = useState(1);
   const [solicitudEnGestion, setSolicitudEnGestion] = useState<SolicitudPendiente | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -414,6 +418,13 @@ export function SolicitudesPage() {
     queryKey: ["solicitudes"],
     queryFn: listarSolicitudesPendientes,
   });
+
+  const [porAbrir, setPorAbrir] = useState(salidaPedida);
+  if (porAbrir && !isLoading) {
+    const deLaSalida = solicitudes.filter((s) => s.reserva.salida.nroSalida === porAbrir);
+    if (deLaSalida.length === 1) setSolicitudEnGestion(deLaSalida[0]);
+    setPorAbrir(null);
+  }
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();

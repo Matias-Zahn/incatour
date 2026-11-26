@@ -98,7 +98,7 @@ export class SolicitudRepository {
       // 1. RES-01 y RES-05: actualizar la reserva solo si NO está CANCELADA (estadoAlojamiento, no estado)
       const resActualizada = await tx.reserva.updateMany({
         where: { idreserva: reservaId, estado: { not: ESTADO_RESERVA.CANCELADA } },
-        data: { estadoAlojamiento: ESTADO_ALOJAMIENTO.CONFIRMADO }
+        data: { estadoAlojamiento: ESTADO_ALOJAMIENTO.CONFIRMADO, idalojamiento: servicioId }, // 12.2: el hotel que aceptó, aunque no sea el original
       });
       if (resActualizada.count === 0) {
         throw CustomError.badRequest("No se puede resolver una solicitud de una reserva cancelada.");

@@ -381,13 +381,13 @@ export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo
   let etapaEsperada: number | null = null;
   const { duracionDias, _count } = salida.paquete.circuito;
   if (salida.estado === ESTADO_SALIDA.EN_CURSO && _count.etapas > 0 && duracionDias > 0) {
-    const dia = Math.floor((ahora.getTime() - salida.fechaInicio.getTime()) / DIA_MS) + 1;
+    const dia = Math.round((hoy.getTime() - salida.fechaInicio.getTime()) / DIA_MS) + 1;
     etapaEsperada = Math.min(_count.etapas, Math.max(1, Math.ceil((dia / duracionDias) * _count.etapas)));
   }
   const etapaInformada = salida.ultimaEtapaAlcanzada ?? null;
 
   const alertas: string[] = [];
-  const diasParaEmpezar = (salida.fechaInicio.getTime() - ahora.getTime()) / DIA_MS;
+  const diasParaEmpezar = (salida.fechaInicio.getTime() - hoy.getTime()) / DIA_MS; // por día calendario, no por hora
   const porEmpezar = salida.estado !== ESTADO_SALIDA.EN_CURSO && SALIDAS_ACTIVAS.includes(salida.estado);
   if (porEmpezar && diasParaEmpezar >= 0 && diasParaEmpezar <= DIAS_ALERTA) {
     if (reservas.some((r) => r.solicitudes.length > 0)) alertas.push("SOLICITUD_PENDIENTE");

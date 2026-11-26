@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- la forma de cada reporte la define el back y estos armadores son su único lector */
 import { solicitarApi } from "./clienteApi";
 import { formatearFechaLocalCorta, formatearFechaUtcCorta, formatearMontoUsd } from "./clientePortalService";
-import { etiquetasTipoIncidente } from "./guiaService";
+import { etiquetasTipoIncidente, formatearEstadoSalida } from "./guiaService";
+import { etiquetaEstadoSolicitud, etiquetaGravedad } from "./formato";
 
 export type TipoReporte = "ventas" | "ocupacion" | "cancelaciones" | "solicitudes" | "calidad";
 
@@ -154,7 +155,7 @@ const ARMADORES: Record<TipoReporte, (d: any) => ReporteArmado> = {
             {
                 titulo: "Por salida",
                 columnas: [
-                    col("Salida", "nroSalida"), col("Paquete", "paquete"), col("Inicio", "fechaInicio", fechaUtc), col("Estado", "estado"),
+                    col("Salida", "nroSalida"), col("Paquete", "paquete"), col("Inicio", "fechaInicio", fechaUtc), col("Estado", "estado", formatearEstadoSalida),
                     col("Capacidad", "capacidad"), col("Vendidos", "ocupados"), col("Ocupación", "ocupacion", pct),
                 ],
                 filas: d.salidas,
@@ -228,7 +229,7 @@ const ARMADORES: Record<TipoReporte, (d: any) => ReporteArmado> = {
                 titulo: "Historial",
                 columnas: [
                     col("Solicitud", "nroSolicitud"), col("Pedido", "fechaPedido", formatearFechaLocalCorta), col("Paquete", "paquete"), col("Salida", "nroSalida"),
-                    col("Plazas", "plazas"), col("Estado", "estado"),
+                    col("Plazas", "plazas"), col("Estado", "estado", etiquetaEstadoSolicitud),
                     {
                         titulo: "Respuesta del hotel",
                         valor: (f) =>
@@ -263,7 +264,7 @@ const ARMADORES: Record<TipoReporte, (d: any) => ReporteArmado> = {
             barras("Personal", d.personal.map((p: Fila) => ({ etiqueta: p.nombre, valor: p.promedio, texto: nota(p.promedio) })), 5),
         ],
         tablas: [
-            { titulo: "Incidentes por gravedad", columnas: COLUMNAS_CONTEO, filas: d.incidentesPorGravedad },
+            { titulo: "Incidentes por gravedad", columnas: [col("Detalle", "nombre", etiquetaGravedad), col("Cantidad", "cantidad")], filas: d.incidentesPorGravedad },
             { titulo: "Proveedores", columnas: COLUMNAS_PROMEDIO, filas: d.proveedores },
             { titulo: "Personal", columnas: COLUMNAS_PROMEDIO, filas: d.personal },
         ],

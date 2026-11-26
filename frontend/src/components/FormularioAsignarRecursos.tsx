@@ -339,7 +339,8 @@ export function FormularioAsignarRecursos({
                     <p className="text-texto-suave">
                         Permisos a emitir:{" "}
                         {pasajerosConfirmados +
-                            (salidaSinPersonal ? personalElegidoIds.length : personal.length)}
+                            (salidaSinPersonal ? personalElegidoIds.length : personal.length) -
+                            (porteadoresSobrantes > 0 ? porteadoresElegidos.length : 0)}
                     </p>
                 </div>
                 <div className="rounded-control border border-borde bg-slate-50/70 p-3">

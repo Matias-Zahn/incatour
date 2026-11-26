@@ -13,6 +13,7 @@ import {
     textoAlojamiento,
     useDetalleMiReserva,
 } from "../services/clientePortalService";
+import { etiquetaMedioPago } from "../services/formato";
 
 type Props = {
     idreserva: number;
@@ -312,9 +313,7 @@ function ModalDetalleReserva({ idreserva, onCerrar, onCancelar }: Props) {
                                                             pago.monto,
                                                         )}{" "}
                                                         ·{" "}
-                                                        {
-                                                            pago.medioPago
-                                                        }
+                                                        {etiquetaMedioPago(pago.medioPago)}
                                                     </p>
                                                     <p className="text-xs text-texto-suave">
                                                         Pago N°{" "}

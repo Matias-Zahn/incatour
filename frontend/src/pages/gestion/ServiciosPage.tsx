@@ -59,7 +59,7 @@ function describirDisponibilidad(servicio: Servicio): string {
             const plazas =
                 servicio.modalidadConfirmacion === "A_SOLICITUD"
                     ? "A solicitud"
-                    : `${servicio.capacidadDisponible ?? 0} plazas (${servicio.modalidadConfirmacion ?? "-"})`;
+                    : `${servicio.capacidadDisponible ?? 0} plazas (bloqueo)`;
             return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${plazas}`;
         }
         case "TRANSPORTE":
