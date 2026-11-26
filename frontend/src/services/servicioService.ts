@@ -194,6 +194,7 @@ export type Servicio = DatosServicio & {
     idproveedor: number;
     estado: EstadoServicio;
     proveedor?: { idproveedor?: number; razonSocial: string; tipoProveedor?: TipoServicio };
+    plazasTotales?: number;
     cantidadComprometida?: number;
     inventarioTotal?: number;
     edicion?: EdicionServicio;

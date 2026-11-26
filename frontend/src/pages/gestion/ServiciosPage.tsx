@@ -56,10 +56,15 @@ function describirDisponibilidad(servicio: Servicio): string {
             return `${servicio.tipoEquipamiento ?? "Equipo"} · Libre hoy: ${libre} / Máximo comprometido: ${comprometida} / Total: ${total}`;
         }
         case "ALOJAMIENTO": {
+            if (servicio.modalidadConfirmacion === "A_SOLICITUD") {
+                return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · A solicitud`;
+            }
+            const total = servicio.plazasTotales ?? servicio.capacidadDisponible ?? 0;
+            const libre = servicio.capacidadDisponible ?? total;
             const plazas =
-                servicio.modalidadConfirmacion === "A_SOLICITUD"
-                    ? "A solicitud"
-                    : `${servicio.capacidadDisponible ?? 0} plazas (bloqueo)`;
+                libre < total
+                    ? `${libre} libres hoy de ${total} plazas (bloqueo)`
+                    : `${total} plazas (bloqueo)`;
             return `${servicio.categoria ?? "-"} · ${servicio.tipoHabitacion ?? "-"} · ${plazas}`;
         }
         case "TRANSPORTE":
@@ -153,7 +158,10 @@ function ServiciosPage() {
                             ? (servicioEnEdicion.inventarioTotal ??
                               (servicioEnEdicion.cantidadDisponible ?? 0) +
                                   (servicioEnEdicion.cantidadComprometida ?? 0))
-                            : servicioEnEdicion[campo];
+                            : campo === "capacidadDisponible"
+                              ? (servicioEnEdicion.plazasTotales ??
+                                servicioEnEdicion.capacidadDisponible)
+                              : servicioEnEdicion[campo];
 
                     if (
                         nuevoValor === undefined ||

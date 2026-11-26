@@ -52,10 +52,15 @@ export class ServicioService {
     const historial = await this.repository.historialOcupacion(id, desde, hasta);
     // Para el día cuentan todas hasta su `hasta`, también las finalizadas (noches posteriores y reacondicionamiento)
     const activas = historial.filter((o) => o.salida.estado !== ESTADO_SALIDA.CANCELADA);
-    const total = totalDe(servicio);
+    const esASolicitud = Boolean(servicio.alojamiento && servicio.alojamiento.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS);
+    const total = esASolicitud ? null : totalDe(servicio);
     return {
       total,
-      dias: [...ocupadoPorDia(activas, desde, hasta)].map(([fecha, ocupado]) => ({ fecha, ocupado, disponible: total - ocupado })),
+      dias: [...ocupadoPorDia(activas, desde, hasta)].map(([fecha, ocupado]) => ({
+        fecha,
+        ocupado,
+        disponible: total === null ? null : total - ocupado,
+      })),
       ocupaciones: historial.map((o) => ({
         nroSalida: o.salida.nroSalida,
         desde: claveDia(o.desde),
@@ -132,7 +137,10 @@ export class ServicioService {
               );
             }
           };
-    // Bloque 8: con bloqueo de plazas el hotel necesita su capacidad
+    // Bloque 8: con bloqueo de plazas el hotel necesita su capacidad; al pasar a solicitud se limpia el tope fijo
+    if (tipo === TIPO_SERVICIO.ALOJAMIENTO && especifico.modalidadConfirmacion && especifico.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS) {
+      especifico.capacidadDisponible = null;
+    }
     if (
       tipo === TIPO_SERVICIO.ALOJAMIENTO &&
       (especifico.modalidadConfirmacion ?? actual.modalidadConfirmacion) === MODALIDAD_BLOQUEO_PLAZAS &&
@@ -249,7 +257,10 @@ export class ServicioService {
         break;
       case TIPO_SERVICIO.ALOJAMIENTO:
         disponibilidad = {
-          capacidadDisponible: datos.plazasTotales === null ? null : datos.plazasTotales - uso.hoy,
+          capacidadDisponible:
+            datos.modalidadConfirmacion !== MODALIDAD_BLOQUEO_PLAZAS || datos.plazasTotales === null
+              ? null
+              : datos.plazasTotales - uso.hoy,
           modalidadConfirmacion: datos.modalidadConfirmacion,
         };
         break;

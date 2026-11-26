@@ -82,6 +82,9 @@ function FormularioServicio({
         if (servicioEnEdicion) {
             reset({
                 ...servicioEnEdicion,
+                ...(servicioEnEdicion.plazasTotales !== undefined && {
+                    capacidadDisponible: servicioEnEdicion.plazasTotales,
+                }),
                 inventarioTotal:
                     servicioEnEdicion.inventarioTotal ??
                     (servicioEnEdicion.cantidadDisponible ?? 0) +

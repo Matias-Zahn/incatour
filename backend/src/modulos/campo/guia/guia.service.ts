@@ -2,7 +2,7 @@ import { envs } from "../../../config/envs";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { CustomError } from "../../../error/CustomError";
-import { hoyUTC } from "../../../shared/fechas";
+import { fechaCorta, hoyUTC } from "../../../shared/fechas";
 import { ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { unaPorServicio } from "../../../shared/ocupacion";
 import { DefinicionPaquete } from "../../../shared/definicionPaquete";
@@ -108,7 +108,7 @@ export class GuiaService {
     }
     if (s.fechaInicio > hoyUTC()) {
       throw CustomError.badRequest(
-        `La salida empieza el ${s.fechaInicio.toISOString().slice(0, 10)}; todavía no se puede iniciar`
+        `La salida empieza el ${fechaCorta(s.fechaInicio)}; todavía no se puede iniciar`
       );
     }
     return this.repository.iniciarSalida(idsalida, new Date());

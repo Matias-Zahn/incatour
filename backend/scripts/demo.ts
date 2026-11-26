@@ -267,7 +267,7 @@ async function main() {
     }
 
     const correo = (texto: string) => texto.normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-zA-Z]+/g, ".").toLowerCase();
-    const hoteles: Record<string, { idservicio: number; idproveedor: number; rechazo: number; plazasHoy: number }[]> = {};
+    const hoteles: Record<string, { idservicio: number; idproveedor: number; rechazo: number; plazasHoy: number; modalidad: Zona["modalidad"] }[]> = {};
     for (const [clave, z] of Object.entries(ZONAS)) {
       hoteles[clave] = [];
       for (const [nombre, rechazo, costo, plazasHoy] of z.hoteles) {
@@ -275,11 +275,13 @@ async function main() {
         const prov = await api("POST", "/proveedores", { tipoProveedor: "ALOJAMIENTO", razonSocial: `${nombre} S.A.C.`, localidad: z.localidad, datosContacto: `reservas@${dominio}`, canalComunicacion: "Email" });
         const idproveedor = idDe(prov, "idproveedor")!;
         // La historia se opera con capacidad de sobra (varias salidas pueden compartir noches) y al final
-        // se deja lo que el hotel tiene libre hoy
+        // se deja lo que el hotel tiene libre hoy (solo en bloqueo de plazas; a solicitud no tiene cupo fijo)
         const s = await api("POST", `/proveedores/${idproveedor}/servicios`, {
-          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble", capacidadDisponible: PLAZAS_PARA_OPERAR[nombre] ?? 900, modalidadConfirmacion: z.modalidad,
+          tipo: "ALOJAMIENTO", nombreServicio: nombre, localidad: z.localidad, costoBase: costo, categoria: z.categoria, tipoHabitacion: "Doble",
+          ...(z.modalidad === "BLOQUEO_PLAZAS" && { capacidadDisponible: PLAZAS_PARA_OPERAR[nombre] ?? 900 }),
+          modalidadConfirmacion: z.modalidad,
         });
-        hoteles[clave]!.push({ idservicio: idDe(s, "idservicio")!, idproveedor, rechazo, plazasHoy });
+        hoteles[clave]!.push({ idservicio: idDe(s, "idservicio")!, idproveedor, rechazo, plazasHoy, modalidad: z.modalidad });
       }
     }
 
@@ -590,8 +592,9 @@ async function main() {
     }
 
     await llevarALaFechaReal(db, marcas, clientes, hoy);
-    // A1: el total del hotel queda en lo que tiene libre hoy más lo ocupado hoy, sin bajar del día más comprometido
+    // A1: el total del hotel con bloqueo queda en lo que tiene libre hoy más lo ocupado hoy, sin bajar del día más comprometido
     for (const h of Object.values(hoteles).flat()) {
+      if (h.modalidad !== "BLOQUEO_PLAZAS") continue;
       const { dias } = await api("GET", `/servicios/${h.idservicio}/ocupacion?desde=${hoy}&hasta=${sumarDias(hoy, 365)}`);
       const total = Math.max(h.plazasHoy + dias[0].ocupado, ...dias.map((d: { ocupado: number }) => d.ocupado));
       await api("PUT", `/servicios/${h.idservicio}`, { capacidadDisponible: total });

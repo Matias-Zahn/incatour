@@ -884,7 +884,7 @@ function CatalogoCompraPage() {
                                         <p className="text-xs text-texto-suave">
                                             Pasaporte: {p.nroPasaporte} ·{" "}
                                             {p.nacionalidad} · Vence:{" "}
-                                            {p.fechaVencimientoPasaporte}
+                                            {formatearFechaUtcCorta(p.fechaVencimientoPasaporte)}
                                         </p>
                                     </div>
                                 </div>
