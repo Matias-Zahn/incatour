@@ -209,7 +209,35 @@ export const manejadoresSalidas = [
                 new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime(),
         );
 
-        return HttpResponse.json({ data: resultado });
+        const hoyIso = new Date().toISOString().slice(0, 10);
+        const enriquecido = resultado.map((s) => {
+            const equipamientoDevuelto = devolucionesRegistradasMock.has(s.idsalida);
+            const tieneEquipamientoAsignado = (equipamientoSalidasMock[s.idsalida] ?? []).length > 0;
+            const devolucionPendiente =
+                s.estado !== "CANCELADA" &&
+                tieneEquipamientoAsignado &&
+                !equipamientoDevuelto &&
+                (s.estado === "FINALIZADA" || s.fechaFin.slice(0, 10) < hoyIso);
+            const alertasBase = (s.alertas ?? []).filter((a) => a !== "DEVOLUCION_PENDIENTE");
+            const avisosBase = (s.avisos ?? []).filter((a) => a.alerta !== "DEVOLUCION_PENDIENTE");
+            return {
+                ...s,
+                equipamientoDevuelto,
+                tieneEquipamientoAsignado,
+                alertas: devolucionPendiente ? [...alertasBase, "DEVOLUCION_PENDIENTE"] : alertasBase,
+                avisos: devolucionPendiente
+                    ? [
+                          ...avisosBase,
+                          {
+                              alerta: "DEVOLUCION_PENDIENTE",
+                              mensaje: "Falta registrar la devolución del equipamiento",
+                          },
+                      ]
+                    : avisosBase,
+            };
+        });
+
+        return HttpResponse.json({ data: enriquecido });
     }),
 
     // GET /api/salidas/opciones (CU-36 — §5.1)

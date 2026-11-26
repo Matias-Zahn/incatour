@@ -50,6 +50,7 @@ export type AlertaSalida =
     | "RIESGO_STOCK" // si se vende completa, faltaría equipo
     | "PERSONAL_NO_APTO" // alguien del personal asignado dejó de ser apto
     | "PENDIENTE_CONFIRMAR" // cerró la venta y sigue PUBLICADA
+    | "DEVOLUCION_PENDIENTE" // concluyó con equipo asignado y falta registrar devolución
     | string;
 
 export type AvisoSalida = {
@@ -88,6 +89,9 @@ export type SalidaApi = {
     ultimoDiaVenta?: string;
     ventaAbierta?: boolean;
     puedeConfirmar?: boolean;
+    // CU-41: estado de devolución de equipamiento en el listado
+    equipamientoDevuelto?: boolean;
+    tieneEquipamientoAsignado?: boolean;
     // 12.5: el precio congelado al que se vende y lo que pagaron las reservas confirmadas
     precioPorPasajero?: { monto: number; moneda: string; temporada: string } | null;
     totalVendido?: number;

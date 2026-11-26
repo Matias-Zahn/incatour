@@ -365,7 +365,7 @@ const HORA_MS = 60 * 60 * 1000;
  *   y la que sigue en curso pasado el día siguiente a su fin.
  */
 export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo = { totales: new Map(), filas: [] }) {
-  const { reservas, permisos, avances, ocupaciones, ...salida } = s;
+  const { reservas, permisos, avances, ocupaciones, auditorias, _count: conteos, ...salida } = s;
   const { tarifas, ...paquete } = salida.paquete;
   const pasajerosConfirmados = reservas.reduce((t, r) => t + r._count.pasajeros, 0);
   // 12.5: el precio al que se vende; lo vendido suma lo que pagó cada reserva (su precio congelado)
@@ -413,6 +413,17 @@ export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo
   if (puedeConfirmar) {
     avisos.push({ alerta: "PENDIENTE_CONFIRMAR", mensaje: `La venta cerró el ${fecha(venta.ultimoDiaVenta)}: falta confirmar la salida` });
   }
+  // CU-41: si la salida concluyó con equipamiento asignado y no se registró la devolución, avisar para inspeccionar roturas o pérdidas
+  const equipamientoDevuelto = (auditorias?.length ?? 0) > 0;
+  const tieneEquipamientoAsignado = (conteos?.ocupaciones ?? 0) > 0;
+  const devolucionPendiente =
+    salida.estado !== ESTADO_SALIDA.CANCELADA &&
+    tieneEquipamientoAsignado &&
+    !equipamientoDevuelto &&
+    (salida.estado === ESTADO_SALIDA.FINALIZADA || salida.fechaFin < hoy);
+  if (devolucionPendiente) {
+    avisos.push({ alerta: "DEVOLUCION_PENDIENTE", mensaje: "Falta registrar la devolución del equipamiento" });
+  }
   alertas.push(...new Set(avisos.map((a) => a.alerta)));
 
   return {
@@ -422,6 +433,8 @@ export function resumirSalida(s: SalidaListada, ahora: Date, equipo: DatosEquipo
     precioPorPasajero: tarifa ? { monto: tarifa.monto, moneda: tarifa.moneda, temporada: tarifa.temporada } : null,
     totalVendido,
     puedeConfirmar,
+    equipamientoDevuelto,
+    tieneEquipamientoAsignado,
     // Decisión 12 del contrato: la forma de SalidaServicio, armada desde Ocupacion (el hotel, una vez aunque ocupe dos tramos)
     servicios: unaPorServicio(ocupaciones).map((o) => ({
       idsalida: o.idsalida,
