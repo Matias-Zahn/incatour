@@ -45,17 +45,22 @@ export class AsignacionService {
         pasajeros: salida.reservas.filter((r) => r.idalojamiento === o.idservicio).reduce((t, r) => t + r.pasajeros.length, 0),
       })),
       transporte: recursos.transporte,
-      equipo: recursos.equipos.map((e) => ({
-        idservicio: e.idservicio,
-        nombreServicio: e.nombreServicio,
-        tipoEquipamiento: salida.ocupaciones.find((o) => o.idservicio === e.idservicio)?.servicio.equipamiento?.tipoEquipamiento ?? null,
-        cantidad: e.cantidad,
-        cadaPasajeros: e.cadaPasajeros, // null = fija por salida
-        necesita: e.necesita,
-        ocupado: e.ocupado,
-        falta: e.falta,
-        fechaFalta: e.falta > 0 ? e.fechaFalta : null,
-      })),
+      equipo: recursos.equipos.map((e) => {
+        const oc = salida.ocupaciones.find((o) => o.idservicio === e.idservicio);
+        return {
+          idservicio: e.idservicio,
+          idproveedor: oc?.servicio.idproveedor ?? null,
+          nombreProveedor: oc?.servicio.proveedor?.razonSocial ?? null,
+          nombreServicio: e.nombreServicio,
+          tipoEquipamiento: oc?.servicio.equipamiento?.tipoEquipamiento ?? null,
+          cantidad: e.cantidad,
+          cadaPasajeros: e.cadaPasajeros, // null = fija por salida
+          necesita: e.necesita,
+          ocupado: e.ocupado,
+          falta: e.falta,
+          fechaFalta: e.falta > 0 ? e.fechaFalta : null,
+        };
+      }),
       reservasSinAlojamiento: c.pendientes,
       faltantes: c.faltantes,
       bloqueoInicial: c.bloqueoInicial,

@@ -22,7 +22,9 @@ export class AsignacionRepository {
           include: {
             servicio: {
               select: {
+                idproveedor: true,
                 nombreServicio: true,
+                proveedor: { select: { razonSocial: true } },
                 transporte: { select: { capacidadVehiculo: true } },
                 alojamiento: { select: { modalidadConfirmacion: true } },
                 equipamiento: { select: { tipoEquipamiento: true } },
