@@ -98,6 +98,17 @@ export class SalidaRepository {
           },
           orderBy: { idocupacion: "asc" },
         },
+        // CU-41: si ya se registró la devolución y si la salida tuvo equipamiento asignado
+        auditorias: {
+          where: { cambios: { path: ["tipoOperacion"], equals: "DEVOLUCION_EQUIPAMIENTO" } },
+          select: { idcambio: true },
+          take: 1,
+        },
+        _count: {
+          select: {
+            ocupaciones: { where: { tipo: TIPO_SERVICIO.EQUIPAMIENTO, cantidad: { gt: 0 } } },
+          },
+        },
       },
       orderBy: { fechaInicio: "asc" },
     });

@@ -92,6 +92,10 @@ const ALERTAS_OPERATIVAS_NUEVAS: Record<string, { etiqueta: string; estilo: stri
         etiqueta: "Para confirmar",
         estilo: "bg-indigo-100 border-indigo-300 text-indigo-900",
     },
+    DEVOLUCION_PENDIENTE: {
+        etiqueta: "Devolución pendiente",
+        estilo: "bg-amber-100 border-amber-300 text-amber-900",
+    },
 };
 
 function extraerDetalleEquipo(error: unknown): DetalleFaltaEquipo | null {
@@ -1346,10 +1350,18 @@ function SalidasPage() {
                 // CU-41: Devolver equipamiento
                 const yaConcluyo =
                     esFinalizada || fila.fechaFin.slice(0, 10) <= fechaLocalHoy();
+                const tieneEquipamiento = fila.tieneEquipamientoAsignado !== false;
+                const equipamientoDevuelto = fila.equipamientoDevuelto === true;
                 const puedeDevolverEquipamiento =
                     esAdmin &&
                     fila.estado !== "CANCELADA" &&
-                    yaConcluyo;
+                    yaConcluyo &&
+                    tieneEquipamiento &&
+                    !equipamientoDevuelto;
+                const mostrarEquipoDevuelto =
+                    fila.estado !== "CANCELADA" &&
+                    yaConcluyo &&
+                    equipamientoDevuelto;
 
                 if (
                     !tieneSolicitudes &&
@@ -1361,7 +1373,8 @@ function SalidasPage() {
                     !puedeModificarLogistica &&
                     !puedeCancelarSalida &&
                     !tieneBloqueoCanceladaPendiente &&
-                    !puedeDevolverEquipamiento
+                    !puedeDevolverEquipamiento &&
+                    !mostrarEquipoDevuelto
                 ) {
                     return <span className="text-xs text-texto-suave">—</span>;
                 }
@@ -1491,6 +1504,14 @@ function SalidasPage() {
                             >
                                 <span>Devolver equipo</span>
                             </button>
+                        ) : mostrarEquipoDevuelto ? (
+                            <span
+                                title="La devolución e inspección del equipamiento ya fue registrada"
+                                className="inline-flex items-center gap-1 rounded-control border border-emerald-200 bg-emerald-50/70 px-2 py-1 text-xs font-medium whitespace-nowrap text-emerald-700"
+                            >
+                                <span aria-hidden="true">✓</span>
+                                <span>Equipo devuelto</span>
+                            </span>
                         ) : null}
 
                         {accionesEditar.length > 0 ? (
@@ -2302,7 +2323,7 @@ function SalidasPage() {
                         <p className="mt-1 text-xs text-texto-suave">
                             {metricas.conAlertas > 0 ? (
                                 <span className="font-semibold text-rose-700">
-                                    Alertas, permisos o desfase
+                                    Alertas, permisos o devoluciones
                                 </span>
                             ) : (
                                 <span className="font-medium text-emerald-700">

@@ -492,4 +492,34 @@ describe("resumirSalida (CU-35, RF-50 y RF-61)", () => {
     const falta = resumirSalida(listada({ definicionPaquete }), AHORA, { totales: new Map([[7, 3]]), filas: [fila, otra] });
     expect(falta.avisos).toContainEqual({ alerta: "FALTA_RECURSO", mensaje: "Faltan 1 de Carpa el 20/11/2026" });
   });
+
+  it("CU-41: DEVOLUCION_PENDIENTE en salidas finalizadas o pasadas de fecha con equipo sin devolver; desaparece al devolver o cancelar", () => {
+    const conEquipo = { _count: { ocupaciones: 3 }, auditorias: [] };
+    const finalizadaPendiente = resumirSalida(listada({ estado: "FINALIZADA", fechaFin: new Date("2026-11-15"), ...conEquipo }), AHORA);
+    expect(finalizadaPendiente).toMatchObject({
+      equipamientoDevuelto: false,
+      tieneEquipamientoAsignado: true,
+      alertas: expect.arrayContaining(["DEVOLUCION_PENDIENTE"]),
+    });
+
+    const devuelta = resumirSalida(
+      listada({ estado: "FINALIZADA", fechaFin: new Date("2026-11-15"), _count: { ocupaciones: 3 }, auditorias: [{ idcambio: 10 }] }),
+      AHORA
+    );
+    expect(devuelta.equipamientoDevuelto).toBe(true);
+    expect(devuelta.alertas).not.toContain("DEVOLUCION_PENDIENTE");
+
+    const sinEquipo = resumirSalida(listada({ estado: "FINALIZADA", fechaFin: new Date("2026-11-15"), _count: { ocupaciones: 0 }, auditorias: [] }), AHORA);
+    expect(sinEquipo.tieneEquipamientoAsignado).toBe(false);
+    expect(sinEquipo.alertas).not.toContain("DEVOLUCION_PENDIENTE");
+
+    const cancelada = resumirSalida(listada({ estado: "CANCELADA", fechaFin: new Date("2026-11-10"), ...conEquipo }), AHORA);
+    expect(cancelada.alertas).not.toContain("DEVOLUCION_PENDIENTE");
+
+    // En curso en su último día todavía no dispara alerta; al día siguiente sí
+    const ultimoDia = resumirSalida(listada({ estado: "EN_CURSO", fechaFin: new Date("2026-11-15"), ...conEquipo }), AHORA);
+    expect(ultimoDia.alertas).not.toContain("DEVOLUCION_PENDIENTE");
+    const vencida = resumirSalida(listada({ estado: "EN_CURSO", fechaFin: new Date("2026-11-14"), ...conEquipo }), AHORA);
+    expect(vencida.alertas).toContain("DEVOLUCION_PENDIENTE");
+  });
 });
