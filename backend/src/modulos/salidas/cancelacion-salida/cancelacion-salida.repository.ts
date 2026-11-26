@@ -57,7 +57,7 @@ export class CancelacionSalidaRepository {
     return db.$transaction(
       async (tx) => {
         const guarda = await tx.salida.updateMany({
-          where: { idsalida: p.idsalida, estado: { in: SALIDAS_NO_INICIADAS }, fechaInicio: { gt: hoyUTC() } },
+          where: { idsalida: p.idsalida, estado: { in: SALIDAS_NO_INICIADAS }, fechaInicio: { gte: hoyUTC() } },
           data: { estado: ESTADO_SALIDA.CANCELADA },
         });
         if (guarda.count === 0) return null;

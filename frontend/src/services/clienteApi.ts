@@ -66,14 +66,21 @@ export async function solicitarApi<T>(ruta: string, opciones: RequestInit = {}):
             ? { Authorization: `Bearer ${token}` }
             : {};
 
-    const respuesta = await fetch(construirUrl(ruta), {
-        ...opciones,
-        headers: {
-            ...cabecerasBase,
-            ...cabeceraAuth,
-            ...opciones.headers,
-        },
-    });
+    let respuesta: Response;
+    try {
+        respuesta = await fetch(construirUrl(ruta), {
+            ...opciones,
+            headers: {
+                ...cabecerasBase,
+                ...cabeceraAuth,
+                ...opciones.headers,
+            },
+        });
+    } catch (causa) {
+        if (causa instanceof DOMException && causa.name === "AbortError") throw causa;
+        // Sin respuesta (sin señal, servidor caído): Error común, no ErrorApi, para que el guía lo siga encolando offline
+        throw new Error("No se pudo conectar con el servidor. Revisá la conexión y reintentá.", { cause: causa });
+    }
 
     if (!respuesta.ok) {
         if (respuesta.status === 401 && !esRutaPublica && !tieneAuthEnOpciones) {

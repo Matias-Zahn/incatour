@@ -39,7 +39,7 @@ describe("SolicitudRepository", () => {
       });
       expect(db.reserva.updateMany).toHaveBeenCalledWith({
         where: { idreserva: 10, estado: { not: "CANCELADA" } },
-        data: { estadoAlojamiento: "CONFIRMADO" },
+        data: { estadoAlojamiento: "CONFIRMADO", idalojamiento: 40 }, // la reserva pasa al hotel que aceptó
       });
       expect(db.gestionSolicitud.create).toHaveBeenCalledWith({
         data: {

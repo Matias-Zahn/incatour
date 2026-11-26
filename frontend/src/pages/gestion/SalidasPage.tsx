@@ -570,7 +570,7 @@ function SalidasPage() {
                         setSalidaParaAsignar(null);
                         setErrorConfirmacion("");
                         setMensajeSalidaYaAsignada(
-                            `La salida ${nroSalida} ya cuenta con personal asignado o se encuentra cerrada. Se actualizó el listado de salidas.`,
+                            `La salida ${nroSalida} ya cuenta con personal asignado o ya está confirmada. Se actualizó el listado de salidas.`,
                         );
                         queryClient.invalidateQueries({ queryKey: clavesSalidas.todas });
                         return;
@@ -644,17 +644,18 @@ function SalidasPage() {
         if (!salidaParaAsignar || !payloadConfirmarAsignacion) {
             return "";
         }
+        // Los porteadores que se liberan no viajan: no llevan permiso
         const cantPersonal =
-            payloadConfirmarAsignacion.personalIds?.length ??
-            datosAsignacion?.personal.length ??
-            salidaParaAsignar.cantidadPersonal ??
-            0;
+            (payloadConfirmarAsignacion.personalIds?.length ??
+                datosAsignacion?.personal.length ??
+                salidaParaAsignar.cantidadPersonal ??
+                0) - (payloadConfirmarAsignacion.porteadoresALiberar?.length ?? 0);
         const pasajeros =
             datosAsignacion?.pasajerosConfirmados ??
             salidaParaAsignar.pasajerosConfirmados ??
             0;
         const totalNomina = pasajeros + cantPersonal;
-        return `¿Confirmás la salida ${salidaParaAsignar.nroSalida}? Se solicitará la emisión de ${totalNomina} permisos nominales ante la autoridad (${pasajeros} pasajeros y ${cantPersonal} de personal asignado), se liberarán los lugares sobrantes del bloqueo y la salida pasará al estado Cerrada.`;
+        return `¿Confirmás la salida ${salidaParaAsignar.nroSalida}? Se solicitará la emisión de ${totalNomina} permisos nominales ante la autoridad (${pasajeros} pasajeros y ${cantPersonal} de personal que viaja), se liberarán los lugares sobrantes del bloqueo y la salida quedará Confirmada.`;
     }, [salidaParaAsignar, payloadConfirmarAsignacion, datosAsignacion]);
 
     function manejarConfirmarCreacion(datos: DatosCrearSalida) {
@@ -1185,7 +1186,7 @@ function SalidasPage() {
 
                         {alertaSol && (
                             <Link
-                                to="/gestion/solicitudes"
+                                to={`/gestion/solicitudes?salida=${fila.nroSalida}`}
                                 title="Solicitudes de alojamiento pendientes en salida próxima (< 7 días)"
                                 className="inline-flex items-center gap-1 rounded bg-sky-100 border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-900 hover:bg-sky-200 transition-colors"
                             >
@@ -1263,7 +1264,7 @@ function SalidasPage() {
                 const puedeCancelarSalida =
                     esAdmin &&
                     estadoCancelable &&
-                    fechaFutura;
+                    fila.fechaInicio.slice(0, 10) >= fechaLocalHoy(); // se puede cancelar el mismo día si no empezó
 
                 // Salida ya cancelada con bloqueo pendiente de liberación ante la autoridad (por 503 previo)
                 const tieneBloqueoCanceladaPendiente =
@@ -1400,7 +1401,7 @@ function SalidasPage() {
 
                         {tieneSolicitudes && (
                             <Link
-                                to="/gestion/solicitudes"
+                                to={`/gestion/solicitudes?salida=${fila.nroSalida}`}
                                 aria-label={`Ver solicitudes de alojamiento de la salida ${fila.nroSalida}`}
                                 className="text-marca hover:underline"
                             >
@@ -2200,7 +2201,7 @@ function SalidasPage() {
                                         {delRecorrido.length > 0 && (tieneSol || tienePerm) && <span>·</span>}
                                         {tieneSol && (
                                             <Link
-                                                to="/gestion/solicitudes"
+                                                to={`/gestion/solicitudes?salida=${s.nroSalida}`}
                                                 className="font-bold underline hover:text-amber-950"
                                             >
                                                 {cantSol

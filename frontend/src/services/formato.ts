@@ -148,3 +148,6 @@ export const etiquetaEstadoReserva = (estado?: string | null) =>
 
 export const etiquetaEstadoSolicitud = (estado?: string | null) =>
     buscarEtiqueta(ESTADOS_SOLICITUD_ETIQUETA, estado);
+
+export const etiquetaMedioPago = (medio?: string | null) =>
+    buscarEtiqueta({ TARJETA: "Tarjeta", TRANSFERENCIA: "Transferencia", EFECTIVO: "Efectivo" }, medio);

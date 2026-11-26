@@ -1533,7 +1533,7 @@ function CatalogoCompraPage() {
                                 type="submit"
                                 className="min-h-11 shrink-0 px-6"
                                 cargando={mutacionReserva.isPending}
-                                disabled={!salidaActiva || salidaActiva.stockLocal <= 0 || sinTarifa}
+                                disabled={!salidaActiva || !esVentaAbierta(salidaActiva) || salidaActiva.stockLocal <= 0 || sinTarifa}
                             >
                                 Pagar
                             </Boton>

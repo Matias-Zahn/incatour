@@ -4,8 +4,10 @@ import {
     formatearFechaLocalCorta,
     formatearFechaUtcCorta,
     formatearMontoUsd,
+    textoAlojamiento,
     type ComprobanteReserva,
 } from "./clientePortalService";
+import { etiquetaMedioPago } from "./formato";
 import { COLORES_GRAFICO, type GraficoDeReporte } from "./reporteService";
 
 const COLOR_MARCA: [number, number, number] = [30, 41, 59];
@@ -71,7 +73,7 @@ export async function descargarComprobantePdf(comprobante: ComprobanteReserva) {
 
     seccion("Reserva", [
         ["Estado", etiquetaEstadoReserva(comprobante.estado)],
-        ...(comprobante.estadoAlojamiento ? [["Alojamiento", comprobante.estadoAlojamiento]] : []),
+        ...(comprobante.estadoAlojamiento ? [["Alojamiento", textoAlojamiento(comprobante.estadoAlojamiento)]] : []),
         ["Titular", `${comprobante.titular.nombre} ${comprobante.titular.apellido}`],
         ["Correo electrónico", comprobante.titular.email],
     ]);
@@ -98,7 +100,7 @@ export async function descargarComprobantePdf(comprobante: ComprobanteReserva) {
             "Transacciones",
             comprobante.pagos.map((p) => [
                 String(p.nroTransaccion),
-                p.medioPago,
+                etiquetaMedioPago(p.medioPago),
                 formatearMontoUsd(p.monto),
                 formatearFechaLocalCorta(p.fechahora),
             ]),
