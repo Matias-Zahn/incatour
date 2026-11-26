@@ -192,7 +192,7 @@ async function main() {
       localidad: "Cusco",
       equipamiento: {
         create: {
-          tipoEquipamiento: "Carpa 4 Estaciones",
+          tipoEquipamiento: "Carpa",
           cantidadTotal: 50,
         },
       },

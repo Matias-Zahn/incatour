@@ -71,6 +71,9 @@ export type TipoServicio = (typeof TIPO_SERVICIO)[keyof typeof TIPO_SERVICIO];
 /** El rubro del proveedor coincide con el tipo de servicio que puede ofrecer. */
 export const TIPOS_PROVEEDOR: string[] = Object.values(TIPO_SERVICIO);
 
+// Tipos de equipamiento: lista cerrada, porque los reemplazos (CU-39) se buscan por tipo igual
+export const TIPOS_EQUIPAMIENTO = ["Bastones", "Bolsa de dormir", "Botiquín", "Carpa", "Carpa comedor", "Cocina", "Colchoneta", "Comunicación", "Oxígeno"];
+
 export const MODALIDAD_BLOQUEO_PLAZAS = "BLOQUEO_PLAZAS";
 
 /** ServicioBase no tiene columna "tipo": se deduce de qué subtipo existe (patrón CTI). */
