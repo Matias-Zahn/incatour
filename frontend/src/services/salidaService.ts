@@ -327,6 +327,8 @@ export type TransporteConfirmacionItem = {
 
 export type EquipoConfirmacionItem = {
     idservicio: number;
+    idproveedor?: number | null;
+    nombreProveedor?: string | null;
     nombreServicio: string;
     tipoEquipamiento: string | null;
     cantidad: number;
