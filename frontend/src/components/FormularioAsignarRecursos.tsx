@@ -28,6 +28,8 @@ export type FormularioAsignarRecursosProps = {
     onCancelar?: () => void;
     onAbrirReemplazo?: () => void;
     onAbrirLogistica?: () => void;
+    /** Mensaje de la alerta RIESGO_STOCK: qué faltaría si se vende completa */
+    avisoEquipoJusto?: string;
 };
 
 export function FormularioAsignarRecursos({
@@ -44,6 +46,7 @@ export function FormularioAsignarRecursos({
     onCancelar,
     onAbrirReemplazo,
     onAbrirLogistica,
+    avisoEquipoJusto,
 }: FormularioAsignarRecursosProps) {
     const idSeccion = useId();
     const [personalElegidoIds, setPersonalElegidoIds] = useState<number[]>([]);
@@ -729,6 +732,11 @@ export function FormularioAsignarRecursos({
                         </Boton>
                     ) : null}
                 </div>
+                {avisoEquipoJusto ? (
+                    <Alerta tipo="advertencia" titulo="Equipo justo si se vende completa">
+                        <p>{avisoEquipoJusto}</p>
+                    </Alerta>
+                ) : null}
                 {equipo.length === 0 ? (
                     <p className="text-xs text-texto-suave">Sin equipamiento asignado.</p>
                 ) : (
