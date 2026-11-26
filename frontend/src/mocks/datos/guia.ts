@@ -98,7 +98,7 @@ export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
         equipamiento: [
             {
                 nombreServicio: "Carpas Alta Montaña",
-                tipoEquipamiento: "Carpa 4 Estaciones",
+                tipoEquipamiento: "Carpa",
                 cantidad: 2,
             },
         ],
@@ -187,7 +187,7 @@ export const detallesSalidasGuiaSemilla: Record<number, DetalleSalidaGuia> = {
         equipamiento: [
             {
                 nombreServicio: "Carpas Alta Montaña",
-                tipoEquipamiento: "Carpa (para 3 personas)",
+                tipoEquipamiento: "Carpa",
                 cantidad: 4,
             },
         ],

@@ -20,7 +20,7 @@ const equipamientoSalidasMock: Record<number, ItemEquipamientoAsignado[]> = {
         {
             idservicio: 5,
             nombreServicio: "Carpa de alta montaña 4 estaciones",
-            tipoEquipamiento: "Carpas",
+            tipoEquipamiento: "Carpa",
             proveedor: "Andes Outdoor",
             cantidadAsignada: 4,
             stockActualDisponible: 12,
@@ -28,7 +28,7 @@ const equipamientoSalidasMock: Record<number, ItemEquipamientoAsignado[]> = {
         {
             idservicio: 6,
             nombreServicio: "Bolsa de dormir -10°C",
-            tipoEquipamiento: "Bolsas de dormir",
+            tipoEquipamiento: "Bolsa de dormir",
             proveedor: "Andes Outdoor",
             cantidadAsignada: 8,
             stockActualDisponible: 20,
@@ -39,8 +39,8 @@ const equipamientoSalidasMock: Record<number, ItemEquipamientoAsignado[]> = {
 // ---- FE-51: datos y ayudas de los manejadores de CU-37 a CU-40 ----
 const proveedorMock = { idproveedor: 4, razonSocial: "Andes Outdoor" };
 const equipamientosMock: RecursoDisponibleEquipamiento[] = [
-    { idservicio: 5, nombreServicio: "Carpa de alta montaña 4 estaciones", localidad: "Cusco", costoBase: 25, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Carpas", cantidadDisponible: 12 } },
-    { idservicio: 6, nombreServicio: "Bolsa de dormir -10°C", localidad: "Cusco", costoBase: 10, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Bolsas de dormir", cantidadDisponible: 20 } },
+    { idservicio: 5, nombreServicio: "Carpa de alta montaña 4 estaciones", localidad: "Cusco", costoBase: 25, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Carpa", cantidadDisponible: 12 } },
+    { idservicio: 6, nombreServicio: "Bolsa de dormir -10°C", localidad: "Cusco", costoBase: 10, proveedor: proveedorMock, disponibilidad: { tipoEquipamiento: "Bolsa de dormir", cantidadDisponible: 20 } },
 ];
 const transportesMock: RecursoDisponibleTransporte[] = [
     { idservicio: 2, nombreServicio: "Bus Cusco - Km 82", localidad: "Cusco", costoBase: 120, proveedor: { idproveedor: 2, razonSocial: "Trans Urubamba" }, disponibilidad: { capacidadVehiculo: 24, pasajerosConfirmados: 0 } },
@@ -428,7 +428,7 @@ export const manejadoresSalidas = [
                       {
                           idservicio: 5,
                           nombreServicio: "Carpa de alta montaña 4 estaciones",
-                          tipoEquipamiento: "Carpas",
+                          tipoEquipamiento: "Carpa",
                           cantidad: 1,
                           cadaPasajeros: 2,
                           stockLibre: 8,
@@ -1043,7 +1043,7 @@ export const manejadoresSalidas = [
             {
                 idservicio: 5,
                 nombreServicio: "Carpa de alta montaña 4 estaciones",
-                tipoEquipamiento: "Carpas",
+                tipoEquipamiento: "Carpa",
                 cantidad: 1,
                 cadaPasajeros: 2,
                 necesita: necesitaCarpas,

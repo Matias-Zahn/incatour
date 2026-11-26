@@ -6,6 +6,7 @@ import Boton from "./Boton";
 import {
     categoriasAlojamiento,
     tiposHabitacion,
+    tiposEquipamiento,
     esquemaServicio,
     modalidadesConfirmacion,
     tiposServicio,
@@ -188,7 +189,6 @@ function FormularioServicio({
             {
                 nombre: "tipoEquipamiento",
                 etiqueta: "Tipo de equipamiento",
-                placeholder: "Ej. Carpa 4 estaciones",
             },
             {
                 nombre: "cantidadDisponible",
@@ -404,11 +404,14 @@ function FormularioServicio({
                         );
                     }
 
-                    if (nombreCampo === "categoria" || nombreCampo === "tipoHabitacion") {
-                        // Lo cargado antes como texto libre se conserva como opción para no perderlo
+                    if (nombreCampo === "categoria" || nombreCampo === "tipoHabitacion" || nombreCampo === "tipoEquipamiento") {
+                        const opciones: string[] = [
+                            ...(nombreCampo === "categoria" ? categoriasAlojamiento : nombreCampo === "tipoHabitacion" ? tiposHabitacion : tiposEquipamiento),
+                        ];
+                        // Lo cargado antes como texto libre se conserva como opción para no perderlo (el back no limita
+                        // categoría ni habitación; el tipo de equipo sí, así que ahí hay que elegir uno de la lista)
                         const actual = servicioEnEdicion?.[nombreCampo];
-                        const opciones: string[] = [...(nombreCampo === "categoria" ? categoriasAlojamiento : tiposHabitacion)];
-                        if (actual && !opciones.includes(actual)) opciones.push(actual);
+                        if (nombreCampo !== "tipoEquipamiento" && actual && !opciones.includes(actual)) opciones.push(actual);
                         return (
                             <label key={nombreCampo} className="grid gap-2 text-sm font-semibold text-texto">
                                 {campo.etiqueta}
@@ -417,7 +420,7 @@ function FormularioServicio({
                                     {...register(nombreCampo)}
                                     className="rounded-control border border-borde bg-white px-3 py-2 font-normal outline-none focus:border-marca focus:ring-2 focus:ring-marca/20 disabled:bg-fondo disabled:text-texto-suave"
                                 >
-                                    <option value="">{nombreCampo === "categoria" ? "Elegí una categoría" : "Elegí un tipo de habitación"}</option>
+                                    <option value="">{nombreCampo === "categoria" ? "Elegí una categoría" : nombreCampo === "tipoHabitacion" ? "Elegí un tipo de habitación" : "Elegí un tipo de equipo"}</option>
                                     {opciones.map((categoria) => (
                                         <option key={categoria} value={categoria}>
                                             {categoria}

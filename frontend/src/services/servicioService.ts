@@ -10,6 +10,9 @@ export const modalidadesConfirmacion = ["BLOQUEO_PLAZAS", "A_SOLICITUD"] as cons
 // Mismo texto que la garantía por categoría del paquete: la búsqueda de hoteles compara la categoría tal cual
 export const categoriasAlojamiento = ["1 Estrella", "2 Estrellas", "3 Estrellas", "4 Estrellas", "5 Estrellas"] as const;
 /** La misma lista que la garantía del paquete: la búsqueda de hoteles al crear la salida compara por este texto */
+// Misma lista que TIPOS_EQUIPAMIENTO del back: los reemplazos de equipo se buscan por tipo igual
+export const tiposEquipamiento = ["Bastones", "Bolsa de dormir", "Botiquín", "Carpa", "Carpa comedor", "Cocina", "Colchoneta", "Comunicación", "Oxígeno"] as const;
+
 export const tiposHabitacion = ["Simple", "Doble", "Triple", "Matrimonial", "Suite"] as const;
 export type ModalidadConfirmacion = (typeof modalidadesConfirmacion)[number];
 

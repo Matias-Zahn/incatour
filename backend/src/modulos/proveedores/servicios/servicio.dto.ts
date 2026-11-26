@@ -1,4 +1,4 @@
-import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TipoServicio, TOPES } from "../../../shared/constantes";
+import { ESTADO, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO, TIPOS_EQUIPAMIENTO, TipoServicio, TOPES } from "../../../shared/constantes";
 import { sumarDias } from "../../../shared/ocupacion";
 
 export const MODALIDADES_CONFIRMACION = [MODALIDAD_BLOQUEO_PLAZAS, "A_SOLICITUD"];
@@ -46,6 +46,9 @@ const vDias: Validador = (v, c) => {
 const vModalidad: Validador = (v, c) =>
   MODALIDADES_CONFIRMACION.includes(v) ? [undefined, v] : [`${c} debe ser uno de: ${MODALIDADES_CONFIRMACION.join(", ")}.`];
 
+const vTipoEquipamiento: Validador = (v, c) =>
+  TIPOS_EQUIPAMIENTO.includes(v) ? [undefined, v] : [`${c} debe ser uno de: ${TIPOS_EQUIPAMIENTO.join(", ")}.`];
+
 // ---------- Campos comunes (ServicioBase) ----------
 const CAMPOS_BASE: { [campo: string]: Validador } = {
   nombreServicio: vTexto(120),
@@ -73,7 +76,7 @@ export const CAMPOS_CREAR: { [tipo in TipoServicio]: { [campo: string]: Validado
     diasOperacion: vDias,
   },
   EQUIPAMIENTO: {
-    tipoEquipamiento: vTexto(60),
+    tipoEquipamiento: vTipoEquipamiento,
     cantidadDisponible: vEntero(0, TOPES.unidadesEquipamiento),
   },
 };
@@ -95,7 +98,7 @@ export const CAMPOS_MODIFICAR: { [tipo in TipoServicio]: { [campo: string]: Vali
   ALOJAMIENTO: { ...CAMPOS_CREAR.ALOJAMIENTO },
   TRANSPORTE: { ...CAMPOS_CREAR.TRANSPORTE },
   TREN: { ...CAMPOS_CREAR.TREN },
-  EQUIPAMIENTO: { tipoEquipamiento: vTexto(60), inventarioTotal: vEntero(0, TOPES.unidadesEquipamiento) },
+  EQUIPAMIENTO: { tipoEquipamiento: vTipoEquipamiento, inventarioTotal: vEntero(0, TOPES.unidadesEquipamiento) },
 };
 
 /** Valida los campos de `campos` presentes en `obj`. Si `exigirTodos`, todos son obligatorios. */

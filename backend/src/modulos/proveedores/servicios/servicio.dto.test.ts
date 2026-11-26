@@ -56,7 +56,7 @@ describe("CU-19: CrearServicioDto", () => {
       nombreServicio: "Carpa 4 Estaciones",
       costoBase: 25,
       localidad: "Cusco",
-      tipoEquipamiento: "Carpa Alta Montaña",
+      tipoEquipamiento: "Carpa",
       cantidadDisponible: 20,
     });
 
@@ -91,6 +91,14 @@ describe("CU-19: CrearServicioDto", () => {
     const [e2] = CrearServicioDto.create({ tipo: "EQUIPAMIENTO", nombreServicio: "Carpas", costoBase: 5, localidad: "Cusco", tipoEquipamiento: "Carpa", cantidadDisponible: 10001 });
     expect(e1).toContain("no puede superar el máximo de 5000");
     expect(e2).toContain("no puede superar el máximo de 10000");
+  });
+
+  it("equipamiento: el tipo tiene que ser uno de la lista (los reemplazos se buscan por tipo igual)", () => {
+    const crear = (tipoEquipamiento: string) =>
+      CrearServicioDto.create({ tipo: "EQUIPAMIENTO", nombreServicio: "Carpas", costoBase: 5, localidad: "Cusco", tipoEquipamiento, cantidadDisponible: 4 })[0];
+    expect(crear("carpa")).toContain("debe ser uno de");
+    expect(crear("Carpa 4 estaciones")).toContain("debe ser uno de");
+    expect(crear("Carpa")).toBeUndefined();
   });
 
   it("transporte: acepta costoBase de 10.000.000 y el equipaje es opcional", () => {
