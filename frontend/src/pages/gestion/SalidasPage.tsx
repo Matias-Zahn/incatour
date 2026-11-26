@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Alerta from "../../components/Alerta";
@@ -8,6 +8,9 @@ import EstadoListado from "../../components/EstadoListado";
 import Modal from "../../components/Modal";
 import Paginacion from "../../components/Paginacion";
 import Tabla from "../../components/Tabla";
+import MenuAccionesSalida, {
+    type AccionMenuSalida,
+} from "../../components/MenuAccionesSalida";
 import FormularioCrearSalida from "../../components/FormularioCrearSalida";
 import FormularioAsignarRecursos from "../../components/FormularioAsignarRecursos";
 import FormularioReemplazarPersonal from "../../components/FormularioReemplazarPersonal";
@@ -125,8 +128,17 @@ const diaLocal = (iso: string) => {
 };
 const diasEntre = (desde: string, hasta: string) => Math.round((new Date(hasta).getTime() - new Date(desde).getTime()) / DIA_MS);
 
+type VistaSalidas = "vigentes" | "alertas" | "confirmar" | "historial";
+
+function salidaRequiereAtencion(s: Salida): boolean {
+    return (
+        (Array.isArray(s.alertas) && s.alertas.length > 0) ||
+        s.etapaDesfasada === true
+    );
+}
+
 /** Lo que está en curso va arriba y después lo más cercano; en el historial, lo más reciente primero */
-function ordenarSalidas(salidas: Salida[], vista: "vigentes" | "historial") {
+function ordenarSalidas(salidas: Salida[], vista: VistaSalidas) {
     return [...salidas].sort((a, b) => {
         if (vista === "historial") return b.fechaInicio.localeCompare(a.fechaInicio);
         return (
@@ -695,7 +707,7 @@ function SalidasPage() {
     const [filtroDesde, setFiltroDesde] = useState<string>("");
     const [filtroHasta, setFiltroHasta] = useState<string>("");
     const [filtroGuia, setFiltroGuia] = useState<number | "">("");
-    const [vista, setVista] = useState<"vigentes" | "historial">("vigentes");
+    const [vista, setVista] = useState<VistaSalidas>("vigentes");
     const [busqueda, setBusqueda] = useState("");
     const [paginaActual, setPaginaActual] = useState(1);
 
@@ -721,6 +733,8 @@ function SalidasPage() {
         ...(filtroGuia !== "" ? { idguia: Number(filtroGuia) } : {}),
     };
 
+    // Mantiene estables los contadores KPI cuando se aplican filtros en la tabla
+    const { data: todasLasSalidas = [] } = useSalidas();
     const {
         data: salidas = [],
         isPending,
@@ -746,10 +760,44 @@ function SalidasPage() {
         return contarSolicitudesPendientesPorSalida(solicitudesPendientes);
     }, [solicitudesPendientes]);
 
-    // Advertencias operativas basadas en salida.alertas provistas por el backend (RF-61)
-    const salidasConAlertasOperativas = useMemo(() => {
-        return salidas.filter((s) => Array.isArray(s.alertas) && s.alertas.length > 0);
-    }, [salidas]);
+    const hoyActual = fechaLocalHoy();
+
+    const esListaParaConfirmar = useCallback(
+        (s: Salida) => {
+            const fechaFutura = s.fechaInicio.slice(0, 10) > hoyActual;
+            const tieneAdvertenciaPendiente =
+                resultadoAsignacion?.advertencia !== undefined &&
+                resultadoAsignacion?.idsalida === s.idsalida;
+            return (
+                esAdmin &&
+                s.estado === "PUBLICADA" &&
+                fechaFutura &&
+                !tieneAdvertenciaPendiente &&
+                (s.puedeConfirmar === true ||
+                    (s.ventaAbierta === false && s.pasajerosConfirmados > 0))
+            );
+        },
+        [hoyActual, esAdmin, resultadoAsignacion],
+    );
+
+    // Contadores KPI clicables sobre todas las salidas (reemplazan el banner ruidoso)
+    const metricas = useMemo(() => {
+        const base = todasLasSalidas.length > 0 ? todasLasSalidas : salidas;
+        const enCurso = base.filter((s) => s.estado === "EN_CURSO");
+        const desfasadas = enCurso.filter((s) => s.etapaDesfasada === true).length;
+        const conAlertas = base.filter(salidaRequiereAtencion).length;
+        const paraConfirmar = base.filter(esListaParaConfirmar).length;
+        const publicadasAbiertas = base.filter(
+            (s) => s.estado === "PUBLICADA" && s.ventaAbierta !== false,
+        ).length;
+        return {
+            enCurso: enCurso.length,
+            desfasadas,
+            conAlertas,
+            paraConfirmar,
+            publicadasAbiertas,
+        };
+    }, [todasLasSalidas, salidas, esListaParaConfirmar]);
 
     const hayFiltrosActivos =
         filtroCircuito !== "" ||
@@ -758,7 +806,8 @@ function SalidasPage() {
         Boolean(filtroDesde) ||
         Boolean(filtroHasta) ||
         filtroGuia !== "" ||
-        Boolean(busqueda);
+        Boolean(busqueda) ||
+        vista === "confirmar";
 
     function limpiarFiltros() {
         setFiltroCircuito("");
@@ -768,6 +817,7 @@ function SalidasPage() {
         setFiltroHasta("");
         setFiltroGuia("");
         setBusqueda("");
+        if (vista === "confirmar") setVista("vigentes");
         setPaginaActual(1);
     }
 
@@ -775,13 +825,21 @@ function SalidasPage() {
     const buscaEnTodas = Boolean(filtroEstado) || Boolean(busqueda.trim());
     const salidasVisibles = useMemo(() => {
         const termino = busqueda.trim().toLowerCase();
-        const elegidas = salidas.filter((s) =>
-            buscaEnTodas
-                ? s.nroSalida.toLowerCase().includes(termino)
-                : ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial"),
-        );
+        const elegidas = salidas.filter((s) => {
+            if (termino) {
+                const coincideNumero = s.nroSalida.toLowerCase().includes(termino);
+                const coincidePaquete = (s.paquete?.nombrePaquete ?? "")
+                    .toLowerCase()
+                    .includes(termino);
+                if (!coincideNumero && !coincidePaquete) return false;
+            }
+            if (buscaEnTodas) return true;
+            if (vista === "alertas") return salidaRequiereAtencion(s);
+            if (vista === "confirmar") return esListaParaConfirmar(s);
+            return ESTADOS_HISTORIAL.includes(s.estado) === (vista === "historial");
+        });
         return ordenarSalidas(elegidas, vista);
-    }, [salidas, vista, busqueda, buscaEnTodas]);
+    }, [salidas, vista, busqueda, buscaEnTodas, esListaParaConfirmar]);
 
     const estadoListado = isPending ? "cargando" : isError ? "error" : "exito";
     const totalPaginas = Math.max(1, Math.ceil(salidasVisibles.length / ELEMENTOS_POR_PAGINA));
@@ -1131,13 +1189,19 @@ function SalidasPage() {
                             const cfg = ALERTAS_OPERATIVAS_NUEVAS[codigo]!;
                             const aviso = fila.avisos?.find((av) => av.alerta === codigo);
                             return (
-                                <span
-                                    key={codigo}
-                                    title={aviso?.mensaje}
-                                    className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-bold ${cfg.estilo}`}
-                                >
-                                    <span>{cfg.etiqueta}</span>
-                                </span>
+                                <div key={codigo} className="flex flex-col items-start gap-0.5">
+                                    <span
+                                        title={aviso?.mensaje}
+                                        className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-bold ${cfg.estilo}`}
+                                    >
+                                        <span>{cfg.etiqueta}</span>
+                                    </span>
+                                    {aviso?.mensaje && aviso.mensaje !== cfg.etiqueta ? (
+                                        <span className="text-[11px] leading-snug text-texto-suave max-w-[200px]">
+                                            {aviso.mensaje}
+                                        </span>
+                                    ) : null}
+                                </div>
                             );
                         })}
                         {alertasRecorrido.map((a) => (
@@ -1231,11 +1295,18 @@ function SalidasPage() {
                     fechaFutura &&
                     !tieneAdvertenciaPendiente;
 
-                const listaParaConfirmar =
+                const ventaCerradaConPasajeros =
                     esPublicadaFutura &&
-                    (fila.puedeConfirmar === true ||
-                        (fila.ventaAbierta === false && fila.pasajerosConfirmados > 0));
-                const puedeRevisarConfirmacion = esPublicadaFutura && !listaParaConfirmar;
+                    (fila.puedeConfirmar === true || fila.ventaAbierta === false) &&
+                    fila.pasajerosConfirmados > 0;
+                const tieneBloqueoConfirmacion =
+                    tieneSolicitudes ||
+                    Boolean(fila.alertas?.includes("FALTA_RECURSO")) ||
+                    Boolean(fila.alertas?.includes("PERSONAL_NO_APTO"));
+                const listaParaEmitirPermisos =
+                    ventaCerradaConPasajeros && !tieneBloqueoConfirmacion;
+                const faltaResolverParaConfirmar =
+                    esPublicadaFutura && !listaParaEmitirPermisos;
 
                 const tieneSobrantesPendientes = (fila.lugaresPorLiberar ?? 0) > 0;
                 const puedeLiberarSobrantes =
@@ -1282,8 +1353,8 @@ function SalidasPage() {
                 if (
                     !tieneSolicitudes &&
                     !esFinalizada &&
-                    !listaParaConfirmar &&
-                    !puedeRevisarConfirmacion &&
+                    !listaParaEmitirPermisos &&
+                    !faltaResolverParaConfirmar &&
                     !puedeLiberarSobrantes &&
                     !puedeReemplazarPersonal &&
                     !puedeModificarLogistica &&
@@ -1304,58 +1375,81 @@ function SalidasPage() {
                     modificarLogisticaMutation.isPending ||
                     cancelarSalidaMutation.isPending;
 
+                // Menú desplegable "Editar": agrupa logística, personal, solicitudes y cancelación
+                const accionesEditar: AccionMenuSalida[] = [];
+
+                if (puedeModificarLogistica) {
+                    accionesEditar.push({
+                        tipo: "boton",
+                        id: "modificar-logistica",
+                        etiqueta: "Modificar logística",
+                        deshabilitado: algunaMutacionPendiente,
+                        onClick: () => abrirModificarLogistica(fila),
+                    });
+                }
+                if (puedeReemplazarPersonal) {
+                    accionesEditar.push({
+                        tipo: "boton",
+                        id: "reemplazar-personal",
+                        etiqueta: "Reemplazar personal",
+                        deshabilitado: algunaMutacionPendiente,
+                        onClick: () => abrirReemplazo(fila),
+                    });
+                }
+                if (tieneSolicitudes) {
+                    accionesEditar.push({
+                        tipo: "enlace",
+                        id: "solicitudes",
+                        etiqueta: "Ver solicitudes",
+                        to: "/gestion/solicitudes",
+                    });
+                }
+                if (esFinalizada) {
+                    accionesEditar.push({
+                        tipo: "enlace",
+                        id: "evaluar",
+                        etiqueta: "Evaluar salida",
+                        to: "/gestion/evaluaciones",
+                    });
+                }
+                if (puedeCancelarSalida) {
+                    accionesEditar.push({
+                        tipo: "boton",
+                        id: "cancelar-salida",
+                        etiqueta: "Cancelar salida",
+                        tono: "peligro",
+                        deshabilitado: algunaMutacionPendiente,
+                        onClick: () => abrirCancelarSalida(fila),
+                    });
+                }
+
                 return (
-                    <div className="flex flex-col gap-1.5 items-start text-xs font-semibold">
-                        {listaParaConfirmar && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {listaParaEmitirPermisos ? (
                             <button
                                 type="button"
                                 aria-label={`Confirmar salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-marca text-white font-semibold text-xs shadow-sm hover:bg-marca-oscura transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-control bg-marca px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-white shadow-2xs transition hover:bg-marca-oscura disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <span>Confirmar salida</span>
-                                <span aria-hidden="true">→</span>
                             </button>
-                        )}
-
-                        {puedeRevisarConfirmacion && (
+                        ) : faltaResolverParaConfirmar ? (
                             <button
                                 type="button"
-                                aria-label={`Ver qué falta para confirmar la salida ${fila.nroSalida}`}
+                                aria-label={`Ver qué falta confirmar en la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirAsignacion(fila)}
-                                className="text-navegacion hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                className={`inline-flex cursor-pointer items-center gap-1 rounded-control border px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                    ventaCerradaConPasajeros
+                                        ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                                        : "border-borde bg-slate-50 text-navegacion hover:border-navegacion/30 hover:bg-slate-100"
+                                }`}
                             >
-                                Ver qué falta para confirmar
+                                <span>Qué falta confirmar</span>
                             </button>
-                        )}
-
-                        {puedeReemplazarPersonal && (
-                            <button
-                                type="button"
-                                aria-label={`Reemplazar personal de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirReemplazo(fila)}
-                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Reemplazar personal
-                            </button>
-                        )}
-
-                        {puedeModificarLogistica && (
-                            <button
-                                type="button"
-                                aria-label={`Modificar logística de la salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirModificarLogistica(fila)}
-                                className="text-marca hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Modificar logística
-                            </button>
-                        )}
-
-                        {puedeLiberarSobrantes && (
+                        ) : puedeLiberarSobrantes ? (
                             <button
                                 type="button"
                                 aria-label={`Liberar lugares sobrantes de la salida ${fila.nroSalida}`}
@@ -1363,25 +1457,13 @@ function SalidasPage() {
                                 onClick={() =>
                                     manejarReintentarLiberacion(fila.idsalida, fila.nroSalida)
                                 }
-                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-control border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
+                                <span>
+                                    {estaLiberandoEstaSalida ? "Liberando..." : "Liberar sobrantes"}
+                                </span>
                             </button>
-                        )}
-
-                        {puedeCancelarSalida && (
-                            <button
-                                type="button"
-                                aria-label={`Cancelar salida ${fila.nroSalida}`}
-                                disabled={algunaMutacionPendiente}
-                                onClick={() => abrirCancelarSalida(fila)}
-                                className="text-rose-700 hover:text-rose-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Cancelar salida
-                            </button>
-                        )}
-
-                        {tieneBloqueoCanceladaPendiente && (
+                        ) : tieneBloqueoCanceladaPendiente ? (
                             <button
                                 type="button"
                                 aria-label={`Reintentar liberar cupos de la salida ${fila.nroSalida}`}
@@ -1389,46 +1471,35 @@ function SalidasPage() {
                                 onClick={() =>
                                     manejarReintentarLiberacionCupos(fila.idsalida, fila.nroSalida)
                                 }
-                                className="text-amber-800 hover:text-amber-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-control border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                {cancelarSalidaMutation.isPending &&
-                                idSalidaReintentandoCupos === fila.idsalida
-                                    ? "Liberando cupos..."
-                                    : "Reintentar liberar cupos"}
+                                <span>
+                                    {cancelarSalidaMutation.isPending &&
+                                    idSalidaReintentandoCupos === fila.idsalida
+                                        ? "Liberando..."
+                                        : "Liberar cupos"}
+                                </span>
                             </button>
-                        )}
-
-                        {tieneSolicitudes && (
-                            <Link
-                                to="/gestion/solicitudes"
-                                aria-label={`Ver solicitudes de alojamiento de la salida ${fila.nroSalida}`}
-                                className="text-marca hover:underline"
-                            >
-                                Ver solicitudes
-                            </Link>
-                        )}
-
-                        {esFinalizada && (
-                            <Link
-                                to="/gestion/evaluaciones"
-                                aria-label={`Evaluar salida ${fila.nroSalida}`}
-                                className="text-marca hover:underline"
-                            >
-                                Evaluar
-                            </Link>
-                        )}
-
-                        {puedeDevolverEquipamiento && (
+                        ) : puedeDevolverEquipamiento ? (
                             <button
                                 type="button"
                                 aria-label={`Devolver equipamiento de la salida ${fila.nroSalida}`}
                                 disabled={algunaMutacionPendiente}
                                 onClick={() => abrirDevolucionEquipamiento(fila)}
-                                className="text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer font-semibold text-xs text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-control border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                Devolver equipamiento
+                                <span>Devolver equipo</span>
                             </button>
-                        )}
+                        ) : null}
+
+                        {accionesEditar.length > 0 ? (
+                            <MenuAccionesSalida
+                                nroSalida={fila.nroSalida}
+                                acciones={accionesEditar}
+                                etiqueta="Editar"
+                                deshabilitado={algunaMutacionPendiente}
+                            />
+                        ) : null}
                     </div>
                 );
             },
@@ -1448,7 +1519,18 @@ function SalidasPage() {
                     </p>
                 </div>
                 {esAdmin ? (
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        {solicitudesPendientes.length > 0 ? (
+                            <Link
+                                to="/gestion/solicitudes"
+                                className="inline-flex items-center gap-1.5 rounded-full border border-borde bg-white px-3.5 py-2 text-xs font-semibold text-navegacion transition hover:border-marca/45 hover:bg-marca-suave/50"
+                            >
+                                <span>Solicitudes de hotel</span>
+                                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                                    {solicitudesPendientes.length}
+                                </span>
+                            </Link>
+                        ) : null}
                         <Boton
                             onClick={abrirFormulario}
                             disabled={
@@ -2156,82 +2238,153 @@ function SalidasPage() {
                 </Alerta>
             ) : null}
 
-            {/* Advertencia operativa en salidas próximas (< 7 días) (RF-61) */}
-            {salidasConAlertasOperativas.length > 0 ? (
-                <Alerta
-                    tipo="advertencia"
-                    titulo="Para resolver antes de salir"
+            {/* 4 TARJETAS KPI CLICABLES (ordenan alertas y contadores sin ruido visual) */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado((prev) => (prev === "EN_CURSO" ? "" : "EN_CURSO"));
+                        setVista("vigentes");
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-tarjeta border p-4 text-left transition ${
+                        filtroEstado === "EN_CURSO"
+                            ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                            : "border-borde bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
                 >
-                    <div className="space-y-2">
-                        <p className="text-sm">
-                            Se detectaron situaciones operativas pendientes en{" "}
-                            {salidasConAlertasOperativas.length}{" "}
-                            {salidasConAlertasOperativas.length === 1 ? "salida" : "salidas"}
-                            :
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            En curso ahora
                         </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                            {salidasConAlertasOperativas.map((s) => {
-                                const tieneSol = s.alertas?.includes("SOLICITUD_PENDIENTE");
-                                const tienePerm = s.alertas?.includes("PERMISOS_SIN_CONFIRMAR");
-                                const delRecorrido = (s.alertas ?? []).filter((a) => a in ALERTAS_RECORRIDO).map((a) => ALERTAS_RECORRIDO[a]);
-                                const nuevas = (s.alertas ?? [])
-                                    .filter((a) => a in ALERTAS_OPERATIVAS_NUEVAS)
-                                    .map((a) => {
-                                        const aviso = s.avisos?.find((av) => av.alerta === a);
-                                        return aviso?.mensaje || ALERTAS_OPERATIVAS_NUEVAS[a]!.etiqueta;
-                                    });
-                                const cantSol = solicitudesPorSalida.get(s.idsalida);
-
-                                return (
-                                    <div
-                                        key={s.idsalida}
-                                        className="inline-flex flex-wrap items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300"
-                                    >
-                                        <span>
-                                            {s.nroSalida} ({s.paquete?.nombrePaquete}):
-                                        </span>
-                                        {nuevas.length > 0 && (
-                                            <span className="text-amber-950 font-bold">{nuevas.join(" · ")}</span>
-                                        )}
-                                        {nuevas.length > 0 && (delRecorrido.length > 0 || tieneSol || tienePerm) && <span>·</span>}
-                                        {delRecorrido.length > 0 && (
-                                            <span className="text-rose-900 font-bold">{delRecorrido.join(" · ")}</span>
-                                        )}
-                                        {delRecorrido.length > 0 && (tieneSol || tienePerm) && <span>·</span>}
-                                        {tieneSol && (
-                                            <Link
-                                                to="/gestion/solicitudes"
-                                                className="font-bold underline hover:text-amber-950"
-                                            >
-                                                {cantSol
-                                                    ? `${cantSol} ${cantSol === 1 ? "solicitud pendiente" : "solicitudes pendientes"}`
-                                                    : "solicitud pendiente"}
-                                            </Link>
-                                        )}
-                                        {tieneSol && tienePerm && <span>·</span>}
-                                        {tienePerm && (
-                                            <span className="text-rose-900 font-bold">
-                                                {s.permisosFaltantes}{" "}
-                                                {s.permisosFaltantes === 1
-                                                    ? "permiso faltante"
-                                                    : "permisos faltantes"}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="pt-1">
-                            <Link
-                                to="/gestion/solicitudes"
-                                className="inline-flex items-center text-xs font-semibold text-amber-900 underline hover:text-amber-950"
-                            >
-                                Ir a Gestión de Solicitudes →
-                            </Link>
-                        </div>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.enCurso}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.desfasadas > 0 ? (
+                                <span className="font-semibold text-amber-700">
+                                    {metricas.desfasadas}{" "}
+                                    {metricas.desfasadas === 1 ? "desfasada" : "desfasadas"}
+                                </span>
+                            ) : metricas.enCurso > 0 ? (
+                                <span className="font-medium text-emerald-700">Todas al día</span>
+                            ) : (
+                                "Sin salidas en ruta"
+                            )}
+                        </p>
                     </div>
-                </Alerta>
-            ) : null}
+                    <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado("");
+                        setVista((prev) => (prev === "alertas" ? "vigentes" : "alertas"));
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-tarjeta border p-4 text-left transition ${
+                        !buscaEnTodas && vista === "alertas"
+                            ? "border-rose-400 bg-rose-50/40 ring-2 ring-rose-400/20"
+                            : "border-borde bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Requieren atención
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.conAlertas}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.conAlertas > 0 ? (
+                                <span className="font-semibold text-rose-700">
+                                    Alertas, permisos o desfase
+                                </span>
+                            ) : (
+                                <span className="font-medium text-emerald-700">
+                                    Todo al día
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                    <span
+                        className={`grid size-8 place-items-center rounded-xl text-xs font-bold ring-1 ring-inset ${
+                            metricas.conAlertas > 0
+                                ? "bg-rose-50 text-rose-700 ring-rose-500/20"
+                                : "bg-fondo text-texto-suave ring-borde"
+                        }`}
+                    >
+                        !
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado("");
+                        setVista((prev) => (prev === "confirmar" ? "vigentes" : "confirmar"));
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-tarjeta border p-4 text-left transition ${
+                        !buscaEnTodas && vista === "confirmar"
+                            ? "border-marca bg-marca-suave/50 ring-2 ring-marca/20"
+                            : "border-borde bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Listas para confirmar
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.paraConfirmar}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            {metricas.paraConfirmar > 0 ? (
+                                <span className="font-semibold text-marca-oscura">
+                                    Venta cerrada · emitir permisos
+                                </span>
+                            ) : (
+                                "Sin cierres pendientes"
+                            )}
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-marca-suave text-xs font-bold text-marca-oscura ring-1 ring-inset ring-marca/20">
+                        ✓
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFiltroEstado((prev) => (prev === "PUBLICADA" ? "" : "PUBLICADA"));
+                        setVista("vigentes");
+                        setPaginaActual(1);
+                    }}
+                    className={`group flex cursor-pointer items-start justify-between rounded-tarjeta border p-4 text-left transition ${
+                        filtroEstado === "PUBLICADA"
+                            ? "border-sky-500 bg-sky-50/40 ring-2 ring-sky-500/20"
+                            : "border-borde bg-white hover:border-navegacion/25 hover:shadow-xs"
+                    }`}
+                >
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-texto-suave">
+                            Publicadas abiertas
+                        </p>
+                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-navegacion">
+                            {metricas.publicadasAbiertas}
+                        </p>
+                        <p className="mt-1 text-xs text-texto-suave">
+                            Disponibles en catálogo público
+                        </p>
+                    </div>
+                    <span className="grid size-8 place-items-center rounded-xl bg-sky-50 text-xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/20">
+                        ●
+                    </span>
+                </button>
+            </div>
 
             {rangoFechasInvalido ? (
                 <Alerta tipo="error" titulo="Rango de fechas inválido">
@@ -2240,27 +2393,51 @@ function SalidasPage() {
             ) : null}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div role="tablist" aria-label="Vista de salidas" className="flex gap-2">
-                    {(["vigentes", "historial"] as const).map((opcion) => (
-                        <button
-                            key={opcion}
-                            type="button"
-                            role="tab"
-                            aria-selected={!buscaEnTodas && vista === opcion}
-                            disabled={buscaEnTodas}
-                            onClick={() => {
-                                setVista(opcion);
-                                setPaginaActual(1);
-                            }}
-                            className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
-                                !buscaEnTodas && vista === opcion
-                                    ? "border-primario bg-primario text-white"
-                                    : "border-borde bg-white text-texto-suave hover:bg-slate-100"
-                            }`}
-                        >
-                            {opcion === "vigentes" ? "Vigentes" : "Historial"}
-                        </button>
-                    ))}
+                <div role="tablist" aria-label="Vista de salidas" className="flex flex-wrap gap-2">
+                    {(
+                        [
+                            { clave: "vigentes", etiqueta: "Vigentes" },
+                            {
+                                clave: "alertas",
+                                etiqueta: "Con alertas",
+                                contador: metricas.conAlertas,
+                            },
+                            { clave: "historial", etiqueta: "Historial" },
+                        ] as const
+                    ).map((tab) => {
+                        const activo = !buscaEnTodas && vista === tab.clave;
+                        return (
+                            <button
+                                key={tab.clave}
+                                type="button"
+                                role="tab"
+                                aria-selected={activo}
+                                disabled={buscaEnTodas}
+                                onClick={() => {
+                                    setVista(tab.clave);
+                                    setPaginaActual(1);
+                                }}
+                                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
+                                    activo
+                                        ? "border-primario bg-primario text-white"
+                                        : "border-borde bg-white text-texto-suave hover:bg-slate-100"
+                                }`}
+                            >
+                                <span>{tab.etiqueta}</span>
+                                {"contador" in tab && tab.contador > 0 ? (
+                                    <span
+                                        className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
+                                            activo
+                                                ? "bg-white/20 text-white"
+                                                : "bg-rose-100 text-rose-800"
+                                        }`}
+                                    >
+                                        {tab.contador}
+                                    </span>
+                                ) : null}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="w-full max-w-sm">
@@ -2441,11 +2618,15 @@ function SalidasPage() {
                 <EstadoListado
                     estado="vacio"
                     mensaje={
-                        hayFiltrosActivos
-                            ? "No se encontraron salidas que coincidan con los filtros seleccionados."
-                            : salidas.length > 0
-                              ? `No hay salidas en ${vista === "vigentes" ? "vigentes" : "el historial"}.`
-                              : "Todavía no hay salidas registradas."
+                        vista === "confirmar" && !buscaEnTodas
+                            ? "No hay salidas listas para confirmar en este momento."
+                            : hayFiltrosActivos
+                              ? "No se encontraron salidas que coincidan con los filtros seleccionados."
+                              : salidas.length > 0
+                                ? vista === "alertas"
+                                  ? "No hay salidas que requieran atención en este momento."
+                                  : `No hay salidas en ${vista === "vigentes" ? "vigentes" : "el historial"}.`
+                                : "Todavía no hay salidas registradas."
                     }
                 />
             ) : (

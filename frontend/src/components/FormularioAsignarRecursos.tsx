@@ -167,8 +167,12 @@ export function FormularioAsignarRecursos({
     } = datos;
 
     const hayPersonalNoApto = personal.some((p) => !p.apto);
+    const equipoConFalta = equipo.filter((e) => e.falta > 0);
+    const transporteInsuficiente = !transporte || !transporte.alcanza;
     const hayFaltaEquipoOTransporte =
-        equipo.some((e) => e.falta > 0) || Boolean(transporte && !transporte.alcanza);
+        equipoConFalta.length > 0 || Boolean(transporte && !transporte.alcanza);
+    const hayPendientesDeResolucion =
+        faltantes.length > 0 || reservasSinAlojamiento.length > 0;
 
     // §14: si la salida no tiene personal y solo falta asignarlo (no hay otros faltantes ni venta abierta),
     // habilitamos confirmar cuando la dotación seleccionada cubre lo requerido para los vendidos.
@@ -295,13 +299,100 @@ export function FormularioAsignarRecursos({
                 </Alerta>
             ) : null}
 
-            {faltantes.length > 0 ? (
+            {hayPendientesDeResolucion ? (
                 <Alerta tipo="error" titulo="Pendientes que impiden confirmar">
-                    <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
-                        {faltantes.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                        ))}
-                    </ul>
+                    <div className="space-y-3">
+                        {faltantes.length > 0 ? (
+                            <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+                                {faltantes.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+
+                        {reservasSinAlojamiento.length > 0 ? (
+                            <p className="text-xs sm:text-sm">
+                                Reservas con alojamiento pendiente de confirmación:{" "}
+                                <strong>{reservasSinAlojamiento.join(", ")}</strong>.
+                            </p>
+                        ) : null}
+
+                        {/* Accesos directos para resolver cada pendiente en su pantalla correspondiente */}
+                        <div className="space-y-2 border-t border-rose-200/80 pt-2.5">
+                            {equipoConFalta.map((item) => {
+                                const rutaProveedor = item.idproveedor
+                                    ? `/gestion/proveedores/${item.idproveedor}/servicios`
+                                    : "/gestion/proveedores";
+                                const textoProveedor = item.nombreProveedor
+                                    ? `Ir a ${item.nombreProveedor}`
+                                    : "Ver en proveedores";
+
+                                return (
+                                    <div
+                                        key={item.idservicio}
+                                        className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-rose-200 bg-white/90 px-3 py-2 text-xs text-texto"
+                                    >
+                                        <div className="min-w-0">
+                                            <span className="font-bold text-navegacion">
+                                                {item.nombreServicio}
+                                            </span>
+                                            <span className="ml-1.5 font-semibold text-peligro">
+                                                (faltan {item.falta})
+                                            </span>
+                                        </div>
+                                        <Link
+                                            to={rutaProveedor}
+                                            className="inline-flex items-center gap-1 rounded-control border border-marca/45 bg-marca/10 px-2.5 py-1 text-xs font-semibold text-marca-oscura transition hover:bg-marca/20"
+                                        >
+                                            <span>{textoProveedor}</span>
+                                            <span aria-hidden="true">→</span>
+                                        </Link>
+                                    </div>
+                                );
+                            })}
+
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                {reservasSinAlojamiento.length > 0 ? (
+                                    <Link
+                                        to="/gestion/solicitudes"
+                                        className="inline-flex items-center gap-1.5 rounded-control border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-navegacion shadow-2xs transition hover:border-marca hover:bg-marca-suave/40"
+                                    >
+                                        <span>
+                                            Resolver solicitudes de hotel ({reservasSinAlojamiento.length})
+                                        </span>
+                                        <span aria-hidden="true">→</span>
+                                    </Link>
+                                ) : null}
+
+                                {(equipoConFalta.length > 0 || transporteInsuficiente) &&
+                                onAbrirLogistica ? (
+                                    <Boton
+                                        type="button"
+                                        variante="secundario"
+                                        className="px-3 py-1.5 text-xs"
+                                        disabled={guardando}
+                                        onClick={onAbrirLogistica}
+                                    >
+                                        {transporteInsuficiente && equipoConFalta.length === 0
+                                            ? "Cambiar transporte en logística"
+                                            : "Modificar logística"}
+                                    </Boton>
+                                ) : null}
+
+                                {hayPersonalNoApto && onAbrirReemplazo ? (
+                                    <Boton
+                                        type="button"
+                                        variante="secundario"
+                                        className="px-3 py-1.5 text-xs"
+                                        disabled={guardando}
+                                        onClick={onAbrirReemplazo}
+                                    >
+                                        Reemplazar personal
+                                    </Boton>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
                 </Alerta>
             ) : null}
 
@@ -382,23 +473,6 @@ export function FormularioAsignarRecursos({
                             Marcá {porteadoresSobrantes} para poder confirmar ({porteadoresElegidos.length} elegidos).
                         </p>
                     ) : null}
-                </Alerta>
-            ) : null}
-
-            {reservasSinAlojamiento.length > 0 ? (
-                <Alerta tipo="advertencia" titulo="Alojamientos pendientes de confirmación">
-                    <div className="space-y-1.5 text-xs sm:text-sm">
-                        <p>
-                            Las siguientes reservas todavía tienen el alojamiento pendiente:{" "}
-                            <strong>{reservasSinAlojamiento.join(", ")}</strong>.
-                        </p>
-                        <Link
-                            to="/gestion/solicitudes"
-                            className="inline-block font-bold underline"
-                        >
-                            Ir a Solicitudes de alojamiento →
-                        </Link>
-                    </div>
                 </Alerta>
             ) : null}
 
@@ -560,7 +634,17 @@ export function FormularioAsignarRecursos({
             {/* Hoteles y Transporte */}
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-control border border-borde p-4 space-y-2">
-                    <h3 className="text-sm font-bold text-navegacion">Hoteles</h3>
+                    <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-navegacion">Hoteles</h3>
+                        {reservasSinAlojamiento.length > 0 ? (
+                            <Link
+                                to="/gestion/solicitudes"
+                                className="text-xs font-semibold text-marca hover:underline"
+                            >
+                                Ir a solicitudes ({reservasSinAlojamiento.length}) →
+                            </Link>
+                        ) : null}
+                    </div>
                     {hoteles.length === 0 ? (
                         <p className="text-xs text-texto-suave">Sin noches de hotel.</p>
                     ) : (
@@ -687,9 +771,28 @@ export function FormularioAsignarRecursos({
                                                     : "text-emerald-700"
                                             }`}
                                         >
-                                            {item.falta > 0
-                                                ? `Faltan ${item.falta}${item.fechaFalta ? ` (stock el ${formatearFechaUtcCorta(item.fechaFalta)})` : ""}`
-                                                : "OK"}
+                                            {item.falta > 0 ? (
+                                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                                    <span>
+                                                        Faltan {item.falta}
+                                                        {item.fechaFalta
+                                                            ? ` (stock el ${formatearFechaUtcCorta(item.fechaFalta)})`
+                                                            : ""}
+                                                    </span>
+                                                    <Link
+                                                        to={
+                                                            item.idproveedor
+                                                                ? `/gestion/proveedores/${item.idproveedor}/servicios`
+                                                                : "/gestion/proveedores"
+                                                        }
+                                                        className="rounded border border-marca/40 bg-marca/10 px-2 py-0.5 text-[11px] font-semibold text-marca-oscura transition hover:bg-marca/20"
+                                                    >
+                                                        Ver proveedor →
+                                                    </Link>
+                                                </div>
+                                            ) : (
+                                                "OK"
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
