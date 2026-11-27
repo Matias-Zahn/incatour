@@ -90,6 +90,17 @@ describe("SalidaService.crearSalida (CU-36)", () => {
     expect(repo.crearSalida.mock.calls[0]![0].definicionPaquete.tarifa.monto).not.toBe(850);
   });
 
+  it("el precio de la salida no puede ser menor a la tarifa del paquete (y no pide cupo a la autoridad)", async () => {
+    const bloquear = vi.spyOn(autoridad, "solicitarBloqueoCupo");
+    repo.buscarPaquete.mockResolvedValue({ ...paquete, tarifas: [{ ...paquete.tarifas[0], monto: 780, moneda: "USD" }] });
+    await expect(new SalidaService().crearSalida(dto({ precioPorPasajero: 779.99 }))).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining("no puede ser menor a la tarifa del paquete"),
+    });
+    expect(bloquear).not.toHaveBeenCalled();
+    expect(repo.crearSalida).not.toHaveBeenCalled();
+  });
+
   it("B3: se aceptan extras; el cupo se pide por el máximo más todo el personal (decisión 5)", async () => {
     repo.buscarPersonalLibre.mockResolvedValue([...PERSONAL, persona(11)]);
     repo.buscarPersonal.mockResolvedValue([...PERSONAL, persona(11)]);

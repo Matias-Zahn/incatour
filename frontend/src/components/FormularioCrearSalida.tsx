@@ -532,7 +532,7 @@ function FormularioCrearSalida({
     }, [opciones, hotelesElegidosObjetos]);
     const extraLogistica = Math.round((extraTransporte + extraHotel) * 100) / 100;
     const precioFinal = precioAjustado.trim() === "" ? (opciones?.tarifa?.monto ?? 0) : Number(precioAjustado);
-    const precioValido = precioFinal > 0;
+    const precioValido = precioFinal > 0 && precioFinal >= (opciones?.tarifa?.monto ?? 0);
 
     const puedeConfirmarFinal =
         precioValido &&
@@ -1149,7 +1149,7 @@ function FormularioCrearSalida({
                                     <input
                                         id="precio-salida"
                                         type="number"
-                                        min={1}
+                                        min={opciones.tarifa.monto}
                                         step="0.01"
                                         value={precioAjustado === "" ? opciones.tarifa.monto : precioAjustado}
                                         onChange={(e) => setPrecioAjustado(e.target.value)}
@@ -1180,7 +1180,9 @@ function FormularioCrearSalida({
                                     </p>
                                 ) : null}
                                 {!precioValido ? (
-                                    <p className="text-xs font-semibold text-peligro">El precio tiene que ser mayor a 0.</p>
+                                    <p className="text-xs font-semibold text-peligro">
+                                        El precio no puede ser menor a la tarifa del paquete (USD {opciones.tarifa.monto}).
+                                    </p>
                                 ) : null}
                                 <p className="text-xs text-texto-suave">
                                     Si se llena: {opciones.tamanoMaximo} × {formatearMonto(precioFinal)} ={" "}
