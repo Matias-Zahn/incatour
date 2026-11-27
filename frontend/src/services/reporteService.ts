@@ -10,7 +10,7 @@ export const REPORTES: { tipo: TipoReporte; titulo: string; descripcion: string;
     { tipo: "ventas", titulo: "Ventas", descripcion: "Reservas, facturación y reintegros por paquete y por mes.", filtroPor: "fecha de compra" },
     { tipo: "ocupacion", titulo: "Ocupación", descripcion: "Lugares vendidos contra capacidad de cada salida.", filtroPor: "inicio de la salida" },
     { tipo: "cancelaciones", titulo: "Cancelaciones", descripcion: "Reintegros, importes retenidos y motivos.", filtroPor: "fecha del reembolso" },
-    { tipo: "solicitudes", titulo: "Solicitudes a hoteles", descripcion: "Historial de solicitudes de alojamiento y respuesta de cada hotel.", filtroPor: "compra de la reserva" },
+    { tipo: "solicitudes", titulo: "Solicitudes a hoteles", descripcion: "Historial de solicitudes de alojamiento y respuesta de cada hotel.", filtroPor: "compra de la reserva o respuesta del hotel" },
     { tipo: "calidad", titulo: "Calidad", descripcion: "Reseñas, incidentes y evaluaciones de proveedores y personal.", filtroPor: "inicio de la salida" },
 ];
 

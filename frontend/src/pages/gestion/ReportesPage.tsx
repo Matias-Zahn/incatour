@@ -129,22 +129,43 @@ function Grafico(grafico: GraficoDeReporte) {
 
 function TablaReporte({ titulo, columnas, filas }: TablaDeReporte) {
     const [pagina, setPagina] = useState(1);
+    const [termino, setTermino] = useState("");
     if (filas.length === 0) return null;
-    const totalPaginas = Math.ceil(filas.length / FILAS_POR_PAGINA);
+    // Busca en lo que muestra cada columna (número, paquete, salida, hotel, estado...)
+    const buscado = termino.trim().toLowerCase();
+    const visibles = buscado
+        ? filas.filter((f) => columnas.some((c) => String(c.valor(f) ?? "").toLowerCase().includes(buscado)))
+        : filas;
+    const totalPaginas = Math.max(1, Math.ceil(visibles.length / FILAS_POR_PAGINA));
     const paginaSegura = Math.min(pagina, totalPaginas);
 
     return (
         <section className="space-y-2">
-            <h2 className="text-sm font-bold text-navegacion">
-                {titulo} ({filas.length})
-            </h2>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+                <h2 className="text-sm font-bold text-navegacion">
+                    {titulo} ({buscado ? `${visibles.length} de ${filas.length}` : filas.length})
+                </h2>
+                {filas.length > FILAS_POR_PAGINA ? (
+                    <input
+                        type="search"
+                        value={termino}
+                        onChange={(e) => {
+                            setTermino(e.target.value);
+                            setPagina(1);
+                        }}
+                        placeholder="Buscar en la tabla..."
+                        aria-label={`Buscar en ${titulo}`}
+                        className="w-full max-w-xs rounded-control border border-borde bg-white px-3 py-1.5 text-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20"
+                    />
+                ) : null}
+            </div>
             <Tabla
                 columnas={columnas.map((c) => ({
                     clave: "id" as const,
                     titulo: c.titulo,
                     renderizar: (fila) => <span className="text-sm">{c.valor(fila)}</span>,
                 }))}
-                filas={filas.slice((paginaSegura - 1) * FILAS_POR_PAGINA, paginaSegura * FILAS_POR_PAGINA)}
+                filas={visibles.slice((paginaSegura - 1) * FILAS_POR_PAGINA, paginaSegura * FILAS_POR_PAGINA)}
             />
             {totalPaginas > 1 ? (
                 <Paginacion paginaActual={paginaSegura} totalPaginas={totalPaginas} onCambiarPagina={setPagina} />
