@@ -322,7 +322,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
 
     const claseElemento = (estaActivo: boolean) =>
         `flex w-full items-center ${
-            colapsada ? "justify-center px-2 py-3" : "gap-3 px-3.5 py-2.5"
+            colapsada ? "justify-center px-2 py-2" : "gap-3 px-3.5 py-2"
         } rounded-xl text-sm font-semibold transition-all max-md:px-2.5 max-md:py-2 ${
             estaActivo
                 ? "bg-[#16d6dc] text-[#075274] shadow-sm"
@@ -332,14 +332,14 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
     return (
         <aside
             aria-label="Navegación administrativa"
-            className={`flex shrink-0 flex-col bg-[#1b9fc7] text-white shadow-md transition-all duration-300 md:sticky md:top-0 md:h-screen max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3 ${
-                colapsada ? "md:w-20 md:p-3.5" : "md:w-64 md:p-5"
+            className={`flex shrink-0 flex-col bg-[#1b9fc7] text-white shadow-md transition-all duration-300 md:sticky md:top-0 md:h-screen md:overflow-y-auto max-md:w-full max-md:flex-row max-md:items-center max-md:justify-between max-md:p-3 ${
+                colapsada ? "md:w-20 md:px-3.5 md:py-4" : "md:w-64 md:px-5 md:py-4"
             }`}
         >
             {/* CABECERA CON LOGO Y TOGGLE COLAPSAR ESTILO GMAIL */}
             <div
-                className={`flex items-center border-b border-white/30 pb-4 max-md:border-none max-md:pb-0 ${
-                    colapsada ? "flex-col justify-center gap-2" : "justify-between"
+                className={`flex shrink-0 items-center border-b border-white/30 pb-3 max-md:border-none max-md:pb-0 ${
+                    colapsada ? "flex-col justify-center gap-1.5" : "justify-between"
                 }`}
             >
                 <Link
@@ -380,9 +380,9 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             {/* LISTA DE NAVEGACIÓN */}
             <nav
                 aria-label="Navegación administrativa"
-                className="mt-6 flex-1 max-md:mt-0 max-md:ml-3 max-md:flex max-md:min-w-0 max-md:overflow-x-auto"
+                className="mt-4 flex-1 md:min-h-0 md:overflow-y-auto max-md:mt-0 max-md:ml-3 max-md:flex max-md:min-w-0 max-md:overflow-x-auto"
             >
-                <ul className="flex flex-col gap-1.5 max-md:flex-row max-md:gap-1">
+                <ul className="flex flex-col gap-1 max-md:flex-row max-md:gap-1">
                     {elementosNavegacion.map((elemento) => {
                         const aviso = avisos[elemento.ruta] ?? 0;
                         const etiqueta = aviso > 0 ? `${elemento.etiqueta} (${aviso} ${aviso === 1 ? "pendiente" : "pendientes"})` : elemento.etiqueta;
@@ -427,11 +427,11 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             </nav>
 
             {/* ACCESO A TIENDA COMO CLIENTE */}
-            <div className="mt-auto border-t border-white/30 pt-3 max-md:hidden">
+            <div className="mt-auto shrink-0 border-t border-white/30 pt-2.5 max-md:hidden">
                 <NavLink
                     to="/catalogo?vista=admin"
                     className={`flex items-center ${
-                        colapsada ? "justify-center p-2.5" : "justify-between px-3 py-2"
+                        colapsada ? "justify-center p-2" : "justify-between px-3 py-2"
                     } rounded-xl bg-white/15 text-xs font-semibold text-white transition hover:bg-white/25`}
                     title="Ver tienda como cliente (Vista previa)"
                 >
@@ -444,7 +444,7 @@ function BarraLateral({ seccionActiva }: BarraLateralProps) {
             </div>
 
             {/* USUARIO LOGUEADO */}
-            <div className="mt-3 border-t border-white/30 pt-3 text-xs max-md:border-none max-md:pt-0">
+            <div className="mt-2.5 shrink-0 border-t border-white/30 pt-2.5 text-xs max-md:border-none max-md:pt-0">
                 {!colapsada ? (
                     <div className="max-md:hidden">
                         <p className="text-cyan-100 text-xs">Usuario de gestión</p>

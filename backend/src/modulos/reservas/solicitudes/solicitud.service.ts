@@ -1,5 +1,6 @@
 import { CustomError } from "../../../error/CustomError";
 import { definicionEfectiva } from "../../../shared/definicionPaquete";
+import { MODALIDAD_BLOQUEO_PLAZAS } from "../../../shared/constantes";
 import { INotificador } from "../../../integraciones/notificador/notificador.interface";
 import { obtenerNotificador } from "../../../integraciones/notificador/notificador.wiring";
 import { SolicitudRepository } from "./solicitud.repository";
@@ -137,6 +138,10 @@ export class SolicitudService {
     }
 
     if (dto.resolucion === "ACEPTADA") {
+      // El que acepta entra a la salida sin plazas fijas: uno con bloqueo no descontaría las suyas
+      if (servicio.alojamiento.modalidadConfirmacion === MODALIDAD_BLOQUEO_PLAZAS) {
+        throw CustomError.badRequest("Solo se puede aceptar un hotel a solicitud: los de bloqueo de plazas se eligen al crear la salida.");
+      }
       const rechazadosIds = solicitud.reserva.solicitudes
         .flatMap((s) => s.gestiones)
         .filter((g) => g.resultado === "Rechazada")

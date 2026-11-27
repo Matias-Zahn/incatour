@@ -23,6 +23,11 @@
 }
 
 @layer base {
+    html,
+    body {
+        background-color: var(--color-fondo);
+    }
+
     :focus-visible {
         outline: 2px solid var(--color-marca);
         outline-offset: 2px;

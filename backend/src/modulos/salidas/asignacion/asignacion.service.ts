@@ -1,5 +1,5 @@
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_ALOJAMIENTO, ESTADO_SALIDA, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { ESTADO_ALOJAMIENTO, ESTADO_SALIDA, MODALIDAD_BLOQUEO_PLAZAS, SALIDAS_NO_INICIADAS, TIPO_SERVICIO } from "../../../shared/constantes";
 import { fechaCorta, hoyUTC } from "../../../shared/fechas";
 import { noAptos } from "../../../shared/aptitud";
 import { unaPorServicio } from "../../../shared/ocupacion";
@@ -25,6 +25,17 @@ export class AsignacionService {
     const c = await this.prepararConfirmacion(idsalida);
     const { salida, venta, vendidos, dotacion, recursos } = c;
     const ocupacion = (tipo: string) => unaPorServicio(salida.ocupaciones.filter((o) => o.tipo === tipo));
+    // 12.2: los pasajeros que la compra o la resolución de solicitudes (CU-34) mandó a cada hotel
+    const alojamientos = ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
+      idservicio: o.idservicio,
+      nombreServicio: o.servicio.nombreServicio,
+      modalidadConfirmacion: o.servicio.alojamiento?.modalidadConfirmacion ?? null,
+      pasajeros: salida.reservas.filter((r) => r.idalojamiento === o.idservicio).reduce((t, r) => t + r.pasajeros.length, 0),
+    }));
+    const algunHotelConPasajeros = alojamientos.some((h) => h.pasajeros > 0);
+    const hoteles = algunHotelConPasajeros
+      ? alojamientos.filter((h) => h.pasajeros > 0 || h.modalidadConfirmacion === MODALIDAD_BLOQUEO_PLAZAS)
+      : alojamientos;
     return {
       salida: {
         idsalida, nroSalida: salida.nroSalida, fechaInicio: salida.fechaInicio, fechaFin: salida.fechaFin, estado: salida.estado,
@@ -37,13 +48,7 @@ export class AsignacionService {
       personal: recursos.personal.map((p) => ({ idpersonal: p.idpersonal, nombreCompleto: p.nombreCompleto, rol: p.rol, apto: !p.motivo, motivo: p.motivo })),
       porteadoresSobrantes: cuantosPorteadoresSobran(salida, dotacion.porteadores), // el admin elige cuáles se desasignan al confirmar
       porteadoresSugeridosALiberar: await this.sugerirPorteadoresALiberar(salida, dotacion.porteadores),
-      // 12.2: los pasajeros que la compra mandó a cada hotel
-      hoteles: ocupacion(TIPO_SERVICIO.ALOJAMIENTO).map((o) => ({
-        idservicio: o.idservicio,
-        nombreServicio: o.servicio.nombreServicio,
-        modalidadConfirmacion: o.servicio.alojamiento?.modalidadConfirmacion ?? null,
-        pasajeros: salida.reservas.filter((r) => r.idalojamiento === o.idservicio).reduce((t, r) => t + r.pasajeros.length, 0),
-      })),
+      hoteles,
       transporte: recursos.transporte,
       equipo: recursos.equipos.map((e) => {
         const oc = salida.ocupaciones.find((o) => o.idservicio === e.idservicio);

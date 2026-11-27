@@ -1,7 +1,9 @@
 import { db } from "../../../config/postgresDatabase";
 import { definicionEfectiva } from "../../../shared/definicionPaquete";
 import { CustomError } from "../../../error/CustomError";
-import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD } from "../../../shared/constantes";
+import { ESTADO_ALOJAMIENTO, ESTADO_RESERVA, ESTADO_SOLICITUD, MODALIDAD_BLOQUEO_PLAZAS, TIPO_SERVICIO } from "../../../shared/constantes";
+import { rangosDe } from "../../../shared/ocupacion";
+import { ocupar } from "../../../shared/ocupacion.repository";
 
 export class SolicitudRepository {
   
@@ -60,6 +62,9 @@ export class SolicitudRepository {
           notIn: serviciosRechazadosIds
         },
         alojamiento: {
+          // Solo a solicitud: el que acepta entra a la salida sin plazas fijas (resolverComoAceptada, plazasLibres null).
+          // ponytail: para ofrecer hoteles con bloqueo habría que validar y descontar sus plazas al aceptar
+          modalidadConfirmacion: { not: MODALIDAD_BLOQUEO_PLAZAS },
           // Sin distinguir mayúsculas, igual que la búsqueda de hoteles al crear la salida
           tipoHabitacion: { equals: tipoHabitacion, mode: "insensitive" },
           categoria: { equals: categoria, mode: "insensitive" }
@@ -78,7 +83,7 @@ export class SolicitudRepository {
       // RES-05: Validar dentro de la transacción que la solicitud existe
       const solActual = await tx.solicitud.findUnique({
         where: { idsolicitud: solicitudId },
-        include: { reserva: true },
+        include: { reserva: { include: { salida: { include: { paquete: true } } } } },
       });
 
       if (!solActual) {
@@ -121,6 +126,28 @@ export class SolicitudRepository {
           resultado: "Aceptada"
         }
       });
+
+      // 4. Si aceptó otro hotel (tras un rechazo -R o salida sin hotel FA3), asociarlo a la salida en Ocupacion
+      // para que figure en Confirmar salida (CU-40), el portal del guía (CU-48) y el historial del hotel.
+      const { salida } = solActual.reserva;
+      if (salida) {
+        const yaAsociado = await tx.ocupacion.count({
+          where: { idsalida: salida.idsalida, idservicio: servicioId, tipo: TIPO_SERVICIO.ALOJAMIENTO },
+        });
+        if (yaAsociado === 0) {
+          const rangos = rangosDe(TIPO_SERVICIO.ALOJAMIENTO, salida, definicionEfectiva(salida));
+          if (rangos.length > 0) {
+            await ocupar(tx, {
+              idsalida: salida.idsalida,
+              idservicio: servicioId,
+              tipo: TIPO_SERVICIO.ALOJAMIENTO,
+              rangos,
+              cantidad: 0,
+              plazasLibres: null,
+            });
+          }
+        }
+      }
 
       return { ...solActual, estado: "CONFIRMADA" };
     });

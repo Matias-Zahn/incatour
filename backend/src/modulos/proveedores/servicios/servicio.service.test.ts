@@ -8,6 +8,7 @@ const { repo } = vi.hoisted(() => ({
     findById: vi.fn(), contarSolicitudesPendientes: vi.fn(), contarSalidasActivas: vi.fn(),
     contarGarantiasDePaquetesActivos: vi.fn(), contarPaquetesActivosQueLoIncluyen: vi.fn(), updateEstado: vi.fn(),
     existeNombre: vi.fn(), maxPasajerosConfirmadosEnSalidasActivas: vi.fn(), updateEnSitio: vi.fn(), ocupacionesDesdeHoy: vi.fn(),
+    historialOcupacion: vi.fn(),
   },
 }));
 vi.mock("./servicio.repository", () => ({ ServicioRepository: class { constructor() { return repo; } } }));
@@ -128,5 +129,38 @@ describe("ServicioService.modificarServicio (CU-20, CAT-31/32/33)", () => {
     await new ServicioService().modificarServicio(6, dto({ categoria: "5 estrellas" }));
 
     expect(repo.updateEnSitio).toHaveBeenCalled();
+  });
+
+  it("bloque 8: al pasar un alojamiento a solicitud se limpian sus plazas fijas (null)", async () => {
+    repo.findById.mockResolvedValue(hotel);
+    repo.contarSalidasActivas.mockResolvedValue(0);
+
+    await new ServicioService().modificarServicio(6, dto({ modalidadConfirmacion: "A_SOLICITUD" }));
+
+    expect(repo.updateEnSitio).toHaveBeenCalledWith(
+      6,
+      "ALOJAMIENTO",
+      {},
+      { modalidadConfirmacion: "A_SOLICITUD", capacidadDisponible: null },
+      undefined
+    );
+  });
+
+  it("bloque 8: consultarOcupacion de un alojamiento a solicitud devuelve total y disponible en null", async () => {
+    repo.findById.mockResolvedValue({
+      ...hotel,
+      alojamiento: { ...hotel.alojamiento, modalidadConfirmacion: "A_SOLICITUD", plazasTotales: null },
+    });
+    repo.historialOcupacion.mockResolvedValue([]);
+    const desde = new Date("2026-12-01T00:00:00.000Z");
+    const hasta = new Date("2026-12-02T00:00:00.000Z");
+
+    const r = await new ServicioService().consultarOcupacion(6, { desde, hasta });
+
+    expect(r.total).toBeNull();
+    expect(r.dias).toEqual([
+      { fecha: "2026-12-01", ocupado: 0, disponible: null },
+      { fecha: "2026-12-02", ocupado: 0, disponible: null },
+    ]);
   });
 });

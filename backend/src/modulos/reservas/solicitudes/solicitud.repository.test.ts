@@ -7,6 +7,8 @@ const { db } = vi.hoisted(() => ({
     solicitud: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
     reserva: { updateMany: vi.fn(), count: vi.fn() },
     gestionSolicitud: { create: vi.fn() },
+    ocupacion: { count: vi.fn(), createMany: vi.fn() },
+    servicioBase: { findMany: vi.fn() },
   },
 }));
 vi.mock("../../../config/postgresDatabase", () => ({ db }));
@@ -21,6 +23,16 @@ describe("SolicitudRepository", () => {
     db.reserva.updateMany.mockResolvedValue({ count: 1 });
     db.reserva.count.mockResolvedValue(1);
     db.gestionSolicitud.create.mockResolvedValue({});
+    db.ocupacion.count.mockResolvedValue(0);
+    db.ocupacion.createMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("CU-34: los hoteles alternativos son solo a solicitud (el que acepta entra sin plazas fijas)", async () => {
+    db.servicioBase.findMany.mockResolvedValue([]);
+    await repo.buscarServiciosCompatiblesExcluyendoRechazados("Doble", "3 Estrellas", "Cusco", [7]);
+    expect(db.servicioBase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ alojamiento: expect.objectContaining({ modalidadConfirmacion: { not: "BLOQUEO_PLAZAS" } }) }) })
+    );
   });
 
   describe("resolverComoAceptada (RES-01, RES-05)", () => {
@@ -95,6 +107,42 @@ describe("SolicitudRepository", () => {
       });
       // La reserva se bloquea antes que la solicitud (mismo orden que la cancelación)
       expect(db.solicitud.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("12.2: si acepta un hotel que todavía no figuraba en Ocupacion de la salida, lo asocia en las noches del paquete", async () => {
+      db.solicitud.findUnique.mockResolvedValue({
+        idsolicitud: 1,
+        estado: "PENDIENTE",
+        reserva: {
+          idreserva: 10,
+          estado: "CONFIRMADA",
+          salida: {
+            idsalida: 43,
+            fechaInicio: new Date("2026-11-29"),
+            fechaFin: new Date("2026-11-30"),
+            definicionPaquete: null,
+            paquete: { nochesPrevias: 0, nochesPosteriores: 1 },
+          },
+        },
+      });
+      db.ocupacion.count.mockResolvedValue(0);
+
+      await repo.resolverComoAceptada(1, 10, 88);
+
+      expect(db.ocupacion.count).toHaveBeenCalledWith({
+        where: { idsalida: 43, idservicio: 88, tipo: "ALOJAMIENTO" },
+      });
+      expect(db.ocupacion.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            idsalida: 43,
+            idservicio: 88,
+            tipo: "ALOJAMIENTO",
+            cantidad: 0,
+            plazasLibres: null,
+          }),
+        ],
+      });
     });
   });
 

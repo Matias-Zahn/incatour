@@ -103,8 +103,8 @@ export class ReservaService {
 
       if (fechaFinal <= salida.fechaFin) {
         throw CustomError.badRequest(
-          `El pasaporte de ${p.nombreCompleto} vence el ${fechaFinal.toISOString().split('T')[0]} ` +
-          `y tiene que vencer después del fin del recorrido (${salida.fechaFin.toISOString().split('T')[0]}). ` +
+          `El pasaporte de ${p.nombreCompleto} vence el ${fechaCorta(fechaFinal)} ` +
+          `y tiene que vencer después del fin del recorrido (${fechaCorta(salida.fechaFin)}). ` +
           `La autoridad rechazará el permiso.`
         );
       }
