@@ -127,11 +127,19 @@ function ModalOcupacionServicio({
                                 <h3 className="text-sm font-bold text-navegacion">
                                     Disponibles por día
                                 </h3>
-                                <p className="flex flex-wrap gap-3 text-[11px] text-texto-suave">
-                                    <span><span className="font-bold text-texto-suave/50">9</span> sin salidas</span>
-                                    <span><span className="font-bold text-emerald-700">9</span> disponibles</span>
-                                    <span><span className="font-bold text-amber-700">0</span> sin stock</span>
-                                    <span><span className="font-bold text-peligro">-2</span> faltan</span>
+                                {/* Leyenda de colores: sin números, para que no se lea como un total */}
+                                <p className="flex flex-wrap items-center gap-3 text-[11px] text-texto-suave">
+                                    {[
+                                        ["border-borde bg-white", "Sin salidas"],
+                                        ["border-borde bg-fondo/60", "En uso, con disponibles"],
+                                        ["border-amber-300 bg-amber-50", "Sin stock"],
+                                        ["border-peligro/40 bg-rose-50", "Faltan"],
+                                    ].map(([clase, texto]) => (
+                                        <span key={texto} className="inline-flex items-center gap-1.5">
+                                            <span className={`inline-block h-3 w-3 rounded-sm border ${clase}`} aria-hidden="true" />
+                                            {texto}
+                                        </span>
+                                    ))}
                                 </p>
                             </div>
                             {Object.entries(

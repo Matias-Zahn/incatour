@@ -166,6 +166,15 @@ export class ReporteService {
       })),
     }));
 
+    // Lo último que pasó va primero: cada reserva se ordena por su respuesta de hotel más reciente (o su compra),
+    // y sus solicitudes quedan juntas (la original y sus reintentos -R)
+    const ultimaNovedad = new Map<string, number>();
+    for (const s of solicitudes) {
+      const fechas = [s.fechaPedido, ...s.gestiones.map((g) => g.fechaRespuesta)].map((d) => new Date(d).getTime());
+      ultimaNovedad.set(s.nroReserva, Math.max(ultimaNovedad.get(s.nroReserva) ?? 0, ...fechas));
+    }
+    solicitudes.sort((a, b) => ultimaNovedad.get(b.nroReserva)! - ultimaNovedad.get(a.nroReserva)! || a.id - b.id);
+
     const gestiones = solicitudes.flatMap((s) => s.gestiones);
     const aceptadas = gestiones.filter((g) => g.resultado === "Aceptada").length;
     const contar = (estado: string) => solicitudes.filter((s) => s.estado === estado).length;

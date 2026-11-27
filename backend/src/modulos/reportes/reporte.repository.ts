@@ -61,10 +61,15 @@ export class ReporteRepository {
     });
   }
 
-  // Solicitud no guarda su fecha de alta: el período se toma de la reserva que la originó
+  // Solicitud no guarda su fecha de alta: entra por la compra de la reserva o por una respuesta de hotel en el período
   async solicitudesDelPeriodo(f: FiltrosReporteDto) {
     return db.solicitud.findMany({
-      where: { reserva: { fechaRealizacion: rango(f) } },
+      where: {
+        OR: [
+          { reserva: { fechaRealizacion: rango(f) } },
+          { reserva: { solicitudes: { some: { gestiones: { some: { fechaRespuesta: rango(f) } } } } } },
+        ],
+      },
       select: {
         idsolicitud: true,
         nroSolicitud: true,

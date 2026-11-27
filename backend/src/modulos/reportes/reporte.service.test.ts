@@ -101,6 +101,21 @@ describe("ReporteService", () => {
     expect(r.motivosRechazo).toEqual([expect.objectContaining({ nombre: "Sin cupo", cantidad: 1 })]);
   });
 
+  it("solicitudes: un rechazo reciente de una compra vieja va primero, con su reintento al lado", async () => {
+    const sol = (idsolicitud: number, nroSolicitud: string, nroReserva: string, compra: string, respuesta?: string) => ({
+      idsolicitud, nroSolicitud, estado: "PENDIENTE", cantidadPlazas: 2, criterios: null,
+      gestiones: respuesta ? [{ idservicio: 1, resultado: "Rechazada", motivoRechazo: "Sin cupo", fechaRespuesta: new Date(respuesta), servicio: { nombreServicio: "H", proveedor: { razonSocial: "P" } } }] : [],
+      reserva: { nroReserva, fechaRealizacion: new Date(compra), salida: { nroSalida: "SAL", fechaInicio: new Date(), paquete: { nombrePaquete: "Clásico" } } },
+    });
+    repo.solicitudesDelPeriodo.mockResolvedValue([
+      sol(5, "SOL-NUEVA", "RES-NUEVA", "2026-11-20"),
+      sol(1, "SOL-VIEJA", "RES-VIEJA", "2026-09-01", "2026-11-27"),
+      sol(2, "SOL-VIEJA-R", "RES-VIEJA", "2026-09-01"),
+    ]);
+    const r = await new ReporteService().solicitudes(filtros);
+    expect(r.solicitudes.map((s) => s.nroSolicitud)).toEqual(["SOL-VIEJA", "SOL-VIEJA-R", "SOL-NUEVA"]);
+  });
+
   it("calidad: sin datos no inventa promedios", async () => {
     repo.calidadDelPeriodo.mockResolvedValue({ resenias: [], incidentes: [], evaluacionesProveedor: [], evaluacionesPersonal: [] });
     const r = await new ReporteService().calidad(filtros);
