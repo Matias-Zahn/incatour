@@ -160,6 +160,13 @@ export class SalidaService {
     const diasCierreVenta = dto.diasCierreVenta ?? corteDeVenta(paquete.diasCierreVenta, aSolicitud);
     const motivo = motivoFechaInvalida(dto.fechaInicio, { diasDisponibles: null, diasCierreVenta });
     if (motivo) throw CustomError.badRequest(motivo);
+    // El precio se puede subir para cubrir la logística, nunca bajar de la tarifa del paquete
+    const tarifa = p.definicion.tarifa;
+    if (dto.precioPorPasajero != null && tarifa && dto.precioPorPasajero < tarifa.monto) {
+      throw CustomError.badRequest(
+        `El precio por pasajero (USD ${dto.precioPorPasajero}) no puede ser menor a la tarifa del paquete (USD ${tarifa.monto})`
+      );
+    }
 
     // Paso 9: la autoridad va ANTES de la transacción, porque no se puede deshacer con un rollback.
     // Decisión 5: el cupo es por el máximo de pasajeros más el personal elegido (con los extras)
