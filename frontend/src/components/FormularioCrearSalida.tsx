@@ -271,6 +271,9 @@ function FormularioCrearSalida({
     }, [opciones?.paquete.diasCierreVenta, algunHotelASolicitud, esSinHotelFA3]);
 
     const diasCierreVenta = diasCierreVentaManual ?? corteSugerido;
+    // 12.6, igual que el back: la salida no puede nacer con la venta ya cerrada
+    const ultimoDiaVentaIso = valorFechaInicio ? sumarDiasIso(valorFechaInicio, -(diasCierreVenta + 1)) : null;
+    const ventaNaceCerrada = Boolean(ultimoDiaVentaIso && ultimoDiaVentaIso < obtenerFechaHoyIsoLocal());
 
     // Personal y totales (B3, 12.4)
     const guiasSeleccionadosIds = useMemo(() => {
@@ -446,6 +449,12 @@ function FormularioCrearSalida({
                 diasCierreVenta > 30
             ) {
                 setErrorPaso("Los días de cierre de venta deben estar entre 1 y 30.");
+                return;
+            }
+            if (ventaNaceCerrada) {
+                setErrorPaso(
+                    `Con un cierre de ${diasCierreVenta} días la venta ya estaría cerrada. Bajá el cierre o elegí una fecha posterior.`,
+                );
                 return;
             }
             setPasoActual(2);
@@ -638,6 +647,12 @@ function FormularioCrearSalida({
                                     </span>
                                 ) : (
                                     <span className="text-xs font-normal text-texto-suave">
+                                        {/* El calendario nativo usa el idioma del navegador (puede verse mm/dd/aaaa): se repite la fecha elegida */}
+                                        {valorFechaInicio && diaElegidoCodigo ? (
+                                            <strong className="font-semibold text-texto">
+                                                Sale el {NOMBRES_DIA_COMPLETO[diaElegidoCodigo].replace(/os$/, "o")} {formatearFechaUtcCorta(valorFechaInicio)} ·{" "}
+                                            </strong>
+                                        ) : null}
                                         Desde el {formatearFechaUtcCorta(fechaMinima)} · Días habilitados: {diasHabilitados.join(", ")}.
                                     </span>
                                 )}
@@ -882,10 +897,17 @@ function FormularioCrearSalida({
                                         : esSinHotelFA3
                                           ? `Se sugieren ${corteSugerido} días antes porque la salida queda sin hotel asignado.`
                                           : `Valor del paquete: ${opciones.paquete.diasCierreVenta} días antes del inicio.`}
-                                    {valorFechaInicio
-                                        ? ` Último día de venta: ${formatearFechaUtcCorta(sumarDiasIso(valorFechaInicio, -(diasCierreVenta + 1)))}.`
+                                    {ultimoDiaVentaIso && !ventaNaceCerrada
+                                        ? ` Último día de venta: ${formatearFechaUtcCorta(ultimoDiaVentaIso)}.`
                                         : ""}
                                 </p>
+                                {ventaNaceCerrada && ultimoDiaVentaIso ? (
+                                    <p role="alert" className="w-full text-xs font-medium text-peligro">
+                                        Con {diasCierreVenta} días de cierre, la venta habría terminado el{" "}
+                                        {formatearFechaUtcCorta(ultimoDiaVentaIso)}: la salida nacería sin poder venderse.
+                                        Bajá el cierre o elegí una fecha posterior.
+                                    </p>
+                                ) : null}
                             </div>
                         </div>
 
